@@ -31,7 +31,7 @@ import {
   openPanel,
 } from "../utils/windowCommunication";
 import { useWindowPersistence } from "../hooks/useWindowPersistence";
-import { useRepeatQueueEvents } from "../hooks/useRepeatQueueEvents";
+import { useTransmitQueueSync } from "../hooks/useTransmitQueueSync";
 import { useSessionRosterSync } from "../hooks/useSessionRosterSync";
 import { useCaptureListSync } from "../hooks/useCaptureListSync";
 import { useOpenAppsSync } from "../hooks/useOpenAppsSync";
@@ -250,7 +250,7 @@ export default function MainLayout() {
 
   // Mirror repeat-transmit lifecycle (e.g. agent-started repeats) from the WS
   // push channel into the transmit queue, opening the Transmit panel on start.
-  useRepeatQueueEvents();
+  useTransmitQueueSync();
 
   // Adopt backend (incl. agent-created) sessions into the store as known-only.
   useSessionRosterSync();

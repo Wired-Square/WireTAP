@@ -195,8 +195,27 @@ pub struct RepeatTransmitStartParams {
 
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct RepeatTransmitStopParams {
-    /// The `queue_id` returned by `repeat_transmit_start`.
+    /// The row's `queue_id`, from `repeat_transmit_start` or `get_transmit_queue`.
     pub queue_id: String,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum QueueAction {
+    Start,
+    Stop,
+    Remove,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct TransmitQueueActParams {
+    pub action: QueueAction,
+    /// The row to act on, from `get_transmit_queue`.
+    #[serde(default)]
+    pub queue_id: Option<String>,
+    /// The group to start or stop, instead of a row.
+    #[serde(default)]
+    pub group: Option<String>,
 }
 
 /// Bytes to put into a byte capture, as a serial port would have produced them.

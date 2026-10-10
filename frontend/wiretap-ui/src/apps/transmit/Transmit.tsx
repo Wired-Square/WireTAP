@@ -59,15 +59,12 @@ function TransmitInner() {
 
   // Store actions
   const loadProfiles = useTransmitStore((s) => s.loadProfiles);
-  const cleanup = useTransmitStore((s) => s.cleanup);
   const clearError = useTransmitStore((s) => s.clearError);
 
   // Dialog state
   const dialogs = useDialogManager(['ioSessionPicker'] as const);
 
-  // Store actions for stopping repeats
   const stopAllRepeats = useTransmitStore((s) => s.stopAllRepeats);
-  const stopAllGroupRepeats = useTransmitStore((s) => s.stopAllGroupRepeats);
 
   // Error handler for session errors
   const handleError = useCallback((error: string) => {
@@ -75,10 +72,7 @@ function TransmitInner() {
   }, []);
 
   // Callback before starting a watch session - stop all repeats
-  const handleBeforeWatch = useCallback(async () => {
-    await stopAllRepeats();
-    await stopAllGroupRepeats();
-  }, [stopAllRepeats, stopAllGroupRepeats]);
+  const handleBeforeWatch = useCallback(() => stopAllRepeats(), [stopAllRepeats]);
 
   // Use centralized IO session manager
   const manager = useIOSessionManager({
@@ -140,13 +134,6 @@ function TransmitInner() {
     loadProfiles();
   }, [loadProfiles]);
 
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      cleanup();
-    };
-  }, [cleanup]);
-
   // ── Menu session control ──
   useMenuSessionControl({
     panelId: "transmit",
@@ -191,7 +178,7 @@ function TransmitInner() {
   }, [isConnected, effectiveSessionId]);
 
   // Count active repeats in queue
-  const activeRepeats = queue.reduce((n, q) => n + (q.isRepeating ? 1 : 0), 0);
+  const activeRepeats = queue.reduce((n, q) => n + (q.repeating ? 1 : 0), 0);
 
   // Determine interface type from protocol traits
   // Serial protocol = bytes/serial frames, CAN/CANFD protocol = CAN frames

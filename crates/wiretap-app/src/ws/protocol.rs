@@ -87,7 +87,8 @@ wire_enum! {
         ReplayState      = 0x0C,
         TestPatternState = 0x0D,
         OtaEvent         = 0x0E,
-        RepeatEvent      = 0x0F,
+        // The whole Transmit queue as JSON (`TransmitQueue`) after every change.
+        TransmitQueue    = 0x0F,
         Subscribe        = 0x10,
         Unsubscribe      = 0x11,
         SubscribeAck     = 0x12,

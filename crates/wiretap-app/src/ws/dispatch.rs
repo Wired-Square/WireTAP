@@ -8,7 +8,6 @@ use once_cell::sync::Lazy;
 use crate::capture_store::CaptureKind;
 use crate::io::post_session::StreamEndedInfo;
 use crate::io::{FrameMessage, IOState, PlaybackPosition};
-use crate::transmit::{RepeatGroupStartedEvent, RepeatStartedEvent, RepeatStoppedEvent};
 use crate::ws::protocol::{self, MsgType};
 use crate::capture_inventory::FrameInventoryMsg;
 use crate::ws::server::{ws_server, WsServer};
@@ -961,35 +960,9 @@ pub fn send_replay_state(state: &crate::replay::ReplayState) {
     send_json_to_all(MsgType::ReplayState, state);
 }
 
-/// Repeat-transmit lifecycle payload, pushed on the global channel as
-/// kind-discriminated JSON: `started` carries the full queue row, `stopped`
-/// carries the queue id and reason. The frontend decodes the union by `kind`,
-/// mirroring how `OtaEvent` discriminates its union.
-#[derive(serde::Serialize)]
-#[serde(tag = "kind", rename_all = "snake_case")]
-enum RepeatEventPayload<'a> {
-    Started(&'a RepeatStartedEvent),
-    Stopped(&'a RepeatStoppedEvent),
-    GroupStarted(&'a RepeatGroupStartedEvent),
-}
-
-fn send_repeat_event(payload: &RepeatEventPayload<'_>) {
-    send_json_to_all(MsgType::RepeatEvent, payload);
-}
-
-/// Announce a repeat transmit that started outside the Transmit UI (e.g. an MCP
-/// agent) so it appears as a queue row.
-pub fn send_repeat_started(event: &RepeatStartedEvent) {
-    send_repeat_event(&RepeatEventPayload::Started(event));
-}
-
-/// Announce a repeat transmit that stopped (agent stop or permanent error).
-pub fn send_repeat_stopped(event: &RepeatStoppedEvent) {
-    send_repeat_event(&RepeatEventPayload::Stopped(event));
-}
-
-pub fn send_repeat_group_started(event: &RepeatGroupStartedEvent) {
-    send_repeat_event(&RepeatEventPayload::GroupStarted(event));
+/// Push the whole Transmit queue after a change (global, channel 0).
+pub fn send_transmit_queue(queue: &crate::transmit_queue::TransmitQueue) {
+    send_json_to_all(MsgType::TransmitQueue, queue);
 }
 
 #[derive(serde::Serialize)]

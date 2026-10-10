@@ -166,7 +166,7 @@ pub fn now_us() -> u64 {
 
 /// CAN frame for transmission. Also the MCP transmit tools' frame parameters,
 /// flattened, so the flags default when a caller leaves them out.
-#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[cfg_attr(test, derive(ts_rs::TS))]
 pub struct CanTransmitFrame {
     /// CAN frame ID (11-bit standard or 29-bit extended)

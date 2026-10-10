@@ -1996,11 +1996,18 @@ method using a `TransmitPayload` enum. The Transmit app chooses its view from
 protocols → `SerialTransmitView`) and gates the send itself on
 `tx_frames` / `tx_bytes`.
 
-**Repeating transmits share one cadence.** `io_start_repeat_transmit` and the
-serial and group variants in [transmit.rs](../crates/wiretap-app/src/transmit.rs)
-are the same skeleton — fire immediately, then once per interval, stopping on a
-cancel flag and skipping ticks while paused — and that timing triad lives in one
-place, `Cadence` ([io/periodic.rs](../crates/wiretap-app/src/io/periodic.rs)):
+**The Transmit queue is process state.** Its rows (session, frame or serial
+bytes, interval, enabled, group, origin) live in
+[transmit_queue.rs](../crates/wiretap-app/src/transmit_queue.rs), not in a
+webview: every window and the MCP read and edit one queue through the
+`transmit_queue_*` commands, and each change pushes the whole queue as
+`TransmitQueue` (0x0F) on the global channel, so a reload or a second window
+reads it back with `transmit_queue_get`. A repeat — one row or a group's
+enabled CAN rows in queue order — runs as one task that sends each row in turn,
+then waits the interval; a row it sends refuses edits until it stops, and a
+permanent failure stops it and leaves the reason on its rows. The timing triad
+(fire immediately, then once per interval, stopping on a cancel flag) lives in
+`Cadence` ([io/periodic.rs](../crates/wiretap-app/src/io/periodic.rs)):
 callers write `while cadence.next().await.is_some() { … }`. Modbus TCP register
 polling no longer uses it: each source's groups are scheduled by `wiretap-io`'s
 `PollTask` ([io/modbus_tcp/poll.rs](../crates/wiretap-app/src/io/modbus_tcp/poll.rs)).

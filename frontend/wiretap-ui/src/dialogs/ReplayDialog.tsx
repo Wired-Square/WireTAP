@@ -12,8 +12,8 @@ import { helpText, labelSmall } from "../styles";
 import { useTransmitStore } from "../stores/transmitStore";
 import { openPanel } from "../utils/windowCommunication";
 import { useSessionStore } from "../stores/sessionStore";
-import { getCaptureFramesPaginatedById, getCaptureMetadataById } from "../api/capture";
-import { toReplayFrame, type ReplayFrame } from "../api/transmit";
+import { getCaptureMetadataById } from "../api/capture";
+import { replayEstimate, type ReplayEstimate, type ReplaySource } from "../api/transmit";
 import { Button } from "../components/Button";
 import { Input, Select, Checkbox, SecondaryButton, PrimaryButton } from "../components/forms";
 import { Alert } from "../components/Alert";
@@ -25,8 +25,6 @@ export function formatDuration(us: number): string {
   const m = Math.floor(s / 60);
   return `${m}m ${(s % 60).toFixed(1)}s`;
 }
-
-export const replayEstimateUs = (spanUs: number, speed: number) => (speed > 0 ? spanUs / speed : spanUs);
 
 const SPEED_PRESETS = [
   { label: "0.25×", value: 0.25 },
@@ -129,22 +127,27 @@ export default function ReplayDialog({ isOpen, onClose, captureId }: Props) {
 
   const expectedCount = startIdx !== null && endIdx !== null && !rangeError ? endIdx - startIdx + 1 : 0;
 
-  // The range's first and last frames, for the time it spans.
-  const [spanUs, setSpanUs] = useState(0);
+  const source = useMemo<ReplaySource | null>(
+    () =>
+      captureId && startIdx !== null && expectedCount > 0
+        ? { capture_id: captureId, offset: startIdx - 1, count: expectedCount, bus: targetBus === "original" ? null : targetBus }
+        : null,
+    [captureId, startIdx, expectedCount, targetBus]
+  );
+
+  // The span and the time one pass takes on the replay's own schedule.
+  const [estimate, setEstimate] = useState<ReplayEstimate | null>(null);
   useEffect(() => {
-    setSpanUs(0);
-    if (!isOpen || !captureId || expectedCount < 2 || startIdx === null || endIdx === null) return;
+    setEstimate(null);
+    if (!isOpen || !source) return;
     let cancelled = false;
-    void Promise.all([
-      getCaptureFramesPaginatedById(captureId, startIdx - 1, 1),
-      getCaptureFramesPaginatedById(captureId, endIdx - 1, 1),
-    ]).then(([first, last]) => {
-      if (cancelled || !first.frames[0] || !last.frames[0]) return;
-      setSpanUs(last.frames[0].timestamp_us - first.frames[0].timestamp_us);
+    void replayEstimate(source, speed).then((e) => {
+      if (!cancelled) setEstimate(e);
     });
     return () => { cancelled = true; };
-  }, [isOpen, captureId, startIdx, endIdx, expectedCount]);
-  const effectiveSpanUs = replayEstimateUs(spanUs, speed);
+  }, [isOpen, source, speed]);
+  const spanUs = estimate?.span_us ?? 0;
+  const passUs = estimate?.pass_duration_us ?? 0;
 
   const handleSpeedPreset = (v: number) => {
     setSpeed(v);
@@ -159,21 +162,12 @@ export default function ReplayDialog({ isOpen, onClose, captureId }: Props) {
     }
   };
 
-  const applyBusOverride = (frames: ReplayFrame[]): ReplayFrame[] => {
-    if (targetBus === "original") return frames;
-    return frames.map((f) => ({ ...f, frame: { ...f.frame, bus: targetBus } }));
-  };
-
   const handleConfirm = async () => {
-    if (!selectedSessionId || startIdx === null || endIdx === null || rangeError) return;
+    if (!selectedSessionId || !source || rangeError) return;
     const replayId = `replay-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     setIsStarting(true);
     try {
-      if (!captureId) return;
-      const response = await getCaptureFramesPaginatedById(captureId, startIdx - 1, expectedCount);
-      const frames: ReplayFrame[] = response.frames.map(toReplayFrame);
-      if (frames.length === 0) return;
-      await startReplay(selectedSessionId, replayId, applyBusOverride(frames), speed, loop);
+      await startReplay(selectedSessionId, replayId, source, speed, loop);
       useTransmitStore.setState({ activeTab: "replay" });
       openPanel("transmit");
       onClose();
@@ -246,8 +240,8 @@ export default function ReplayDialog({ isOpen, onClose, captureId }: Props) {
                     count: expectedCount,
                     span: spanUs > 0 ? formatDuration(spanUs) : "—",
                   })}
-                  {effectiveSpanUs !== spanUs && effectiveSpanUs > 0 && speed !== 1
-                    ? t("replay.spanAtSpeed", { adjusted: formatDuration(effectiveSpanUs), speed })
+                  {passUs !== spanUs && passUs > 0
+                    ? t("replay.spanAtSpeed", { adjusted: formatDuration(passUs), speed })
                     : ""}
                 </p>
               )}

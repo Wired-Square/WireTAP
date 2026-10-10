@@ -45,6 +45,7 @@ mod serial_terminal;
 mod store_manager;
 mod transmit;
 mod transmit_history;
+mod transmit_queue;
 mod replay;
 mod report;
 mod io_test;
@@ -1386,17 +1387,20 @@ pub fn run() {
             transmit::io_transmit_serial,
             transmit::io_set_framing,
             transmit::get_io_session_capabilities,
-            transmit::io_start_repeat_transmit,
-            transmit::io_stop_repeat_transmit,
-            transmit::io_stop_all_repeats,
-            // IO session serial repeat
-            transmit::io_start_serial_repeat_transmit,
-            // IO session group repeat (multiple frames in one loop)
-            transmit::io_start_repeat_group,
-            transmit::io_stop_repeat_group,
-            transmit::io_stop_all_group_repeats,
+            transmit_queue::transmit_queue_get,
+            transmit_queue::transmit_queue_add,
+            transmit_queue::transmit_queue_edit,
+            transmit_queue::transmit_queue_remove,
+            transmit_queue::transmit_queue_clear,
+            transmit_queue::transmit_queue_start,
+            transmit_queue::transmit_queue_stop,
+            transmit_queue::transmit_group_start,
+            transmit_queue::transmit_group_stop,
+            transmit_queue::transmit_queue_stop_all,
             // Time-accurate frame replay
             replay::io_start_replay,
+            replay::io_restart_replay,
+            replay::replay_estimate,
             replay::io_stop_replay,
             replay::io_stop_all_replays,
             // Direct serial-terminal (Serial app) — desktop only

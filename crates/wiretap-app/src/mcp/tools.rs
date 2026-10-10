@@ -31,7 +31,6 @@ use crate::payload_source::{resolve, Capture, QuerySource};
 
 /// Counter for generating unique replay IDs without a clock/RNG.
 static REPLAY_SEQ: AtomicU64 = AtomicU64::new(1);
-static REPEAT_SEQ: AtomicU64 = AtomicU64::new(1);
 static TEST_PATTERN_SEQ: AtomicU64 = AtomicU64::new(1);
 
 const BRIDGE_TIMEOUT: Duration = Duration::from_secs(15);
@@ -78,8 +77,8 @@ impl WireTapTools {
                  engineering and development. Read tools expose live sessions, captures, \
                  frame data, payload analysis and decoded signals. Permission-gated \
                  control tools open/stop sessions, transmit one-shot or repeating frames \
-                 (a repeat is mirrored into the Transmit queue as an Agent-badged, \
-                 human-controllable row), replay captures, and read/write Modbus. \
+                 (a repeat is an Agent-badged row of the Transmit queue every window \
+                 shows, controllable by the human), replay captures, and read/write Modbus. \
                  attach_source surfaces a session in a source-aware tab (discovery, \
                  decoder, transmit, query, or dashboard) so the human sees what the agent is \
                  working on. Every read tool answers with no window open. The DOM tools \
@@ -641,6 +640,11 @@ impl WireTapTools {
         ok_json(json!({ "available": true, "path": path.to_string_lossy(), "lines": tail }))
     }
 
+    #[tool(description = "Read the Transmit queue every window shows: rows (id, session_id, profile_id, profile_name, payload as a CAN frame or serial bytes with their framing, interval_ms, enabled, group, origin user or agent, repeating, last_error — why its last repeat stopped by itself) and the groups running. repeat_transmit_start adds to this same queue.")]
+    async fn get_transmit_queue(&self) -> Result<CallToolResult, McpError> {
+        ok_json(crate::transmit_queue::snapshot())
+    }
+
     #[tool(description = "Read the session log every window shows in Session Manager: typed entries (id, timestamp_ms, session_id, profile_ids, subscriber_id, app_name, event with a kind such as created, joined, left, state, transition, stream_ended, error, destroyed, device_probe, mcp_connected). The ring keeps the newest 500; pass after_id to read on from an earlier call.")]
     async fn get_session_log(
         &self,
@@ -1056,45 +1060,62 @@ impl WireTapTools {
     }
 
     #[tool(
-        description = "Start a repeating frame transmit through a session at a fixed interval — the same cadence engine that backs the Transmit app's repeat. Returns a queue_id; pass it to repeat_transmit_stop. A frame sent to a serial bus is framed onto that interface, like transmit_frame. interval_ms 250 ≈ 4 Hz.",
+        description = "Start a repeating frame transmit through a session at a fixed interval, as a row of the Transmit queue every window shows (badged Agent, controllable by the human). Returns a queue_id; pass it to repeat_transmit_stop or transmit_queue_act. A frame sent to a serial bus is framed onto that interface, like transmit_frame. interval_ms 250 ≈ 4 Hz.",
         annotations(read_only_hint = false, destructive_hint = true,  idempotent_hint = false)
     )]
     async fn repeat_transmit_start(
         &self,
         Parameters(p): Parameters<RepeatTransmitStartParams>,
     ) -> Result<CallToolResult, McpError> {
-        let queue_id = format!("mcp-repeat-{}", REPEAT_SEQ.fetch_add(1, Ordering::Relaxed));
-        crate::transmit::start_repeat_transmit(
-            &self.app,
-            p.session_id,
-            queue_id.clone(),
-            p.frame,
-            p.interval_ms,
-            "agent",
-        )
-        .await
-        .map_err(err)?;
+        let row = crate::transmit_queue::NewQueueRow {
+            session: crate::transmit_queue::session_row(&self.app, &p.session_id),
+            payload: crate::transmit_queue::QueuePayload::Can { frame: p.frame },
+            interval_ms: p.interval_ms,
+            group: None,
+        };
+        let queue_id = crate::transmit_queue::add_and_start(row, crate::transmit_queue::QueueOrigin::Agent)
+            .await
+            .map_err(err)?;
         ok_json(json!({ "queue_id": queue_id, "interval_ms": p.interval_ms }))
     }
 
     #[tool(
-        description = "Stop a repeating transmit started by repeat_transmit_start, by its queue_id.",
+        description = "Stop a repeating row of the Transmit queue by its queue_id. The row stays queued.",
         annotations(read_only_hint = false, destructive_hint = false, idempotent_hint = true)
     )]
     async fn repeat_transmit_stop(
         &self,
         Parameters(p): Parameters<RepeatTransmitStopParams>,
     ) -> Result<CallToolResult, McpError> {
-        crate::transmit::io_stop_repeat_transmit(p.queue_id.clone())
-            .await
-            .map_err(err)?;
-        // Mark the agent's queue row stopped in the Transmit UI (the UI's own
-        // stop path updates state locally, but a backend stop needs this).
-        crate::ws::dispatch::send_repeat_stopped(&crate::transmit::RepeatStoppedEvent {
-            queue_id: p.queue_id.clone(),
-            reason: "Stopped by agent".to_string(),
-        });
+        crate::transmit_queue::stop_row(&p.queue_id);
         ok_json(json!({ "stopped": p.queue_id }))
+    }
+
+    #[tool(
+        description = "Act on the Transmit queue every window shows (read it with get_transmit_queue): start, stop or remove one row by queue_id, or start or stop a group by name. A row that is sending refuses edits until stopped; a group sends its enabled CAN rows in queue order at its first row's interval.",
+        annotations(read_only_hint = false, destructive_hint = true,  idempotent_hint = false)
+    )]
+    async fn transmit_queue_act(
+        &self,
+        Parameters(p): Parameters<TransmitQueueActParams>,
+    ) -> Result<CallToolResult, McpError> {
+        use crate::transmit_queue as queue;
+        match (p.action, p.queue_id.as_deref(), p.group.as_deref()) {
+            (QueueAction::Start, Some(id), None) => queue::start_row(id).await,
+            (QueueAction::Stop, Some(id), None) => {
+                queue::stop_row(id);
+                Ok(())
+            }
+            (QueueAction::Remove, Some(id), None) => queue::remove(id),
+            (QueueAction::Start, None, Some(group)) => queue::start_group(group).await,
+            (QueueAction::Stop, None, Some(group)) => {
+                queue::stop_group(group);
+                Ok(())
+            }
+            _ => Err("give a queue_id, or a group to start or stop".to_string()),
+        }
+        .map_err(err)?;
+        ok_json(queue::snapshot())
     }
 
     #[tool(
@@ -1109,32 +1130,12 @@ impl WireTapTools {
         if total == 0 {
             return Err(err(format!("Capture '{}' is empty or not found", p.capture_id)));
         }
-        let cap = total.min(100_000);
-        let (frames, _idx, _total) =
-            crate::capture_store::get_capture_frames_paginated(&p.capture_id, 0, cap);
-
-        let replay_frames: Vec<crate::replay::ReplayFrame> = frames
-            .iter()
-            .filter(|f| f.protocol == "can" || f.protocol == "canfd")
-            .map(crate::replay::ReplayFrame::from)
-            .collect();
-
-        if replay_frames.is_empty() {
-            return Err(err("Capture contains no CAN frames to replay".to_string()));
-        }
-
         let seq = REPLAY_SEQ.fetch_add(1, Ordering::Relaxed);
         let replay_id = format!("mcp-{}-{}", p.capture_id, seq);
-        let count = replay_frames.len();
-        crate::replay::io_start_replay(
-            p.session_id.clone(),
-            replay_id.clone(),
-            replay_frames,
-            p.speed,
-            p.loop_replay,
-        )
+        let source = crate::replay::ReplaySource { capture_id: p.capture_id, offset: 0, count: total.min(100_000), bus: None };
+        let count = crate::replay::io_start_replay(p.session_id, replay_id.clone(), source, p.speed, p.loop_replay)
         .await
-        .map_err(err)?;
+        .map_err(|e| err(if e == "No frames to replay" { "Capture contains no CAN frames to replay".to_string() } else { e }))?;
         ok_json(json!({ "replay_id": replay_id, "frame_count": count }))
     }
 

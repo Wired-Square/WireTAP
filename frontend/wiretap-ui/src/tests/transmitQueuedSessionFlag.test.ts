@@ -11,7 +11,7 @@ vi.mock("../api/capture", () => ({ renameCapture: vi.fn(async () => {}) }));
 
 import { useSessionStore, type Session } from "../stores/sessionStore";
 import { useTransmitStore } from "../stores/transmitStore";
-import type { RepeatStartedEvent } from "../api/transmit";
+import type { QueueRow } from "../api/transmit";
 
 const SESSION_ID = "f_slcan-uuid-1";
 const PROFILE_ID = "io_slcan";
@@ -26,70 +26,62 @@ const realtimeSession = {
   capabilities: { traits: { tx_frames: true } },
 } as unknown as Session;
 
-const bulkFrame = { frame_id: 0x100, bytes: [1, 2], bus: 0, is_extended: false, dlc: 2 };
+const row = (id: string, sessionId = SESSION_ID): QueueRow => ({
+  id,
+  session_id: sessionId,
+  profile_id: PROFILE_ID,
+  profile_name: "slcan",
+  payload: { kind: "can", frame: { frame_id: 0x100, data: [1], bus: 0, is_extended: false, is_fd: false, is_brs: false, is_rtr: false } },
+  interval_ms: 1000,
+  enabled: true,
+  group: null,
+  origin: "user",
+  repeating: false,
+  last_error: null,
+});
+
+let revision = 0;
+const pushed = (...rows: QueueRow[]) =>
+  useTransmitStore.getState().applyQueue({ revision: ++revision, rows, active_groups: [] });
 
 beforeEach(() => {
   useSessionStore.setState({ sessions: { [SESSION_ID]: realtimeSession }, activeSessionId: SESSION_ID });
-  useTransmitStore.setState({ queue: [] });
+  useTransmitStore.setState({ queue: [], queueRevision: -1 });
+  revision = 0;
 });
 
 describe("a queued transmit row marks its session", () => {
-  it("queuing a frame marks the realtime session, not an entry keyed by its profile", () => {
-    useTransmitStore.getState().addCanToQueue();
+  it("a pushed row marks the realtime session, not an entry keyed by its profile", () => {
+    pushed(row("tx-1"));
     const { sessions } = useSessionStore.getState();
     expect(Object.keys(sessions)).toEqual([SESSION_ID]);
     expect(sessions[SESSION_ID].hasQueuedMessages).toBe(true);
   });
 
-  it("bulk-added rows and an agent's repeat mark the session they transmit through", () => {
-    useTransmitStore.getState().addCanFramesBulk([bulkFrame], realtimeSession);
-    expect(useSessionStore.getState().sessions[SESSION_ID].hasQueuedMessages).toBe(true);
-
-    useSessionStore.getState().setHasQueuedMessages(SESSION_ID, false);
-    useTransmitStore.getState().addExternalRepeat({
-      queue_id: "agent-1",
-      session_id: SESSION_ID,
-      profile_id: PROFILE_ID,
-      profile_name: "slcan",
-      frame_id: 0x200,
-      data: [0],
-      bus: 0,
-      is_extended: false,
-      is_fd: false,
-      interval_ms: 100,
-      origin: "agent",
-    } as RepeatStartedEvent);
-    const { sessions } = useSessionStore.getState();
-    expect(Object.keys(sessions)).toEqual([SESSION_ID]);
-    expect(sessions[SESSION_ID].hasQueuedMessages).toBe(true);
-  });
-
-  it("removing the session's last row clears its mark", () => {
-    useTransmitStore.getState().addCanToQueue();
-    const [row] = useTransmitStore.getState().queue;
-    useTransmitStore.getState().removeFromQueue(row.id);
+  it("a push without the session's last row clears its mark", () => {
+    pushed(row("tx-1"));
+    pushed();
     expect(useSessionStore.getState().sessions[SESSION_ID].hasQueuedMessages).toBe(false);
   });
 
-  it("reassigning an orphaned row moves it, and its mark, to the new session", () => {
-    useTransmitStore.getState().addCanToQueue();
-    const [row] = useTransmitStore.getState().queue;
+  it("a row moved to another session moves the mark with it", () => {
     const next = { ...realtimeSession, id: "f_slcan-uuid-2" } as Session;
-    useSessionStore.setState((s) => ({
-      sessions: {
-        [SESSION_ID]: { ...s.sessions[SESSION_ID], lifecycleState: "disconnected" },
-        [next.id]: next,
-      },
-    }));
-    useTransmitStore.getState().updateQueueItemSession(row.id, next);
+    useSessionStore.setState((s) => ({ sessions: { ...s.sessions, [next.id]: next } }));
+    pushed(row("tx-1"));
+    pushed(row("tx-1", next.id));
     const { sessions } = useSessionStore.getState();
-    expect(useTransmitStore.getState().queue[0].sessionId).toBe(next.id);
     expect(sessions[next.id].hasQueuedMessages).toBe(true);
     expect(sessions[SESSION_ID].hasQueuedMessages).toBe(false);
   });
 
+  it("an older push than the one held is ignored", () => {
+    pushed(row("tx-1"), row("tx-2"));
+    useTransmitStore.getState().applyQueue({ revision: 1, rows: [], active_groups: [] });
+    expect(useTransmitStore.getState().queue.map((q) => q.id)).toEqual(["tx-1", "tx-2"]);
+  });
+
   it("a session's capture can be renamed after a row is queued", async () => {
-    useTransmitStore.getState().addCanToQueue();
+    pushed(row("tx-1"));
     await useSessionStore.getState().renameSessionCapture("cap-1", "new");
     expect(useSessionStore.getState().sessions[SESSION_ID].capture.name).toBe("new");
   });

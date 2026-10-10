@@ -305,7 +305,7 @@ io_transmit_can_frame / io_transmit_serial
   └─ transmit_history::write_entry() → SQLite
      └─ app.emit("transmit-history-updated") → frontend refetches count
 
-io_start_repeat_transmit / io_start_serial_repeat_transmit / io_start_repeat_group
+transmit_queue_start / transmit_group_start (transmit_queue.rs)
   └─ transmit_history::write_entry() per frame (rate-limited emit every 250 ms)
 
 io_start_replay (replay.rs)

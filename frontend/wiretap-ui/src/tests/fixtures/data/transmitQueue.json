@@ -6,59 +6,66 @@
         "activeSessionId": null
       },
       "expected": {
-        "queue": [],
-        "activeGroups": [],
         "error": "No IO session connected. Use 'Data Source' to connect.",
-        "replayCache": {},
+        "invoked": [],
+        "queue": [],
+        "queueRevision": -1,
+        "activeGroups": [],
         "queuedMarks": {
           "a": false,
           "b": false
-        },
-        "invoked": []
+        }
       }
     },
     {
       "name": "addCanToQueue from the default editor",
       "input": "defaults",
       "expected": {
-        "queue": [
+        "error": null,
+        "invoked": [
           {
-            "id": "#0",
-            "profileId": "profile_a",
-            "profileName": "name_a",
-            "type": "can",
-            "canFrame": {
-              "frame_id": 291,
-              "data": [
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0
-              ],
-              "bus": 0,
-              "is_extended": false,
-              "is_fd": false,
-              "is_brs": false,
-              "is_rtr": false
-            },
-            "repeatIntervalMs": 1000,
-            "isRepeating": false,
-            "enabled": true,
-            "sessionId": "a"
+            "cmd": "transmit_queue_add",
+            "args": {
+              "rows": [
+                {
+                  "session_id": "a",
+                  "profile_id": "profile_a",
+                  "profile_name": "name_a",
+                  "payload": {
+                    "kind": "can",
+                    "frame": {
+                      "frame_id": 291,
+                      "data": [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                      ],
+                      "bus": 0,
+                      "is_extended": false,
+                      "is_fd": false,
+                      "is_brs": false,
+                      "is_rtr": false
+                    }
+                  },
+                  "interval_ms": 1000,
+                  "group": null
+                }
+              ]
+            }
           }
         ],
+        "queue": [],
+        "queueRevision": -1,
         "activeGroups": [],
-        "error": null,
-        "replayCache": {},
         "queuedMarks": {
-          "a": true,
+          "a": false,
           "b": false
-        },
-        "invoked": []
+        }
       }
     },
     {
@@ -67,15 +74,15 @@
         "frameId": "800"
       },
       "expected": {
-        "queue": [],
-        "activeGroups": [],
         "error": null,
-        "replayCache": {},
+        "invoked": [],
+        "queue": [],
+        "queueRevision": -1,
+        "activeGroups": [],
         "queuedMarks": {
           "a": false,
           "b": false
-        },
-        "invoked": []
+        }
       }
     },
     {
@@ -111,1064 +118,19 @@
         "group": ""
       },
       "expected": {
-        "queue": [
-          {
-            "id": "#0",
-            "profileId": "profile_b",
-            "profileName": "name_b",
-            "sessionId": "b",
-            "type": "can",
-            "canFrame": {
-              "frame_id": 256,
-              "data": [
-                1,
-                2
-              ],
-              "bus": 0,
-              "is_extended": false,
-              "is_fd": false,
-              "is_brs": false,
-              "is_rtr": false
-            },
-            "repeatIntervalMs": 1000,
-            "isRepeating": false,
-            "enabled": true
-          },
-          {
-            "id": "#1",
-            "profileId": "profile_b",
-            "profileName": "name_b",
-            "sessionId": "b",
-            "type": "can",
-            "canFrame": {
-              "frame_id": 512,
-              "data": [
-                0,
-                0,
-                0
-              ],
-              "bus": 0,
-              "is_extended": false,
-              "is_fd": false,
-              "is_brs": false,
-              "is_rtr": true
-            },
-            "repeatIntervalMs": 1000,
-            "isRepeating": false,
-            "enabled": true
-          }
-        ],
-        "activeGroups": [],
         "error": null,
-        "replayCache": {},
-        "queuedMarks": {
-          "a": false,
-          "b": true
-        },
-        "invoked": []
-      }
-    },
-    {
-      "name": "addCanFramesBulk with an interval and group",
-      "input": {
-        "intervalMs": 50,
-        "group": "g1"
-      },
-      "expected": {
-        "queue": [
-          {
-            "id": "#0",
-            "profileId": "profile_a",
-            "profileName": "name_a",
-            "sessionId": "a",
-            "type": "can",
-            "canFrame": {
-              "frame_id": 256,
-              "data": [
-                1,
-                2
-              ],
-              "bus": 0,
-              "is_extended": false,
-              "is_fd": false,
-              "is_brs": false,
-              "is_rtr": false
-            },
-            "repeatIntervalMs": 50,
-            "isRepeating": false,
-            "enabled": true,
-            "groupName": "g1"
-          }
-        ],
-        "activeGroups": [],
-        "error": null,
-        "replayCache": {},
-        "queuedMarks": {
-          "a": true,
-          "b": false
-        },
-        "invoked": []
-      }
-    },
-    {
-      "name": "addSerialToQueue with no bytes adds nothing",
-      "input": {
-        "hexInput": "zz"
-      },
-      "expected": {
-        "queue": [],
-        "activeGroups": [],
-        "error": null,
-        "replayCache": {},
-        "queuedMarks": {
-          "a": false,
-          "b": false
-        },
-        "invoked": []
-      }
-    },
-    {
-      "name": "addSerialToQueue raw framing",
-      "input": {
-        "hexInput": "AA BB C"
-      },
-      "expected": {
-        "queue": [
-          {
-            "id": "#0",
-            "profileId": "profile_a",
-            "profileName": "name_a",
-            "type": "serial",
-            "serialBytes": [
-              170,
-              187,
-              12
-            ],
-            "serialFraming": {
-              "mode": "raw"
-            },
-            "repeatIntervalMs": 1000,
-            "isRepeating": false,
-            "enabled": true,
-            "sessionId": "a"
-          }
-        ],
-        "activeGroups": [],
-        "error": null,
-        "replayCache": {},
-        "queuedMarks": {
-          "a": true,
-          "b": false
-        },
-        "invoked": []
-      }
-    },
-    {
-      "name": "addSerialToQueue delimiter framing keeps the editor's delimiter",
-      "input": {
-        "hexInput": "01",
-        "framingMode": "delimiter"
-      },
-      "expected": {
-        "queue": [
-          {
-            "id": "#0",
-            "profileId": "profile_a",
-            "profileName": "name_a",
-            "type": "serial",
-            "serialBytes": [
-              1
-            ],
-            "serialFraming": {
-              "mode": "delimiter",
-              "delimiter": [
-                13,
-                10
-              ]
-            },
-            "repeatIntervalMs": 1000,
-            "isRepeating": false,
-            "enabled": true,
-            "sessionId": "a"
-          }
-        ],
-        "activeGroups": [],
-        "error": null,
-        "replayCache": {},
-        "queuedMarks": {
-          "a": true,
-          "b": false
-        },
-        "invoked": []
-      }
-    },
-    {
-      "name": "toggleQueueEnabled on a repeating row stops it and clears repeating",
-      "input": "row 0 repeating",
-      "expected": {
-        "queue": [
-          {
-            "id": "#0",
-            "profileId": "profile_a",
-            "profileName": "name_a",
-            "sessionId": "a",
-            "type": "can",
-            "canFrame": {
-              "frame_id": 256,
-              "data": [
-                1,
-                2
-              ],
-              "bus": 0,
-              "is_extended": false,
-              "is_fd": false,
-              "is_brs": false,
-              "is_rtr": false
-            },
-            "repeatIntervalMs": 1000,
-            "isRepeating": false,
-            "enabled": false
-          }
-        ],
-        "activeGroups": [],
-        "error": null,
-        "replayCache": {},
-        "queuedMarks": {
-          "a": true,
-          "b": false
-        },
         "invoked": [
           {
-            "cmd": "io_stop_repeat_transmit",
+            "cmd": "transmit_queue_add",
             "args": {
-              "queueId": "#0"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "toggleQueueEnabled twice re-enables a row without restarting it",
-      "input": "row 0 repeating",
-      "expected": {
-        "queue": [
-          {
-            "id": "#0",
-            "profileId": "profile_a",
-            "profileName": "name_a",
-            "sessionId": "a",
-            "type": "can",
-            "canFrame": {
-              "frame_id": 256,
-              "data": [
-                1,
-                2
-              ],
-              "bus": 0,
-              "is_extended": false,
-              "is_fd": false,
-              "is_brs": false,
-              "is_rtr": false
-            },
-            "repeatIntervalMs": 1000,
-            "isRepeating": false,
-            "enabled": true
-          }
-        ],
-        "activeGroups": [],
-        "error": null,
-        "replayCache": {},
-        "queuedMarks": {
-          "a": true,
-          "b": false
-        },
-        "invoked": [
-          {
-            "cmd": "io_stop_repeat_transmit",
-            "args": {
-              "queueId": "#0"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "updateQueueInterval takes any number while repeating, with no backend call",
-      "input": {
-        "intervalMs": -5
-      },
-      "expected": {
-        "queue": [
-          {
-            "id": "#0",
-            "profileId": "profile_a",
-            "profileName": "name_a",
-            "sessionId": "a",
-            "type": "can",
-            "canFrame": {
-              "frame_id": 256,
-              "data": [
-                1,
-                2
-              ],
-              "bus": 0,
-              "is_extended": false,
-              "is_fd": false,
-              "is_brs": false,
-              "is_rtr": false
-            },
-            "repeatIntervalMs": -5,
-            "isRepeating": true,
-            "enabled": true
-          }
-        ],
-        "activeGroups": [],
-        "error": null,
-        "replayCache": {},
-        "queuedMarks": {
-          "a": true,
-          "b": false
-        },
-        "invoked": []
-      }
-    },
-    {
-      "name": "updateQueueItemBus applies to CAN rows only",
-      "input": {
-        "bus": 3
-      },
-      "expected": {
-        "queue": [
-          {
-            "id": "#0",
-            "profileId": "profile_a",
-            "profileName": "name_a",
-            "sessionId": "a",
-            "type": "can",
-            "canFrame": {
-              "frame_id": 256,
-              "data": [
-                1,
-                2
-              ],
-              "bus": 3,
-              "is_extended": false,
-              "is_fd": false,
-              "is_brs": false,
-              "is_rtr": false
-            },
-            "repeatIntervalMs": 1000,
-            "isRepeating": false,
-            "enabled": true
-          },
-          {
-            "id": "#1",
-            "profileId": "profile_a",
-            "profileName": "name_a",
-            "type": "serial",
-            "serialBytes": [
-              1
-            ],
-            "serialFraming": {
-              "mode": "raw"
-            },
-            "repeatIntervalMs": 1000,
-            "isRepeating": false,
-            "enabled": true,
-            "sessionId": "a"
-          }
-        ],
-        "activeGroups": [],
-        "error": null,
-        "replayCache": {},
-        "queuedMarks": {
-          "a": true,
-          "b": false
-        },
-        "invoked": []
-      }
-    },
-    {
-      "name": "updateQueueItemSession moves a row and re-marks both sessions",
-      "input": {
-        "from": "a",
-        "to": "b"
-      },
-      "expected": {
-        "queue": [
-          {
-            "id": "#0",
-            "profileId": "profile_b",
-            "profileName": "name_b",
-            "sessionId": "b",
-            "type": "can",
-            "canFrame": {
-              "frame_id": 256,
-              "data": [
-                1,
-                2
-              ],
-              "bus": 0,
-              "is_extended": false,
-              "is_fd": false,
-              "is_brs": false,
-              "is_rtr": false
-            },
-            "repeatIntervalMs": 1000,
-            "isRepeating": false,
-            "enabled": true
-          }
-        ],
-        "activeGroups": [],
-        "error": null,
-        "replayCache": {},
-        "queuedMarks": {
-          "a": false,
-          "b": true
-        },
-        "invoked": []
-      }
-    },
-    {
-      "name": "removeFromQueue of a repeating row stops it and unmarks an emptied session",
-      "input": "row 0 repeating",
-      "expected": {
-        "queue": [],
-        "activeGroups": [],
-        "error": null,
-        "replayCache": {},
-        "queuedMarks": {
-          "a": false,
-          "b": false
-        },
-        "invoked": [
-          {
-            "cmd": "io_stop_repeat_transmit",
-            "args": {
-              "queueId": "#0"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "clearQueue stops each repeating row one by one",
-      "input": "rows 0 and 2 repeating",
-      "expected": {
-        "queue": [],
-        "activeGroups": [],
-        "error": null,
-        "replayCache": {},
-        "queuedMarks": {
-          "a": false,
-          "b": false
-        },
-        "invoked": [
-          {
-            "cmd": "io_stop_repeat_transmit",
-            "args": {
-              "queueId": "#0"
-            }
-          },
-          {
-            "cmd": "io_stop_repeat_transmit",
-            "args": {
-              "queueId": "#1"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "setItemGroup blank is none; getGroupNames sorted and unique",
-      "input": {
-        "groups": [
-          "b",
-          "a",
-          "b",
-          ""
-        ]
-      },
-      "expected": {
-        "queue": [
-          {
-            "id": "#0",
-            "profileId": "profile_a",
-            "profileName": "name_a",
-            "sessionId": "a",
-            "type": "can",
-            "canFrame": {
-              "frame_id": 256,
-              "data": [
-                1,
-                2
-              ],
-              "bus": 0,
-              "is_extended": false,
-              "is_fd": false,
-              "is_brs": false,
-              "is_rtr": false
-            },
-            "repeatIntervalMs": 1000,
-            "isRepeating": false,
-            "enabled": true,
-            "groupName": "b"
-          },
-          {
-            "id": "#1",
-            "profileId": "profile_a",
-            "profileName": "name_a",
-            "sessionId": "a",
-            "type": "can",
-            "canFrame": {
-              "frame_id": 256,
-              "data": [
-                1,
-                2
-              ],
-              "bus": 0,
-              "is_extended": false,
-              "is_fd": false,
-              "is_brs": false,
-              "is_rtr": false
-            },
-            "repeatIntervalMs": 1000,
-            "isRepeating": false,
-            "enabled": true,
-            "groupName": "a"
-          },
-          {
-            "id": "#2",
-            "profileId": "profile_a",
-            "profileName": "name_a",
-            "sessionId": "a",
-            "type": "can",
-            "canFrame": {
-              "frame_id": 256,
-              "data": [
-                1,
-                2
-              ],
-              "bus": 0,
-              "is_extended": false,
-              "is_fd": false,
-              "is_brs": false,
-              "is_rtr": false
-            },
-            "repeatIntervalMs": 1000,
-            "isRepeating": false,
-            "enabled": true,
-            "groupName": "b"
-          },
-          {
-            "id": "#3",
-            "profileId": "profile_a",
-            "profileName": "name_a",
-            "sessionId": "a",
-            "type": "can",
-            "canFrame": {
-              "frame_id": 256,
-              "data": [
-                1,
-                2
-              ],
-              "bus": 0,
-              "is_extended": false,
-              "is_fd": false,
-              "is_brs": false,
-              "is_rtr": false
-            },
-            "repeatIntervalMs": 1000,
-            "isRepeating": false,
-            "enabled": true
-          }
-        ],
-        "activeGroups": [],
-        "error": "[\"a\",\"b\"]",
-        "replayCache": {},
-        "queuedMarks": {
-          "a": true,
-          "b": false
-        },
-        "invoked": []
-      }
-    },
-    {
-      "name": "startRepeat CAN sends the row's frame and interval and marks it repeating",
-      "input": "row 0",
-      "expected": {
-        "queue": [
-          {
-            "id": "#0",
-            "profileId": "profile_a",
-            "profileName": "name_a",
-            "sessionId": "a",
-            "type": "can",
-            "canFrame": {
-              "frame_id": 256,
-              "data": [
-                1,
-                2
-              ],
-              "bus": 0,
-              "is_extended": false,
-              "is_fd": false,
-              "is_brs": false,
-              "is_rtr": false
-            },
-            "repeatIntervalMs": 1000,
-            "isRepeating": true,
-            "enabled": true
-          }
-        ],
-        "activeGroups": [],
-        "error": null,
-        "replayCache": {},
-        "queuedMarks": {
-          "a": true,
-          "b": false
-        },
-        "invoked": [
-          {
-            "cmd": "io_start_repeat_transmit",
-            "args": {
-              "sessionId": "a",
-              "queueId": "#0",
-              "frame": {
-                "frame_id": 256,
-                "data": [
-                  1,
-                  2
-                ],
-                "bus": 0,
-                "is_extended": false,
-                "is_fd": false,
-                "is_brs": false,
-                "is_rtr": false
-              },
-              "intervalMs": 1000
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "startRepeat serial falls back to raw framing",
-      "input": {},
-      "expected": {
-        "queue": [
-          {
-            "id": "#0",
-            "profileId": "profile_a",
-            "profileName": "name_a",
-            "type": "serial",
-            "serialBytes": [
-              1,
-              2
-            ],
-            "repeatIntervalMs": 1000,
-            "isRepeating": true,
-            "enabled": true,
-            "sessionId": "a"
-          }
-        ],
-        "activeGroups": [],
-        "error": null,
-        "replayCache": {},
-        "queuedMarks": {
-          "a": true,
-          "b": false
-        },
-        "invoked": [
-          {
-            "cmd": "io_start_serial_repeat_transmit",
-            "args": {
-              "sessionId": "a",
-              "queueId": "#0",
-              "bytes": [
-                1,
-                2
-              ],
-              "framing": {
-                "mode": "raw"
-              },
-              "intervalMs": 1000
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "startRepeat on a disconnected session",
-      "input": {
-        "lifecycleState": "connecting"
-      },
-      "expected": {
-        "queue": [
-          {
-            "id": "#0",
-            "profileId": "profile_a",
-            "profileName": "name_a",
-            "sessionId": "a",
-            "type": "can",
-            "canFrame": {
-              "frame_id": 256,
-              "data": [
-                1,
-                2
-              ],
-              "bus": 0,
-              "is_extended": false,
-              "is_fd": false,
-              "is_brs": false,
-              "is_rtr": false
-            },
-            "repeatIntervalMs": 1000,
-            "isRepeating": false,
-            "enabled": true
-          }
-        ],
-        "activeGroups": [],
-        "error": "Session 'name_a' is not connected. Connect to it first.",
-        "replayCache": {},
-        "queuedMarks": {
-          "a": true
-        },
-        "invoked": []
-      }
-    },
-    {
-      "name": "startRepeat on a disabled row still starts",
-      "input": {
-        "enabled": false
-      },
-      "expected": {
-        "queue": [
-          {
-            "id": "#0",
-            "profileId": "profile_a",
-            "profileName": "name_a",
-            "sessionId": "a",
-            "type": "can",
-            "canFrame": {
-              "frame_id": 256,
-              "data": [
-                1,
-                2
-              ],
-              "bus": 0,
-              "is_extended": false,
-              "is_fd": false,
-              "is_brs": false,
-              "is_rtr": false
-            },
-            "repeatIntervalMs": 1000,
-            "isRepeating": true,
-            "enabled": false
-          }
-        ],
-        "activeGroups": [],
-        "error": null,
-        "replayCache": {},
-        "queuedMarks": {
-          "a": true,
-          "b": false
-        },
-        "invoked": [
-          {
-            "cmd": "io_start_repeat_transmit",
-            "args": {
-              "sessionId": "a",
-              "queueId": "#0",
-              "frame": {
-                "frame_id": 256,
-                "data": [
-                  1,
-                  2
-                ],
-                "bus": 0,
-                "is_extended": false,
-                "is_fd": false,
-                "is_brs": false,
-                "is_rtr": false
-              },
-              "intervalMs": 1000
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "startGroupRepeat: enabled CAN rows in queue order, consecutive same-session rows merged, first row's interval",
-      "input": {
-        "rows": [
-          "g a 10ms",
-          "g b 20ms",
-          "g a 30ms (disabled)",
-          "g a 40ms",
-          "h a"
-        ]
-      },
-      "expected": {
-        "queue": [
-          {
-            "id": "#0",
-            "profileId": "profile_a",
-            "profileName": "name_a",
-            "sessionId": "a",
-            "type": "can",
-            "canFrame": {
-              "frame_id": 1,
-              "data": [
-                1,
-                2
-              ],
-              "bus": 0,
-              "is_extended": false,
-              "is_fd": false,
-              "is_brs": false,
-              "is_rtr": false
-            },
-            "repeatIntervalMs": 10,
-            "isRepeating": false,
-            "enabled": true,
-            "groupName": "g"
-          },
-          {
-            "id": "#1",
-            "profileId": "profile_b",
-            "profileName": "name_b",
-            "sessionId": "b",
-            "type": "can",
-            "canFrame": {
-              "frame_id": 2,
-              "data": [
-                1,
-                2
-              ],
-              "bus": 0,
-              "is_extended": false,
-              "is_fd": false,
-              "is_brs": false,
-              "is_rtr": false
-            },
-            "repeatIntervalMs": 20,
-            "isRepeating": false,
-            "enabled": true,
-            "groupName": "g"
-          },
-          {
-            "id": "#2",
-            "profileId": "profile_a",
-            "profileName": "name_a",
-            "sessionId": "a",
-            "type": "can",
-            "canFrame": {
-              "frame_id": 3,
-              "data": [
-                1,
-                2
-              ],
-              "bus": 0,
-              "is_extended": false,
-              "is_fd": false,
-              "is_brs": false,
-              "is_rtr": false
-            },
-            "repeatIntervalMs": 30,
-            "isRepeating": false,
-            "enabled": false,
-            "groupName": "g"
-          },
-          {
-            "id": "#3",
-            "profileId": "profile_a",
-            "profileName": "name_a",
-            "sessionId": "a",
-            "type": "can",
-            "canFrame": {
-              "frame_id": 4,
-              "data": [
-                1,
-                2
-              ],
-              "bus": 0,
-              "is_extended": false,
-              "is_fd": false,
-              "is_brs": false,
-              "is_rtr": false
-            },
-            "repeatIntervalMs": 40,
-            "isRepeating": false,
-            "enabled": true,
-            "groupName": "g"
-          },
-          {
-            "id": "#4",
-            "profileId": "profile_a",
-            "profileName": "name_a",
-            "sessionId": "a",
-            "type": "can",
-            "canFrame": {
-              "frame_id": 5,
-              "data": [
-                1,
-                2
-              ],
-              "bus": 0,
-              "is_extended": false,
-              "is_fd": false,
-              "is_brs": false,
-              "is_rtr": false
-            },
-            "repeatIntervalMs": 50,
-            "isRepeating": false,
-            "enabled": true,
-            "groupName": "h"
-          }
-        ],
-        "activeGroups": [],
-        "error": null,
-        "replayCache": {},
-        "queuedMarks": {
-          "a": true,
-          "b": true
-        },
-        "invoked": [
-          {
-            "cmd": "io_start_repeat_group",
-            "args": {
-              "groupId": "g",
-              "members": [
-                {
-                  "session_id": "a",
-                  "frames": [
-                    {
-                      "frame_id": 1,
-                      "data": [
-                        1,
-                        2
-                      ],
-                      "bus": 0,
-                      "is_extended": false,
-                      "is_fd": false,
-                      "is_brs": false,
-                      "is_rtr": false
-                    }
-                  ]
-                },
+              "rows": [
                 {
                   "session_id": "b",
-                  "frames": [
-                    {
-                      "frame_id": 2,
-                      "data": [
-                        1,
-                        2
-                      ],
-                      "bus": 0,
-                      "is_extended": false,
-                      "is_fd": false,
-                      "is_brs": false,
-                      "is_rtr": false
-                    }
-                  ]
-                },
-                {
-                  "session_id": "a",
-                  "frames": [
-                    {
-                      "frame_id": 4,
-                      "data": [
-                        1,
-                        2
-                      ],
-                      "bus": 0,
-                      "is_extended": false,
-                      "is_fd": false,
-                      "is_brs": false,
-                      "is_rtr": false
-                    }
-                  ]
-                }
-              ],
-              "intervalMs": 10
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "startGroupRepeat then the backend's group-started event marks enabled CAN rows",
-      "input": "group g, one disabled",
-      "expected": {
-        "queue": [
-          {
-            "id": "#0",
-            "profileId": "profile_a",
-            "profileName": "name_a",
-            "sessionId": "a",
-            "type": "can",
-            "canFrame": {
-              "frame_id": 256,
-              "data": [
-                1,
-                2
-              ],
-              "bus": 0,
-              "is_extended": false,
-              "is_fd": false,
-              "is_brs": false,
-              "is_rtr": false
-            },
-            "repeatIntervalMs": 1000,
-            "isRepeating": true,
-            "enabled": true,
-            "groupName": "g"
-          },
-          {
-            "id": "#1",
-            "profileId": "profile_a",
-            "profileName": "name_a",
-            "sessionId": "a",
-            "type": "can",
-            "canFrame": {
-              "frame_id": 256,
-              "data": [
-                1,
-                2
-              ],
-              "bus": 0,
-              "is_extended": false,
-              "is_fd": false,
-              "is_brs": false,
-              "is_rtr": false
-            },
-            "repeatIntervalMs": 1000,
-            "isRepeating": false,
-            "enabled": false,
-            "groupName": "g"
-          }
-        ],
-        "activeGroups": [
-          "g"
-        ],
-        "error": null,
-        "replayCache": {},
-        "queuedMarks": {
-          "a": true,
-          "b": false
-        },
-        "invoked": [
-          {
-            "cmd": "io_start_repeat_group",
-            "args": {
-              "groupId": "g",
-              "members": [
-                {
-                  "session_id": "a",
-                  "frames": [
-                    {
+                  "profile_id": "profile_b",
+                  "profile_name": "name_b",
+                  "payload": {
+                    "kind": "can",
+                    "frame": {
                       "frame_id": 256,
                       "data": [
                         1,
@@ -1180,567 +142,412 @@
                       "is_brs": false,
                       "is_rtr": false
                     }
-                  ]
+                  },
+                  "interval_ms": 1000,
+                  "group": null
+                },
+                {
+                  "session_id": "b",
+                  "profile_id": "profile_b",
+                  "profile_name": "name_b",
+                  "payload": {
+                    "kind": "can",
+                    "frame": {
+                      "frame_id": 512,
+                      "data": [
+                        0,
+                        0,
+                        0
+                      ],
+                      "bus": 0,
+                      "is_extended": false,
+                      "is_fd": false,
+                      "is_brs": false,
+                      "is_rtr": true
+                    }
+                  },
+                  "interval_ms": 1000,
+                  "group": null
                 }
-              ],
-              "intervalMs": 1000
+              ]
             }
           }
-        ]
+        ],
+        "queue": [],
+        "queueRevision": -1,
+        "activeGroups": [],
+        "queuedMarks": {
+          "a": false,
+          "b": false
+        }
       }
     },
     {
-      "name": "disabling a row of a repeating group stops the row's id, not the group",
-      "input": "group g active",
+      "name": "addCanFramesBulk with an interval and group",
+      "input": {
+        "intervalMs": 50,
+        "group": "g1"
+      },
       "expected": {
-        "queue": [
+        "error": null,
+        "invoked": [
           {
-            "id": "#0",
-            "profileId": "profile_a",
-            "profileName": "name_a",
-            "sessionId": "a",
-            "type": "can",
-            "canFrame": {
-              "frame_id": 256,
-              "data": [
-                1,
-                2
-              ],
-              "bus": 0,
-              "is_extended": false,
-              "is_fd": false,
-              "is_brs": false,
-              "is_rtr": false
-            },
-            "repeatIntervalMs": 1000,
-            "isRepeating": false,
-            "enabled": false,
-            "groupName": "g"
-          },
-          {
-            "id": "#1",
-            "profileId": "profile_a",
-            "profileName": "name_a",
-            "sessionId": "a",
-            "type": "can",
-            "canFrame": {
-              "frame_id": 256,
-              "data": [
-                1,
-                2
-              ],
-              "bus": 0,
-              "is_extended": false,
-              "is_fd": false,
-              "is_brs": false,
-              "is_rtr": false
-            },
-            "repeatIntervalMs": 1000,
-            "isRepeating": true,
-            "enabled": true,
-            "groupName": "g"
+            "cmd": "transmit_queue_add",
+            "args": {
+              "rows": [
+                {
+                  "session_id": "a",
+                  "profile_id": "profile_a",
+                  "profile_name": "name_a",
+                  "payload": {
+                    "kind": "can",
+                    "frame": {
+                      "frame_id": 256,
+                      "data": [
+                        1,
+                        2
+                      ],
+                      "bus": 0,
+                      "is_extended": false,
+                      "is_fd": false,
+                      "is_brs": false,
+                      "is_rtr": false
+                    }
+                  },
+                  "interval_ms": 50,
+                  "group": "g1"
+                }
+              ]
+            }
           }
         ],
+        "queue": [],
+        "queueRevision": -1,
+        "activeGroups": [],
+        "queuedMarks": {
+          "a": false,
+          "b": false
+        }
+      }
+    },
+    {
+      "name": "addSerialToQueue with no bytes adds nothing",
+      "input": {
+        "hexInput": "zz"
+      },
+      "expected": {
+        "error": null,
+        "invoked": [],
+        "queue": [],
+        "queueRevision": -1,
+        "activeGroups": [],
+        "queuedMarks": {
+          "a": false,
+          "b": false
+        }
+      }
+    },
+    {
+      "name": "addSerialToQueue raw framing",
+      "input": {
+        "hexInput": "AA BB C"
+      },
+      "expected": {
+        "error": null,
+        "invoked": [
+          {
+            "cmd": "transmit_queue_add",
+            "args": {
+              "rows": [
+                {
+                  "session_id": "a",
+                  "profile_id": "profile_a",
+                  "profile_name": "name_a",
+                  "payload": {
+                    "kind": "serial",
+                    "bytes": [
+                      170,
+                      187,
+                      12
+                    ],
+                    "framing": {
+                      "mode": "raw"
+                    }
+                  },
+                  "interval_ms": 1000,
+                  "group": null
+                }
+              ]
+            }
+          }
+        ],
+        "queue": [],
+        "queueRevision": -1,
+        "activeGroups": [],
+        "queuedMarks": {
+          "a": false,
+          "b": false
+        }
+      }
+    },
+    {
+      "name": "addSerialToQueue reads separators as hexToBytes does",
+      "input": {
+        "hexInput": "AA-BB,CC"
+      },
+      "expected": {
+        "error": null,
+        "invoked": [
+          {
+            "cmd": "transmit_queue_add",
+            "args": {
+              "rows": [
+                {
+                  "session_id": "a",
+                  "profile_id": "profile_a",
+                  "profile_name": "name_a",
+                  "payload": {
+                    "kind": "serial",
+                    "bytes": [
+                      170,
+                      187,
+                      204
+                    ],
+                    "framing": {
+                      "mode": "raw"
+                    }
+                  },
+                  "interval_ms": 1000,
+                  "group": null
+                }
+              ]
+            }
+          }
+        ],
+        "queue": [],
+        "queueRevision": -1,
+        "activeGroups": [],
+        "queuedMarks": {
+          "a": false,
+          "b": false
+        }
+      }
+    },
+    {
+      "name": "addSerialToQueue delimiter framing keeps the editor's delimiter",
+      "input": {
+        "hexInput": "01",
+        "framingMode": "delimiter"
+      },
+      "expected": {
+        "error": null,
+        "invoked": [
+          {
+            "cmd": "transmit_queue_add",
+            "args": {
+              "rows": [
+                {
+                  "session_id": "a",
+                  "profile_id": "profile_a",
+                  "profile_name": "name_a",
+                  "payload": {
+                    "kind": "serial",
+                    "bytes": [
+                      1
+                    ],
+                    "framing": {
+                      "mode": "delimiter",
+                      "delimiter": [
+                        13,
+                        10
+                      ]
+                    }
+                  },
+                  "interval_ms": 1000,
+                  "group": null
+                }
+              ]
+            }
+          }
+        ],
+        "queue": [],
+        "queueRevision": -1,
+        "activeGroups": [],
+        "queuedMarks": {
+          "a": false,
+          "b": false
+        }
+      }
+    },
+    {
+      "name": "each queue action is one command",
+      "input": "edit, start, stop, group start and stop, stop all, remove, clear",
+      "expected": {
+        "error": null,
+        "invoked": [
+          {
+            "cmd": "transmit_queue_edit",
+            "args": {
+              "id": "tx-1",
+              "edit": {
+                "enabled": false
+              }
+            }
+          },
+          {
+            "cmd": "transmit_queue_start",
+            "args": {
+              "id": "tx-1"
+            }
+          },
+          {
+            "cmd": "transmit_queue_stop",
+            "args": {
+              "id": "tx-1"
+            }
+          },
+          {
+            "cmd": "transmit_group_start",
+            "args": {
+              "group": "g"
+            }
+          },
+          {
+            "cmd": "transmit_group_stop",
+            "args": {
+              "group": "g"
+            }
+          },
+          {
+            "cmd": "transmit_queue_stop_all"
+          },
+          {
+            "cmd": "transmit_queue_remove",
+            "args": {
+              "id": "tx-1"
+            }
+          },
+          {
+            "cmd": "transmit_queue_clear"
+          }
+        ],
+        "queue": [],
+        "queueRevision": -1,
+        "activeGroups": [],
+        "queuedMarks": {
+          "a": false,
+          "b": false
+        }
+      }
+    },
+    {
+      "name": "a command Rust refuses lands in error",
+      "input": "start refused",
+      "expected": {
+        "error": "This row is disabled",
+        "invoked": [
+          {
+            "cmd": "transmit_queue_start",
+            "args": {
+              "id": "tx-1"
+            }
+          }
+        ],
+        "queue": [],
+        "queueRevision": -1,
+        "activeGroups": [],
+        "queuedMarks": {
+          "a": false,
+          "b": false
+        }
+      }
+    },
+    {
+      "name": "a pushed queue replaces the view and marks its sessions; an older one is ignored",
+      "input": "revision 2, then revision 1",
+      "expected": {
+        "error": null,
+        "invoked": [],
+        "queue": [
+          "tx-1",
+          "tx-2"
+        ],
+        "queueRevision": 2,
         "activeGroups": [
           "g"
         ],
-        "error": null,
-        "replayCache": {},
         "queuedMarks": {
           "a": true,
           "b": false
-        },
-        "invoked": [
-          {
-            "cmd": "io_stop_repeat_transmit",
-            "args": {
-              "queueId": "#0"
-            }
-          }
-        ]
+        }
       }
     },
     {
-      "name": "startGroupRepeat with no enabled rows",
-      "input": "group g all disabled",
-      "expected": {
-        "queue": [
-          {
-            "id": "#0",
-            "profileId": "profile_a",
-            "profileName": "name_a",
-            "sessionId": "a",
-            "type": "can",
-            "canFrame": {
-              "frame_id": 256,
-              "data": [
-                1,
-                2
-              ],
-              "bus": 0,
-              "is_extended": false,
-              "is_fd": false,
-              "is_brs": false,
-              "is_rtr": false
-            },
-            "repeatIntervalMs": 1000,
-            "isRepeating": false,
-            "enabled": false,
-            "groupName": "g"
-          }
-        ],
-        "activeGroups": [],
-        "error": "No enabled CAN frames in group 'g'",
-        "replayCache": {},
-        "queuedMarks": {
-          "a": true,
-          "b": false
-        },
-        "invoked": []
-      }
-    },
-    {
-      "name": "startGroupRepeat with one member's session gone",
+      "name": "getGroupNames is the queue's groups, unique and sorted",
       "input": {
-        "sessions": [
-          "a"
+        "groups": [
+          "b",
+          "a",
+          "b",
+          null
         ]
       },
       "expected": {
+        "error": "[\"a\",\"b\"]",
+        "invoked": [],
         "queue": [
-          {
-            "id": "#0",
-            "profileId": "profile_a",
-            "profileName": "name_a",
-            "sessionId": "a",
-            "type": "can",
-            "canFrame": {
-              "frame_id": 256,
-              "data": [
-                1,
-                2
-              ],
-              "bus": 0,
-              "is_extended": false,
-              "is_fd": false,
-              "is_brs": false,
-              "is_rtr": false
-            },
-            "repeatIntervalMs": 1000,
-            "isRepeating": false,
-            "enabled": true,
-            "groupName": "g"
-          },
-          {
-            "id": "#1",
-            "profileId": "profile_gone",
-            "profileName": "name_gone",
-            "sessionId": "gone",
-            "type": "can",
-            "canFrame": {
-              "frame_id": 256,
-              "data": [
-                1,
-                2
-              ],
-              "bus": 0,
-              "is_extended": false,
-              "is_fd": false,
-              "is_brs": false,
-              "is_rtr": false
-            },
-            "repeatIntervalMs": 1000,
-            "isRepeating": false,
-            "enabled": true,
-            "groupName": "g"
-          }
+          "1",
+          "2",
+          "3",
+          "4"
         ],
+        "queueRevision": 1,
         "activeGroups": [],
-        "error": "Session 'name_gone' is not connected. Connect to it first.",
-        "replayCache": {},
         "queuedMarks": {
           "a": true,
           "b": false
-        },
-        "invoked": []
+        }
       }
     },
     {
-      "name": "markRepeatStopped with a group name stops the group; with a row id the row",
-      "input": "group g active, row 2 repeating alone",
-      "expected": {
-        "queue": [
-          {
-            "id": "#0",
-            "profileId": "profile_a",
-            "profileName": "name_a",
-            "sessionId": "a",
-            "type": "can",
-            "canFrame": {
-              "frame_id": 256,
-              "data": [
-                1,
-                2
-              ],
-              "bus": 0,
-              "is_extended": false,
-              "is_fd": false,
-              "is_brs": false,
-              "is_rtr": false
-            },
-            "repeatIntervalMs": 1000,
-            "isRepeating": false,
-            "enabled": true,
-            "groupName": "g"
-          },
-          {
-            "id": "#1",
-            "profileId": "profile_a",
-            "profileName": "name_a",
-            "sessionId": "a",
-            "type": "can",
-            "canFrame": {
-              "frame_id": 256,
-              "data": [
-                1,
-                2
-              ],
-              "bus": 0,
-              "is_extended": false,
-              "is_fd": false,
-              "is_brs": false,
-              "is_rtr": false
-            },
-            "repeatIntervalMs": 1000,
-            "isRepeating": false,
-            "enabled": true,
-            "groupName": "g"
-          },
-          {
-            "id": "#2",
-            "profileId": "profile_a",
-            "profileName": "name_a",
-            "sessionId": "a",
-            "type": "can",
-            "canFrame": {
-              "frame_id": 256,
-              "data": [
-                1,
-                2
-              ],
-              "bus": 0,
-              "is_extended": false,
-              "is_fd": false,
-              "is_brs": false,
-              "is_rtr": false
-            },
-            "repeatIntervalMs": 1000,
-            "isRepeating": false,
-            "enabled": true
-          }
-        ],
-        "activeGroups": [],
-        "error": null,
-        "replayCache": {},
-        "queuedMarks": {
-          "a": true,
-          "b": false
-        },
-        "invoked": []
-      }
-    },
-    {
-      "name": "stopAllRepeats asks the active session only and clears every row",
-      "input": "rows on a and b repeating",
-      "expected": {
-        "queue": [
-          {
-            "id": "#0",
-            "profileId": "profile_a",
-            "profileName": "name_a",
-            "sessionId": "a",
-            "type": "can",
-            "canFrame": {
-              "frame_id": 256,
-              "data": [
-                1,
-                2
-              ],
-              "bus": 0,
-              "is_extended": false,
-              "is_fd": false,
-              "is_brs": false,
-              "is_rtr": false
-            },
-            "repeatIntervalMs": 1000,
-            "isRepeating": false,
-            "enabled": true
-          },
-          {
-            "id": "#1",
-            "profileId": "profile_b",
-            "profileName": "name_b",
-            "sessionId": "b",
-            "type": "can",
-            "canFrame": {
-              "frame_id": 256,
-              "data": [
-                1,
-                2
-              ],
-              "bus": 0,
-              "is_extended": false,
-              "is_fd": false,
-              "is_brs": false,
-              "is_rtr": false
-            },
-            "repeatIntervalMs": 1000,
-            "isRepeating": false,
-            "enabled": true
-          }
-        ],
-        "activeGroups": [],
-        "error": null,
-        "replayCache": {},
-        "queuedMarks": {
-          "a": true,
-          "b": true
-        },
-        "invoked": [
-          {
-            "cmd": "io_stop_all_repeats",
-            "args": {
-              "sessionId": "a"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "stopAllGroupRepeats clears grouped rows only",
-      "input": "group g active, ungrouped row repeating",
-      "expected": {
-        "queue": [
-          {
-            "id": "#0",
-            "profileId": "profile_a",
-            "profileName": "name_a",
-            "sessionId": "a",
-            "type": "can",
-            "canFrame": {
-              "frame_id": 256,
-              "data": [
-                1,
-                2
-              ],
-              "bus": 0,
-              "is_extended": false,
-              "is_fd": false,
-              "is_brs": false,
-              "is_rtr": false
-            },
-            "repeatIntervalMs": 1000,
-            "isRepeating": false,
-            "enabled": true,
-            "groupName": "g"
-          },
-          {
-            "id": "#1",
-            "profileId": "profile_a",
-            "profileName": "name_a",
-            "sessionId": "a",
-            "type": "can",
-            "canFrame": {
-              "frame_id": 256,
-              "data": [
-                1,
-                2
-              ],
-              "bus": 0,
-              "is_extended": false,
-              "is_fd": false,
-              "is_brs": false,
-              "is_rtr": false
-            },
-            "repeatIntervalMs": 1000,
-            "isRepeating": true,
-            "enabled": true
-          }
-        ],
-        "activeGroups": [],
-        "error": null,
-        "replayCache": {},
-        "queuedMarks": {
-          "a": true,
-          "b": false
-        },
-        "invoked": [
-          {
-            "cmd": "io_stop_all_group_repeats"
-          }
-        ]
-      }
-    },
-    {
-      "name": "addExternalRepeat adds an agent row, then updates it in place",
-      "input": {
-        "queue_id": "agent-1",
-        "origin": "agent"
-      },
-      "expected": {
-        "queue": [
-          {
-            "id": "#0",
-            "profileId": "p",
-            "profileName": "n",
-            "type": "can",
-            "canFrame": {
-              "frame_id": 16,
-              "data": [
-                1
-              ],
-              "bus": 0,
-              "is_extended": false,
-              "is_fd": false,
-              "is_brs": false,
-              "is_rtr": false
-            },
-            "repeatIntervalMs": 200,
-            "isRepeating": true,
-            "enabled": true,
-            "origin": "agent",
-            "sessionId": "b",
-            "groupName": "kept"
-          }
-        ],
-        "activeGroups": [],
-        "error": null,
-        "replayCache": {},
-        "queuedMarks": {
-          "a": true,
-          "b": true
-        },
-        "invoked": []
-      }
-    },
-    {
-      "name": "startReplay caches the replay; a stop or finish never drops it; restart reuses it",
+      "name": "a replay starts from a capture range and restarts by its id",
       "input": {
         "replayId": "r1",
         "speed": 2,
         "loop": true
       },
       "expected": {
-        "queue": [],
-        "activeGroups": [],
         "error": null,
-        "replayCache": {
-          "r1": {
-            "sessionId": "a",
-            "frames": [
-              {
-                "timestamp_us": 0,
-                "frame": {
-                  "frame_id": 1,
-                  "data": [
-                    1
-                  ],
-                  "bus": 0,
-                  "is_extended": false,
-                  "is_fd": false,
-                  "is_brs": false,
-                  "is_rtr": false
-                }
-              }
-            ],
-            "speed": 2,
-            "loop": true
-          }
-        },
-        "queuedMarks": {
-          "a": false,
-          "b": false
-        },
         "invoked": [
           {
             "cmd": "io_start_replay",
             "args": {
               "sessionId": "a",
               "replayId": "r1",
-              "frames": [
-                {
-                  "timestamp_us": 0,
-                  "frame": {
-                    "frame_id": 1,
-                    "data": [
-                      1
-                    ],
-                    "bus": 0,
-                    "is_extended": false,
-                    "is_fd": false,
-                    "is_brs": false,
-                    "is_rtr": false
-                  }
-                }
-              ],
+              "source": {
+                "capture_id": "c",
+                "offset": 4,
+                "count": 10,
+                "bus": 1
+              },
               "speed": 2,
               "loopReplay": true
             }
           },
           {
-            "cmd": "io_start_replay",
+            "cmd": "io_restart_replay",
             "args": {
-              "sessionId": "a",
-              "replayId": "r1",
-              "frames": [
-                {
-                  "timestamp_us": 0,
-                  "frame": {
-                    "frame_id": 1,
-                    "data": [
-                      1
-                    ],
-                    "bus": 0,
-                    "is_extended": false,
-                    "is_fd": false,
-                    "is_brs": false,
-                    "is_rtr": false
-                  }
-                }
-              ],
-              "speed": 2,
-              "loopReplay": true
+              "replayId": "r1"
             }
           }
-        ]
-      }
-    },
-    {
-      "name": "startReplay that the backend refuses is not cached",
-      "input": {
-        "replayId": "r2"
-      },
-      "expected": {
+        ],
         "queue": [],
+        "queueRevision": -1,
         "activeGroups": [],
-        "error": "Error: no session",
-        "replayCache": {},
         "queuedMarks": {
           "a": false,
           "b": false
-        },
-        "invoked": [
-          {
-            "cmd": "io_start_replay",
-            "args": {
-              "sessionId": "a",
-              "replayId": "r2",
-              "frames": [],
-              "speed": 1,
-              "loopReplay": false
-            }
-          }
-        ]
+        }
       }
     }
   ]
