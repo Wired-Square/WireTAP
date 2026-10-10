@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { useSettings } from "../../hooks/useSettings";
 import { useAllIOProfiles } from "../../hooks/useAllIOProfiles";
 import { withFrameIdFormat } from "../../hooks/useFrameIdFormat";
-import { useDashboardStore, type SignalValueEntry } from "../../stores/dashboardStore";
+import { useDashboardStore, signalKey } from "../../stores/dashboardStore";
 import { useIOSessionManager } from "../../hooks/useIOSessionManager";
 import { useMenuSessionControl } from "../../hooks/useMenuSessionControl";
 import { useSessionCatalog } from "../../hooks/useSessionCatalog";
@@ -32,7 +32,8 @@ import HypothesisExplorerDialog from "./dialogs/HypothesisExplorerDialog";
 import DecoderConflictDialog, { type DecoderConflictOption } from "../../dialogs/DecoderConflictDialog";
 import { useDialogManager } from "../../hooks/useDialogManager";
 import type { AdhocSignalsMsg, DecodedSignalsEntry } from "../../services/wsProtocol";
-import { clearAdhocSignals, resetAdhocToggles, setAdhocSignals } from "../../api/adhoc";
+import { clearAdhocSignals, setAdhocSignals } from "../../api/adhoc";
+import { clearHistory } from "../../api/dashboardHistory";
 import { adhocWatch } from "./utils/adhocWatch";
 import { wsTransport } from "../../services/wsTransport";
 
@@ -75,10 +76,8 @@ function DashboardInner() {
   const loadCatalog = useDashboardStore((s) => s.loadCatalog);
   const loadCatalogForSession = useDashboardStore((s) => s.loadCatalogForSession);
   const setCatalogPath = useDashboardStore((s) => s.setCatalogPath);
-  const pushSignalValues = useDashboardStore((s) => s.pushSignalValues);
   const clearData = useDashboardStore((s) => s.clearData);
   const setPlaybackSpeed = useDashboardStore((s) => s.setPlaybackSpeed);
-  const setBufferCapacity = useDashboardStore((s) => s.setBufferCapacity);
 
   // Layout persistence
   const savedLayouts = useDashboardStore((s) => s.savedLayouts);
@@ -136,28 +135,22 @@ function DashboardInner() {
     setRawViewMode(!rawViewMode);
   }, [rawViewMode, rawViewContent, catalogPath, loadLayout]);
 
-  // ── Frame batching ──
+  // ── Delivery batching ──
+  // Rust holds each signal's history and the panels read it; what arrives here is
+  // only each signal's newest value, for the instruments, and the cue to re-read.
   const autoImportRef = useRef(false);
-  const pendingValuesRef = useRef<SignalValueEntry[]>([]);
+  const pendingLatestRef = useRef(new Map<string, number>());
   const flushScheduledRef = useRef(false);
-  const pushSignalValuesRef = useRef(pushSignalValues);
-  // UI_UPDATE_INTERVAL_MS imported from constants
-
-  useEffect(() => {
-    pushSignalValuesRef.current = pushSignalValues;
-  }, [pushSignalValues]);
 
   const flushPendingValues = useCallback(() => {
     flushScheduledRef.current = false;
-    const values = pendingValuesRef.current;
-    if (values.length === 0) return;
-    pendingValuesRef.current = [];
-    pushSignalValuesRef.current(values);
+    const values = pendingLatestRef.current;
+    pendingLatestRef.current = new Map();
+    useDashboardStore.getState().setLatest(values);
   }, []);
 
-  // Schedule a flush of buffered values if one isn't already pending.
   const scheduleFlush = useCallback(() => {
-    if (!flushScheduledRef.current && pendingValuesRef.current.length > 0) {
+    if (!flushScheduledRef.current && pendingLatestRef.current.size > 0) {
       flushScheduledRef.current = true;
       setTimeout(flushPendingValues, UI_UPDATE_INTERVAL_MS);
     }
@@ -167,42 +160,29 @@ function DashboardInner() {
   const handleAdhocSignals = useCallback((msg: AdhocSignalsMsg) => {
     const store = useDashboardStore.getState();
     for (const id of msg.frameIds) store.recordFrameId(id);
-    for (const v of msg.values) {
-      pendingValuesRef.current.push({ frameId: v.frameId, signalName: v.name, value: v.value, timestamp: v.t / 1_000_000 });
-    }
+    for (const v of msg.values) pendingLatestRef.current.set(signalKey(v.frameId, v.name), v.value);
     store.setBitToggles(msg.toggles);
     scheduleFlush();
   }, [scheduleFlush]);
 
-  // Catalog-decoded signals from the Rust decoder (DecodedSignals stream). The
-  // stream already flattens mux-case signals into `signals`, so there's no
-  // separate mux handling here. Replaces the former TS catalog decode.
-  const handleDecoded = useCallback((decoded: DecodedSignalsEntry[], backlog: boolean) => {
+  // Catalogue-decoded signals; a backlog is the history Rust has just rebuilt.
+  const handleDecoded = useCallback((decoded: DecodedSignalsEntry[]) => {
     const store = useDashboardStore.getState();
     for (const msg of decoded) {
       if ("kind" in msg) continue;
-      const timestamp = msg.t / 1_000_000;
       store.recordFrameId(msg.maskedFrameId);
       for (const s of msg.signals) {
-        if (s.scaled !== null) {
-          pendingValuesRef.current.push({
-            frameId: msg.maskedFrameId,
-            signalName: s.name,
-            value: s.scaled,
-            timestamp,
-            replace: backlog,
-          });
-        }
+        if (s.scaled !== null) pendingLatestRef.current.set(signalKey(msg.maskedFrameId, s.name), s.scaled);
       }
     }
     scheduleFlush();
   }, [scheduleFlush]);
 
-  // Heatmap counts live in Rust, so a clear resets them there too.
+  // The history and heatmap counts are the session's, so a clear reaches every window on it.
   const sessionIdRef = useRef<string | null>(null);
   const clearAll = useCallback(() => {
     clearData();
-    if (sessionIdRef.current) resetAdhocToggles(sessionIdRef.current).catch(() => {});
+    if (sessionIdRef.current) clearHistory(sessionIdRef.current).catch(() => {});
   }, [clearData]);
 
   const handleError = useCallback((error: string) => {
@@ -249,7 +229,10 @@ function DashboardInner() {
   } = manager;
 
   const { sessionId, state: readerState } = session;
-  useEffect(() => { sessionIdRef.current = sessionId; }, [sessionId]);
+  useEffect(() => {
+    sessionIdRef.current = sessionId;
+    useDashboardStore.getState().setSessionId(sessionId);
+  }, [sessionId]);
 
   // What the panels chart, registered with Rust for this window and session.
   const panels = useDashboardStore((s) => s.panels);
@@ -371,11 +354,8 @@ function DashboardInner() {
 
   // ── Initialise from settings ──
   useEffect(() => {
-    if (settings) {
-      initFromSettings(settings.decoder_dir);
-      setBufferCapacity(settings.graph_buffer_size ?? 10_000);
-    }
-  }, [settings, initFromSettings, setBufferCapacity]);
+    if (settings) initFromSettings(settings.decoder_dir);
+  }, [settings, initFromSettings]);
 
   // Catalogue list comes from useCatalogList (backend-owned, pushed live).
   // Load saved layouts on mount.

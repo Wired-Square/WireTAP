@@ -1,6 +1,6 @@
 // ui/src/apps/dashboard/utils/dashboardFormat.ts
 //
-// Shared formatting helpers for dashboard panels, tooltips, measurement overlays, and CSV export.
+// Shared formatting helpers for dashboard panels, tooltips and measurement overlays.
 
 /** Format a numeric value for display with adaptive decimal precision.
  *  A missing or non-finite value reads "—". */
@@ -27,9 +27,4 @@ export function formatTimeDelta(seconds: number): string {
 /** Format a unix timestamp (seconds) to a locale time string. */
 export function formatTimestamp(unixSeconds: number): string {
   return new Date(unixSeconds * 1000).toLocaleTimeString();
-}
-
-/** Format a unix timestamp as ISO-8601 for CSV export. */
-export function formatTimestampIso(unixSeconds: number): string {
-  return new Date(unixSeconds * 1000).toISOString();
 }

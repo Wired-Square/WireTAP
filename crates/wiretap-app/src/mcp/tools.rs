@@ -805,6 +805,17 @@ impl WireTapTools {
     }
 
     #[tool(
+        description = "A signal's history as the Dashboard holds it: its newest values oldest first (t in seconds, v), and min, max, mean, count and the latest over every value held. Held per session while a Dashboard window watches it, up to the Dashboard buffer size per signal. A signal arriving on several protocols or buses reads merged in time order unless protocol or bus names one; last limits it to the newest N."
+    )]
+    async fn get_signal_history(
+        &self,
+        Parameters(p): Parameters<SignalHistoryParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let signal = crate::dashboard_history::SignalRef { frame_id: p.frame_id, name: p.signal, protocol: p.protocol, bus: p.bus };
+        ok_json(crate::dashboard_history::series(&p.session_id, &signal, p.last).map_err(err)?)
+    }
+
+    #[tool(
         description = "The last-seen payload of every frame id in a session's capture, keyed as Discovery keys them (\"can:256\", \"modbus:5013\"): bytes, bus, is_extended, is_fd, is_rtr, is_brs, is_esi, dlc (an RTR's is the length it asks for) and timestampUs. Headless — no view needed. frame_ids restricts it to those keys."
     )]
     async fn get_live_frame_map(

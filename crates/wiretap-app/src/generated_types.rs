@@ -99,6 +99,10 @@ fn render() -> BTreeMap<PathBuf, String> {
     r.visit::<crate::sessions::SessionPurpose>();
     r.visit::<crate::ws::decoded::DecodedSignalsEntry<'static>>();
     r.visit::<crate::adhoc::AdhocBatch>();
+    r.visit::<crate::dashboard_history::SignalRef>();
+    r.visit::<crate::dashboard_history::SeriesWindow>();
+    r.visit::<crate::dashboard_history::AlignedSeries>();
+    r.visit::<crate::dashboard_history::HistogramBins>();
     r.visit::<crate::io::modbus_tcp::scanner::ModbusScanState>();
     r.visit::<crate::ws::dispatch::AttachToPanelMsg<'static>>();
     r.visit::<crate::settings::DirectoryValidation>();
@@ -487,11 +491,21 @@ fn ws_json_bodies_serialise_as_declared() {
         "protocol": "can", "timestamp_us": 5, "frame_id": 1, "bus": 0, "dlc": 1, "bytes": [7],
     }))
     .unwrap();
-    let [(_, payload)] = crate::adhoc::batch_messages(session, &[frame], None).try_into().unwrap();
-    crate::adhoc::forget_session(session);
+    let history = crate::dashboard_history::get(session).unwrap();
+    let mut history = history.lock().unwrap();
+    crate::adhoc::record(session, std::slice::from_ref(&frame), None, &mut history);
+    history.record_toggles(std::slice::from_ref(&frame), None);
+    let [(_, payload)] = crate::adhoc::batch_messages(session, &[frame], None, Some(&history)).try_into().unwrap();
+    drop(history);
     let batch: serde_json::Value = serde_json::from_slice(&payload).unwrap();
     assert_declared::<crate::adhoc::AdhocBatch>(&batch);
     assert!(!batch["values"].as_array().unwrap().is_empty() && !batch["toggles"].as_array().unwrap().is_empty());
+    let query = |op: &str| {
+        crate::dashboard_history::dispatch(op, json!({ "session_id": session, "signals": signals, "bins": 4 })).unwrap()
+    };
+    query("dashboard.series").as_array().unwrap().iter().for_each(assert_declared::<crate::dashboard_history::SeriesWindow>);
+    assert_declared::<crate::dashboard_history::AlignedSeries>(&query("dashboard.aligned"));
+    crate::adhoc::forget_session(session);
 
     use crate::io::modbus_tcp::scanner::ModbusScanState;
     let state = |capture_id: Option<&str>| ModbusScanState {

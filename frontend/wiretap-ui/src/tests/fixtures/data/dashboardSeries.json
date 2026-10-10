@@ -1,7 +1,60 @@
 {
   "cases": [
     {
-      "name": "A short series reads in push order",
+      "expected": {
+        "read": {
+          "timestamps": [
+            1,
+            2,
+            3
+          ],
+          "values": [
+            5,
+            -3,
+            7
+          ]
+        },
+        "summary": {
+          "capacity": 1000,
+          "count": 3,
+          "head": [
+            [
+              1,
+              5
+            ],
+            [
+              2,
+              -3
+            ],
+            [
+              3,
+              7
+            ]
+          ],
+          "stats": {
+            "count": 3,
+            "latest": 7,
+            "latestT": 3,
+            "max": 7,
+            "mean": 3,
+            "min": -3
+          },
+          "tail": [
+            [
+              1,
+              5
+            ],
+            [
+              2,
+              -3
+            ],
+            [
+              3,
+              7
+            ]
+          ]
+        }
+      },
       "input": {
         "samples": [
           [
@@ -18,67 +71,21 @@
           ]
         ]
       },
-      "expected": {
-        "capacity": 1000,
-        "count": 3,
-        "writeIndex": 3,
-        "latest": [
-          3,
-          7
-        ],
-        "stats": {
-          "min": -3,
-          "max": 7,
-          "sum": 9,
-          "sampleCount": 3,
-          "mean": 3
-        },
-        "windowMin": -3,
-        "windowMax": 7,
-        "head": [
-          [
-            1,
-            5
-          ],
-          [
-            2,
-            -3
-          ],
-          [
-            3,
-            7
-          ]
-        ],
-        "tail": [
-          [
-            1,
-            5
-          ],
-          [
-            2,
-            -3
-          ],
-          [
-            3,
-            7
-          ]
-        ],
-        "read": {
-          "timestamps": [
-            1,
-            2,
-            3
-          ],
-          "values": [
-            5,
-            -3,
-            7
-          ]
-        }
-      }
+      "name": "A short series reads in time order"
     },
     {
-      "name": "Out-of-order timestamps are stored as pushed, not sorted",
+      "expected": {
+        "timestamps": [
+          1,
+          2,
+          3
+        ],
+        "values": [
+          2,
+          3,
+          1
+        ]
+      },
       "input": {
         "samples": [
           [
@@ -95,42 +102,37 @@
           ]
         ]
       },
+      "name": "Out-of-order timestamps are stored in time order (H8)"
+    },
+    {
       "expected": {
         "timestamps": [
-          3,
-          1,
-          2
+          5,
+          5
         ],
         "values": [
           1,
-          2,
-          3
+          2
         ]
-      }
+      },
+      "input": {
+        "samples": [
+          [
+            5,
+            1
+          ],
+          [
+            5,
+            2
+          ]
+        ]
+      },
+      "name": "A repeated timestamp keeps both samples in arrival order"
     },
     {
-      "name": "Exactly full: write index wraps to 0",
-      "input": {
-        "capacity": 1000,
-        "pushes": 1000
-      },
       "expected": {
         "capacity": 1000,
         "count": 1000,
-        "writeIndex": 0,
-        "latest": [
-          999,
-          999
-        ],
-        "stats": {
-          "min": 0,
-          "max": 999,
-          "sum": 499500,
-          "sampleCount": 1000,
-          "mean": 499.5
-        },
-        "windowMin": 0,
-        "windowMax": 999,
         "head": [
           [
             0,
@@ -145,6 +147,14 @@
             2
           ]
         ],
+        "stats": {
+          "count": 1000,
+          "latest": 999,
+          "latestT": 999,
+          "max": 999,
+          "mean": 499.5,
+          "min": 0
+        },
         "tail": [
           [
             997,
@@ -159,32 +169,17 @@
             999
           ]
         ]
-      }
-    },
-    {
-      "name": "Past capacity: the oldest are evicted; min/max/sum still cover every sample ever pushed",
+      },
       "input": {
         "capacity": 1000,
-        "pushes": 1250,
-        "values": "0..1249 ascending"
+        "pushes": 1000
       },
+      "name": "Exactly full"
+    },
+    {
       "expected": {
         "capacity": 1000,
         "count": 1000,
-        "writeIndex": 250,
-        "latest": [
-          1249,
-          1249
-        ],
-        "stats": {
-          "min": 0,
-          "max": 1249,
-          "sum": 780625,
-          "sampleCount": 1250,
-          "mean": 624.5
-        },
-        "windowMin": 250,
-        "windowMax": 1249,
         "head": [
           [
             250,
@@ -199,6 +194,14 @@
             252
           ]
         ],
+        "stats": {
+          "count": 1000,
+          "latest": 1249,
+          "latestT": 1249,
+          "max": 1249,
+          "mean": 749.5,
+          "min": 250
+        },
         "tail": [
           [
             1247,
@@ -213,31 +216,18 @@
             1249
           ]
         ]
-      }
-    },
-    {
-      "name": "An evicted extreme stays the running min",
+      },
       "input": {
         "capacity": 1000,
-        "pushes": "one -100 then 1,000 zeros"
+        "pushes": 1250,
+        "values": "0..1249 ascending"
       },
+      "name": "Past capacity: the oldest are evicted and the statistics cover the samples held (H2)"
+    },
+    {
       "expected": {
         "capacity": 1000,
         "count": 1000,
-        "writeIndex": 1,
-        "latest": [
-          1000,
-          0
-        ],
-        "stats": {
-          "min": -100,
-          "max": 0,
-          "sum": -100,
-          "sampleCount": 1001,
-          "mean": -0.0999000999000999
-        },
-        "windowMin": 0,
-        "windowMax": 0,
         "head": [
           [
             1,
@@ -252,6 +242,14 @@
             0
           ]
         ],
+        "stats": {
+          "count": 1000,
+          "latest": 0,
+          "latestT": 1000,
+          "max": 0,
+          "mean": 0,
+          "min": 0
+        },
         "tail": [
           [
             998,
@@ -266,44 +264,165 @@
             0
           ]
         ]
-      }
+      },
+      "input": {
+        "capacity": 1000,
+        "pushes": "one -100 then 1,000 zeros"
+      },
+      "name": "An evicted extreme leaves the statistics (H2)"
     },
     {
-      "name": "setBufferCapacity clamps to 1,000..100,000",
+      "expected": {
+        "lowered": {
+          "capacity": 500,
+          "count": 500,
+          "head": [
+            [
+              300,
+              300
+            ],
+            [
+              301,
+              301
+            ],
+            [
+              302,
+              302
+            ]
+          ],
+          "stats": {
+            "count": 500,
+            "latest": 799,
+            "latestT": 799,
+            "max": 799,
+            "mean": 549.5,
+            "min": 300
+          },
+          "tail": [
+            [
+              797,
+              797
+            ],
+            [
+              798,
+              798
+            ],
+            [
+              799,
+              799
+            ]
+          ]
+        },
+        "raised": {
+          "capacity": 2000,
+          "count": 1500,
+          "head": [
+            [
+              300,
+              300
+            ],
+            [
+              301,
+              301
+            ],
+            [
+              302,
+              302
+            ]
+          ],
+          "stats": {
+            "count": 1500,
+            "latest": 1799,
+            "latestT": 1799,
+            "max": 1799,
+            "mean": 1049.5,
+            "min": 300
+          },
+          "tail": [
+            [
+              1797,
+              1797
+            ],
+            [
+              1798,
+              1798
+            ],
+            [
+              1799,
+              1799
+            ]
+          ]
+        }
+      },
       "input": {
-        "requested": [
-          10,
-          250000
+        "capacity": [
+          1000,
+          500,
+          2000
+        ],
+        "pushes": [
+          800,
+          1000
         ]
       },
-      "expected": {
-        "low": 1000,
-        "high": 100000
-      }
+      "name": "A capacity change reaches live series: lowered trims the oldest, raised lets them grow (H5)"
     },
     {
-      "name": "A capacity change reaches only series created afterwards",
-      "input": {
-        "before": 1000,
-        "after": 2000
+      "expected": {
+        "a": {
+          "capacity": 1000,
+          "count": 3,
+          "head": [
+            [
+              10,
+              1
+            ],
+            [
+              11,
+              2
+            ],
+            [
+              12,
+              3
+            ]
+          ],
+          "stats": {
+            "count": 3,
+            "latest": 3,
+            "latestT": 12,
+            "max": 3,
+            "mean": 2,
+            "min": 1
+          },
+          "tail": [
+            [
+              10,
+              1
+            ],
+            [
+              11,
+              2
+            ],
+            [
+              12,
+              3
+            ]
+          ]
+        },
+        "byte[0]": {
+          "timestamps": [
+            1
+          ],
+          "values": [
+            7
+          ]
+        }
       },
-      "expected": {
-        "oldAfterChange": 1000,
-        "new": 2000,
-        "oldAfterClearData": 2000
-      }
-    },
-    {
-      "name": "A backlog (replace) starts the series afresh, once per batch, and resets the statistics",
       "input": {
-        "first": [
+        "adhoc": [
           [
             1,
-            50
-          ],
-          [
-            2,
-            60
+            7
           ]
         ],
         "backlog": [
@@ -316,6 +435,16 @@
             2
           ]
         ],
+        "live": [
+          [
+            1,
+            50
+          ],
+          [
+            2,
+            60
+          ]
+        ],
         "then": [
           [
             12,
@@ -323,55 +452,62 @@
           ]
         ]
       },
-      "expected": {
-        "capacity": 1000,
-        "count": 3,
-        "writeIndex": 3,
-        "latest": [
-          12,
-          3
-        ],
-        "stats": {
-          "min": 1,
-          "max": 3,
-          "sum": 6,
-          "sampleCount": 3,
-          "mean": 2
-        },
-        "windowMin": 1,
-        "windowMax": 3,
-        "head": [
-          [
-            10,
-            1
-          ],
-          [
-            11,
-            2
-          ],
-          [
-            12,
-            3
-          ]
-        ],
-        "tail": [
-          [
-            10,
-            1
-          ],
-          [
-            11,
-            2
-          ],
-          [
-            12,
-            3
-          ]
-        ]
-      }
+      "name": "A catalogue's backlog replaces its series whatever arrived before; ad-hoc series stay (H6)"
     },
     {
-      "name": "Two signals of one frame and the same name on two frames are separate keys",
+      "expected": {
+        "can bus 1": [
+          2
+        ],
+        "merged": [
+          1,
+          2,
+          3,
+          4
+        ],
+        "modbus": [
+          4
+        ],
+        "series": 3
+      },
+      "input": {
+        "can bus 0": [
+          [
+            1,
+            1
+          ],
+          [
+            3,
+            3
+          ]
+        ],
+        "can bus 1": [
+          [
+            2,
+            2
+          ]
+        ],
+        "modbus bus 0": [
+          [
+            4,
+            4
+          ]
+        ]
+      },
+      "name": "One signal on two protocols or buses is held apart and read merged in time order, or one wire when named (H9)"
+    },
+    {
+      "expected": [
+        [
+          1
+        ],
+        [
+          2
+        ],
+        [
+          3
+        ]
+      ],
       "input": {
         "samples": [
           "1:a",
@@ -379,14 +515,41 @@
           "2:a"
         ]
       },
-      "expected": [
-        "1:a",
-        "1:b",
-        "2:a"
-      ]
+      "name": "Two signals of one frame and the same name on two frames are separate series"
     },
     {
-      "name": "A NaN value: min/max skip it, sum and mean become NaN",
+      "expected": {
+        "capacity": 1000,
+        "count": 2,
+        "head": [
+          [
+            1,
+            1
+          ],
+          [
+            4,
+            3
+          ]
+        ],
+        "stats": {
+          "count": 2,
+          "latest": 3,
+          "latestT": 4,
+          "max": 3,
+          "mean": 2,
+          "min": 1
+        },
+        "tail": [
+          [
+            1,
+            1
+          ],
+          [
+            4,
+            3
+          ]
+        ]
+      },
       "input": {
         "samples": [
           [
@@ -395,34 +558,55 @@
           ],
           [
             2,
-            null
+            "NaN"
           ],
           [
             3,
+            "Infinity"
+          ],
+          [
+            4,
             3
           ]
         ]
       },
-      "expected": {
-        "min": 1,
-        "max": 3,
-        "sum": "NaN",
-        "sampleCount": 3,
-        "latestValue": "3"
-      }
+      "name": "A non-finite value is not kept, so the statistics stay finite (H3)"
     },
     {
-      "name": "dataVersion bumps once per push call, and clearData resets it to 0",
-      "input": {
-        "pushes": 3
+      "expected": {
+        "stats": {
+          "count": 10,
+          "latest": 9,
+          "latestT": 9,
+          "max": 9,
+          "mean": 4.5,
+          "min": 0
+        },
+        "t": [
+          7,
+          8,
+          9
+        ],
+        "v": [
+          7,
+          8,
+          9
+        ]
       },
-      "expected": [
-        0,
-        1,
-        2,
-        3,
-        0
-      ]
+      "input": {
+        "last": 3,
+        "samples": "0..9"
+      },
+      "name": "The last N values of a signal, with the statistics of all held"
+    },
+    {
+      "expected": {
+        "stats": null,
+        "t": [],
+        "v": []
+      },
+      "input": {},
+      "name": "A signal without samples reads empty"
     }
   ]
 }

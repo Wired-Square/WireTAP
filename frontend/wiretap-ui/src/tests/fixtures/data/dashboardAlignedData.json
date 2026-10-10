@@ -1,34 +1,74 @@
 {
   "cases": [
     {
-      "name": "No signals",
-      "input": {
-        "signals": [],
-        "pushes": []
+      "expected": {
+        "stats": [],
+        "x": [],
+        "y": []
       },
-      "expected": [
-        []
-      ]
+      "input": {
+        "pushes": [],
+        "signals": []
+      },
+      "name": "No signals"
     },
     {
-      "name": "No signal has data",
+      "expected": {
+        "stats": [
+          null
+        ],
+        "x": [],
+        "y": [
+          []
+        ]
+      },
       "input": {
+        "pushes": [],
         "signals": [
           "1:a"
-        ],
-        "pushes": []
+        ]
       },
-      "expected": [
-        []
-      ]
+      "name": "No signal has data"
     },
     {
-      "name": "Same rate, same timestamps",
-      "input": {
-        "signals": [
-          "1:a",
-          "1:b"
+      "expected": {
+        "stats": [
+          {
+            "count": 3,
+            "latest": 30,
+            "latestT": 3,
+            "max": 30,
+            "mean": 20,
+            "min": 10
+          },
+          {
+            "count": 3,
+            "latest": 3,
+            "latestT": 3,
+            "max": 3,
+            "mean": 2,
+            "min": 1
+          }
         ],
+        "x": [
+          1,
+          2,
+          3
+        ],
+        "y": [
+          [
+            10,
+            20,
+            30
+          ],
+          [
+            1,
+            2,
+            3
+          ]
+        ]
+      },
+      "input": {
         "pushes": [
           [
             "1:a",
@@ -60,162 +100,249 @@
             3,
             3
           ]
-        ]
-      },
-      "expected": [
-        [
-          1,
-          2,
-          3
         ],
-        [
-          10,
-          20,
-          30
-        ],
-        [
-          1,
-          2,
-          3
-        ]
-      ]
-    },
-    {
-      "name": "Multi-rate: the second series' raw values sit on the base's x, unaligned and shorter (not interpolated)",
-      "input": {
-        "signals": [
-          "1:fast",
-          "2:slow"
-        ],
-        "pushes": [
-          [
-            "1:fast",
-            1,
-            1
-          ],
-          [
-            "1:fast",
-            1.1,
-            2
-          ],
-          [
-            "1:fast",
-            1.2,
-            3
-          ],
-          [
-            "1:fast",
-            1.3,
-            4
-          ],
-          [
-            "1:fast",
-            1.4,
-            5
-          ],
-          [
-            "2:slow",
-            1.25,
-            100
-          ],
-          [
-            "2:slow",
-            1.45,
-            200
-          ]
-        ]
-      },
-      "expected": [
-        [
-          1,
-          1.1,
-          1.2,
-          1.3,
-          1.4
-        ],
-        [
-          1,
-          2,
-          3,
-          4,
-          5
-        ],
-        [
-          100,
-          200
-        ]
-      ]
-    },
-    {
-      "name": "Multi-rate: a longer non-base series overruns the base's x",
-      "input": {
-        "signals": [
-          "2:slow",
-          "1:fast"
-        ],
-        "pushes": [
-          [
-            "1:fast",
-            1,
-            1
-          ],
-          [
-            "1:fast",
-            1.1,
-            2
-          ],
-          [
-            "1:fast",
-            1.2,
-            3
-          ],
-          [
-            "1:fast",
-            1.3,
-            4
-          ],
-          [
-            "1:fast",
-            1.4,
-            5
-          ],
-          [
-            "2:slow",
-            1.25,
-            100
-          ],
-          [
-            "2:slow",
-            1.45,
-            200
-          ]
-        ]
-      },
-      "expected": [
-        [
-          1.25,
-          1.45
-        ],
-        [
-          100,
-          200
-        ],
-        [
-          1,
-          2,
-          3,
-          4,
-          5
-        ]
-      ]
-    },
-    {
-      "name": "Offset start: the later series' first value is drawn at the base's first timestamp",
-      "input": {
         "signals": [
           "1:a",
           "1:b"
+        ]
+      },
+      "name": "Same rate, same timestamps"
+    },
+    {
+      "expected": {
+        "stats": [
+          {
+            "count": 5,
+            "latest": 5,
+            "latestT": 1.4,
+            "max": 5,
+            "mean": 3,
+            "min": 1
+          },
+          {
+            "count": 2,
+            "latest": 200,
+            "latestT": 1.45,
+            "max": 200,
+            "mean": 150,
+            "min": 100
+          }
         ],
+        "x": [
+          1,
+          1.1,
+          1.2,
+          1.25,
+          1.3,
+          1.4,
+          1.45
+        ],
+        "y": [
+          [
+            1,
+            2,
+            3,
+            null,
+            4,
+            5,
+            null
+          ],
+          [
+            null,
+            null,
+            null,
+            100,
+            null,
+            null,
+            200
+          ]
+        ]
+      },
+      "input": {
+        "pushes": [
+          [
+            "1:fast",
+            1,
+            1
+          ],
+          [
+            "1:fast",
+            1.1,
+            2
+          ],
+          [
+            "1:fast",
+            1.2,
+            3
+          ],
+          [
+            "1:fast",
+            1.3,
+            4
+          ],
+          [
+            "1:fast",
+            1.4,
+            5
+          ],
+          [
+            "2:slow",
+            1.25,
+            100
+          ],
+          [
+            "2:slow",
+            1.45,
+            200
+          ]
+        ],
+        "signals": [
+          "1:fast",
+          "2:slow"
+        ]
+      },
+      "name": "Multi-rate: x is every stamp of both, each series has values only at its own (H1)"
+    },
+    {
+      "expected": {
+        "stats": [
+          {
+            "count": 2,
+            "latest": 200,
+            "latestT": 1.45,
+            "max": 200,
+            "mean": 150,
+            "min": 100
+          },
+          {
+            "count": 5,
+            "latest": 5,
+            "latestT": 1.4,
+            "max": 5,
+            "mean": 3,
+            "min": 1
+          }
+        ],
+        "x": [
+          1,
+          1.1,
+          1.2,
+          1.25,
+          1.3,
+          1.4,
+          1.45
+        ],
+        "y": [
+          [
+            null,
+            null,
+            null,
+            100,
+            null,
+            null,
+            200
+          ],
+          [
+            1,
+            2,
+            3,
+            null,
+            4,
+            5,
+            null
+          ]
+        ]
+      },
+      "input": {
+        "pushes": [
+          [
+            "1:fast",
+            1,
+            1
+          ],
+          [
+            "1:fast",
+            1.1,
+            2
+          ],
+          [
+            "1:fast",
+            1.2,
+            3
+          ],
+          [
+            "1:fast",
+            1.3,
+            4
+          ],
+          [
+            "1:fast",
+            1.4,
+            5
+          ],
+          [
+            "2:slow",
+            1.25,
+            100
+          ],
+          [
+            "2:slow",
+            1.45,
+            200
+          ]
+        ],
+        "signals": [
+          "2:slow",
+          "1:fast"
+        ]
+      },
+      "name": "Multi-rate: the signal order changes only the column order (H1)"
+    },
+    {
+      "expected": {
+        "stats": [
+          {
+            "count": 3,
+            "latest": 20,
+            "latestT": 20,
+            "max": 20,
+            "mean": 10,
+            "min": 0
+          },
+          {
+            "count": 3,
+            "latest": 4,
+            "latestT": 40,
+            "max": 4,
+            "mean": 3,
+            "min": 2
+          }
+        ],
+        "x": [
+          0,
+          10,
+          20,
+          30,
+          40
+        ],
+        "y": [
+          [
+            0,
+            10,
+            20,
+            null,
+            null
+          ],
+          [
+            null,
+            null,
+            2,
+            3,
+            4
+          ]
+        ]
+      },
+      "input": {
         "pushes": [
           [
             "1:a",
@@ -247,33 +374,98 @@
             40,
             4
           ]
+        ],
+        "signals": [
+          "1:a",
+          "1:b"
         ]
       },
-      "expected": [
-        [
-          0,
-          10,
-          20
-        ],
-        [
-          0,
-          10,
-          20
-        ],
-        [
-          2,
-          3,
-          4
-        ]
-      ]
+      "name": "Offset start: the later series begins at its own first stamp (H1)"
     },
     {
-      "name": "The first signal without data: the base is the next one, the empty one is nulls of the base's length",
+      "expected": {
+        "stats": [
+          null,
+          {
+            "count": 2,
+            "latest": 2,
+            "latestT": 2,
+            "max": 2,
+            "mean": 1.5,
+            "min": 1
+          }
+        ],
+        "x": [
+          1,
+          2
+        ],
+        "y": [
+          [
+            null,
+            null
+          ],
+          [
+            1,
+            2
+          ]
+        ]
+      },
       "input": {
+        "pushes": [
+          [
+            "1:a",
+            1,
+            1
+          ],
+          [
+            "1:a",
+            2,
+            2
+          ]
+        ],
         "signals": [
           "9:empty",
           "1:a"
+        ]
+      },
+      "name": "A signal without data is a column of nulls"
+    },
+    {
+      "expected": {
+        "stats": [
+          {
+            "count": 2,
+            "latest": 2,
+            "latestT": 2,
+            "max": 2,
+            "mean": 1.5,
+            "min": 1
+          },
+          {
+            "count": 2,
+            "latest": 2,
+            "latestT": 2,
+            "max": 2,
+            "mean": 1.5,
+            "min": 1
+          }
         ],
+        "x": [
+          1,
+          2
+        ],
+        "y": [
+          [
+            1,
+            2
+          ],
+          [
+            1,
+            2
+          ]
+        ]
+      },
+      "input": {
         "pushes": [
           [
             "1:a",
@@ -285,57 +477,53 @@
             2,
             2
           ]
-        ]
-      },
-      "expected": [
-        [
-          1,
-          2
         ],
-        [
-          null,
-          null
-        ],
-        [
-          1,
-          2
-        ]
-      ]
-    },
-    {
-      "name": "The same signal twice reads twice",
-      "input": {
         "signals": [
           "1:a",
           "1:a"
+        ]
+      },
+      "name": "The same signal twice reads twice"
+    },
+    {
+      "expected": {
+        "stats": [
+          {
+            "count": 2,
+            "latest": 2,
+            "latestT": 5,
+            "max": 2,
+            "mean": 1.5,
+            "min": 1
+          }
         ],
-        "pushes": [
+        "x": [
+          5
+        ],
+        "y": [
           [
-            "1:a",
-            1,
-            1
-          ],
-          [
-            "1:a",
-            2,
             2
           ]
         ]
       },
-      "expected": [
-        [
-          1,
-          2
+      "input": {
+        "pushes": [
+          [
+            "1:a",
+            5,
+            1
+          ],
+          [
+            "1:a",
+            5,
+            2
+          ]
         ],
-        [
-          1,
-          2
-        ],
-        [
-          1,
-          2
+        "signals": [
+          "1:a"
         ]
-      ]
+      },
+      "name": "A repeated stamp in one series shows its later value"
     }
   ]
 }

@@ -173,6 +173,25 @@ pub struct DecodedSignalsParams {
     pub frame_id: Option<String>,
 }
 
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct SignalHistoryParams {
+    /// A session a Dashboard window watches (from `list_sessions`).
+    pub session_id: String,
+    /// The masked frame id, decimal.
+    pub frame_id: u32,
+    /// The signal's name as the catalogue (or an ad-hoc `byte[i]` / `hyp_*` name) gives it.
+    pub signal: String,
+    /// Optional: one wire only, by protocol (`can`, `modbus`, `serial`, …).
+    #[serde(default)]
+    pub protocol: Option<String>,
+    /// Optional: one wire only, by bus.
+    #[serde(default)]
+    pub bus: Option<u8>,
+    /// Optional: only the newest N values.
+    #[serde(default)]
+    pub last: Option<usize>,
+}
+
 // ── Control (gated behind `mcp_allow_control`) ───────────────────────────────
 
 #[derive(Debug, Deserialize, JsonSchema)]

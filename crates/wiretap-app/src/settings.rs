@@ -948,6 +948,7 @@ fn announce_saved(app: &AppHandle, settings: &AppSettings) {
 
     // Keep the cached telemetry consent + install id in sync (read on every emit).
     crate::telemetry::refresh_consent(settings);
+    crate::dashboard_history::set_capacity(settings.graph_buffer_size);
 
     // Every window's settings store rebases on this, so a write from any path
     // (another window, a device reconfigure, MCP) is not undone by its next save.

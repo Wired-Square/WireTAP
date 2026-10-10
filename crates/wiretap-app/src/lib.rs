@@ -18,6 +18,7 @@ mod catalog_share;
 mod apiclient;
 mod gateway_admin;
 mod dashboard;
+mod dashboard_history;
 mod drafting;
 mod checksum_discovery;
 mod checksums;
@@ -1026,6 +1027,7 @@ pub fn run() {
 
             // Start file logging as early as possible.
             if let Ok(s) = &startup_settings {
+                dashboard_history::set_capacity(s.graph_buffer_size);
                 logging::set_log_level(&s.log_level);
                 if s.log_level != "off" {
                     if let Ok(doc_dir) = app.path().document_dir() {

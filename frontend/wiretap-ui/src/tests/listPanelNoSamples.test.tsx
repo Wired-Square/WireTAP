@@ -20,7 +20,7 @@ describe("the list panel", () => {
   afterEach(() => act(() => root.unmount()));
 
   it("a signal with no samples reads as a dash, not zero, and a real zero as zero", async () => {
-    useDashboardStore.getState().pushSignalValues([{ frameId: 0x100, signalName: "Zero", value: 0, timestamp: 1 }]);
+    useDashboardStore.getState().setLatest(new Map([["256:Zero", 0]]));
     const panel = { id: "l", type: "list", title: "", signals: [signal("Zero"), signal("Never")], minValue: 0, maxValue: 0 } as DashboardPanel;
     const host = document.createElement("div");
     root = createRoot(host);
