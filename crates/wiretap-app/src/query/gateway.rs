@@ -11,11 +11,11 @@ use serde::Serialize;
 use serde_json::Value;
 use tauri::AppHandle;
 use wiretap_gateway::{
-    ByteChangeQueryResult, CaptureProtocol, ByteChangesParams, DistributionParams, DistributionQueryResult,
+    ByteChangeQueryResult, ByteChangesParams, DistributionParams, DistributionQueryResult,
     FirstLastParams, FirstLastQueryResult, FrameChangeQueryResult, FrameChangesParams,
     FrequencyParams, FrequencyQueryResult, GapAnalysisParams, GapAnalysisQueryResult,
     MirrorValidationParams, MirrorValidationQueryResult, MuxStatisticsParams,
-    MuxStatisticsQueryResult, PatternSearchParams, PatternSearchQueryResult, QuerySpec,
+    MuxStatisticsQueryResult, PatternSearchParams, PatternSearchQueryResult, QuerySpec, TimeRangeQuery,
 };
 
 use super::{QueryOutcome, QueryResults};
@@ -43,12 +43,12 @@ impl Request {
 
 /// `narrowed`: a mirror validation the catalogue narrows asks for every mismatch.
 pub(super) fn request(api: &ApiProfile, spec: &QuerySpec, query_id: Option<&str>, narrowed: bool) -> Result<Request, String> {
-    let rows = &spec.row_filters()[0];
-    if !rows.protocols.is_empty() && rows.protocols != CaptureProtocol::of(api.protocol) {
+    let window = spec.window();
+    if window.protocol.is_some_and(|p| p != api.protocol) {
         return Err("a WireTAP backend profile reads only its own protocol".into());
     }
-    let start = rows.start_us.map(apiclient::rfc3339).transpose()?;
-    let end = rows.end_us.map(apiclient::rfc3339).transpose()?;
+    let start = window.start_us.map(apiclient::rfc3339).transpose()?;
+    let end = window.end_us.map(apiclient::rfc3339).transpose()?;
     let query_id = query_id.map(str::to_string);
     let filter = |frame_id: &u32, is_extended: &Option<bool>| {
         api.filter(*frame_id, *is_extended, start.clone(), end.clone())
@@ -124,7 +124,12 @@ pub(super) fn request(api: &ApiProfile, spec: &QuerySpec, query_id: Option<&str>
                 query_id,
             },
         ),
-        QuerySpec::FrameInventory { .. } => Request::Get(apiclient::inventory_path(api, start.as_deref(), end.as_deref())),
+        QuerySpec::FrameInventory { limit, .. } => Request::Get(apiclient::inventory_path(&TimeRangeQuery {
+            start,
+            end,
+            protocol: api.wire_protocol(),
+            limit: *limit,
+        })),
     })
 }
 
@@ -180,11 +185,9 @@ pub async fn run(
     let request = request(&api, spec, Some(query_id), compare.is_some())?;
     let mut outcome = match &request {
         Request::Get(path) => {
-            let mut rows = apiclient::read_inventory(&api, path).await?;
-            if let QuerySpec::FrameInventory { limit: Some(limit), .. } = spec {
-                rows.truncate(*limit as usize);
-            }
-            QueryOutcome { results: QueryResults::FrameInventory(rows), stats: None, sql: Vec::new() }
+            let QuerySpec::FrameInventory { limit, .. } = spec else { unreachable!("only an inventory is a GET") };
+            let (rows, truncated) = apiclient::read_inventory(&api, path, *limit).await?;
+            QueryOutcome { results: QueryResults::FrameInventory(rows), stats: None, sql: Vec::new(), truncated }
         }
         Request::Post(path, body) => decode(spec, apiclient::post_query(&api, path, body, query_id).await?, compare)?,
     };
@@ -199,7 +202,20 @@ pub async fn preview(app: &AppHandle, profile_id: &str, spec: &QuerySpec, narrow
 #[cfg(test)]
 mod tests {
     use super::*;
-    use wiretap_gateway::{MirrorValidationResult, QueryStats};
+    use wiretap_gateway::{MirrorValidationResult, Protocol, QueryStats};
+
+    #[test]
+    fn a_backend_profile_refuses_another_protocols_window() {
+        let spec = |protocol| QuerySpec::FrameInventory {
+            window: wiretap_gateway::RowWindow { protocol, start_us: None, end_us: None },
+            limit: Some(5),
+        };
+        let api = apiclient::test_api(Protocol::Modbus);
+        assert!(request(&api, &spec(Some(Protocol::Can)), None, false).is_err());
+        for protocol in [None, Some(Protocol::Modbus)] {
+            assert_eq!(request(&api, &spec(protocol), None, false).unwrap().text(), "GET /inventory?protocol=modbus&limit=5");
+        }
+    }
 
     #[test]
     fn a_narrowed_mirror_limits_after_narrowing() {

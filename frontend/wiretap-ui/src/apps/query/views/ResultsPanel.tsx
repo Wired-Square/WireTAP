@@ -29,7 +29,7 @@ import { formatHumanUs } from "../../../utils/timeFormat";
 import DataViewPaginationToolbar, { FRAME_PAGE_SIZE_OPTIONS } from "../../../components/DataViewPaginationToolbar";
 import { monoBody, emptyStateContainer, emptyStateText, emptyStateHeading, emptyStateDescription } from "../../../styles/typography";
 import { iconSm, iconMd, iconXl } from "../../../styles/spacing";
-import { bgSurface, borderDefault, borderDivider, hoverBg, textPrimary, textSecondary, textMuted, textDataAmber, textDataGreen, textDataPurple, textDataCyan, textDanger } from "../../../styles/colourTokens";
+import { bgSurface, borderDefault, borderDivider, hoverBg, textPrimary, textSecondary, textMuted, textDataAmber, textDataGreen, textDataPurple, textDataCyan, textDanger, textWarning } from "../../../styles/colourTokens";
 import { useAutoRowCount } from "../../../hooks/useAutoRowCount";
 import { pageCount, resolvePageSize, type PageSize } from "../../../utils/pageSize";
 import { Button, IconButton } from "../../../components/Button";
@@ -368,6 +368,7 @@ function ResultsBody({
           </h2>
           <p className={`text-xs ${textSecondary}`}>
             {t("results.foundCount", { count: resultCount.toLocaleString(), label: queryInfo.label.toLowerCase() })}
+            {outcome?.truncated && <span className={textWarning}>{t("results.truncated")}</span>}
             {lastQueryStats && (
               <span className={textMuted}>
                 {t("results.rowsScanned", { rows: lastQueryStats.rows_scanned.toLocaleString(), ms: lastQueryStats.execution_time_ms.toLocaleString() })}

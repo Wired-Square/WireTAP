@@ -20,7 +20,7 @@ use tokio::sync::Mutex;
 use wiretap_gateway::{
     DatabaseActivityResult, Event, EventPatch, EventsResponse, FrameFilter, ImportResult,
     InventoryEntry, InventoryResponse, NewEvent, PayloadsParams, PayloadsResponse, Protocol,
-    SignalResponse, TimeBounds,
+    SignalResponse, TimeBounds, TimeRangeQuery,
 };
 
 use crate::capture_events::CaptureEvent;
@@ -108,13 +108,19 @@ pub fn frame_tag(protocol: Protocol) -> &'static str {
 
 /// `?protocol=…` for a GET, empty for CAN. `first` says whether this is the
 /// first parameter on the URL.
-pub fn protocol_query(protocol: Protocol, first: bool) -> String {
-    let name = match protocol {
-        Protocol::Can => return String::new(),
+fn protocol_name(protocol: Protocol) -> &'static str {
+    match protocol {
+        Protocol::Can => "can",
         Protocol::Modbus => "modbus",
         Protocol::Serial => "serial",
-    };
-    format!("{}protocol={name}", if first { "?" } else { "&" })
+    }
+}
+
+pub fn protocol_query(protocol: Protocol, first: bool) -> String {
+    if protocol == Protocol::Can {
+        return String::new();
+    }
+    format!("{}protocol={}", if first { "?" } else { "&" }, protocol_name(protocol))
 }
 
 /// Resolved connection details for a wiretap profile.
@@ -313,34 +319,55 @@ pub(crate) fn rfc3339(us: i64) -> Result<String, String> {
         .ok_or_else(|| format!("time bound {us} µs is out of range"))
 }
 
-pub(crate) fn inventory_path(api: &ApiProfile, start: Option<&str>, end: Option<&str>) -> String {
-    let bounds: Vec<String> = [("start", start), ("end", end)]
-        .into_iter()
-        .filter_map(|(key, value)| value.map(|v| format!("{key}={}", urlencoding(v))))
-        .collect();
-    let query = if bounds.is_empty() { String::new() } else { format!("?{}", bounds.join("&")) };
-    format!("/inventory{query}{}", protocol_query(api.protocol, bounds.is_empty()))
+pub(crate) fn inventory_path(query: &TimeRangeQuery) -> String {
+    let TimeRangeQuery { start, end, protocol, limit } = query;
+    let pairs: Vec<String> = [
+        start.as_deref().map(|v| format!("start={}", urlencoding(v))),
+        end.as_deref().map(|v| format!("end={}", urlencoding(v))),
+        protocol.map(|p| format!("protocol={}", protocol_name(p))),
+        limit.map(|n| format!("limit={n}")),
+    ]
+    .into_iter()
+    .flatten()
+    .collect();
+    if pairs.is_empty() { "/inventory".into() } else { format!("/inventory?{}", pairs.join("&")) }
+}
+
+/// The rows and whether the inventory was cut. `limit` is applied here as well,
+/// since a gateway may ignore it.
+pub(crate) async fn read_inventory(
+    api: &ApiProfile,
+    path: &str,
+    limit: Option<u32>,
+) -> Result<(Vec<crate::capture_db::InventoryRow>, bool), String> {
+    Ok(inventory_rows(api.protocol, get(api, path).await?, limit))
 }
 
 /// Every entry is the profile's protocol — the gateway groups one protocol at
 /// a time, and a Modbus row's `frame_id` is its unit/function word.
-pub(crate) async fn read_inventory(api: &ApiProfile, path: &str) -> Result<Vec<crate::capture_db::InventoryRow>, String> {
-    let resp: InventoryResponse = get(api, path).await?;
-    Ok(resp
+fn inventory_rows(
+    protocol: Protocol,
+    resp: InventoryResponse,
+    limit: Option<u32>,
+) -> (Vec<crate::capture_db::InventoryRow>, bool) {
+    let mut rows: Vec<_> = resp
         .entries
         .into_iter()
         .map(|e| {
             crate::capture_db::InventoryRow::new(
-                frame_tag(api.protocol),
+                frame_tag(protocol),
                 e.frame_id,
                 e.is_extended,
                 e.count,
                 e.first_us,
                 e.last_us,
-                inventory_max_len(&e, api.protocol),
+                inventory_max_len(&e, protocol),
             )
         })
-        .collect())
+        .collect();
+    let cut = limit.is_some_and(|n| rows.len() > n as usize);
+    rows.truncate(limit.map_or(usize::MAX, |n| n as usize));
+    (rows, resp.truncated || cut)
 }
 
 pub async fn frame_inventory(
@@ -349,9 +376,13 @@ pub async fn frame_inventory(
     end_us: Option<i64>,
 ) -> Result<Vec<crate::capture_db::InventoryRow>, String> {
     let api = resolve(profile)?;
-    let start = start_us.map(rfc3339).transpose()?;
-    let end = end_us.map(rfc3339).transpose()?;
-    read_inventory(&api, &inventory_path(&api, start.as_deref(), end.as_deref())).await
+    let query = TimeRangeQuery {
+        start: start_us.map(rfc3339).transpose()?,
+        end: end_us.map(rfc3339).transpose()?,
+        protocol: api.wire_protocol(),
+        limit: None,
+    };
+    Ok(read_inventory(&api, &inventory_path(&query), None).await?.0)
 }
 
 pub async fn fetch_frame_payloads(
@@ -822,6 +853,45 @@ mod tests {
         };
         assert_eq!(inventory_max_len(&entry(json!(20)), Protocol::Can), 20);
         assert_eq!(inventory_max_len(&entry(Value::Null), Protocol::Can), 12);
+    }
+
+    #[test]
+    fn an_inventory_is_truncated_when_the_gateway_says_so_or_the_client_cuts_it() {
+        let response = |ids: &[u32], truncated| InventoryResponse {
+            entries: ids
+                .iter()
+                .map(|&frame_id| InventoryEntry {
+                    frame_id,
+                    is_extended: false,
+                    count: 1,
+                    first_us: 0,
+                    last_us: 0,
+                    max_dlc: 8,
+                    max_len: None,
+                })
+                .collect(),
+            truncated,
+        };
+        let cut = |ids: &[u32], truncated, limit| {
+            let (rows, truncated) = inventory_rows(Protocol::Can, response(ids, truncated), limit);
+            (rows.iter().map(|r| r.frame_id).collect::<Vec<_>>(), truncated)
+        };
+        assert_eq!(cut(&[1, 2, 3], false, Some(2)), (vec![1, 2], true), "a gateway that ignores the limit");
+        assert_eq!(cut(&[1, 2], true, Some(2)), (vec![1, 2], true), "a gateway that honours it");
+        assert_eq!(cut(&[1, 2], false, Some(2)), (vec![1, 2], false));
+        assert_eq!(cut(&[1, 2, 3], false, None), (vec![1, 2, 3], false));
+    }
+
+    #[test]
+    fn an_inventory_request_carries_its_bounds_protocol_and_limit() {
+        let query = |protocol, limit| TimeRangeQuery { start: Some("2026-01-01T00:00:00Z".into()), end: None, protocol, limit };
+        assert_eq!(inventory_path(&query(None, None)), "/inventory?start=2026-01-01T00%3A00%3A00Z");
+        assert_eq!(
+            inventory_path(&query(Some(Protocol::Modbus), Some(50))),
+            "/inventory?start=2026-01-01T00%3A00%3A00Z&protocol=modbus&limit=50"
+        );
+        let bare = TimeRangeQuery { start: None, end: None, protocol: None, limit: None };
+        assert_eq!(inventory_path(&bare), "/inventory");
     }
 
     #[test]

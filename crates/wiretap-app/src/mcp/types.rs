@@ -736,6 +736,9 @@ pub struct FrameInventoryParams {
     /// Optional RFC3339 upper time bound (exclusive).
     #[serde(default)]
     pub end_time: Option<String>,
+    /// Max frame ids to return (default 10000, as the Query panel's).
+    #[serde(default)]
+    pub limit: Option<u32>,
 }
 
 /// Per-byte static/counter/sensor roles for one frame id.

@@ -158,7 +158,7 @@ fn run_paged(
     let filter = &spec.row_filters()[0];
     let counted = |results: QueryResults, read: usize| {
         let stats = kernel::stats(read, results.len(), started);
-        QueryOutcome { results, stats: Some(stats), sql: Vec::new() }
+        QueryOutcome { results, stats: Some(stats), sql: Vec::new(), truncated: false }
     };
     let mut outcome: QueryOutcome = match spec {
         QuerySpec::ByteChanges { byte_index, limit, .. } => {
@@ -198,10 +198,11 @@ fn run_paged(
             })?;
             counted(QueryResults::PatternSearch(found), read)
         }
-        QuerySpec::FrameInventory { .. } => {
+        QuerySpec::FrameInventory { limit, .. } => {
             let rows = capture_db::read_rows(&statements[0], cancel, inventory_row)?;
             let read = rows.iter().map(|r| r.count as usize).sum();
-            counted(QueryResults::FrameInventory(rows), read)
+            let truncated = limit.is_some_and(|n| rows.len() >= n as usize);
+            QueryOutcome { truncated, ..counted(QueryResults::FrameInventory(rows), read) }
         }
     };
     outcome.sql = statements.iter().map(Sql::inlined).collect();

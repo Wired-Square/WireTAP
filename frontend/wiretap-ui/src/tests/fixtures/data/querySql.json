@@ -343,7 +343,7 @@
         "SELECT protocol, frame_id, is_extended, COUNT(*), MIN(timestamp_us), MAX(timestamp_us), MAX(MAX(dlc, length(payload))) FROM frames WHERE capture_id = 'd5-sql-golden' GROUP BY protocol, frame_id, is_extended ORDER BY frame_id, protocol, is_extended LIMIT 5000"
       ],
       "gateway": [
-        "GET /inventory"
+        "GET /inventory?limit=5000"
       ],
       "name": "frame_inventory unbounded"
     },
@@ -352,7 +352,7 @@
         "SELECT protocol, frame_id, is_extended, COUNT(*), MIN(timestamp_us), MAX(timestamp_us), MAX(MAX(dlc, length(payload))) FROM frames WHERE capture_id = 'd5-sql-golden' AND timestamp_us >= 1772319600000000 AND timestamp_us < 1772319900000000 GROUP BY protocol, frame_id, is_extended ORDER BY frame_id, protocol, is_extended LIMIT 5000"
       ],
       "gateway": [
-        "GET /inventory?start=2026-02-28T23%3A00%3A00Z&end=2026-02-28T23%3A05%3A00Z"
+        "GET /inventory?start=2026-02-28T23%3A00%3A00Z&end=2026-02-28T23%3A05%3A00Z&limit=5000"
       ],
       "name": "frame_inventory bounded"
     },

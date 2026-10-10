@@ -40,6 +40,7 @@
     "totalFrames": "{{count}} total frames",
     "rowsScanned": " · {{rows}} rows in {{ms}}ms",
     "foundCount": "{{count}} {{label}} found",
+    "truncated": " · stopped at the limit, more may exist",
     "exportTooltip": "Export results to CSV",
     "ingest": "Ingest",
     "ingestAll": "Ingest All",

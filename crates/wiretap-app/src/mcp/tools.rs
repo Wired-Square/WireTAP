@@ -26,7 +26,6 @@ use wslib_ai_mcp::server::{ServerIdentity, ToolListCache};
 
 use super::types::*;
 use super::McpRunningConfig;
-use crate::analysis::PayloadSource;
 use crate::payload_source::{resolve, Capture};
 use wiretap_gateway::{QuerySpec, RowWindow};
 
@@ -835,18 +834,14 @@ impl WireTapTools {
 
     // ── Headless analysis levers (capture OR WireTAP backend) ───────────────────────
 
-    #[tool(description = "Per-frame-id rollup (count, first/last timestamp, max dlc, extended) for a capture (capture_id) or WireTAP backend profile (profile_id). Headless — no view needed. Use to see which frame ids exist and how often.")]
+    #[tool(description = "Per-frame-id rollup (count, first/last timestamp, max dlc, extended) for a capture (capture_id) or WireTAP backend profile (profile_id), lowest frame id first, up to limit ids; truncated says the limit cut it. Headless — no view needed. Use to see which frame ids exist and how often.")]
     async fn frame_inventory(
         &self,
         Parameters(p): Parameters<FrameInventoryParams>,
     ) -> Result<CallToolResult, McpError> {
-        let src = resolve(p.capture_id, p.profile_id).map_err(err)?;
-        let rows = src
-            .reader(&self.app)
-            .inventory(bound(&p.start_time)?, bound(&p.end_time)?)
-            .await
-            .map_err(err)?;
-        ok_json(json!({ "frames": rows.len(), "inventory": rows }))
+        let spec = QuerySpec::FrameInventory { window: window(&p.start_time, &p.end_time)?, limit: p.limit };
+        let outcome = self.run_query(p.capture_id, p.profile_id, spec).await?;
+        ok_json(json!({ "frames": outcome.results.len(), "inventory": outcome.results, "truncated": outcome.truncated }))
     }
 
     #[tool(description = "Byte profile of one frame id over its most recent sample_limit payloads: per-byte statistics and role (static/counter/sensor/value/unknown), multi-byte patterns (counter16/sensor16/sensor32/text) and mux cases. Headless; the same profile Discovery's Payload Changes shows. Source is capture_id or profile_id.")]
@@ -1023,16 +1018,25 @@ impl WireTapTools {
 }
 
 impl WireTapTools {
+    async fn run_query(
+        &self,
+        capture_id: Option<String>,
+        profile_id: Option<String>,
+        spec: QuerySpec,
+    ) -> Result<crate::query::QueryOutcome, McpError> {
+        let source = resolve(capture_id, profile_id).map_err(err)?;
+        let request = crate::query::QueryRequest { source, spec, catalog_path: None };
+        let id = crate::query::new_query_id();
+        crate::query::run(&self.app, &request, &id, &Default::default()).await.map_err(err)
+    }
+
     async fn query(
         &self,
         capture_id: Option<String>,
         profile_id: Option<String>,
         spec: QuerySpec,
     ) -> Result<CallToolResult, McpError> {
-        let source = resolve(capture_id, profile_id).map_err(err)?;
-        let request = crate::query::QueryRequest { source, spec, catalog_path: None };
-        let id = crate::query::new_query_id();
-        ok_json(crate::query::run(&self.app, &request, &id, &Default::default()).await.map_err(err)?)
+        ok_json(self.run_query(capture_id, profile_id, spec).await?)
     }
 }
 

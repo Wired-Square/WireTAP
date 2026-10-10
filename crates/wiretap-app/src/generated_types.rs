@@ -870,7 +870,7 @@ fn query_shapes_serialise_as_declared() {
                 _ => assert_declared::<crate::capture_db::InventoryRow>(row),
             }
         }
-        assert_serialises_as_declared(&[QueryOutcome { results, stats: Some(stats.clone()), sql: vec!["SELECT 1".into()] }]);
+        assert_serialises_as_declared(&[QueryOutcome { results, stats: Some(stats.clone()), sql: vec!["SELECT 1".into()], truncated: true }]);
     }
     let (_, spec) = form_specs().remove(0);
     let request = QueryRequest {

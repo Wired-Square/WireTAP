@@ -109,6 +109,8 @@ Per-frame-id rollup: `count`, `first_us` / `last_us`, `max_dlc`, `is_extended` a
 `protocol`, with a `frame_id_hex`. The "what frame ids exist and how often" lever.
 Optional time bounds. **On a large archive this is a full-table GROUP BY — pass
 `start_time` / `end_time` to scope it.**
+At most `limit` ids, lowest first (default 10 000, as the Query panel's);
+`truncated` is true when the limit cut the answer.
 
 Frame identity is **(protocol, frame_id)**: a mixed capture holds CAN `0x100` and
 Modbus register 256 under the same number, and they are separate rows. A
