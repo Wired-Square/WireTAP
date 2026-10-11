@@ -11,10 +11,9 @@ use std::sync::{
 };
 use std::time::Duration;
 
-use super::base::{
-    publish_position, publish_position_now, Pacer, PlaybackControl, Playout, RecordedSourceState,
-    Unlimited,
-};
+use wiretap_io::replay::{Pacer, PlaybackControl, Playout, Unlimited};
+
+use super::base::{publish_position, publish_position_now, RecordedSourceState};
 use crate::io::{emit_session_error, post_session, signal_frames_ready, FrameMessage, IOCapabilities, IOSource, IOState, PlaybackPosition, SignalThrottle, StreamEndReason, TemporalMode};
 use crate::{capture_db, capture_store};
 
@@ -361,7 +360,7 @@ fn handle_seek(
     chunk_idx: &mut usize,
     frame_index: &mut usize,
     last_consumed_rowid: &mut i64,
-    pacer: &mut Pacer,
+    pacer: &mut Pacer<FrameMessage>,
 ) -> bool {
     // Playback moves to `rowid`, frame `target_idx`, and is published there; the
     // frame's time is read from the reloaded chunk unless it is given.
@@ -373,7 +372,7 @@ fn handle_seek(
         *last_consumed_rowid = rowid;
         *chunk = load_chunk(buf_id, if is_reverse { rowid + 1 } else { rowid - 1 }, CHUNK_SIZE, is_reverse);
         *chunk_idx = 0;
-        pacer.batch.clear();
+        pacer.clear_batch();
         crate::ws::dispatch::reset_decode_state(session_id);
 
         if let Some(timestamp_us) = timestamp_us.or_else(|| chunk.first().map(|(_, f)| f.timestamp_us)) {
@@ -429,7 +428,7 @@ struct ToSubscribers<'a> {
     total_frames: usize,
 }
 
-impl Playout for ToSubscribers<'_> {
+impl Playout<FrameMessage> for ToSubscribers<'_> {
     fn frames(&mut self, frames: Vec<FrameMessage>) {
         crate::ws::dispatch::send_frames(self.session_id, &frames);
     }
@@ -637,14 +636,15 @@ async fn run_capture_stream(
     }
 
     // Flush any remaining batch
-    if !pacer.batch.is_empty() {
-        out.frames(std::mem::take(&mut pacer.batch));
+    let rest = pacer.take_batch();
+    if !rest.is_empty() {
+        out.frames(rest);
         out.throttle.flush();
 
         // Emit final position so frontend highlights the last frame.
         // Forward: frame_index is one-past-end (post-increment), subtract 1.
         // Reverse: frame_index IS the last consumed position (pre-decrement), use directly.
-        if let Some(last_time) = pacer.last_frame_time_secs {
+        if let Some(last_time) = pacer.last_frame_secs() {
             let is_reverse = control.is_reverse();
             let final_index = if is_reverse { frame_index } else { frame_index.saturating_sub(1) };
             // throttle already flushed above; always signal final position
@@ -724,10 +724,11 @@ async fn run_capture_stream(
     }
     } // end 'outer
 
-    let data_duration_secs = pacer.last_frame_time_secs.unwrap_or(stream_start_secs) - stream_start_secs;
+    let data_duration_secs = pacer.last_frame_secs().unwrap_or(stream_start_secs) - stream_start_secs;
+    let stats = pacer.stats();
     tlog!(
         "[Capture:{}] Stream ended (reason: stopped, count: {}, wall_time: {}ms, data_duration: {:.1}s, waits: {} totaling {}ms)",
-        session_id, pacer.emitted, pacer.wall_elapsed().as_millis(), data_duration_secs, pacer.waits, pacer.waited_ms
+        session_id, stats.emitted, pacer.wall_elapsed().as_millis(), data_duration_secs, stats.waits, stats.waited_ms
     );
 }
 

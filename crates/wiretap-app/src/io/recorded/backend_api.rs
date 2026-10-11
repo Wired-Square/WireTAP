@@ -14,7 +14,9 @@ use std::collections::VecDeque;
 use std::time::Duration;
 use wiretap_gateway::{FrameBatch, FrameBatchRow, Protocol as ArchiveProtocol};
 
-use super::base::{publish_position, Pacer, PlaybackControl, Playout, RecordedSourceState, Unlimited};
+use wiretap_io::replay::{Pacer, PlaybackControl, Playout, Unlimited};
+
+use super::base::{publish_position, RecordedSourceState};
 use crate::apiclient::{frame_tag, protocol_query};
 use crate::capture_store::{self, CaptureKind};
 use crate::io::{
@@ -270,7 +272,7 @@ struct IntoCapture<'a> {
     throttle: SignalThrottle,
 }
 
-impl Playout for IntoCapture<'_> {
+impl Playout<FrameMessage> for IntoCapture<'_> {
     fn frames(&mut self, frames: Vec<FrameMessage>) {
         capture_store::append_frames_to_session(self.session_id, frames);
         if self.throttle.should_signal("frames-ready") {
@@ -387,16 +389,25 @@ async fn run_api_stream(
         }
     }
 
-    if !pacer.batch.is_empty() {
-        capture_store::append_frames_to_session(&session_id, std::mem::take(&mut pacer.batch));
+    let rest = pacer.take_batch();
+    if !rest.is_empty() {
+        capture_store::append_frames_to_session(&session_id, rest);
         out.throttle.flush();
         signal_frames_ready(&session_id);
     }
 
     if control.is_cancelled() {
-        tlog!("[BackendAPI:{}] Stream cancelled by user (emitted: {})", session_id, pacer.emitted);
+        tlog!(
+            "[BackendAPI:{}] Stream cancelled by user (emitted: {})",
+            session_id,
+            pacer.stats().emitted
+        );
     } else {
-        tlog!("[BackendAPI:{}] Stream ended (emitted: {})", session_id, pacer.emitted);
+        tlog!(
+            "[BackendAPI:{}] Stream ended (emitted: {})",
+            session_id,
+            pacer.stats().emitted
+        );
         emit_stream_ended(&session_id, StreamEndReason::Complete, "BackendAPI");
     }
     Ok(())
