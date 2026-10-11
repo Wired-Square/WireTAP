@@ -11,7 +11,7 @@ use std::time::Duration;
 
 use wiretap_io::can::{CanError, CanEvent, DeviceInfo};
 
-use crate::io::bus_mapping::{gvret_protocols, BusMapping};
+use crate::io::bus_mapping::{gvret_protocols, reconcile_with_device, BusMapping};
 use crate::io::can_task::{announce_on_event, open_failed};
 use crate::io::types::SourceMessage;
 
@@ -74,29 +74,19 @@ pub fn probed_bus_count(probed: Result<DeviceInfo, CanError>) -> Result<GvretDev
 /// nothing" is not spelled as a count here — it is [`NumBusesOutcome::Silent`],
 /// and the decision to honour the profile lives in `mappings_from_num_buses`.
 fn reconcile_to_bus_count(profile_mappings: &[BusMapping], bus_count: u8) -> Vec<BusMapping> {
-    (0..bus_count)
-        .enumerate()
-        .map(|(slot, device_bus)| {
-            let override_for = profile_mappings.iter().find(|m| m.device_bus == device_bus);
-            BusMapping {
-                device_bus,
-                // A bus the profile has never heard of streams by default; one
-                // it has been told to mute stays muted.
-                enabled: override_for.map(|m| m.enabled).unwrap_or(true),
-                output_bus: override_for.map(|m| m.output_bus).unwrap_or(slot as u8),
-                interface_id: override_for
-                    .map(|m| m.interface_id.clone())
-                    .filter(|id| !id.is_empty())
-                    .unwrap_or_else(|| format!("can{}", device_bus)),
-                supported_protocols: gvret_protocols(),
-                // The protocol is the session's to choose, not the device's —
-                // GVRET reports a bus *count* and says nothing about FD. So it
-                // survives the reconcile, and the traits follow from it.
-                ..BusMapping::default()
-                    .with_protocol(override_for.map(|m| m.protocol).unwrap_or_default())
-            }
-        })
-        .collect()
+    reconcile_with_device(profile_mappings, 0..bus_count, |device_bus, profile| {
+        BusMapping {
+            interface_id: profile
+                .map(|m| m.interface_id.clone())
+                .filter(|id| !id.is_empty())
+                .unwrap_or_else(|| format!("can{}", device_bus)),
+            supported_protocols: gvret_protocols(),
+            // The protocol is the session's to choose, not the device's — GVRET
+            // reports a bus *count* and says nothing about FD. So it survives the
+            // reconcile, and the traits follow from it.
+            ..BusMapping::default().with_protocol(profile.map(|m| m.protocol).unwrap_or_default())
+        }
+    })
 }
 
 /// How long a source waits for GET_NUMBUSES: `GvretOptions::probe_timeout`'s default.
@@ -256,39 +246,15 @@ mod tests {
         }
     }
 
-    /// The case this exists for: the profile was never probed and carries one
-    /// bus 0, while the device in front of us has two.
     #[test]
-    fn a_device_bus_the_profile_never_saw_still_streams() {
-        let mappings = reconcile_to_bus_count(&[reconcile_mapping(0, true, 0)], 2);
-        assert_eq!(mappings.len(), 2);
-        assert!(mappings.iter().all(|m| m.enabled));
-        assert_eq!(mappings[1].device_bus, 1);
-        assert_eq!(mappings[1].interface_id, "can1");
-    }
-
-    #[test]
-    fn the_profile_still_decides_enabled_and_output_bus() {
-        let mappings = reconcile_to_bus_count(
-            &[
-                reconcile_mapping(0, false, 7),
-                reconcile_mapping(1, true, 9),
-            ],
-            2,
-        );
-        assert!(!mappings[0].enabled, "a muted bus stays muted");
-        assert_eq!(mappings[0].output_bus, 7);
-        assert_eq!(mappings[1].output_bus, 9);
-    }
-
-    #[test]
-    fn a_bus_the_device_does_not_have_is_dropped() {
-        let mappings = reconcile_to_bus_count(
-            &[reconcile_mapping(0, true, 0), reconcile_mapping(3, true, 3)],
-            1,
-        );
-        assert_eq!(mappings.len(), 1);
-        assert_eq!(mappings[0].device_bus, 0);
+    fn a_bus_is_named_by_its_number_unless_the_profile_named_it() {
+        let named = BusMapping {
+            interface_id: "left".into(),
+            ..reconcile_mapping(0, true, 0)
+        };
+        let mappings = reconcile_to_bus_count(&[named], 2);
+        let ids: Vec<&str> = mappings.iter().map(|m| m.interface_id.as_str()).collect();
+        assert_eq!(ids, ["left", "can1"]);
     }
 
     /// A profile carrying a bus the device would never synthesise, so honouring

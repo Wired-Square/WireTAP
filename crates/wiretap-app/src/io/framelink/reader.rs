@@ -13,7 +13,7 @@ use super::shared;
 use framelink::protocol::types::{IFACE_CAN, IFACE_CANFD, IFACE_RS232, IFACE_RS485};
 
 use crate::io::error::IoError;
-use crate::io::bus_mapping::BusMapping;
+use crate::io::bus_mapping::{reconcile_with_device, BusMapping};
 use crate::io::types::{transmit_channel, EndReason, SourceMessage};
 use crate::io::Protocol;
 
@@ -212,29 +212,17 @@ fn reconcile_bus_mappings(
     let mut indices: Vec<u8> = iface_types.keys().copied().collect();
     indices.sort_unstable();
 
-    indices
-        .into_iter()
-        .enumerate()
-        .map(|(slot, device_bus)| {
-            let iface_type = iface_types.get(&device_bus).copied().unwrap_or(IFACE_CAN);
-            let protocol = protocol_for_iface_type(iface_type);
-            let override_for = profile_mappings.iter().find(|m| m.device_bus == device_bus);
-            BusMapping {
-                device_bus,
-                // An interface the profile has never heard of streams by default;
-                // one it has been told to mute stays muted.
-                enabled: override_for.map(|m| m.enabled).unwrap_or(true),
-                output_bus: override_for
-                    .map(|m| m.output_bus)
-                    .unwrap_or(slot as u8),
-                interface_id: interface_id_for(device_bus, iface_type),
-                // The device's interface type wins over anything the profile or
-                // the picker said — an RS485 port cannot be talked into CAN.
-                supported_protocols: vec![protocol],
-                ..BusMapping::default().with_protocol(protocol)
-            }
-        })
-        .collect()
+    reconcile_with_device(profile_mappings, indices, |device_bus, _| {
+        let iface_type = iface_types.get(&device_bus).copied().unwrap_or(IFACE_CAN);
+        let protocol = protocol_for_iface_type(iface_type);
+        BusMapping {
+            interface_id: interface_id_for(device_bus, iface_type),
+            // The device's interface type wins over anything the profile or
+            // the picker said — an RS485 port cannot be talked into CAN.
+            supported_protocols: vec![protocol],
+            ..BusMapping::default().with_protocol(protocol)
+        }
+    })
 }
 
 /// `can0` / `serial1` — the identifier shape the session picker displays.
@@ -275,40 +263,6 @@ mod tests {
         }
     }
 
-    /// The case this whole change exists for: a profile whose probe never ran
-    /// carries one hardcoded can0, and the device has two interfaces.
-    #[test]
-    fn a_device_interface_the_profile_never_saw_still_streams() {
-        let iface_types = HashMap::from([(0u8, IFACE_CAN), (1u8, IFACE_CAN)]);
-        let mappings = reconcile_bus_mappings(&[mapping(0, true, 0)], &iface_types);
-
-        assert_eq!(mappings.len(), 2, "both device interfaces should be mapped");
-        assert!(mappings.iter().all(|m| m.enabled));
-        assert_eq!(mappings[1].device_bus, 1);
-        assert_eq!(mappings[1].interface_id, "can1");
-    }
-
-    #[test]
-    fn the_profile_still_decides_enabled_and_output_bus() {
-        let iface_types = HashMap::from([(0u8, IFACE_CAN), (1u8, IFACE_CAN)]);
-        let mappings =
-            reconcile_bus_mappings(&[mapping(0, false, 7), mapping(1, true, 9)], &iface_types);
-
-        assert!(!mappings[0].enabled, "a muted interface stays muted");
-        assert_eq!(mappings[0].output_bus, 7);
-        assert_eq!(mappings[1].output_bus, 9);
-    }
-
-    #[test]
-    fn an_interface_the_device_does_not_have_is_dropped() {
-        let iface_types = HashMap::from([(0u8, IFACE_CAN)]);
-        let mappings =
-            reconcile_bus_mappings(&[mapping(0, true, 0), mapping(3, true, 3)], &iface_types);
-
-        assert_eq!(mappings.len(), 1);
-        assert_eq!(mappings[0].device_bus, 0);
-    }
-
     /// An RS-485 interface must come back as a serial bus, not a CAN one, or the
     /// session advertises the wrong protocol for it.
     #[test]
@@ -316,7 +270,8 @@ mod tests {
         let iface_types = HashMap::from([(0u8, IFACE_CAN), (1u8, IFACE_RS485)]);
         let mappings = reconcile_bus_mappings(&[], &iface_types);
 
-        assert_eq!(mappings[1].interface_id, "serial1");
+        let ids: Vec<&str> = mappings.iter().map(|m| m.interface_id.as_str()).collect();
+        assert_eq!(ids, ["can0", "serial1"]);
         let traits = mappings[1].traits.as_ref().unwrap();
         assert_eq!(traits.protocols, vec![Protocol::Serial]);
         assert!(traits.tx_bytes && !traits.tx_frames);
