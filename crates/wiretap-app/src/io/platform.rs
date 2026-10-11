@@ -74,9 +74,15 @@ pub async fn platform_probe_slcan_device(
 ) -> SlcanProbeResultCompat {
     #[cfg(not(target_os = "ios"))]
     {
-        let line = match super::serial::utils::parse_line(baud_rate, data_bits, stop_bits, parity.as_deref()) {
+        let parsed = wiretap_io::serial::LineSettings::parse(
+            baud_rate,
+            data_bits,
+            stop_bits,
+            parity.as_deref(),
+        );
+        let line = match parsed {
             Ok(line) => line,
-            Err(e) => return SlcanProbeResultCompat::failed(e),
+            Err(e) => return SlcanProbeResultCompat::failed(e.to_string()),
         };
         let result = super::slcan::reader::probe_slcan(&port, line).await;
         SlcanProbeResultCompat {

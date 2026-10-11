@@ -8,6 +8,8 @@ use std::sync::mpsc as std_mpsc;
 use tokio::sync::mpsc::{self, error::TrySendError};
 use tokio_util::sync::CancellationToken;
 
+use wiretap_catalog::FramingMode;
+
 use super::{FrameMessage, TransmitResult};
 
 // ============================================================================
@@ -201,32 +203,9 @@ fn refused_or_queued(answer: Option<Result<(), String>>) -> TransmitResult {
 // Control Types (live framing changes)
 // ============================================================================
 
-/// How a serial byte stream is cut into frames, in every path that frames one:
-/// the port, a live framing change and re-framing a capture. `Raw` is no
-/// framing, the bytes as read.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(test, derive(ts_rs::TS))]
-#[serde(rename_all = "snake_case")]
-pub enum FramingMode {
-    #[default]
-    Raw,
-    Slip,
-    Delimiter,
-    ModbusRtu,
-}
-
-impl std::fmt::Display for FramingMode {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let name = serde_json::to_value(self).ok();
-        f.write_str(name.as_ref().and_then(serde_json::Value::as_str).unwrap_or_default())
-    }
-}
-
 #[cfg(test)]
-impl FramingMode {
-    pub(crate) fn named(name: &str) -> Self {
-        serde_json::from_value(serde_json::json!(name)).unwrap()
-    }
+pub(crate) fn framing_named(name: &str) -> FramingMode {
+    serde_json::from_value(serde_json::json!(name)).unwrap()
 }
 
 /// A live framing change for a running serial source. Carries primitives only

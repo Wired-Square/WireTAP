@@ -10,6 +10,7 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
+use wiretap_catalog::serial_framing::{FrameIdConfig, FramingEncoding, SerialFrame, SerialFramer};
 use wiretap_catalog::{Catalog, ModbusRtuOptions, RtuSettings, RtuTap, TappedMessage};
 use wiretap_io::serial::{
     self, ports, Access, LineSettings, PortInfo, PortKind, SerialEvent,
@@ -24,10 +25,7 @@ use crate::io::types::{
 };
 use crate::io::FrameMessage;
 
-use super::framer::{
-    residue, rtu_frame, FrameIdConfig, FramingEncoding, SerialFrame, SerialFramer,
-};
-use super::utils::{framing_from_mode, probe_serial_presence, SerialSourceConfig};
+use super::utils::{probe_serial_presence, SerialSourceConfig};
 
 /// How often the read loop looks for a framing or catalogue change.
 const POLL: Duration = Duration::from_millis(50);
@@ -68,7 +66,7 @@ fn stamped(frames: Vec<SerialFrame>, at: SystemTime) -> Vec<(SerialFrame, u64)> 
 }
 
 fn tapped(tapped: TappedMessage) -> (SerialFrame, u64) {
-    (rtu_frame(tapped.message), micros(tapped.at))
+    (SerialFrame::from(tapped.message), micros(tapped.at))
 }
 
 enum Framer {
@@ -107,7 +105,14 @@ impl Framer {
                 line,
                 mid_message,
             } => {
+                let abandoned = framer.abandoned_frames();
                 let frames = framer.feed(bytes);
+                if framer.abandoned_frames() > abandoned {
+                    tlog!(
+                        "[serial] SLIP frame outgrew the frame cap without an END ({} abandoned)",
+                        framer.abandoned_frames()
+                    );
+                }
                 let fed = framer.bytes_fed();
                 *mid_message = match frames.last() {
                     Some(last) => fed > last.end_offset,
@@ -147,7 +152,8 @@ impl Framer {
             }
             Self::Rtu(tap, _) => {
                 let (messages, trailing) = tap.finish();
-                let leftover = stamped(residue(trailing, tap.bytes_fed()), now);
+                let leftover =
+                    SerialFrame::residue(trailing, tap.bytes_fed()).map(|f| (f, micros(now)));
                 tap.reset();
                 messages.into_iter().map(tapped).chain(leftover).collect()
             }
@@ -331,7 +337,7 @@ impl LiveLine {
     /// next boundary in the new encoding.
     fn set_framing(&mut self, req: SetFramingRequest) {
         self.framer = Framer::new(
-            framing_from_mode(req.encoding, req.modbus.as_ref()),
+            FramingEncoding::from_mode(req.encoding, req.modbus.as_ref()),
             self.line,
             self.catalog.as_deref(),
         );
@@ -537,7 +543,7 @@ mod tests {
     use super::*;
     use crate::io::IoErrorKind;
     use wiretap_io::serial::SerialError;
-    use crate::io::serial::DelimiterOptions;
+    use wiretap_catalog::serial_framing::DelimiterOptions;
     use wiretap_io::serial::Parity as LineParity;
 
     const LINE_9600_8N1: LineSettings = LineSettings {

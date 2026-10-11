@@ -7,7 +7,8 @@ use std::sync::{Arc, Mutex};
 
 use crate::io::bus_mapping::BusMapping;
 use crate::io::modbus_tcp::PollGroup;
-use crate::io::types::{ControlSender, FramingMode, TransmitSender};
+use crate::io::types::{ControlSender, TransmitSender};
+use crate::io::FramingMode;
 use crate::io::Protocol;
 
 /// The serial settings a session may override on one source, as the picker sends

@@ -2,11 +2,10 @@
 //
 // Shared utilities for serial port readers.
 
-use wiretap_catalog::RtuSettings;
-use wiretap_io::serial::{LineSettings, Parity};
+use wiretap_catalog::serial_framing::{DelimiterOptions, FrameIdConfig, FramingEncoding};
+use wiretap_catalog::{FramingMode, RtuSettings};
+use wiretap_io::serial::LineSettings;
 
-use super::framer::{DelimiterOptions, FrameIdConfig, FramingEncoding};
-use crate::io::types::FramingMode;
 use crate::io::device_kinds::{conn_bool, conn_i64, conn_str, conn_u8_list};
 use crate::io::SerialOverrides;
 use crate::io::error::DevicePresence;
@@ -44,21 +43,6 @@ pub struct SerialSourceConfig {
     pub emit_raw_bytes: bool,
 }
 
-/// A [`FramingEncoding`] with default options, for live framing changes that
-/// carry no profile context.
-pub fn framing_from_mode(mode: FramingMode, modbus: Option<&RtuSettings>) -> FramingEncoding {
-    match mode {
-        FramingMode::Slip => FramingEncoding::default(),
-        FramingMode::ModbusRtu => FramingEncoding::ModbusRtu(modbus.cloned().unwrap_or_default()),
-        FramingMode::Delimiter => FramingEncoding::Delimiter(DelimiterOptions {
-            delimiter: vec![0x0A],
-            max_length: 1024,
-            include_delimiter: false,
-        }),
-        FramingMode::Raw => FramingEncoding::Raw,
-    }
-}
-
 /// Where a frame id or source address is read from within a framed message: the
 /// session's override if it names a start byte, else the profile's own triple,
 /// else nothing.
@@ -91,33 +75,13 @@ fn extraction(
 /// seeds from.
 pub(crate) fn line_settings(profile: &IOProfile) -> Result<LineSettings, String> {
     let bits = |key| conn_i64(profile, key).map(|n| u8::try_from(n).unwrap_or(u8::MAX));
-    parse_line(
+    LineSettings::parse(
         conn_i64(profile, "baud_rate").unwrap_or_default() as u32,
         bits("data_bits"),
         bits("stop_bits"),
         conn_str(profile, "parity").as_deref(),
     )
-}
-
-/// An absent field reads as 8N1's; a present one must be valid.
-pub(crate) fn parse_line(
-    baud: u32,
-    data_bits: Option<u8>,
-    stop_bits: Option<u8>,
-    parity: Option<&str>,
-) -> Result<LineSettings, String> {
-    let parity = parity
-        .filter(|p| !p.is_empty())
-        .map_or(Ok(Parity::None), str::parse)
-        .map_err(|e| e.to_string())?;
-    let line = LineSettings {
-        baud,
-        data_bits: data_bits.unwrap_or(8),
-        parity,
-        stop_bits: stop_bits.unwrap_or(1),
-    };
-    line.validate().map_err(|e| e.to_string())?;
-    Ok(line)
+    .map_err(|e| e.to_string())
 }
 
 /// Parse an IOProfile into a SerialSourceConfig, applying session-level overrides.
@@ -206,46 +170,10 @@ pub fn parse_profile_for_source(
     Ok(SerialSourceConfig {
         port,
         line,
-        framing_encoding: framing_encoding.checked()?,
+        framing_encoding: framing_encoding.checked().map_err(|e| e.to_string())?,
         frame_id_config,
         source_address_config,
         min_frame_length,
         emit_raw_bytes,
     })
-}
-
-// ============================================================================
-// Tests
-// ============================================================================
-
-#[cfg(test)]
-mod tests {
-    use super::super::framer::SerialFramer;
-    use super::*;
-
-    #[test]
-    fn an_absent_line_field_reads_as_8n1() {
-        assert_eq!(parse_line(9600, None, None, None).unwrap().to_string(), "9600 8N1");
-        assert_eq!(parse_line(9600, None, None, Some("")).unwrap().to_string(), "9600 8N1");
-        assert_eq!(
-            parse_line(19200, Some(7), Some(2), Some("Even")).unwrap().to_string(),
-            "19200 7E2"
-        );
-    }
-
-    #[test]
-    fn a_slip_line_without_end_stops_growing_at_the_frame_cap() {
-        let mut framer = SerialFramer::new(framing_from_mode(FramingMode::Slip, None)).unwrap();
-        framer.feed(&[0x55; 4096]);
-        let released = framer.feed(&[wiretap_protocol::slip::END]);
-        let longest = released.iter().map(|f| f.bytes.len()).max();
-        assert!(longest.is_none_or(|len| len <= 1024), "released a {longest:?}-byte frame");
-    }
-
-    #[test]
-    fn a_present_but_invalid_line_field_is_refused() {
-        assert!(parse_line(9600, Some(9), None, None).is_err());
-        assert!(parse_line(9600, None, Some(0), None).is_err());
-        assert!(parse_line(9600, None, None, Some("mark")).is_err());
-    }
 }

@@ -28,9 +28,9 @@ use super::can_task::can_frame;
 use super::lifecycle::SourceLifecycle;
 use super::traits::validate_session_traits;
 use super::types::{
-    channel_refusal, FramingMode, PendingTransmit, SetFramingRequest, SourceMessage,
-    TransmitRequest,
+    channel_refusal, PendingTransmit, SetFramingRequest, SourceMessage, TransmitRequest,
 };
+use super::FramingMode;
 use super::{
     CanTransmitFrame, IOCapabilities, IOSource, IOState, InterfaceTraits, SessionDataStreams,
     TransmitPayload, TransmitResult, VirtualBusState, emit_capture_changed,
@@ -1075,7 +1075,7 @@ mod tests {
         SourceConfig {
             profile_kind: "serial".into(),
             serial: SerialOverrides {
-                framing_encoding: Some(FramingMode::named(framing)),
+                framing_encoding: Some(crate::io::types::framing_named(framing)),
                 emit_raw_bytes: Some(emit_raw_bytes),
                 ..Default::default()
             },
@@ -1085,7 +1085,7 @@ mod tests {
 
     fn set_framing(encoding: &str, emit_raw_bytes: bool) -> SetFramingRequest {
         SetFramingRequest {
-            encoding: FramingMode::named(encoding),
+            encoding: crate::io::types::framing_named(encoding),
             frame_id_start_byte: None,
             frame_id_bytes: None,
             frame_id_big_endian: true,

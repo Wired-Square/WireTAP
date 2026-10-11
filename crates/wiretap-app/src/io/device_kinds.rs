@@ -563,26 +563,14 @@ pub fn validate_profile(
     if canonical_kind(&profile.kind) == "serial" {
         let delimiter = conn_u8_list(profile, "delimiter");
         let max_frame_length = conn_i64(profile, "max_frame_length");
-        if let Some(field) = degenerate_framing_field(delimiter.as_deref(), max_frame_length) {
+        if let Some(field) = wiretap_catalog::serial_framing::degenerate_framing_field(
+            delimiter.as_deref(),
+            max_frame_length,
+        ) {
             return Err(ProfileValidationError::new(ValidationCode::FieldInvalid, Some(field)));
         }
     }
     Ok(())
-}
-
-/// The serial framing field, if any, whose value would release every byte as
-/// its own frame.
-pub fn degenerate_framing_field(
-    delimiter: Option<&[u8]>,
-    max_frame_length: Option<i64>,
-) -> Option<&'static str> {
-    if delimiter.is_some_and(<[u8]>::is_empty) {
-        Some("delimiter")
-    } else if max_frame_length.is_some_and(|n| n <= 0) {
-        Some("max_frame_length")
-    } else {
-        None
-    }
 }
 
 // ── Tauri commands ───────────────────────────────────────────────────────────
@@ -880,7 +868,7 @@ mod tests {
         let mut profile = profile("serial");
         profile.connection.insert("port".to_string(), "/dev/ttyUSB0".into());
         let session = |framing: &str| SerialOverrides {
-            framing_encoding: Some(FramingMode::named(framing)),
+            framing_encoding: Some(crate::io::types::framing_named(framing)),
             ..Default::default()
         };
         assert!(parse_profile_for_source(&profile, &session("delimiter")).is_ok());

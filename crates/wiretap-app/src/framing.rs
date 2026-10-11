@@ -44,7 +44,9 @@ mod desktop {
     use crate::{
         capture_store,
         io::{FrameMessage, FramingMode},
-        io::serial::{DelimiterOptions, FrameIdConfig, FramingEncoding, SerialFramer},
+    };
+    use wiretap_catalog::serial_framing::{
+        DelimiterOptions, FrameIdConfig, FramingEncoding, SerialFramer,
     };
 
     /// Per-interface framing configuration (overrides default for specific bus)
@@ -293,7 +295,8 @@ mod desktop {
                 Some(interface_config) => build_encoding(interface_config)?,
                 None => default_encoding.clone(),
             }
-            .checked()?;
+            .checked()
+            .map_err(|e| e.to_string())?;
 
             let Some(mut framer) = SerialFramer::with_catalog(encoding, catalog) else {
                 continue;
@@ -303,6 +306,12 @@ mod desktop {
             // a list, not one residue.
             let mut released = framer.feed(&line);
             released.extend(framer.flush());
+            if framer.abandoned_frames() > 0 {
+                tlog!(
+                    "[serial] SLIP frame outgrew the frame cap without an END ({} abandoned)",
+                    framer.abandoned_frames()
+                );
+            }
 
             // Each frame's last byte, not the one that released it: a sync
             // releases the RTU messages it buffered on a later byte.
@@ -373,7 +382,7 @@ mod desktop {
         fn config(mode: &str) -> BackendFramingConfig {
             BackendFramingConfig {
                 framing: InterfaceFramingConfig {
-                    mode: FramingMode::named(mode),
+                    mode: crate::io::types::framing_named(mode),
                     delimiter: None,
                     max_length: None,
                     modbus: None,

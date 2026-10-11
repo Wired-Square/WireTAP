@@ -23,7 +23,6 @@ use serialport::{DataBits, SerialPort, StopBits};
 use wiretap_io::serial::{LineSettings, Parity};
 
 use crate::blocking::off_runtime;
-use crate::io::serial::utils::parse_line;
 
 const SERIAL_TERMINAL_DATA_EVENT: &str = "serial-terminal-data";
 
@@ -92,7 +91,8 @@ pub async fn serial_terminal_open(
     stop_bits: Option<u8>,
     parity: Option<String>,
 ) -> Result<String, String> {
-    let line = parse_line(baud_rate, data_bits, stop_bits, parity.as_deref())?;
+    let line = LineSettings::parse(baud_rate, data_bits, stop_bits, parity.as_deref())
+        .map_err(|e| e.to_string())?;
     off_runtime(move || open_terminal(app, port, line)).await
 }
 

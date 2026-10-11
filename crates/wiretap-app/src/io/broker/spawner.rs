@@ -273,7 +273,7 @@ async fn run_serial_reader(
 
     // The WS decode path frames these messages a second time, and has to be told
     // the same vendor codes or it discards what the port framed.
-    if let crate::io::serial::FramingEncoding::ModbusRtu(opts) = &config.framing_encoding {
+    if let wiretap_catalog::FramingEncoding::ModbusRtu(opts) = &config.framing_encoding {
         crate::ws::dispatch::set_serial_rtu_options(session_id, opts.clone());
     }
 
