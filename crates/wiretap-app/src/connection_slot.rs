@@ -2,9 +2,9 @@
 
 use rusqlite::Connection;
 use std::path::Path;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
-pub struct ConnectionSlot(Mutex<Option<Connection>>);
+pub struct ConnectionSlot(Mutex<Option<Arc<Mutex<Connection>>>>);
 
 impl ConnectionSlot {
     pub const fn new() -> Self {
@@ -23,26 +23,39 @@ impl ConnectionSlot {
         }
         let mut conn = Connection::open(path).map_err(|e| format!("Failed to open {what}: {e}"))?;
         init(&mut conn)?;
-        *self.lock()? = Some(conn);
+        *self.lock()? = Some(Arc::new(Mutex::new(conn)));
         Ok(())
     }
 
     pub fn with<T>(&self, f: impl FnOnce(&mut Connection) -> Result<T, String>) -> Result<T, String> {
-        #[cfg(test)]
-        if self.lent_to_this_thread() {
-            return THREAD_CONNECTIONS.with_borrow_mut(|lent| f(lent.get_mut(&self.key()).expect("lent connection")));
-        }
-        f(self.lock()?.as_mut().ok_or("Database not initialised")?)
+        let conn = self.shared()?;
+        let mut conn = conn.lock().map_err(|_| poisoned())?;
+        f(&mut conn)
     }
 
-    fn lock(&self) -> Result<std::sync::MutexGuard<'_, Option<Connection>>, String> {
-        self.0.lock().map_err(|_| "Database mutex poisoned".to_string())
+    /// The connection itself, for a reader that takes its own lock.
+    pub fn shared(&self) -> Result<Arc<Mutex<Connection>>, String> {
+        #[cfg(test)]
+        if let Some(lent) = THREAD_CONNECTIONS.with_borrow(|lent| lent.get(&self.key()).cloned()) {
+            return Ok(lent);
+        }
+        self.lock()?
+            .clone()
+            .ok_or_else(|| "Database not initialised".to_string())
     }
+
+    fn lock(&self) -> Result<std::sync::MutexGuard<'_, Option<Arc<Mutex<Connection>>>>, String> {
+        self.0.lock().map_err(|_| poisoned())
+    }
+}
+
+fn poisoned() -> String {
+    "Database mutex poisoned".to_string()
 }
 
 #[cfg(test)]
 thread_local! {
-    static THREAD_CONNECTIONS: std::cell::RefCell<std::collections::HashMap<usize, Connection>> =
+    static THREAD_CONNECTIONS: std::cell::RefCell<std::collections::HashMap<usize, Arc<Mutex<Connection>>>> =
         std::cell::RefCell::default();
 }
 
@@ -64,16 +77,16 @@ impl ConnectionSlot {
         self as *const Self as usize
     }
 
-    fn lent_to_this_thread(&self) -> bool {
-        THREAD_CONNECTIONS.with_borrow(|lent| lent.contains_key(&self.key()))
-    }
-
     pub fn install_once(&self, make: impl FnOnce() -> Connection) {
-        self.0.lock().unwrap().get_or_insert_with(make);
+        self.0
+            .lock()
+            .unwrap()
+            .get_or_insert_with(|| Arc::new(Mutex::new(make())));
     }
 
     pub fn lend_to_this_thread(&self, conn: Connection) -> ThreadConnection {
-        THREAD_CONNECTIONS.with_borrow_mut(|lent| lent.insert(self.key(), conn));
+        THREAD_CONNECTIONS
+            .with_borrow_mut(|lent| lent.insert(self.key(), Arc::new(Mutex::new(conn))));
         ThreadConnection(self.key())
     }
 }

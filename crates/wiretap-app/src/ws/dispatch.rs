@@ -958,7 +958,7 @@ fn stream_ended_payload(info: &StreamEndedInfo) -> Vec<u8> {
         info.reason.code(),
         info.capture_available,
         info.capture_id.as_deref(),
-        info.capture_kind.as_ref().map(CaptureKind::as_str),
+        info.capture_kind.map(CaptureKind::as_str),
         info.count as u32,
         info.time_range,
     )

@@ -1,18 +1,10 @@
 // Generated from the Rust serde types by `npm run gen:types`. Do not edit.
 
 /**
- * Timestamped byte for raw serial data
+ * One raw serial byte.
  */
-export type TimestampedByte = { 
+export type TimestampedByte = { byte: number, 
 /**
- * The byte value
+ * Microseconds since the epoch.
  */
-byte: number, 
-/**
- * Timestamp in microseconds since epoch
- */
-timestamp_us: number, 
-/**
- * Bus/interface number (for multi-source sessions)
- */
-bus: number, };
+timestamp_us: number, bus: number, };

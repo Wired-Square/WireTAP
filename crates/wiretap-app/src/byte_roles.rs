@@ -19,7 +19,7 @@ use wiretap_analysis::source::{
 use crate::drafting;
 use wiretap_analysis::draft::Draft;
 use crate::checksum_discovery::DEFAULT_SAMPLE_LIMIT;
-use crate::payload_source::Capture;
+use crate::capture_db;
 use crate::report::{held, ReportFormat};
 
 /// One protocol's mirror groups.
@@ -70,7 +70,10 @@ pub async fn payload_changes_cmd(
     draft: Option<Draft>,
 ) -> Result<Drafted<PayloadChanges>, String> {
     let key = held::window_key(&capture_id, &selection, newest, None);
-    let result = payload_changes(&Capture(&capture_id), selection, newest, usize::MAX).await?;
+    let result = capture_db::analyse(&capture_id, async move |c| {
+        payload_changes(c, selection, newest, usize::MAX).await
+    })
+    .await??;
     held::hold_changes(key, result.clone());
     let mut draft = draft.unwrap_or_default();
     drafting::apply_changes(&mut draft, &result);
@@ -156,7 +159,11 @@ pub async fn frame_order_cmd(
 ) -> Result<Drafted<Vec<ProtocolOrder>>, String> {
     let key = held::window_key(&capture_id, &selection, newest, start.as_ref());
     let selection = FrameSelection::from_groups(selection);
-    let frames = Capture(&capture_id).frames(&selection, newest).await?;
+    let frames = capture_db::analyse(&capture_id, async move |c| {
+        c.frames(&selection, newest).await
+    })
+    .await?
+    .map_err(capture_db::source_error)?;
     let mut draft = draft.unwrap_or_default();
     drafting::seed(
         &mut draft,

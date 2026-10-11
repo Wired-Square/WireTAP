@@ -33,13 +33,12 @@ pub async fn discover_checksums_in_capture_cmd(
     // Empty reads as "every frame", the same as everywhere else a selection is
     // accepted; Discovery guards its own "nothing selected" case before calling.
     let filter = ScanFilter::Selection(FrameSelection::from_groups(selection));
-    wiretap_analysis::source::checksum_scan(
-        &crate::payload_source::Capture(&capture_id),
-        &filter,
-        DEFAULT_SAMPLE_LIMIT,
-        options.unwrap_or_default(),
-    )
-    .await
+    let options = options.unwrap_or_default();
+    crate::capture_db::analyse(&capture_id, async move |c| {
+        wiretap_analysis::source::checksum_scan(c, &filter, DEFAULT_SAMPLE_LIMIT, options).await
+    })
+    .await?
+    .map_err(crate::capture_db::source_error)
 }
 
 /// Just enough of a `FrameMessage` to group and analyse. Serde ignores the rest
