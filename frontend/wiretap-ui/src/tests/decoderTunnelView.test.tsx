@@ -36,6 +36,7 @@ const base: TunnelTransaction = {
   exceptionLabel: null,
   frame: null,
   frameId: 0x1e0,
+  isExtended: false,
   bus: 0,
   timestampUs: 1_000_000,
 };

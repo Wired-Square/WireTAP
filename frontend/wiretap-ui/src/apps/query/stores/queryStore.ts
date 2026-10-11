@@ -24,6 +24,7 @@ import {
 import type { TimeBounds } from "../../../components/TimeBoundsInput";
 import { useSettingsStore } from "../../settings/stores/settingsStore";
 import { datetimeLocalToMicros } from "../../../utils/timeFormat";
+import { formatFrameId } from "../../../utils/frameIds";
 import type { Catalog, Frame } from "../../../types/catalogModel";
 import { framesById } from "../../../utils/catalogFrames";
 
@@ -112,21 +113,14 @@ export const CONTEXT_PRESETS: { label: string; beforeMs: number; afterMs: number
   { label: "±1m", beforeMs: 60000, afterMs: 60000 },
 ];
 
-/** Format frame ID with leading zeros (3 digits for standard, 8 for extended) */
-function formatFrameId(frameId: number, isExtended: boolean | null): string {
-  // When isExtended is null (no filter), default to standard display (3 digits)
-  const hexDigits = isExtended === true ? 8 : 3;
-  return `0x${frameId.toString(16).toUpperCase().padStart(hexDigits, "0")}`;
-}
-
 /** Generate a display name for a query */
 function generateQueryDisplayName(queryType: QueryType, queryParams: QueryParams): string {
   const typeLabel = QUERY_TYPE_INFO[queryType].label;
 
   let name: string;
   if (queryType === "mirror_validation") {
-    const mirrorHex = formatFrameId(queryParams.mirrorFrameId, queryParams.isExtended);
-    const sourceHex = formatFrameId(queryParams.sourceFrameId, queryParams.isExtended);
+    const mirrorHex = formatFrameId(queryParams.mirrorFrameId, "hex", queryParams.isExtended);
+    const sourceHex = formatFrameId(queryParams.sourceFrameId, "hex", queryParams.isExtended);
     name = `${typeLabel} - ${mirrorHex} ↔ ${sourceHex}`;
   } else if (queryType === "frame_inventory") {
     name = typeLabel;
@@ -136,7 +130,7 @@ function generateQueryDisplayName(queryType: QueryType, queryParams: QueryParams
       .join(" ");
     name = `${typeLabel} - ${patternHex}`;
   } else {
-    const frameHex = formatFrameId(queryParams.frameId, queryParams.isExtended);
+    const frameHex = formatFrameId(queryParams.frameId, "hex", queryParams.isExtended);
     name = `${typeLabel} - ${frameHex}`;
     if (queryType === "byte_changes" || queryType === "distribution") {
       name += ` [byte ${queryParams.byteIndex}]`;

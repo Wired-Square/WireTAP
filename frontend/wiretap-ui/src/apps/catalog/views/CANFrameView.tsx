@@ -54,7 +54,7 @@ export default function CANFrameView({
   const muxInherited = inherited.has("mux");
   const [colorForRange, setColorForRange] = useState<(range: BitRange) => string | undefined>(() => () => undefined);
   const [confirmDeleteMux, setConfirmDeleteMux] = useState(false);
-  const formattedId = formatFrameId(idKey, displayFrameIdFormat);
+  const formattedId = formatFrameId(frame, displayFrameIdFormat);
   const layout = useFrameLayout(selectedNode.path);
   const ranges = previewRanges(layout);
   const signalColor = useCallback((signal: Signal) => colorForRange(signalRange(signal)), [colorForRange]);

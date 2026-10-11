@@ -76,6 +76,11 @@ export async function frameLayout(content: string, protocol: Protocol, key: stri
   return await wsTransport.command<FrameLayout | null>("catalog.frameLayout", { content, protocol, key, path });
 }
 
+/** A frame key's numeric id as the catalogue reads it, null for a name. */
+export async function catalogParseId(id: string): Promise<number | null> {
+  return await wsTransport.command<number | null>("catalog.parseId", { id });
+}
+
 /** Validate catalogue TOML, returning field-path + message findings. */
 export async function validateCatalogWs(content: string): Promise<ValidationResult> {
   return await wsTransport.command<ValidationResult>("catalog.validate", { content });

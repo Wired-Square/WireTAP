@@ -23,7 +23,10 @@ import { Table } from "../../../../components/Table";
 import { iconSm } from "../../../../styles/spacing";
 import { getCaptureLatestFrames } from "../../../../api/capture";
 import { bytesToHex } from "../../../../utils/byteUtils";
-import { interpretPair, interpretRegister, type WordOrder } from "../../../../utils/modbusValues";
+import { interpretRegisters, type RegisterReading } from "../../../../api/decode";
+import type { RegisterPairView } from "../../../../generated/RegisterPairView";
+import { useAsyncAnswer } from "../../../../hooks/useAsyncAnswer";
+import type { Endianness } from "../../../../generated/Endianness";
 import CheckboxField from "../../../../components/forms/CheckboxField";
 import { Button, IconButton } from "../../../../components/Button";
 import { Select } from "../../../../components/forms";
@@ -40,6 +43,8 @@ type Props = {
 type ScanRow = { address: number; bytes: number[]; bus: number };
 
 const EMPTY_ROWS = new Map<number, ScanRow>();
+type ReadRow = { row: ScanRow; reading: RegisterReading };
+const NO_READINGS: ReadRow[] = [];
 
 
 export default function ModbusScanResultView({
@@ -52,7 +57,7 @@ export default function ModbusScanResultView({
   const { scanType, isScanning, progress, deviceInfo, notes, sessionId, captureId } = results;
   const hasDeviceInfo = deviceInfo.size > 0;
 
-  const [wordOrder, setWordOrder] = useState<WordOrder>("big");
+  const [wordOrder, setWordOrder] = useState<Endianness>("big");
   const [showWide, setShowWide] = useState(false);
 
   // While Discovery is joined to this sweep, its frame count moves as registers land,
@@ -91,6 +96,11 @@ export default function ModbusScanResultView({
   // A repeated sweep writes each register once per pass; the table shows the
   // current value, and what changed between passes is the Changes tool's job.
   const rows = useMemo(() => [...byAddress.values()].sort((a, b) => a.address - b.address), [byAddress]);
+  const readings = useAsyncAnswer<ReadRow[]>(
+    async () => (await interpretRegisters(rows, wordOrder)).map((reading, i) => ({ row: rows[i], reading })),
+    [rows, wordOrder],
+    NO_READINGS,
+  );
 
   // One line whichever phase the sweep is in. Before the first progress tick it
   // is empty — the tab opens with the sweep, so the table's own placeholder is
@@ -137,7 +147,7 @@ export default function ModbusScanResultView({
               {showWide && (
                 <Select
                   value={wordOrder}
-                  onChange={(e) => setWordOrder(e.target.value as WordOrder)}
+                  onChange={(e) => setWordOrder(e.target.value as Endianness)}
                   className="w-auto"
                   title={t("modbusScan.wordOrder")}
                 >
@@ -240,31 +250,24 @@ export default function ModbusScanResultView({
               </tr>
             </thead>
             <tbody>
-              {rows.map((row) => {
-                const v = interpretRegister(row.bytes);
-                // The 32-bit reading pairs this register with the next one, and
-                // only means anything if that neighbour was actually found.
-                const next = byAddress.get(row.address + 1);
-                const wide = next ? interpretPair(row.bytes, next.bytes, wordOrder) : null;
-                return (
-                  <tr key={`${row.bus}-${row.address}`}>
-                    <td>{row.address}</td>
-                    <td className={textMuted}>{v.hex}</td>
-                    <td className={textSecondary}>{v.u16}</td>
-                    <td className={textSecondary}>{v.s16}</td>
-                    <td className={textMuted}>{v.ascii}</td>
-                    {showWide && (
-                      <>
-                        <td className={textSecondary}>{wide?.u32 ?? ""}</td>
-                        <td className={textSecondary}>{wide?.s32 ?? ""}</td>
-                        <td className={textMuted}>
-                          {wide ? formatFloat(wide.f32) : ""}
-                        </td>
-                      </>
-                    )}
-                  </tr>
-                );
-              })}
+              {readings.map(({ row, reading: { register: v, pair: wide } }) => (
+                <tr key={`${row.bus}-${row.address}`}>
+                  <td>{row.address}</td>
+                  <td className={textMuted}>{v.hex}</td>
+                  <td className={textSecondary}>{v.u16}</td>
+                  <td className={textSecondary}>{v.s16}</td>
+                  <td className={textMuted}>{v.ascii}</td>
+                  {showWide && (
+                    <>
+                      <td className={textSecondary}>{wide?.u32 ?? ""}</td>
+                      <td className={textSecondary}>{wide?.s32 ?? ""}</td>
+                      <td className={textMuted}>
+                        {wide ? formatFloat(wide.f32) : ""}
+                      </td>
+                    </>
+                  )}
+                </tr>
+              ))}
             </tbody>
           </Table>
         )}
@@ -274,8 +277,8 @@ export default function ModbusScanResultView({
 }
 
 /** Keep float columns narrow: absurd exponents are the tell-tale of a wrong word order. */
-function formatFloat(f: number): string {
-  if (!Number.isFinite(f)) return "—";
+function formatFloat(f: RegisterPairView["f32"]): string {
+  if (typeof f === "string") return f;
   const abs = Math.abs(f);
   if (abs !== 0 && (abs < 1e-3 || abs >= 1e9)) return f.toExponential(3);
   return f.toFixed(3);

@@ -1,32 +1,19 @@
 // ui/src/apps/catalog/utils.ts
 
+import { NAME_KEYED_FRAME_ID } from "../../generated/wireConstants";
+import type { Frame } from "../../types/catalogModel";
+import { formatFrameId as formatHexId } from "../../utils/frameIds";
+
 export type FormattedId = { primary: string; secondary?: string };
 
-export function parseCanIdToNumber(id: string | number | null | undefined): number | null {
-  if (id === null || id === undefined) return null;
-  const str = String(id).trim();
-  if (/^0x[0-9a-fA-F]+$/.test(str)) return parseInt(str, 16);
-  if (/^\d+$/.test(str)) return parseInt(str, 10);
-  return null;
-}
-
-export function formatFrameId(id: string, display: "hex" | "decimal"): FormattedId {
-  const numeric = parseCanIdToNumber(id);
-
-  // Format hex: uppercase, no 0x prefix, padded (3 chars for 11-bit, 8 for 29-bit)
-  let hex: string;
-  if (numeric !== null) {
-    // 11-bit standard IDs are 0x000-0x7FF, 29-bit extended are larger
-    const isExtended = numeric > 0x7FF;
-    const padLength = isExtended ? 8 : 3;
-    hex = numeric.toString(16).toUpperCase().padStart(padLength, '0');
-  } else {
-    hex = id;
-  }
-
-  const dec = numeric !== null ? String(numeric) : id;
-
-  return display === "hex"
-    ? { primary: hex, secondary: numeric !== null ? dec : undefined }
-    : { primary: dec, secondary: numeric !== null ? hex : undefined };
+/** A catalogue frame's id in both radixes, its hex width by the extended flag; a frame keyed by a name shows its key. */
+export function formatFrameId(
+  frame: Pick<Frame, "key" | "frameId" | "protocol" | "isExtended">,
+  display: "hex" | "decimal",
+): FormattedId {
+  const keyIsId = frame.protocol === "modbus" ? String(frame.frameId) === frame.key.trim() : frame.frameId !== NAME_KEYED_FRAME_ID;
+  if (!keyIsId) return { primary: frame.key };
+  const hex = formatHexId(frame.frameId, "hex", frame.isExtended).slice(2);
+  const dec = String(frame.frameId);
+  return display === "hex" ? { primary: hex, secondary: dec } : { primary: dec, secondary: hex };
 }

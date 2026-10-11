@@ -1,10 +1,10 @@
 // Generated from the Rust serde types by `npm run gen:types`. Do not edit.
-import type { ModbusRegisterType } from "./ModbusRegisterType";
+import type { RegisterType } from "./RegisterType";
 
 /**
  * One contiguous span of registers to poll.
  */
-export type ModbusRange = { register_type: ModbusRegisterType, 
+export type ModbusRange = { register_type: RegisterType, 
 /**
  * Protocol-level start address (0-based).
  */

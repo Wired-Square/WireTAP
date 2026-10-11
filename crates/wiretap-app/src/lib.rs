@@ -26,6 +26,7 @@ mod checksum_discovery;
 mod checksums;
 mod credentials;
 mod dbquery;
+mod decode_views;
 mod query;
 mod device_scan;
 #[cfg(not(target_os = "ios"))]
@@ -281,7 +282,7 @@ pub fn run() {
             // Checksum calculation API
             checksums::calculate_checksum_cmd,
             checksums::validate_checksum_cmd,
-            checksums::resolve_byte_index_cmd,
+            checksums::resolve_byte_indices,
             checksums::sweep_checksum_specs_cmd,
             checksums::detect_checksum_cmd,
             checksum_discovery::discover_checksums_cmd,
@@ -292,10 +293,16 @@ pub fn run() {
             byte_roles::frame_order_report_cmd,
             drafting::draft_preview_cmd,
             drafting::draft_catalog_cmd,
+            drafting::export_frames_catalog_cmd,
+            drafting::export_modbus_catalog_cmd,
+            decode_views::decode_groups_cmd,
+            decode_views::interpret_registers_cmd,
+            decode_views::can_mask_match_cmd,
             drafting::candidate_signals_cmd,
             byte_roles::serial_structure_cmd,
             adhoc::rank_hypotheses,
             frame_export::export_frame_dump,
+            frame_export::export_byte_dump,
             // Transmit API
             transmit::get_transmit_capable_profiles,
             // IO session-based transmit

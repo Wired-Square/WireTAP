@@ -24,11 +24,12 @@ import type { StreamEndedInfo, PlaybackPosition, FcProbeConfig, ModbusScanConfig
 import { createModbusScanSession, generateSessionId, probeModbusFunctionCodes, startReaderSession, stopReaderSession } from '../../api/io';
 import { MODBUS_SCAN_SOURCE_TYPE } from '../../generated/wireConstants';
 import type { ScanJob } from '../../api/io';
-import type { ModbusExportConfig } from '../../utils/frameExport';
+import type { ModbusExportConfig } from '../../api/drafting';
 import type { ModbusPollerRef } from '../../utils/modbusProfiles';
 import { useModbusPollControl } from '../../hooks/useModbusPollControl';
 import { REALTIME_CLOCK_INTERVAL_MS } from "../../constants";
 import AppLayout from "../../components/AppLayout";
+import FlashNotification from "../../components/FlashNotification";
 import DiscoveryTopBar from "./views/DiscoveryTopBar";
 import DiscoveryFramesView from "./views/DiscoveryFramesView";
 import SerialDiscoveryView from "./views/SerialDiscoveryView";
@@ -43,12 +44,11 @@ import SaveSelectionSetDialog from "../../dialogs/SaveSelectionSetDialog";
 import IoSourcePickerDialog from "../../dialogs/IoSourcePickerDialog";
 import { useSelectionSets } from "../../hooks/useSelectionSets";
 import { useEffectiveCaptureMetadata } from "../../hooks/useEffectiveCaptureMetadata";
-import { getCaptureMetadata, getCaptureMetadataById, getCaptureFramesPaginatedFiltered, getCaptureBytesPaginated, getCaptureFrameInfo, getCaptureFramesPaginatedById, type CaptureMetadata } from "../../api/capture";
+import { getCaptureMetadata, getCaptureMetadataById, getCaptureFramesPaginatedFiltered, getCaptureFrameInfo, type CaptureMetadata } from "../../api/capture";
 import { WINDOW_EVENTS } from "../../events/registry";
 import FramePickerDialog from "../../dialogs/FramePickerDialog";
 import ToolboxDialog from "../../dialogs/ToolboxDialog";
 import { pickFileToSave } from "../../api/dialogs";
-import { saveCatalog } from "../../api/catalog";
 import { frameExportBasename } from "../../utils/frameDump";
 import { useDialogManager } from "../../hooks/useDialogManager";
 import { useSessionEvents } from "../../hooks/useSessionEvents";
@@ -107,6 +107,8 @@ function DiscoveryInner() {
   const framesViewActiveTab = useDiscoveryUIStore((s) => s.framesViewActiveTab);
   const setShowBusColumn = useDiscoveryUIStore((s) => s.setShowBusColumn);
   const setModbusExportConfig = useDiscoveryUIStore((s) => s.setModbusExportConfig);
+  const exportFindings = useDiscoveryUIStore((s) => s.exportFindings);
+  const clearExportFindings = useDiscoveryUIStore((s) => s.clearExportFindings);
   const setMaxBuffer = useDiscoveryUIStore((s) => s.setMaxBuffer);
   const setIoProfile = useDiscoveryUIStore((s) => s.setIoProfile);
   const setPlaybackSpeed = useDiscoveryUIStore((s) => s.setPlaybackSpeed);
@@ -850,10 +852,8 @@ function DiscoveryInner() {
     playbackSpeed,
     isStopped,
     captureModeEnabled: captureMode.enabled,
-    captureModeTotalFrames: captureMode.totalFrames,
 
     // Frame state
-    liveFrameCount,
     framedData,
     framedCaptureId,
     frameInfoMap,
@@ -861,7 +861,7 @@ function DiscoveryInner() {
 
     // Serial state
     isSerialMode,
-    backendByteCount: watchByteCount,
+    bytesCaptureId: sessionBytesCaptureId,
     backendFrameCount,
 
     // Time state
@@ -919,15 +919,9 @@ function DiscoveryInner() {
     applySelectionSet,
 
     // API functions (for export/other features)
-    // Bytes live in their own capture. Falling back to the session's frames capture (as
-    // this used to) reads a Frames capture with a byte query, which returns nothing — an
-    // export that promised N bytes and wrote none.
-    getCaptureBytesPaginated: (offset, limit) => getCaptureBytesPaginated(sessionBytesCaptureId ?? '', offset, limit),
     activeCaptureId,
-    getCaptureFramesPaginatedById,
     captureMetadata,
     pickFileToSave,
-    saveCatalog,
 
     // Dialog controls
     closeSpeedChangeDialog: dialogs.speedChange.close,
@@ -1153,6 +1147,22 @@ function DiscoveryInner() {
         onCancel={closeSaveDialog}
         onSave={handlers.handleSaveFrames}
       />
+      {exportFindings.length > 0 && (
+        <FlashNotification
+          type="warning"
+          duration={0}
+          message={exportFindings
+            .map((f) =>
+              t("catalogueExport.headerFieldOutOfRange", {
+                field: t(`catalogueExport.fields.${f.field}`, { defaultValue: f.field }),
+                bytes: f.bytes,
+                start: f.startByte,
+              }),
+            )
+            .join(" ")}
+          onDismiss={clearExportFindings}
+        />
+      )}
 
       <EventDialog
         isOpen={sessionEvents.draft !== null}

@@ -573,6 +573,7 @@ pub async fn dispatch_framelink_command(
         // Editor helpers (no device)
         "framelink.bit_owners" => cmd_bit_owners(params),
         "framelink.next_id" => cmd_next_id(params),
+        "framelink.signal_type_errors" => cmd_signal_type_errors(params),
 
         _ => Err(format!("Unknown framelink command: {op_name}")),
     }
@@ -1429,6 +1430,23 @@ fn cmd_next_id(params: Value) -> Result<Value, String> {
     Ok(serde_json::json!(next_id(&used, param(&params, "kind")?)))
 }
 
+#[derive(Debug, Clone, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+pub struct SignalType {
+    pub bit_length: u16,
+    pub value_type: u8,
+}
+
+/// What `check_signal_type` says of each signal, `None` where it passes.
+fn signal_type_errors(signals: &[SignalType]) -> Vec<Option<String>> {
+    signals.iter().map(|s| check_signal_type(s.bit_length, s.value_type).err()).collect()
+}
+
+fn cmd_signal_type_errors(params: Value) -> Result<Value, String> {
+    let signals: Vec<SignalType> = param(&params, "signals")?;
+    Ok(serde_json::json!(signal_type_errors(&signals)))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1444,9 +1462,10 @@ mod tests {
                 assert_eq!(frame_def::value_type_name(value_type), row["toml"], "{row}");
             }
         }
-        for row in rows("framelinkSignalTypes.json") {
-            let checked = check_signal_type(row["bit_length"].as_u64().unwrap() as u16, row["value_type"].as_u64().unwrap() as u8);
-            assert_eq!(checked.err().map(Value::from).unwrap_or(Value::Null), row["error"], "{row}");
+        let table = rows("framelinkSignalTypes.json");
+        let errors = cmd_signal_type_errors(serde_json::json!({ "signals": table })).unwrap();
+        for (row, error) in table.iter().zip(errors.as_array().unwrap()) {
+            assert_eq!(*error, row["error"], "{row}");
         }
     }
 

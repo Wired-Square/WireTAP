@@ -15,6 +15,7 @@ import type { SignalDefDescriptor } from "../generated/SignalDefDescriptor";
 import type { SignalMappingDescriptor } from "../generated/SignalMappingDescriptor";
 import type { SignalPlacement } from "../generated/SignalPlacement";
 import type { SignalReadResult } from "../generated/SignalReadResult";
+import type { SignalType } from "../generated/SignalType";
 import type { TransformerDescriptor } from "../generated/TransformerDescriptor";
 import type { FrameLinkProbeResult as ProbeResult } from "../generated/FrameLinkProbeResult";
 
@@ -60,6 +61,11 @@ export function framelinkBitOwners(signals: SignalPlacement[], payloadBytes: num
 /** The lowest id not in `used`: rule ids from 0, signal ids from 1. */
 export function framelinkNextId(used: number[], kind: FrameLinkIdKind): Promise<number> {
   return wsTransport.command("framelink.next_id", { used, kind });
+}
+
+/** Why the device would refuse each signal's value type for its length, null where it would not. */
+export function framelinkSignalTypeErrors(signals: SignalType[]): Promise<(string | null)[]> {
+  return wsTransport.command("framelink.signal_type_errors", { signals });
 }
 
 // ============================================================================

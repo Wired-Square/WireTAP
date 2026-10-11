@@ -1,0 +1,1052 @@
+{
+  "cases": [
+    {
+      "name": "json can",
+      "input": "frame-dump/can.json",
+      "expected": "[\n  {\n    \"timestamp_us\": 1727000000000042,\n    \"frame_id\": 291,\n    \"frame_id_hex\": \"0x123\",\n    \"bus\": 0,\n    \"dlc\": 4,\n    \"is_extended\": false,\n    \"is_fd\": false,\n    \"bytes\": [\n      222,\n      173,\n      190,\n      239\n    ],\n    \"bytes_hex\": [\n      \"DE\",\n      \"AD\",\n      \"BE\",\n      \"EF\"\n    ]\n  },\n  {\n    \"timestamp_us\": 1727000000001500,\n    \"frame_id\": 416936208,\n    \"frame_id_hex\": \"0x18D9F110\",\n    \"bus\": 1,\n    \"dlc\": 8,\n    \"is_extended\": true,\n    \"is_fd\": false,\n    \"bytes\": [\n      2,\n      16,\n      3,\n      0,\n      0,\n      0,\n      0,\n      0\n    ],\n    \"bytes_hex\": [\n      \"02\",\n      \"10\",\n      \"03\",\n      \"00\",\n      \"00\",\n      \"00\",\n      \"00\",\n      \"00\"\n    ]\n  },\n  {\n    \"timestamp_us\": 1727000000002000,\n    \"frame_id\": 7,\n    \"frame_id_hex\": \"0x7\",\n    \"bus\": 0,\n    \"dlc\": 0,\n    \"is_extended\": false,\n    \"is_fd\": false,\n    \"bytes\": [],\n    \"bytes_hex\": []\n  },\n  {\n    \"timestamp_us\": 1727000000003250,\n    \"frame_id\": 2047,\n    \"frame_id_hex\": \"0x7FF\",\n    \"bus\": 2,\n    \"dlc\": 12,\n    \"is_extended\": false,\n    \"is_fd\": true,\n    \"bytes\": [\n      165,\n      165,\n      165,\n      165,\n      165,\n      165,\n      165,\n      165,\n      165,\n      165,\n      165,\n      165\n    ],\n    \"bytes_hex\": [\n      \"A5\",\n      \"A5\",\n      \"A5\",\n      \"A5\",\n      \"A5\",\n      \"A5\",\n      \"A5\",\n      \"A5\",\n      \"A5\",\n      \"A5\",\n      \"A5\",\n      \"A5\"\n    ]\n  },\n  {\n    \"timestamp_us\": 1727000001000000,\n    \"frame_id\": 536870911,\n    \"frame_id_hex\": \"0x1FFFFFFF\",\n    \"bus\": 0,\n    \"dlc\": 64,\n    \"is_extended\": true,\n    \"is_fd\": true,\n    \"bytes\": [\n      0,\n      1,\n      2,\n      3,\n      4,\n      5,\n      6,\n      7,\n      8,\n      9,\n      10,\n      11,\n      12,\n      13,\n      14,\n      15,\n      16,\n      17,\n      18,\n      19,\n      20,\n      21,\n      22,\n      23,\n      24,\n      25,\n      26,\n      27,\n      28,\n      29,\n      30,\n      31,\n      32,\n      33,\n      34,\n      35,\n      36,\n      37,\n      38,\n      39,\n      40,\n      41,\n      42,\n      43,\n      44,\n      45,\n      46,\n      47,\n      48,\n      49,\n      50,\n      51,\n      52,\n      53,\n      54,\n      55,\n      56,\n      57,\n      58,\n      59,\n      60,\n      61,\n      62,\n      63\n    ],\n    \"bytes_hex\": [\n      \"00\",\n      \"01\",\n      \"02\",\n      \"03\",\n      \"04\",\n      \"05\",\n      \"06\",\n      \"07\",\n      \"08\",\n      \"09\",\n      \"0A\",\n      \"0B\",\n      \"0C\",\n      \"0D\",\n      \"0E\",\n      \"0F\",\n      \"10\",\n      \"11\",\n      \"12\",\n      \"13\",\n      \"14\",\n      \"15\",\n      \"16\",\n      \"17\",\n      \"18\",\n      \"19\",\n      \"1A\",\n      \"1B\",\n      \"1C\",\n      \"1D\",\n      \"1E\",\n      \"1F\",\n      \"20\",\n      \"21\",\n      \"22\",\n      \"23\",\n      \"24\",\n      \"25\",\n      \"26\",\n      \"27\",\n      \"28\",\n      \"29\",\n      \"2A\",\n      \"2B\",\n      \"2C\",\n      \"2D\",\n      \"2E\",\n      \"2F\",\n      \"30\",\n      \"31\",\n      \"32\",\n      \"33\",\n      \"34\",\n      \"35\",\n      \"36\",\n      \"37\",\n      \"38\",\n      \"39\",\n      \"3A\",\n      \"3B\",\n      \"3C\",\n      \"3D\",\n      \"3E\",\n      \"3F\"\n    ]\n  }\n]"
+    },
+    {
+      "name": "json serial",
+      "input": "frame-dump/serial.json",
+      "expected": "[\n  {\n    \"timestamp_us\": 1500000,\n    \"frame_id\": 1,\n    \"frame_id_hex\": \"0x1\",\n    \"bus\": 0,\n    \"dlc\": 3,\n    \"is_extended\": false,\n    \"is_fd\": false,\n    \"bytes\": [\n      126,\n      1,\n      126\n    ],\n    \"bytes_hex\": [\n      \"7E\",\n      \"01\",\n      \"7E\"\n    ]\n  },\n  {\n    \"timestamp_us\": 1500250,\n    \"frame_id\": 2,\n    \"frame_id_hex\": \"0x2\",\n    \"bus\": 0,\n    \"dlc\": 100,\n    \"is_extended\": false,\n    \"is_fd\": false,\n    \"bytes\": [\n      0,\n      1,\n      2,\n      3,\n      4,\n      5,\n      6,\n      7,\n      8,\n      9,\n      10,\n      11,\n      12,\n      13,\n      14,\n      15,\n      16,\n      17,\n      18,\n      19,\n      20,\n      21,\n      22,\n      23,\n      24,\n      25,\n      26,\n      27,\n      28,\n      29,\n      30,\n      31,\n      32,\n      33,\n      34,\n      35,\n      36,\n      37,\n      38,\n      39,\n      40,\n      41,\n      42,\n      43,\n      44,\n      45,\n      46,\n      47,\n      48,\n      49,\n      50,\n      51,\n      52,\n      53,\n      54,\n      55,\n      56,\n      57,\n      58,\n      59,\n      60,\n      61,\n      62,\n      63,\n      64,\n      65,\n      66,\n      67,\n      68,\n      69,\n      70,\n      71,\n      72,\n      73,\n      74,\n      75,\n      76,\n      77,\n      78,\n      79,\n      80,\n      81,\n      82,\n      83,\n      84,\n      85,\n      86,\n      87,\n      88,\n      89,\n      90,\n      91,\n      92,\n      93,\n      94,\n      95,\n      96,\n      97,\n      98,\n      99\n    ],\n    \"bytes_hex\": [\n      \"00\",\n      \"01\",\n      \"02\",\n      \"03\",\n      \"04\",\n      \"05\",\n      \"06\",\n      \"07\",\n      \"08\",\n      \"09\",\n      \"0A\",\n      \"0B\",\n      \"0C\",\n      \"0D\",\n      \"0E\",\n      \"0F\",\n      \"10\",\n      \"11\",\n      \"12\",\n      \"13\",\n      \"14\",\n      \"15\",\n      \"16\",\n      \"17\",\n      \"18\",\n      \"19\",\n      \"1A\",\n      \"1B\",\n      \"1C\",\n      \"1D\",\n      \"1E\",\n      \"1F\",\n      \"20\",\n      \"21\",\n      \"22\",\n      \"23\",\n      \"24\",\n      \"25\",\n      \"26\",\n      \"27\",\n      \"28\",\n      \"29\",\n      \"2A\",\n      \"2B\",\n      \"2C\",\n      \"2D\",\n      \"2E\",\n      \"2F\",\n      \"30\",\n      \"31\",\n      \"32\",\n      \"33\",\n      \"34\",\n      \"35\",\n      \"36\",\n      \"37\",\n      \"38\",\n      \"39\",\n      \"3A\",\n      \"3B\",\n      \"3C\",\n      \"3D\",\n      \"3E\",\n      \"3F\",\n      \"40\",\n      \"41\",\n      \"42\",\n      \"43\",\n      \"44\",\n      \"45\",\n      \"46\",\n      \"47\",\n      \"48\",\n      \"49\",\n      \"4A\",\n      \"4B\",\n      \"4C\",\n      \"4D\",\n      \"4E\",\n      \"4F\",\n      \"50\",\n      \"51\",\n      \"52\",\n      \"53\",\n      \"54\",\n      \"55\",\n      \"56\",\n      \"57\",\n      \"58\",\n      \"59\",\n      \"5A\",\n      \"5B\",\n      \"5C\",\n      \"5D\",\n      \"5E\",\n      \"5F\",\n      \"60\",\n      \"61\",\n      \"62\",\n      \"63\"\n    ]\n  }\n]"
+    },
+    {
+      "name": "json empty",
+      "input": [],
+      "expected": "[]"
+    },
+    {
+      "name": "hex empty",
+      "input": [],
+      "expected": ""
+    },
+    {
+      "name": "csv empty",
+      "input": [],
+      "expected": "timestamp_us,byte_hex,byte_dec\n"
+    },
+    {
+      "name": "bin empty",
+      "input": [],
+      "expected": []
+    },
+    {
+      "name": "hex one byte",
+      "input": [
+        {
+          "byte": 65,
+          "timestampUs": 1000
+        }
+      ],
+      "expected": "1000: 41                                                |A|"
+    },
+    {
+      "name": "csv one byte",
+      "input": [
+        {
+          "byte": 65,
+          "timestampUs": 1000
+        }
+      ],
+      "expected": "timestamp_us,byte_hex,byte_dec\n1000,41,65\n"
+    },
+    {
+      "name": "bin one byte",
+      "input": [
+        {
+          "byte": 65,
+          "timestampUs": 1000
+        }
+      ],
+      "expected": [
+        65
+      ]
+    },
+    {
+      "name": "hex 40 bytes, 10 µs apart",
+      "input": [
+        {
+          "byte": 7,
+          "timestampUs": 1727000000000000
+        },
+        {
+          "byte": 36,
+          "timestampUs": 1727000000000010
+        },
+        {
+          "byte": 65,
+          "timestampUs": 1727000000000020
+        },
+        {
+          "byte": 94,
+          "timestampUs": 1727000000000030
+        },
+        {
+          "byte": 123,
+          "timestampUs": 1727000000000040
+        },
+        {
+          "byte": 152,
+          "timestampUs": 1727000000000050
+        },
+        {
+          "byte": 181,
+          "timestampUs": 1727000000000060
+        },
+        {
+          "byte": 210,
+          "timestampUs": 1727000000000070
+        },
+        {
+          "byte": 239,
+          "timestampUs": 1727000000000080
+        },
+        {
+          "byte": 12,
+          "timestampUs": 1727000000000090
+        },
+        {
+          "byte": 41,
+          "timestampUs": 1727000000000100
+        },
+        {
+          "byte": 70,
+          "timestampUs": 1727000000000110
+        },
+        {
+          "byte": 99,
+          "timestampUs": 1727000000000120
+        },
+        {
+          "byte": 128,
+          "timestampUs": 1727000000000130
+        },
+        {
+          "byte": 157,
+          "timestampUs": 1727000000000140
+        },
+        {
+          "byte": 186,
+          "timestampUs": 1727000000000150
+        },
+        {
+          "byte": 215,
+          "timestampUs": 1727000000000160
+        },
+        {
+          "byte": 244,
+          "timestampUs": 1727000000000170
+        },
+        {
+          "byte": 17,
+          "timestampUs": 1727000000000180
+        },
+        {
+          "byte": 46,
+          "timestampUs": 1727000000000190
+        },
+        {
+          "byte": 75,
+          "timestampUs": 1727000000000200
+        },
+        {
+          "byte": 104,
+          "timestampUs": 1727000000000210
+        },
+        {
+          "byte": 133,
+          "timestampUs": 1727000000000220
+        },
+        {
+          "byte": 162,
+          "timestampUs": 1727000000000230
+        },
+        {
+          "byte": 191,
+          "timestampUs": 1727000000000240
+        },
+        {
+          "byte": 220,
+          "timestampUs": 1727000000000250
+        },
+        {
+          "byte": 249,
+          "timestampUs": 1727000000000260
+        },
+        {
+          "byte": 22,
+          "timestampUs": 1727000000000270
+        },
+        {
+          "byte": 51,
+          "timestampUs": 1727000000000280
+        },
+        {
+          "byte": 80,
+          "timestampUs": 1727000000000290
+        },
+        {
+          "byte": 109,
+          "timestampUs": 1727000000000300
+        },
+        {
+          "byte": 138,
+          "timestampUs": 1727000000000310
+        },
+        {
+          "byte": 167,
+          "timestampUs": 1727000000000320
+        },
+        {
+          "byte": 196,
+          "timestampUs": 1727000000000330
+        },
+        {
+          "byte": 225,
+          "timestampUs": 1727000000000340
+        },
+        {
+          "byte": 254,
+          "timestampUs": 1727000000000350
+        },
+        {
+          "byte": 27,
+          "timestampUs": 1727000000000360
+        },
+        {
+          "byte": 56,
+          "timestampUs": 1727000000000370
+        },
+        {
+          "byte": 85,
+          "timestampUs": 1727000000000380
+        },
+        {
+          "byte": 114,
+          "timestampUs": 1727000000000390
+        }
+      ],
+      "expected": "1727000000000000: 07 24 41 5E 7B 98 B5 D2 EF 0C 29 46 63 80 9D BA   |.$A^{.....)Fc...|\n1727000000000160: D7 F4 11 2E 4B 68 85 A2 BF DC F9 16 33 50 6D 8A   |....Kh......3Pm.|\n1727000000000320: A7 C4 E1 FE 1B 38 55 72                           |.....8Ur|"
+    },
+    {
+      "name": "csv 40 bytes, 10 µs apart",
+      "input": [
+        {
+          "byte": 7,
+          "timestampUs": 1727000000000000
+        },
+        {
+          "byte": 36,
+          "timestampUs": 1727000000000010
+        },
+        {
+          "byte": 65,
+          "timestampUs": 1727000000000020
+        },
+        {
+          "byte": 94,
+          "timestampUs": 1727000000000030
+        },
+        {
+          "byte": 123,
+          "timestampUs": 1727000000000040
+        },
+        {
+          "byte": 152,
+          "timestampUs": 1727000000000050
+        },
+        {
+          "byte": 181,
+          "timestampUs": 1727000000000060
+        },
+        {
+          "byte": 210,
+          "timestampUs": 1727000000000070
+        },
+        {
+          "byte": 239,
+          "timestampUs": 1727000000000080
+        },
+        {
+          "byte": 12,
+          "timestampUs": 1727000000000090
+        },
+        {
+          "byte": 41,
+          "timestampUs": 1727000000000100
+        },
+        {
+          "byte": 70,
+          "timestampUs": 1727000000000110
+        },
+        {
+          "byte": 99,
+          "timestampUs": 1727000000000120
+        },
+        {
+          "byte": 128,
+          "timestampUs": 1727000000000130
+        },
+        {
+          "byte": 157,
+          "timestampUs": 1727000000000140
+        },
+        {
+          "byte": 186,
+          "timestampUs": 1727000000000150
+        },
+        {
+          "byte": 215,
+          "timestampUs": 1727000000000160
+        },
+        {
+          "byte": 244,
+          "timestampUs": 1727000000000170
+        },
+        {
+          "byte": 17,
+          "timestampUs": 1727000000000180
+        },
+        {
+          "byte": 46,
+          "timestampUs": 1727000000000190
+        },
+        {
+          "byte": 75,
+          "timestampUs": 1727000000000200
+        },
+        {
+          "byte": 104,
+          "timestampUs": 1727000000000210
+        },
+        {
+          "byte": 133,
+          "timestampUs": 1727000000000220
+        },
+        {
+          "byte": 162,
+          "timestampUs": 1727000000000230
+        },
+        {
+          "byte": 191,
+          "timestampUs": 1727000000000240
+        },
+        {
+          "byte": 220,
+          "timestampUs": 1727000000000250
+        },
+        {
+          "byte": 249,
+          "timestampUs": 1727000000000260
+        },
+        {
+          "byte": 22,
+          "timestampUs": 1727000000000270
+        },
+        {
+          "byte": 51,
+          "timestampUs": 1727000000000280
+        },
+        {
+          "byte": 80,
+          "timestampUs": 1727000000000290
+        },
+        {
+          "byte": 109,
+          "timestampUs": 1727000000000300
+        },
+        {
+          "byte": 138,
+          "timestampUs": 1727000000000310
+        },
+        {
+          "byte": 167,
+          "timestampUs": 1727000000000320
+        },
+        {
+          "byte": 196,
+          "timestampUs": 1727000000000330
+        },
+        {
+          "byte": 225,
+          "timestampUs": 1727000000000340
+        },
+        {
+          "byte": 254,
+          "timestampUs": 1727000000000350
+        },
+        {
+          "byte": 27,
+          "timestampUs": 1727000000000360
+        },
+        {
+          "byte": 56,
+          "timestampUs": 1727000000000370
+        },
+        {
+          "byte": 85,
+          "timestampUs": 1727000000000380
+        },
+        {
+          "byte": 114,
+          "timestampUs": 1727000000000390
+        }
+      ],
+      "expected": "timestamp_us,byte_hex,byte_dec\n1727000000000000,07,7\n1727000000000010,24,36\n1727000000000020,41,65\n1727000000000030,5E,94\n1727000000000040,7B,123\n1727000000000050,98,152\n1727000000000060,B5,181\n1727000000000070,D2,210\n1727000000000080,EF,239\n1727000000000090,0C,12\n1727000000000100,29,41\n1727000000000110,46,70\n1727000000000120,63,99\n1727000000000130,80,128\n1727000000000140,9D,157\n1727000000000150,BA,186\n1727000000000160,D7,215\n1727000000000170,F4,244\n1727000000000180,11,17\n1727000000000190,2E,46\n1727000000000200,4B,75\n1727000000000210,68,104\n1727000000000220,85,133\n1727000000000230,A2,162\n1727000000000240,BF,191\n1727000000000250,DC,220\n1727000000000260,F9,249\n1727000000000270,16,22\n1727000000000280,33,51\n1727000000000290,50,80\n1727000000000300,6D,109\n1727000000000310,8A,138\n1727000000000320,A7,167\n1727000000000330,C4,196\n1727000000000340,E1,225\n1727000000000350,FE,254\n1727000000000360,1B,27\n1727000000000370,38,56\n1727000000000380,55,85\n1727000000000390,72,114\n"
+    },
+    {
+      "name": "bin 40 bytes, 10 µs apart",
+      "input": [
+        {
+          "byte": 7,
+          "timestampUs": 1727000000000000
+        },
+        {
+          "byte": 36,
+          "timestampUs": 1727000000000010
+        },
+        {
+          "byte": 65,
+          "timestampUs": 1727000000000020
+        },
+        {
+          "byte": 94,
+          "timestampUs": 1727000000000030
+        },
+        {
+          "byte": 123,
+          "timestampUs": 1727000000000040
+        },
+        {
+          "byte": 152,
+          "timestampUs": 1727000000000050
+        },
+        {
+          "byte": 181,
+          "timestampUs": 1727000000000060
+        },
+        {
+          "byte": 210,
+          "timestampUs": 1727000000000070
+        },
+        {
+          "byte": 239,
+          "timestampUs": 1727000000000080
+        },
+        {
+          "byte": 12,
+          "timestampUs": 1727000000000090
+        },
+        {
+          "byte": 41,
+          "timestampUs": 1727000000000100
+        },
+        {
+          "byte": 70,
+          "timestampUs": 1727000000000110
+        },
+        {
+          "byte": 99,
+          "timestampUs": 1727000000000120
+        },
+        {
+          "byte": 128,
+          "timestampUs": 1727000000000130
+        },
+        {
+          "byte": 157,
+          "timestampUs": 1727000000000140
+        },
+        {
+          "byte": 186,
+          "timestampUs": 1727000000000150
+        },
+        {
+          "byte": 215,
+          "timestampUs": 1727000000000160
+        },
+        {
+          "byte": 244,
+          "timestampUs": 1727000000000170
+        },
+        {
+          "byte": 17,
+          "timestampUs": 1727000000000180
+        },
+        {
+          "byte": 46,
+          "timestampUs": 1727000000000190
+        },
+        {
+          "byte": 75,
+          "timestampUs": 1727000000000200
+        },
+        {
+          "byte": 104,
+          "timestampUs": 1727000000000210
+        },
+        {
+          "byte": 133,
+          "timestampUs": 1727000000000220
+        },
+        {
+          "byte": 162,
+          "timestampUs": 1727000000000230
+        },
+        {
+          "byte": 191,
+          "timestampUs": 1727000000000240
+        },
+        {
+          "byte": 220,
+          "timestampUs": 1727000000000250
+        },
+        {
+          "byte": 249,
+          "timestampUs": 1727000000000260
+        },
+        {
+          "byte": 22,
+          "timestampUs": 1727000000000270
+        },
+        {
+          "byte": 51,
+          "timestampUs": 1727000000000280
+        },
+        {
+          "byte": 80,
+          "timestampUs": 1727000000000290
+        },
+        {
+          "byte": 109,
+          "timestampUs": 1727000000000300
+        },
+        {
+          "byte": 138,
+          "timestampUs": 1727000000000310
+        },
+        {
+          "byte": 167,
+          "timestampUs": 1727000000000320
+        },
+        {
+          "byte": 196,
+          "timestampUs": 1727000000000330
+        },
+        {
+          "byte": 225,
+          "timestampUs": 1727000000000340
+        },
+        {
+          "byte": 254,
+          "timestampUs": 1727000000000350
+        },
+        {
+          "byte": 27,
+          "timestampUs": 1727000000000360
+        },
+        {
+          "byte": 56,
+          "timestampUs": 1727000000000370
+        },
+        {
+          "byte": 85,
+          "timestampUs": 1727000000000380
+        },
+        {
+          "byte": 114,
+          "timestampUs": 1727000000000390
+        }
+      ],
+      "expected": [
+        7,
+        36,
+        65,
+        94,
+        123,
+        152,
+        181,
+        210,
+        239,
+        12,
+        41,
+        70,
+        99,
+        128,
+        157,
+        186,
+        215,
+        244,
+        17,
+        46,
+        75,
+        104,
+        133,
+        162,
+        191,
+        220,
+        249,
+        22,
+        51,
+        80,
+        109,
+        138,
+        167,
+        196,
+        225,
+        254,
+        27,
+        56,
+        85,
+        114
+      ]
+    },
+    {
+      "name": "hex a gap past 1 ms",
+      "input": [
+        {
+          "byte": 7,
+          "timestampUs": 2000000
+        },
+        {
+          "byte": 36,
+          "timestampUs": 2000100
+        },
+        {
+          "byte": 65,
+          "timestampUs": 2000200
+        },
+        {
+          "byte": 94,
+          "timestampUs": 2000300
+        },
+        {
+          "byte": 123,
+          "timestampUs": 2000400
+        },
+        {
+          "byte": 7,
+          "timestampUs": 2001500
+        },
+        {
+          "byte": 36,
+          "timestampUs": 2001600
+        },
+        {
+          "byte": 65,
+          "timestampUs": 2001700
+        },
+        {
+          "byte": 0,
+          "timestampUs": 2001701
+        },
+        {
+          "byte": 126,
+          "timestampUs": 2003000
+        }
+      ],
+      "expected": "2000000: 07 24 41 5E 7B                                    |.$A^{|\n2001500: 07 24 41 00                                       |.$A.|\n2003000: 7E                                                |~|"
+    },
+    {
+      "name": "csv a gap past 1 ms",
+      "input": [
+        {
+          "byte": 7,
+          "timestampUs": 2000000
+        },
+        {
+          "byte": 36,
+          "timestampUs": 2000100
+        },
+        {
+          "byte": 65,
+          "timestampUs": 2000200
+        },
+        {
+          "byte": 94,
+          "timestampUs": 2000300
+        },
+        {
+          "byte": 123,
+          "timestampUs": 2000400
+        },
+        {
+          "byte": 7,
+          "timestampUs": 2001500
+        },
+        {
+          "byte": 36,
+          "timestampUs": 2001600
+        },
+        {
+          "byte": 65,
+          "timestampUs": 2001700
+        },
+        {
+          "byte": 0,
+          "timestampUs": 2001701
+        },
+        {
+          "byte": 126,
+          "timestampUs": 2003000
+        }
+      ],
+      "expected": "timestamp_us,byte_hex,byte_dec\n2000000,07,7\n2000100,24,36\n2000200,41,65\n2000300,5E,94\n2000400,7B,123\n2001500,07,7\n2001600,24,36\n2001700,41,65\n2001701,00,0\n2003000,7E,126\n"
+    },
+    {
+      "name": "bin a gap past 1 ms",
+      "input": [
+        {
+          "byte": 7,
+          "timestampUs": 2000000
+        },
+        {
+          "byte": 36,
+          "timestampUs": 2000100
+        },
+        {
+          "byte": 65,
+          "timestampUs": 2000200
+        },
+        {
+          "byte": 94,
+          "timestampUs": 2000300
+        },
+        {
+          "byte": 123,
+          "timestampUs": 2000400
+        },
+        {
+          "byte": 7,
+          "timestampUs": 2001500
+        },
+        {
+          "byte": 36,
+          "timestampUs": 2001600
+        },
+        {
+          "byte": 65,
+          "timestampUs": 2001700
+        },
+        {
+          "byte": 0,
+          "timestampUs": 2001701
+        },
+        {
+          "byte": 126,
+          "timestampUs": 2003000
+        }
+      ],
+      "expected": [
+        7,
+        36,
+        65,
+        94,
+        123,
+        7,
+        36,
+        65,
+        0,
+        126
+      ]
+    },
+    {
+      "name": "hex a gap of exactly 1 ms",
+      "input": [
+        {
+          "byte": 32,
+          "timestampUs": 0
+        },
+        {
+          "byte": 127,
+          "timestampUs": 1000
+        },
+        {
+          "byte": 255,
+          "timestampUs": 1001
+        }
+      ],
+      "expected": "0: 20 7F                                             | .|\n1001: FF                                                |.|"
+    },
+    {
+      "name": "csv a gap of exactly 1 ms",
+      "input": [
+        {
+          "byte": 32,
+          "timestampUs": 0
+        },
+        {
+          "byte": 127,
+          "timestampUs": 1000
+        },
+        {
+          "byte": 255,
+          "timestampUs": 1001
+        }
+      ],
+      "expected": "timestamp_us,byte_hex,byte_dec\n0,20,32\n1000,7F,127\n1001,FF,255\n"
+    },
+    {
+      "name": "bin a gap of exactly 1 ms",
+      "input": [
+        {
+          "byte": 32,
+          "timestampUs": 0
+        },
+        {
+          "byte": 127,
+          "timestampUs": 1000
+        },
+        {
+          "byte": 255,
+          "timestampUs": 1001
+        }
+      ],
+      "expected": [
+        32,
+        127,
+        255
+      ]
+    },
+    {
+      "name": "hex 16 then 1",
+      "input": [
+        {
+          "byte": 7,
+          "timestampUs": 5
+        },
+        {
+          "byte": 36,
+          "timestampUs": 6
+        },
+        {
+          "byte": 65,
+          "timestampUs": 7
+        },
+        {
+          "byte": 94,
+          "timestampUs": 8
+        },
+        {
+          "byte": 123,
+          "timestampUs": 9
+        },
+        {
+          "byte": 152,
+          "timestampUs": 10
+        },
+        {
+          "byte": 181,
+          "timestampUs": 11
+        },
+        {
+          "byte": 210,
+          "timestampUs": 12
+        },
+        {
+          "byte": 239,
+          "timestampUs": 13
+        },
+        {
+          "byte": 12,
+          "timestampUs": 14
+        },
+        {
+          "byte": 41,
+          "timestampUs": 15
+        },
+        {
+          "byte": 70,
+          "timestampUs": 16
+        },
+        {
+          "byte": 99,
+          "timestampUs": 17
+        },
+        {
+          "byte": 128,
+          "timestampUs": 18
+        },
+        {
+          "byte": 157,
+          "timestampUs": 19
+        },
+        {
+          "byte": 186,
+          "timestampUs": 20
+        },
+        {
+          "byte": 215,
+          "timestampUs": 21
+        }
+      ],
+      "expected": "5: 07 24 41 5E 7B 98 B5 D2 EF 0C 29 46 63 80 9D BA   |.$A^{.....)Fc...|\n21: D7                                                |.|"
+    },
+    {
+      "name": "csv 16 then 1",
+      "input": [
+        {
+          "byte": 7,
+          "timestampUs": 5
+        },
+        {
+          "byte": 36,
+          "timestampUs": 6
+        },
+        {
+          "byte": 65,
+          "timestampUs": 7
+        },
+        {
+          "byte": 94,
+          "timestampUs": 8
+        },
+        {
+          "byte": 123,
+          "timestampUs": 9
+        },
+        {
+          "byte": 152,
+          "timestampUs": 10
+        },
+        {
+          "byte": 181,
+          "timestampUs": 11
+        },
+        {
+          "byte": 210,
+          "timestampUs": 12
+        },
+        {
+          "byte": 239,
+          "timestampUs": 13
+        },
+        {
+          "byte": 12,
+          "timestampUs": 14
+        },
+        {
+          "byte": 41,
+          "timestampUs": 15
+        },
+        {
+          "byte": 70,
+          "timestampUs": 16
+        },
+        {
+          "byte": 99,
+          "timestampUs": 17
+        },
+        {
+          "byte": 128,
+          "timestampUs": 18
+        },
+        {
+          "byte": 157,
+          "timestampUs": 19
+        },
+        {
+          "byte": 186,
+          "timestampUs": 20
+        },
+        {
+          "byte": 215,
+          "timestampUs": 21
+        }
+      ],
+      "expected": "timestamp_us,byte_hex,byte_dec\n5,07,7\n6,24,36\n7,41,65\n8,5E,94\n9,7B,123\n10,98,152\n11,B5,181\n12,D2,210\n13,EF,239\n14,0C,12\n15,29,41\n16,46,70\n17,63,99\n18,80,128\n19,9D,157\n20,BA,186\n21,D7,215\n"
+    },
+    {
+      "name": "bin 16 then 1",
+      "input": [
+        {
+          "byte": 7,
+          "timestampUs": 5
+        },
+        {
+          "byte": 36,
+          "timestampUs": 6
+        },
+        {
+          "byte": 65,
+          "timestampUs": 7
+        },
+        {
+          "byte": 94,
+          "timestampUs": 8
+        },
+        {
+          "byte": 123,
+          "timestampUs": 9
+        },
+        {
+          "byte": 152,
+          "timestampUs": 10
+        },
+        {
+          "byte": 181,
+          "timestampUs": 11
+        },
+        {
+          "byte": 210,
+          "timestampUs": 12
+        },
+        {
+          "byte": 239,
+          "timestampUs": 13
+        },
+        {
+          "byte": 12,
+          "timestampUs": 14
+        },
+        {
+          "byte": 41,
+          "timestampUs": 15
+        },
+        {
+          "byte": 70,
+          "timestampUs": 16
+        },
+        {
+          "byte": 99,
+          "timestampUs": 17
+        },
+        {
+          "byte": 128,
+          "timestampUs": 18
+        },
+        {
+          "byte": 157,
+          "timestampUs": 19
+        },
+        {
+          "byte": 186,
+          "timestampUs": 20
+        },
+        {
+          "byte": 215,
+          "timestampUs": 21
+        }
+      ],
+      "expected": [
+        7,
+        36,
+        65,
+        94,
+        123,
+        152,
+        181,
+        210,
+        239,
+        12,
+        41,
+        70,
+        99,
+        128,
+        157,
+        186,
+        215
+      ]
+    }
+  ]
+}

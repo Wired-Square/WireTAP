@@ -313,8 +313,8 @@ export function useFrameHandlers({
             encoding: forms.serialEncoding,
             byte_order: forms.serialByteOrder,
             header_length: forms.serialHeaderLength,
-            frame_id_mask: catalog?.serial?.frameIdMask,
-            min_frame_length: catalog?.serial?.minFrameLength,
+            frame_id_mask: catalog?.serial?.frameIdMask ?? undefined,
+            min_frame_length: catalog?.serial?.minFrameLength ?? undefined,
             fields: Object.fromEntries(
               forms.serialHeaderFields.map((f) => [f.name, { mask: f.mask, endianness: f.endianness, format: f.format }]),
             ),

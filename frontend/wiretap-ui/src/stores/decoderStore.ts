@@ -3,11 +3,8 @@
 import { create } from 'zustand';
 import { tlog } from '../api/settings';
 import { LRUMap } from '../utils/LRUMap';
-import {
-  useSettingsStore,
-  DEFAULT_DECODER_MAX_DECODED_FRAMES,
-  DEFAULT_DECODER_MAX_DECODED_PER_SOURCE,
-} from '../apps/settings/stores/settingsStore';
+import { useSettingsStore } from '../apps/settings/stores/settingsStore';
+import { SETTING_DEFAULTS } from '../generated/settingDefaults';
 
 /** Maximum number of unique values to track per header field */
 const MAX_HEADER_FIELD_VALUES = 256;
@@ -67,8 +64,8 @@ function getDecoderLimits() {
 // 100ms decode flush, which causes JSC GC pressure that crashes the WebView
 // after ~2 hours of streaming. Components subscribe to `decodedVersion` for
 // reactivity and read from these via getter functions.
-let _decoded: LRUMap<number, DecodedFrame> = new LRUMap(DEFAULT_DECODER_MAX_DECODED_FRAMES);
-let _decodedPerSource: LRUMap<string, DecodedFrame> = new LRUMap(DEFAULT_DECODER_MAX_DECODED_PER_SOURCE);
+let _decoded: LRUMap<number, DecodedFrame> = new LRUMap(SETTING_DEFAULTS.decoder_max_decoded_frames);
+let _decodedPerSource: LRUMap<string, DecodedFrame> = new LRUMap(SETTING_DEFAULTS.decoder_max_decoded_per_source);
 let _unmatchedFrames: UnmatchedFrame[] = [];
 let _filteredFrames: FilteredFrame[] = [];
 let _tunnelTransactions: TunnelTransaction[] = [];
@@ -85,9 +82,9 @@ export function getFilteredFrames(): FilteredFrame[] { return _filteredFrames; }
 export function getTunnelTransactions(): TunnelTransaction[] { return _tunnelTransactions; }
 
 import { saveCatalog } from '../api';
-import { framesCatalogOps, serialFrameConfigOf, type SerialFrameConfig } from '../utils/frameExport';
+import { serialFrameConfigOf, type SerialFrameConfig } from '../utils/frameExport';
+import { exportFramesCatalog } from '../api/drafting';
 import { withAppError } from '../utils/appError';
-import { formatFrameId } from '../utils/frameIds';
 import type { Catalog, Frame } from '../types/catalogModel';
 import type { DecodedMirrorVerdict, DecodedSignalsEntry, DecodedTunnelMessage } from '../services/wsProtocol';
 import type { ChecksumValidationResult } from '../api/checksums';
@@ -95,7 +92,7 @@ import { selectionSetKeys, type SelectionSet } from '../utils/selectionSets';
 import type { HeaderFieldFormat } from '../apps/catalog/types';
 import type { PlaybackSpeed } from '../components/TimeController';
 import { subscriberIdFor } from '../utils/subscriberId';
-import { attachCatalog, buildCatalog, catalogPolls, openCatalog, parseCatalog, type ModbusPollGroup } from '../api/catalog';
+import { attachCatalog, catalogPolls, openCatalog, parseCatalog, type ModbusPollGroup } from '../api/catalog';
 import { framesById } from '../utils/catalogFrames';
 import { frameKey } from '../utils/frameKey';
 
@@ -213,6 +210,7 @@ export type FilteredFrame = {
  */
 export type TunnelTransaction = DecodedTunnelMessage & {
   frameId: number;
+  isExtended: boolean;
   bus: number;
   /** Host timestamp (µs) of the frame that completed the message. */
   timestampUs: number;
@@ -594,7 +592,7 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
       if (msg.mirror) nextMirrorValidation.set(id, msg.mirror);
 
       for (const t of msg.tunnel ?? []) {
-        tunnel.push({ ...t, frameId: id, bus: msg.bus, timestampUs: msg.t });
+        tunnel.push({ ...t, frameId: id, isExtended: msg.isExtended, bus: msg.bus, timestampUs: msg.t });
       }
 
       const headerFields: HeaderFieldValue[] = msg.headerFields.map((h) => ({
@@ -843,11 +841,11 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
 
     const selectedFramesList = Array.from(frames.entries())
       .filter(([fk]) => selectedFrames.has(fk))
-      .map(([, f]) => ({ id: f.frameId, len: f.length, isExtended: f.isExtended }))
+      .map(([, f]) => ({ id: f.frameId, len: f.length, isExtended: !!f.isExtended, protocol: null }))
       .sort((a, b) => a.id - b.id);
 
     const saved = await withAppError('Save Error', 'The catalogue was not saved', async () => {
-      const ops = framesCatalogOps(
+      const text = await exportFramesCatalog(
         selectedFramesList,
         {
           name: saveMetadata.name,
@@ -855,9 +853,9 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
           default_byte_order: saveMetadata.default_byte_order,
           default_interval: saveMetadata.default_interval,
         },
-        (id, isExt) => formatFrameId(id, saveFrameIdFormat, isExt)
+        saveFrameIdFormat === 'decimal',
       );
-      await saveCatalog(path, await buildCatalog(ops));
+      await saveCatalog(path, text);
     });
     if (saved) set({ showSaveDialog: false });
   },

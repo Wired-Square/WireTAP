@@ -10,7 +10,7 @@ import {
   MODBUS_SCAN_BOUNDS,
   MODBUS_SCAN_DEFAULTS,
 } from "../../../../components/modbus/modbusScanDefaults";
-import type { UnitIdScanConfig, ModbusRegisterType } from "../../../../api/io";
+import type { UnitIdScanConfig, RegisterType } from "../../../../api/io";
 import { Alert } from "../../../../components/Alert";
 type Props = {
   onStartScan: (config: UnitIdScanConfig) => void;
@@ -23,7 +23,7 @@ export default function ModbusUnitIdScanPanel({ onStartScan }: Props) {
   const [startUnitId, setStartUnitId] = useState(1);
   const [endUnitId, setEndUnitId] = useState(247);
   const [testRegister, setTestRegister] = useState(0);
-  const [registerType, setRegisterType] = useState<ModbusRegisterType>("holding");
+  const [registerType, setRegisterType] = useState<RegisterType>("holding");
   const [delayMs, setDelayMs] = useState(MODBUS_SCAN_DEFAULTS.interRequestDelayMs);
   const [timeoutMs, setTimeoutMs] = useState(MODBUS_SCAN_DEFAULTS.timeoutMs);
 

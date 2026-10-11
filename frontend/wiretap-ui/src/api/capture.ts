@@ -288,14 +288,19 @@ export async function getCaptureFramesPaginatedById(
 
 export type FrameDumpSource = { captureId: string } | { frames: FrameMessage[] };
 
-/** Write a CSV or candump export in Rust; it refuses the whole file if any frame cannot be written. */
+/** Write a CSV, candump or JSON export in Rust; a CSV or candump refuses the whole file if any frame cannot be written. */
 export async function exportFrameDump(
   source: FrameDumpSource,
-  format: "csv" | "candump",
+  format: "csv" | "candump" | "json",
   path: string,
 ): Promise<number> {
   const wire = "captureId" in source ? { capture_id: source.captureId } : source;
   return invoke("export_frame_dump", { source: wire, format, path });
+}
+
+/** Write a byte capture as a hex dump, a CSV or raw binary. Returns the byte count. */
+export async function exportByteDump(captureId: string, format: "hex" | "csv" | "bin", path: string): Promise<number> {
+  return invoke("export_byte_dump", { capture_id: captureId, format, path });
 }
 
 /**

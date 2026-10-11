@@ -5,7 +5,7 @@
 
 import type { IOProfile } from "../hooks/useSettings";
 import type { BadgeTone } from "../components/Badge";
-import type { ModbusRegisterType } from "../api/io";
+import type { RegisterType } from "../api/io";
 import type { Protocol } from "../generated/Protocol";
 
 export type { Protocol };
@@ -42,7 +42,7 @@ export function protocolTone(protocol: string): BadgeTone {
 }
 
 /** The hue a Modbus register type's badge wears, in the Decoder and the catalogue tree alike. */
-export const MODBUS_REGISTER_TONES: Record<ModbusRegisterType, BadgeTone> = {
+export const MODBUS_REGISTER_TONES: Record<RegisterType, BadgeTone> = {
   holding: "primary",
   input: "success",
   coil: "warning",
@@ -56,11 +56,6 @@ export const MODBUS_REGISTER_TONES: Record<ModbusRegisterType, BadgeTone> = {
  */
 export function isMessageProtocol(protocol: string): boolean {
   return protocol === "modbus_rtu";
-}
-
-/** Trailing check bytes a message protocol carries; 0 where the frame has none. */
-export function trailingCheckBytes(protocol: string | undefined): number {
-  return protocol === "modbus_rtu" ? 2 : 0;
 }
 
 /**

@@ -6,7 +6,8 @@
 
 import { textDataGreen, textDataTertiary } from '../styles';
 import { byteToHex } from '../utils/byteUtils';
-import { trailingCheckBytes } from '../utils/profileTraits';
+import { TRAILING_CHECK_BYTES } from '../generated/protocolTraits';
+import type { Protocol } from '../generated/Protocol';
 
 type Props = {
   bytes: number[];
@@ -19,7 +20,7 @@ type Props = {
 
 export default function MessageBytes({ bytes, hexBytes, protocol, className = textDataGreen }: Props) {
   const hex = hexBytes ?? bytes.map(byteToHex);
-  const check = trailingCheckBytes(protocol);
+  const check: number = TRAILING_CHECK_BYTES[protocol as Protocol] ?? 0;
   if (check > 0 && hex.length > check + 1) {
     return (
       <span className={`break-all ${className}`}>

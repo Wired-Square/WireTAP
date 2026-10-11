@@ -1,6 +1,6 @@
 // Copyright 2026 Wired Square Pty Ltd
 
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { labelDefault } from "../../../styles/typography";
 import { textPrimary, textSecondary } from "../../../styles";
@@ -11,9 +11,9 @@ import {
   ID_MASK_29,
   isValidHex,
   parseHex,
-  matchedIdCount,
-  matchedRange,
 } from "../utils/canMask";
+import { canMaskMatch } from "../../../api/decode";
+import { useAsyncAnswer } from "../../../hooks/useAsyncAnswer";
 import { formatHexId } from "../utils/formatHex";
 import MaskBitRow from "../components/MaskBitRow";
 import type { BridgeFilterKind, BridgeFilterIde } from "../../../api/framelinkRules";
@@ -57,19 +57,21 @@ export default function BridgeFilterHelp({ kind, ide, onApplyMask }: BridgeFilte
   const idValue = parseHex(calcId, 0, widthMask);
   const maskValue = parseHex(calcMask, 0, widthMask);
 
-  const summary = useMemo(() => {
-    if (!calcInputValid) return null;
-    const count = matchedIdCount(maskValue, bitWidth);
-    const { lo, hi } = matchedRange(idValue, maskValue, bitWidth);
-    if (count === 1) {
-      return t("bridgeDialog.help.maskMatchedSingle", { id: formatHexId(lo, hexBytes) });
-    }
-    return t("bridgeDialog.help.maskMatchedRange", {
-      count,
-      lo: formatHexId(lo, hexBytes),
-      hi: formatHexId(hi, hexBytes),
-    });
-  }, [calcInputValid, idValue, maskValue, bitWidth, hexBytes, t]);
+  const match = useAsyncAnswer(
+    async () => (calcInputValid ? canMaskMatch(idValue, maskValue, bitWidth) : null),
+    [calcInputValid, idValue, maskValue, bitWidth],
+    null,
+  );
+
+  const summary =
+    match &&
+    (match.count === 1
+      ? t("bridgeDialog.help.maskMatchedSingle", { id: formatHexId(match.range.lo, hexBytes) })
+      : t("bridgeDialog.help.maskMatchedRange", {
+          count: match.count,
+          lo: formatHexId(match.range.lo, hexBytes),
+          hi: formatHexId(match.range.hi, hexBytes),
+        }));
 
   if (kind === "range") {
     return (

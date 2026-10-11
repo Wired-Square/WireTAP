@@ -50,21 +50,6 @@ export function normaliseRange(a: number, b: number): { startBit: number; bitLen
   return { startBit: min, bitLength: max - min + 1 };
 }
 
-export type ValidationError = string | null;
-
-export function validateSignalType(bitLength: number, valueType: number): ValidationError {
-  switch (valueType) {
-    case VALUE_TYPE_BOOL:
-      return bitLength !== 1 ? "Bool requires exactly 1 bit" : null;
-    case VALUE_TYPE_FLOAT:
-      return bitLength !== 32 ? "Float requires exactly 32 bits" : null;
-    case VALUE_TYPE_ARRAY:
-      return bitLength % 8 !== 0 ? "Array requires a multiple of 8 bits" : null;
-    default:
-      return bitLength > 64 ? "Maximum 64 bits for integer signals" : null;
-  }
-}
-
 export function canSave(signals: PlacedSignal[]): boolean {
   if (signals.length === 0) return true;
   return signals.every((s) => s.name.trim().length > 0);

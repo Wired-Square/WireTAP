@@ -1,0 +1,3065 @@
+{
+  "cases": [
+    {
+      "name": "headOps can plain",
+      "input": {
+        "protocol": "can",
+        "meta": {
+          "name": "Export",
+          "version": 2,
+          "default_byte_order": "big",
+          "default_interval": 100
+        }
+      },
+      "expected": [
+        {
+          "op": "SetMeta",
+          "meta": {
+            "name": "Export",
+            "version": 2,
+            "default_frame": "can"
+          }
+        },
+        {
+          "op": "SetCanConfig",
+          "config": {
+            "default_byte_order": "big",
+            "default_interval": 100
+          }
+        }
+      ]
+    },
+    {
+      "name": "headOps modbus plain",
+      "input": {
+        "protocol": "modbus",
+        "meta": {
+          "name": "Export",
+          "version": 2,
+          "default_byte_order": "big",
+          "default_interval": 100
+        }
+      },
+      "expected": [
+        {
+          "op": "SetMeta",
+          "meta": {
+            "name": "Export",
+            "version": 2,
+            "default_frame": "modbus"
+          }
+        }
+      ]
+    },
+    {
+      "name": "headOps can version 0, negative interval",
+      "input": {
+        "protocol": "can",
+        "meta": {
+          "name": "Zero",
+          "version": 0,
+          "default_byte_order": "little",
+          "default_interval": -5
+        }
+      },
+      "expected": [
+        {
+          "op": "SetMeta",
+          "meta": {
+            "name": "Zero",
+            "version": 1,
+            "default_frame": "can"
+          }
+        },
+        {
+          "op": "SetCanConfig",
+          "config": {
+            "default_byte_order": "little",
+            "default_interval": 0
+          }
+        }
+      ]
+    },
+    {
+      "name": "headOps modbus version 0, negative interval",
+      "input": {
+        "protocol": "modbus",
+        "meta": {
+          "name": "Zero",
+          "version": 0,
+          "default_byte_order": "little",
+          "default_interval": -5
+        }
+      },
+      "expected": [
+        {
+          "op": "SetMeta",
+          "meta": {
+            "name": "Zero",
+            "version": 1,
+            "default_frame": "modbus"
+          }
+        }
+      ]
+    },
+    {
+      "name": "headOps can quoted name",
+      "input": {
+        "protocol": "can",
+        "meta": {
+          "name": "Discovery \"export\"",
+          "version": 7,
+          "default_byte_order": "little",
+          "default_interval": 0
+        }
+      },
+      "expected": [
+        {
+          "op": "SetMeta",
+          "meta": {
+            "name": "Discovery \"export\"",
+            "version": 7,
+            "default_frame": "can"
+          }
+        },
+        {
+          "op": "SetCanConfig",
+          "config": {
+            "default_byte_order": "little",
+            "default_interval": 0
+          }
+        }
+      ]
+    },
+    {
+      "name": "headOps modbus quoted name",
+      "input": {
+        "protocol": "modbus",
+        "meta": {
+          "name": "Discovery \"export\"",
+          "version": 7,
+          "default_byte_order": "little",
+          "default_interval": 0
+        }
+      },
+      "expected": [
+        {
+          "op": "SetMeta",
+          "meta": {
+            "name": "Discovery \"export\"",
+            "version": 7,
+            "default_frame": "modbus"
+          }
+        }
+      ]
+    },
+    {
+      "name": "headOps serial plain empty",
+      "input": {
+        "protocol": "serial",
+        "meta": {
+          "name": "Export",
+          "version": 2,
+          "default_byte_order": "big",
+          "default_interval": 100
+        },
+        "serialConfig": {}
+      },
+      "expected": [
+        {
+          "op": "SetMeta",
+          "meta": {
+            "name": "Export",
+            "version": 2,
+            "default_frame": "serial"
+          }
+        },
+        {
+          "op": "SetSerialConfig",
+          "config": {
+            "byte_order": "big",
+            "fields": {}
+          }
+        }
+      ]
+    },
+    {
+      "name": "headOps serial version 0, negative interval empty",
+      "input": {
+        "protocol": "serial",
+        "meta": {
+          "name": "Zero",
+          "version": 0,
+          "default_byte_order": "little",
+          "default_interval": -5
+        },
+        "serialConfig": {}
+      },
+      "expected": [
+        {
+          "op": "SetMeta",
+          "meta": {
+            "name": "Zero",
+            "version": 1,
+            "default_frame": "serial"
+          }
+        },
+        {
+          "op": "SetSerialConfig",
+          "config": {
+            "byte_order": "little",
+            "fields": {}
+          }
+        }
+      ]
+    },
+    {
+      "name": "serialReservedSpans empty",
+      "input": {},
+      "expected": []
+    },
+    {
+      "name": "headOps serial plain id 0/1",
+      "input": {
+        "protocol": "serial",
+        "meta": {
+          "name": "Export",
+          "version": 2,
+          "default_byte_order": "big",
+          "default_interval": 100
+        },
+        "serialConfig": {
+          "frame_id_start_byte": 0,
+          "frame_id_bytes": 1
+        }
+      },
+      "expected": [
+        {
+          "op": "SetMeta",
+          "meta": {
+            "name": "Export",
+            "version": 2,
+            "default_frame": "serial"
+          }
+        },
+        {
+          "op": "SetSerialConfig",
+          "config": {
+            "byte_order": "big",
+            "fields": {
+              "id": {
+                "mask": 255
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "headOps serial version 0, negative interval id 0/1",
+      "input": {
+        "protocol": "serial",
+        "meta": {
+          "name": "Zero",
+          "version": 0,
+          "default_byte_order": "little",
+          "default_interval": -5
+        },
+        "serialConfig": {
+          "frame_id_start_byte": 0,
+          "frame_id_bytes": 1
+        }
+      },
+      "expected": [
+        {
+          "op": "SetMeta",
+          "meta": {
+            "name": "Zero",
+            "version": 1,
+            "default_frame": "serial"
+          }
+        },
+        {
+          "op": "SetSerialConfig",
+          "config": {
+            "byte_order": "little",
+            "fields": {
+              "id": {
+                "mask": 255
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "serialReservedSpans id 0/1",
+      "input": {
+        "frame_id_start_byte": 0,
+        "frame_id_bytes": 1
+      },
+      "expected": [
+        {
+          "start": 0,
+          "len": 1
+        }
+      ]
+    },
+    {
+      "name": "headOps serial plain id 1/2 little, source 0/1, xor at -1",
+      "input": {
+        "protocol": "serial",
+        "meta": {
+          "name": "Export",
+          "version": 2,
+          "default_byte_order": "big",
+          "default_interval": 100
+        },
+        "serialConfig": {
+          "encoding": "slip",
+          "frame_id_mask": 65280,
+          "frame_id_start_byte": 1,
+          "frame_id_bytes": 2,
+          "frame_id_byte_order": "little",
+          "source_address_start_byte": 0,
+          "source_address_bytes": 1,
+          "min_frame_length": 4,
+          "header_length": 3,
+          "checksum": {
+            "algorithm": "xor",
+            "start_byte": -1,
+            "byte_length": 1,
+            "calc_start_byte": 0,
+            "calc_end_byte": -1,
+            "big_endian": false
+          }
+        }
+      },
+      "expected": [
+        {
+          "op": "SetMeta",
+          "meta": {
+            "name": "Export",
+            "version": 2,
+            "default_frame": "serial"
+          }
+        },
+        {
+          "op": "SetSerialConfig",
+          "config": {
+            "encoding": "slip",
+            "byte_order": "big",
+            "frame_id_mask": 65280,
+            "min_frame_length": 4,
+            "header_length": 3,
+            "fields": {
+              "id": {
+                "mask": 16776960,
+                "endianness": "little"
+              },
+              "source_address": {
+                "mask": 255
+              }
+            },
+            "checksum": {
+              "algorithm": "xor",
+              "startByte": -1,
+              "byteLength": 1,
+              "calcStartByte": 0,
+              "calcEndByte": -1,
+              "bigEndian": false
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "headOps serial version 0, negative interval id 1/2 little, source 0/1, xor at -1",
+      "input": {
+        "protocol": "serial",
+        "meta": {
+          "name": "Zero",
+          "version": 0,
+          "default_byte_order": "little",
+          "default_interval": -5
+        },
+        "serialConfig": {
+          "encoding": "slip",
+          "frame_id_mask": 65280,
+          "frame_id_start_byte": 1,
+          "frame_id_bytes": 2,
+          "frame_id_byte_order": "little",
+          "source_address_start_byte": 0,
+          "source_address_bytes": 1,
+          "min_frame_length": 4,
+          "header_length": 3,
+          "checksum": {
+            "algorithm": "xor",
+            "start_byte": -1,
+            "byte_length": 1,
+            "calc_start_byte": 0,
+            "calc_end_byte": -1,
+            "big_endian": false
+          }
+        }
+      },
+      "expected": [
+        {
+          "op": "SetMeta",
+          "meta": {
+            "name": "Zero",
+            "version": 1,
+            "default_frame": "serial"
+          }
+        },
+        {
+          "op": "SetSerialConfig",
+          "config": {
+            "encoding": "slip",
+            "byte_order": "little",
+            "frame_id_mask": 65280,
+            "min_frame_length": 4,
+            "header_length": 3,
+            "fields": {
+              "id": {
+                "mask": 16776960,
+                "endianness": "little"
+              },
+              "source_address": {
+                "mask": 255
+              }
+            },
+            "checksum": {
+              "algorithm": "xor",
+              "startByte": -1,
+              "byteLength": 1,
+              "calcStartByte": 0,
+              "calcEndByte": -1,
+              "bigEndian": false
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "serialReservedSpans id 1/2 little, source 0/1, xor at -1",
+      "input": {
+        "encoding": "slip",
+        "frame_id_mask": 65280,
+        "frame_id_start_byte": 1,
+        "frame_id_bytes": 2,
+        "frame_id_byte_order": "little",
+        "source_address_start_byte": 0,
+        "source_address_bytes": 1,
+        "min_frame_length": 4,
+        "header_length": 3,
+        "checksum": {
+          "algorithm": "xor",
+          "start_byte": -1,
+          "byte_length": 1,
+          "calc_start_byte": 0,
+          "calc_end_byte": -1,
+          "big_endian": false
+        }
+      },
+      "expected": [
+        {
+          "start": 1,
+          "len": 2
+        },
+        {
+          "start": 0,
+          "len": 1
+        },
+        {
+          "start": -1,
+          "len": 1
+        }
+      ]
+    },
+    {
+      "name": "headOps serial plain id 2/2 big, source 4/2 little, crc16 at -2 big",
+      "input": {
+        "protocol": "serial",
+        "meta": {
+          "name": "Export",
+          "version": 2,
+          "default_byte_order": "big",
+          "default_interval": 100
+        },
+        "serialConfig": {
+          "encoding": "modbus_rtu",
+          "frame_id_start_byte": 2,
+          "frame_id_bytes": 2,
+          "frame_id_byte_order": "big",
+          "source_address_start_byte": 4,
+          "source_address_bytes": 2,
+          "source_address_byte_order": "little",
+          "checksum": {
+            "algorithm": "crc16_modbus",
+            "start_byte": -2,
+            "byte_length": 2,
+            "calc_start_byte": 0,
+            "calc_end_byte": -2,
+            "big_endian": true
+          }
+        }
+      },
+      "expected": [
+        {
+          "op": "SetMeta",
+          "meta": {
+            "name": "Export",
+            "version": 2,
+            "default_frame": "serial"
+          }
+        },
+        {
+          "op": "SetSerialConfig",
+          "config": {
+            "encoding": "modbus_rtu",
+            "byte_order": "big",
+            "fields": {
+              "id": {
+                "mask": 4294901760,
+                "endianness": "big"
+              },
+              "source_address": {
+                "mask": 281470681743360,
+                "endianness": "little"
+              }
+            },
+            "checksum": {
+              "algorithm": "crc16_modbus",
+              "startByte": -2,
+              "byteLength": 2,
+              "calcStartByte": 0,
+              "calcEndByte": -2,
+              "bigEndian": true
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "headOps serial version 0, negative interval id 2/2 big, source 4/2 little, crc16 at -2 big",
+      "input": {
+        "protocol": "serial",
+        "meta": {
+          "name": "Zero",
+          "version": 0,
+          "default_byte_order": "little",
+          "default_interval": -5
+        },
+        "serialConfig": {
+          "encoding": "modbus_rtu",
+          "frame_id_start_byte": 2,
+          "frame_id_bytes": 2,
+          "frame_id_byte_order": "big",
+          "source_address_start_byte": 4,
+          "source_address_bytes": 2,
+          "source_address_byte_order": "little",
+          "checksum": {
+            "algorithm": "crc16_modbus",
+            "start_byte": -2,
+            "byte_length": 2,
+            "calc_start_byte": 0,
+            "calc_end_byte": -2,
+            "big_endian": true
+          }
+        }
+      },
+      "expected": [
+        {
+          "op": "SetMeta",
+          "meta": {
+            "name": "Zero",
+            "version": 1,
+            "default_frame": "serial"
+          }
+        },
+        {
+          "op": "SetSerialConfig",
+          "config": {
+            "encoding": "modbus_rtu",
+            "byte_order": "little",
+            "fields": {
+              "id": {
+                "mask": 4294901760,
+                "endianness": "big"
+              },
+              "source_address": {
+                "mask": 281470681743360,
+                "endianness": "little"
+              }
+            },
+            "checksum": {
+              "algorithm": "crc16_modbus",
+              "startByte": -2,
+              "byteLength": 2,
+              "calcStartByte": 0,
+              "calcEndByte": -2,
+              "bigEndian": true
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "serialReservedSpans id 2/2 big, source 4/2 little, crc16 at -2 big",
+      "input": {
+        "encoding": "modbus_rtu",
+        "frame_id_start_byte": 2,
+        "frame_id_bytes": 2,
+        "frame_id_byte_order": "big",
+        "source_address_start_byte": 4,
+        "source_address_bytes": 2,
+        "source_address_byte_order": "little",
+        "checksum": {
+          "algorithm": "crc16_modbus",
+          "start_byte": -2,
+          "byte_length": 2,
+          "calc_start_byte": 0,
+          "calc_end_byte": -2,
+          "big_endian": true
+        }
+      },
+      "expected": [
+        {
+          "start": 2,
+          "len": 2
+        },
+        {
+          "start": 4,
+          "len": 2
+        },
+        {
+          "start": -2,
+          "len": 2
+        }
+      ]
+    },
+    {
+      "name": "headOps serial plain id 3/3, source 6/1",
+      "input": {
+        "protocol": "serial",
+        "meta": {
+          "name": "Export",
+          "version": 2,
+          "default_byte_order": "big",
+          "default_interval": 100
+        },
+        "serialConfig": {
+          "frame_id_start_byte": 3,
+          "frame_id_bytes": 3,
+          "source_address_start_byte": 6,
+          "source_address_bytes": 1
+        }
+      },
+      "expected": [
+        {
+          "op": "SetMeta",
+          "meta": {
+            "name": "Export",
+            "version": 2,
+            "default_frame": "serial"
+          }
+        },
+        {
+          "op": "SetSerialConfig",
+          "config": {
+            "byte_order": "big",
+            "fields": {
+              "id": {
+                "mask": 281474959933440
+              },
+              "source_address": {
+                "mask": 71776119061217280
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "headOps serial version 0, negative interval id 3/3, source 6/1",
+      "input": {
+        "protocol": "serial",
+        "meta": {
+          "name": "Zero",
+          "version": 0,
+          "default_byte_order": "little",
+          "default_interval": -5
+        },
+        "serialConfig": {
+          "frame_id_start_byte": 3,
+          "frame_id_bytes": 3,
+          "source_address_start_byte": 6,
+          "source_address_bytes": 1
+        }
+      },
+      "expected": [
+        {
+          "op": "SetMeta",
+          "meta": {
+            "name": "Zero",
+            "version": 1,
+            "default_frame": "serial"
+          }
+        },
+        {
+          "op": "SetSerialConfig",
+          "config": {
+            "byte_order": "little",
+            "fields": {
+              "id": {
+                "mask": 281474959933440
+              },
+              "source_address": {
+                "mask": 71776119061217280
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "serialReservedSpans id 3/3, source 6/1",
+      "input": {
+        "frame_id_start_byte": 3,
+        "frame_id_bytes": 3,
+        "source_address_start_byte": 6,
+        "source_address_bytes": 1
+      },
+      "expected": [
+        {
+          "start": 3,
+          "len": 3
+        },
+        {
+          "start": 6,
+          "len": 1
+        }
+      ]
+    },
+    {
+      "name": "headOps serial plain id 4/4 (mask past 2^53)",
+      "input": {
+        "protocol": "serial",
+        "meta": {
+          "name": "Export",
+          "version": 2,
+          "default_byte_order": "big",
+          "default_interval": 100
+        },
+        "serialConfig": {
+          "frame_id_start_byte": 4,
+          "frame_id_bytes": 4
+        }
+      },
+      "expected": [
+        {
+          "op": "SetMeta",
+          "meta": {
+            "name": "Export",
+            "version": 2,
+            "default_frame": "serial"
+          }
+        },
+        {
+          "op": "SetSerialConfig",
+          "config": {
+            "byte_order": "big",
+            "fields": {
+              "id": {
+                "mask": 18446744069414584000
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "headOps serial version 0, negative interval id 4/4 (mask past 2^53)",
+      "input": {
+        "protocol": "serial",
+        "meta": {
+          "name": "Zero",
+          "version": 0,
+          "default_byte_order": "little",
+          "default_interval": -5
+        },
+        "serialConfig": {
+          "frame_id_start_byte": 4,
+          "frame_id_bytes": 4
+        }
+      },
+      "expected": [
+        {
+          "op": "SetMeta",
+          "meta": {
+            "name": "Zero",
+            "version": 1,
+            "default_frame": "serial"
+          }
+        },
+        {
+          "op": "SetSerialConfig",
+          "config": {
+            "byte_order": "little",
+            "fields": {
+              "id": {
+                "mask": 18446744069414584000
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "serialReservedSpans id 4/4 (mask past 2^53)",
+      "input": {
+        "frame_id_start_byte": 4,
+        "frame_id_bytes": 4
+      },
+      "expected": [
+        {
+          "start": 4,
+          "len": 4
+        }
+      ]
+    },
+    {
+      "name": "headOps serial plain id 0/7 (mask past 2^53)",
+      "input": {
+        "protocol": "serial",
+        "meta": {
+          "name": "Export",
+          "version": 2,
+          "default_byte_order": "big",
+          "default_interval": 100
+        },
+        "serialConfig": {
+          "frame_id_start_byte": 0,
+          "frame_id_bytes": 7
+        }
+      },
+      "expected": [
+        {
+          "op": "SetMeta",
+          "meta": {
+            "name": "Export",
+            "version": 2,
+            "default_frame": "serial"
+          }
+        },
+        {
+          "op": "SetSerialConfig",
+          "config": {
+            "byte_order": "big",
+            "fields": {
+              "id": {
+                "mask": 72057594037927940
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "headOps serial version 0, negative interval id 0/7 (mask past 2^53)",
+      "input": {
+        "protocol": "serial",
+        "meta": {
+          "name": "Zero",
+          "version": 0,
+          "default_byte_order": "little",
+          "default_interval": -5
+        },
+        "serialConfig": {
+          "frame_id_start_byte": 0,
+          "frame_id_bytes": 7
+        }
+      },
+      "expected": [
+        {
+          "op": "SetMeta",
+          "meta": {
+            "name": "Zero",
+            "version": 1,
+            "default_frame": "serial"
+          }
+        },
+        {
+          "op": "SetSerialConfig",
+          "config": {
+            "byte_order": "little",
+            "fields": {
+              "id": {
+                "mask": 72057594037927940
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "serialReservedSpans id 0/7 (mask past 2^53)",
+      "input": {
+        "frame_id_start_byte": 0,
+        "frame_id_bytes": 7
+      },
+      "expected": [
+        {
+          "start": 0,
+          "len": 7
+        }
+      ]
+    },
+    {
+      "name": "headOps serial plain id 0/8 (mask past 2^53)",
+      "input": {
+        "protocol": "serial",
+        "meta": {
+          "name": "Export",
+          "version": 2,
+          "default_byte_order": "big",
+          "default_interval": 100
+        },
+        "serialConfig": {
+          "frame_id_start_byte": 0,
+          "frame_id_bytes": 8
+        }
+      },
+      "expected": [
+        {
+          "op": "SetMeta",
+          "meta": {
+            "name": "Export",
+            "version": 2,
+            "default_frame": "serial"
+          }
+        },
+        {
+          "op": "SetSerialConfig",
+          "config": {
+            "byte_order": "big",
+            "fields": {
+              "id": {
+                "mask": 18446744073709552000
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "headOps serial version 0, negative interval id 0/8 (mask past 2^53)",
+      "input": {
+        "protocol": "serial",
+        "meta": {
+          "name": "Zero",
+          "version": 0,
+          "default_byte_order": "little",
+          "default_interval": -5
+        },
+        "serialConfig": {
+          "frame_id_start_byte": 0,
+          "frame_id_bytes": 8
+        }
+      },
+      "expected": [
+        {
+          "op": "SetMeta",
+          "meta": {
+            "name": "Zero",
+            "version": 1,
+            "default_frame": "serial"
+          }
+        },
+        {
+          "op": "SetSerialConfig",
+          "config": {
+            "byte_order": "little",
+            "fields": {
+              "id": {
+                "mask": 18446744073709552000
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "serialReservedSpans id 0/8 (mask past 2^53)",
+      "input": {
+        "frame_id_start_byte": 0,
+        "frame_id_bytes": 8
+      },
+      "expected": [
+        {
+          "start": 0,
+          "len": 8
+        }
+      ]
+    },
+    {
+      "name": "headOps serial plain id 6/2",
+      "input": {
+        "protocol": "serial",
+        "meta": {
+          "name": "Export",
+          "version": 2,
+          "default_byte_order": "big",
+          "default_interval": 100
+        },
+        "serialConfig": {
+          "frame_id_start_byte": 6,
+          "frame_id_bytes": 2
+        }
+      },
+      "expected": [
+        {
+          "op": "SetMeta",
+          "meta": {
+            "name": "Export",
+            "version": 2,
+            "default_frame": "serial"
+          }
+        },
+        {
+          "op": "SetSerialConfig",
+          "config": {
+            "byte_order": "big",
+            "fields": {
+              "id": {
+                "mask": 18446462598732840000
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "headOps serial version 0, negative interval id 6/2",
+      "input": {
+        "protocol": "serial",
+        "meta": {
+          "name": "Zero",
+          "version": 0,
+          "default_byte_order": "little",
+          "default_interval": -5
+        },
+        "serialConfig": {
+          "frame_id_start_byte": 6,
+          "frame_id_bytes": 2
+        }
+      },
+      "expected": [
+        {
+          "op": "SetMeta",
+          "meta": {
+            "name": "Zero",
+            "version": 1,
+            "default_frame": "serial"
+          }
+        },
+        {
+          "op": "SetSerialConfig",
+          "config": {
+            "byte_order": "little",
+            "fields": {
+              "id": {
+                "mask": 18446462598732840000
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "serialReservedSpans id 6/2",
+      "input": {
+        "frame_id_start_byte": 6,
+        "frame_id_bytes": 2
+      },
+      "expected": [
+        {
+          "start": 6,
+          "len": 2
+        }
+      ]
+    },
+    {
+      "name": "headOps serial plain negative id start is no field",
+      "input": {
+        "protocol": "serial",
+        "meta": {
+          "name": "Export",
+          "version": 2,
+          "default_byte_order": "big",
+          "default_interval": 100
+        },
+        "serialConfig": {
+          "frame_id_start_byte": -2,
+          "frame_id_bytes": 2,
+          "source_address_start_byte": 1
+        }
+      },
+      "expected": [
+        {
+          "op": "SetMeta",
+          "meta": {
+            "name": "Export",
+            "version": 2,
+            "default_frame": "serial"
+          }
+        },
+        {
+          "op": "SetSerialConfig",
+          "config": {
+            "byte_order": "big",
+            "fields": {}
+          }
+        }
+      ]
+    },
+    {
+      "name": "headOps serial version 0, negative interval negative id start is no field",
+      "input": {
+        "protocol": "serial",
+        "meta": {
+          "name": "Zero",
+          "version": 0,
+          "default_byte_order": "little",
+          "default_interval": -5
+        },
+        "serialConfig": {
+          "frame_id_start_byte": -2,
+          "frame_id_bytes": 2,
+          "source_address_start_byte": 1
+        }
+      },
+      "expected": [
+        {
+          "op": "SetMeta",
+          "meta": {
+            "name": "Zero",
+            "version": 1,
+            "default_frame": "serial"
+          }
+        },
+        {
+          "op": "SetSerialConfig",
+          "config": {
+            "byte_order": "little",
+            "fields": {}
+          }
+        }
+      ]
+    },
+    {
+      "name": "serialReservedSpans negative id start is no field",
+      "input": {
+        "frame_id_start_byte": -2,
+        "frame_id_bytes": 2,
+        "source_address_start_byte": 1
+      },
+      "expected": [
+        {
+          "start": -2,
+          "len": 2
+        }
+      ]
+    },
+    {
+      "name": "headOps serial plain id start without bytes",
+      "input": {
+        "protocol": "serial",
+        "meta": {
+          "name": "Export",
+          "version": 2,
+          "default_byte_order": "big",
+          "default_interval": 100
+        },
+        "serialConfig": {
+          "frame_id_start_byte": 1
+        }
+      },
+      "expected": [
+        {
+          "op": "SetMeta",
+          "meta": {
+            "name": "Export",
+            "version": 2,
+            "default_frame": "serial"
+          }
+        },
+        {
+          "op": "SetSerialConfig",
+          "config": {
+            "byte_order": "big",
+            "fields": {}
+          }
+        }
+      ]
+    },
+    {
+      "name": "headOps serial version 0, negative interval id start without bytes",
+      "input": {
+        "protocol": "serial",
+        "meta": {
+          "name": "Zero",
+          "version": 0,
+          "default_byte_order": "little",
+          "default_interval": -5
+        },
+        "serialConfig": {
+          "frame_id_start_byte": 1
+        }
+      },
+      "expected": [
+        {
+          "op": "SetMeta",
+          "meta": {
+            "name": "Zero",
+            "version": 1,
+            "default_frame": "serial"
+          }
+        },
+        {
+          "op": "SetSerialConfig",
+          "config": {
+            "byte_order": "little",
+            "fields": {}
+          }
+        }
+      ]
+    },
+    {
+      "name": "serialReservedSpans id start without bytes",
+      "input": {
+        "frame_id_start_byte": 1
+      },
+      "expected": []
+    },
+    {
+      "name": "headOps serial plain checksum at 5 with no calc end",
+      "input": {
+        "protocol": "serial",
+        "meta": {
+          "name": "Export",
+          "version": 2,
+          "default_byte_order": "big",
+          "default_interval": 100
+        },
+        "serialConfig": {
+          "checksum": {
+            "algorithm": "sum8",
+            "start_byte": 5,
+            "byte_length": 1,
+            "calc_start_byte": 1,
+            "calc_end_byte": 5
+          }
+        }
+      },
+      "expected": [
+        {
+          "op": "SetMeta",
+          "meta": {
+            "name": "Export",
+            "version": 2,
+            "default_frame": "serial"
+          }
+        },
+        {
+          "op": "SetSerialConfig",
+          "config": {
+            "byte_order": "big",
+            "fields": {},
+            "checksum": {
+              "algorithm": "sum8",
+              "startByte": 5,
+              "byteLength": 1,
+              "calcStartByte": 1,
+              "calcEndByte": 5
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "headOps serial version 0, negative interval checksum at 5 with no calc end",
+      "input": {
+        "protocol": "serial",
+        "meta": {
+          "name": "Zero",
+          "version": 0,
+          "default_byte_order": "little",
+          "default_interval": -5
+        },
+        "serialConfig": {
+          "checksum": {
+            "algorithm": "sum8",
+            "start_byte": 5,
+            "byte_length": 1,
+            "calc_start_byte": 1,
+            "calc_end_byte": 5
+          }
+        }
+      },
+      "expected": [
+        {
+          "op": "SetMeta",
+          "meta": {
+            "name": "Zero",
+            "version": 1,
+            "default_frame": "serial"
+          }
+        },
+        {
+          "op": "SetSerialConfig",
+          "config": {
+            "byte_order": "little",
+            "fields": {},
+            "checksum": {
+              "algorithm": "sum8",
+              "startByte": 5,
+              "byteLength": 1,
+              "calcStartByte": 1,
+              "calcEndByte": 5
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "serialReservedSpans checksum at 5 with no calc end",
+      "input": {
+        "checksum": {
+          "algorithm": "sum8",
+          "start_byte": 5,
+          "byte_length": 1,
+          "calc_start_byte": 1,
+          "calc_end_byte": 5
+        }
+      },
+      "expected": [
+        {
+          "start": 5,
+          "len": 1
+        }
+      ]
+    },
+    {
+      "name": "framesCatalogOps can standard and extended hex",
+      "input": {
+        "frames": [
+          {
+            "id": 256,
+            "len": 8
+          },
+          {
+            "id": 2047,
+            "len": 2
+          },
+          {
+            "id": 419364865,
+            "len": 8,
+            "isExtended": true
+          },
+          {
+            "id": 5,
+            "len": 0,
+            "isExtended": true
+          }
+        ],
+        "meta": {
+          "name": "Export",
+          "version": 2,
+          "default_byte_order": "big",
+          "default_interval": 100
+        },
+        "formatId": "formatFrameId(id, \"hex\", isExtended)"
+      },
+      "expected": [
+        {
+          "op": "SetMeta",
+          "meta": {
+            "name": "Export",
+            "version": 2,
+            "default_frame": "can"
+          }
+        },
+        {
+          "op": "SetCanConfig",
+          "config": {
+            "default_byte_order": "big",
+            "default_interval": 100
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "can",
+          "key": "0x100",
+          "frame": {
+            "length": 8
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "can",
+          "key": "0x7FF",
+          "frame": {
+            "length": 2
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "can",
+          "key": "0x18FF0001",
+          "frame": {
+            "length": 8
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "can",
+          "key": "0x00000005",
+          "frame": {
+            "length": 0
+          }
+        }
+      ]
+    },
+    {
+      "name": "framesCatalogOps can standard and extended decimal",
+      "input": {
+        "frames": [
+          {
+            "id": 256,
+            "len": 8
+          },
+          {
+            "id": 2047,
+            "len": 2
+          },
+          {
+            "id": 419364865,
+            "len": 8,
+            "isExtended": true
+          },
+          {
+            "id": 5,
+            "len": 0,
+            "isExtended": true
+          }
+        ],
+        "meta": {
+          "name": "Export",
+          "version": 2,
+          "default_byte_order": "big",
+          "default_interval": 100
+        },
+        "formatId": "formatFrameId(id, \"decimal\", isExtended)"
+      },
+      "expected": [
+        {
+          "op": "SetMeta",
+          "meta": {
+            "name": "Export",
+            "version": 2,
+            "default_frame": "can"
+          }
+        },
+        {
+          "op": "SetCanConfig",
+          "config": {
+            "default_byte_order": "big",
+            "default_interval": 100
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "can",
+          "key": "256",
+          "frame": {
+            "length": 8
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "can",
+          "key": "2047",
+          "frame": {
+            "length": 2
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "can",
+          "key": "419364865",
+          "frame": {
+            "length": 8
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "can",
+          "key": "5",
+          "frame": {
+            "length": 0
+          }
+        }
+      ]
+    },
+    {
+      "name": "framesCatalogOps can fd lengths hex",
+      "input": {
+        "frames": [
+          {
+            "id": 291,
+            "len": 64,
+            "protocol": "can"
+          },
+          {
+            "id": 292,
+            "len": 12,
+            "protocol": "can"
+          }
+        ],
+        "meta": {
+          "name": "Export",
+          "version": 2,
+          "default_byte_order": "big",
+          "default_interval": 100
+        },
+        "formatId": "formatFrameId(id, \"hex\", isExtended)"
+      },
+      "expected": [
+        {
+          "op": "SetMeta",
+          "meta": {
+            "name": "Export",
+            "version": 2,
+            "default_frame": "can"
+          }
+        },
+        {
+          "op": "SetCanConfig",
+          "config": {
+            "default_byte_order": "big",
+            "default_interval": 100
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "can",
+          "key": "0x123",
+          "frame": {
+            "length": 64
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "can",
+          "key": "0x124",
+          "frame": {
+            "length": 12
+          }
+        }
+      ]
+    },
+    {
+      "name": "framesCatalogOps can fd lengths decimal",
+      "input": {
+        "frames": [
+          {
+            "id": 291,
+            "len": 64,
+            "protocol": "can"
+          },
+          {
+            "id": 292,
+            "len": 12,
+            "protocol": "can"
+          }
+        ],
+        "meta": {
+          "name": "Export",
+          "version": 2,
+          "default_byte_order": "big",
+          "default_interval": 100
+        },
+        "formatId": "formatFrameId(id, \"decimal\", isExtended)"
+      },
+      "expected": [
+        {
+          "op": "SetMeta",
+          "meta": {
+            "name": "Export",
+            "version": 2,
+            "default_frame": "can"
+          }
+        },
+        {
+          "op": "SetCanConfig",
+          "config": {
+            "default_byte_order": "big",
+            "default_interval": 100
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "can",
+          "key": "291",
+          "frame": {
+            "length": 64
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "can",
+          "key": "292",
+          "frame": {
+            "length": 12
+          }
+        }
+      ]
+    },
+    {
+      "name": "framesCatalogOps serial ids hex",
+      "input": {
+        "frames": [
+          {
+            "id": 1,
+            "len": 6,
+            "protocol": "serial"
+          },
+          {
+            "id": 43981,
+            "len": 10,
+            "protocol": "serial"
+          }
+        ],
+        "meta": {
+          "name": "Export",
+          "version": 2,
+          "default_byte_order": "big",
+          "default_interval": 100
+        },
+        "formatId": "formatFrameId(id, \"hex\", isExtended)"
+      },
+      "expected": [
+        {
+          "op": "SetMeta",
+          "meta": {
+            "name": "Export",
+            "version": 2,
+            "default_frame": "serial"
+          }
+        },
+        {
+          "op": "SetSerialConfig",
+          "config": {
+            "byte_order": "big",
+            "fields": {}
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "serial",
+          "key": "0x001",
+          "frame": {
+            "length": 6
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "serial",
+          "key": "0xABCD",
+          "frame": {
+            "length": 10
+          }
+        }
+      ]
+    },
+    {
+      "name": "framesCatalogOps serial ids decimal",
+      "input": {
+        "frames": [
+          {
+            "id": 1,
+            "len": 6,
+            "protocol": "serial"
+          },
+          {
+            "id": 43981,
+            "len": 10,
+            "protocol": "serial"
+          }
+        ],
+        "meta": {
+          "name": "Export",
+          "version": 2,
+          "default_byte_order": "big",
+          "default_interval": 100
+        },
+        "formatId": "formatFrameId(id, \"decimal\", isExtended)"
+      },
+      "expected": [
+        {
+          "op": "SetMeta",
+          "meta": {
+            "name": "Export",
+            "version": 2,
+            "default_frame": "serial"
+          }
+        },
+        {
+          "op": "SetSerialConfig",
+          "config": {
+            "byte_order": "big",
+            "fields": {}
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "serial",
+          "key": "1",
+          "frame": {
+            "length": 6
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "serial",
+          "key": "43981",
+          "frame": {
+            "length": 10
+          }
+        }
+      ]
+    },
+    {
+      "name": "framesCatalogOps modbus registers hex",
+      "input": {
+        "frames": [
+          {
+            "id": 40001,
+            "len": 2,
+            "protocol": "modbus"
+          }
+        ],
+        "meta": {
+          "name": "Export",
+          "version": 2,
+          "default_byte_order": "big",
+          "default_interval": 100
+        },
+        "formatId": "formatFrameId(id, \"hex\", isExtended)"
+      },
+      "expected": [
+        {
+          "op": "SetMeta",
+          "meta": {
+            "name": "Export",
+            "version": 2,
+            "default_frame": "modbus"
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "modbus",
+          "key": "0x9C41",
+          "frame": {
+            "length": 2
+          }
+        }
+      ]
+    },
+    {
+      "name": "framesCatalogOps modbus registers decimal",
+      "input": {
+        "frames": [
+          {
+            "id": 40001,
+            "len": 2,
+            "protocol": "modbus"
+          }
+        ],
+        "meta": {
+          "name": "Export",
+          "version": 2,
+          "default_byte_order": "big",
+          "default_interval": 100
+        },
+        "formatId": "formatFrameId(id, \"decimal\", isExtended)"
+      },
+      "expected": [
+        {
+          "op": "SetMeta",
+          "meta": {
+            "name": "Export",
+            "version": 2,
+            "default_frame": "modbus"
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "modbus",
+          "key": "40001",
+          "frame": {
+            "length": 2
+          }
+        }
+      ]
+    },
+    {
+      "name": "framesCatalogOps first protocol wins hex",
+      "input": {
+        "frames": [
+          {
+            "id": 1,
+            "len": 1
+          },
+          {
+            "id": 2,
+            "len": 2,
+            "protocol": "serial"
+          },
+          {
+            "id": 3,
+            "len": 3,
+            "protocol": "can"
+          }
+        ],
+        "meta": {
+          "name": "Export",
+          "version": 2,
+          "default_byte_order": "big",
+          "default_interval": 100
+        },
+        "formatId": "formatFrameId(id, \"hex\", isExtended)"
+      },
+      "expected": [
+        {
+          "op": "SetMeta",
+          "meta": {
+            "name": "Export",
+            "version": 2,
+            "default_frame": "serial"
+          }
+        },
+        {
+          "op": "SetSerialConfig",
+          "config": {
+            "byte_order": "big",
+            "fields": {}
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "serial",
+          "key": "0x001",
+          "frame": {
+            "length": 1
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "serial",
+          "key": "0x002",
+          "frame": {
+            "length": 2
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "serial",
+          "key": "0x003",
+          "frame": {
+            "length": 3
+          }
+        }
+      ]
+    },
+    {
+      "name": "framesCatalogOps first protocol wins decimal",
+      "input": {
+        "frames": [
+          {
+            "id": 1,
+            "len": 1
+          },
+          {
+            "id": 2,
+            "len": 2,
+            "protocol": "serial"
+          },
+          {
+            "id": 3,
+            "len": 3,
+            "protocol": "can"
+          }
+        ],
+        "meta": {
+          "name": "Export",
+          "version": 2,
+          "default_byte_order": "big",
+          "default_interval": 100
+        },
+        "formatId": "formatFrameId(id, \"decimal\", isExtended)"
+      },
+      "expected": [
+        {
+          "op": "SetMeta",
+          "meta": {
+            "name": "Export",
+            "version": 2,
+            "default_frame": "serial"
+          }
+        },
+        {
+          "op": "SetSerialConfig",
+          "config": {
+            "byte_order": "big",
+            "fields": {}
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "serial",
+          "key": "1",
+          "frame": {
+            "length": 1
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "serial",
+          "key": "2",
+          "frame": {
+            "length": 2
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "serial",
+          "key": "3",
+          "frame": {
+            "length": 3
+          }
+        }
+      ]
+    },
+    {
+      "name": "framesCatalogOps empty hex",
+      "input": {
+        "frames": [],
+        "meta": {
+          "name": "Export",
+          "version": 2,
+          "default_byte_order": "big",
+          "default_interval": 100
+        },
+        "formatId": "formatFrameId(id, \"hex\", isExtended)"
+      },
+      "expected": [
+        {
+          "op": "SetMeta",
+          "meta": {
+            "name": "Export",
+            "version": 2,
+            "default_frame": "can"
+          }
+        },
+        {
+          "op": "SetCanConfig",
+          "config": {
+            "default_byte_order": "big",
+            "default_interval": 100
+          }
+        }
+      ]
+    },
+    {
+      "name": "framesCatalogOps empty decimal",
+      "input": {
+        "frames": [],
+        "meta": {
+          "name": "Export",
+          "version": 2,
+          "default_byte_order": "big",
+          "default_interval": 100
+        },
+        "formatId": "formatFrameId(id, \"decimal\", isExtended)"
+      },
+      "expected": [
+        {
+          "op": "SetMeta",
+          "meta": {
+            "name": "Export",
+            "version": 2,
+            "default_frame": "can"
+          }
+        },
+        {
+          "op": "SetCanConfig",
+          "config": {
+            "default_byte_order": "big",
+            "default_interval": 100
+          }
+        }
+      ]
+    },
+    {
+      "name": "framesCatalogOps modbus_rtu is refused hex",
+      "input": {
+        "frames": [
+          {
+            "id": 259,
+            "len": 8,
+            "protocol": "modbus_rtu"
+          }
+        ],
+        "meta": {
+          "name": "Export",
+          "version": 2,
+          "default_byte_order": "big",
+          "default_interval": 100
+        },
+        "formatId": "formatFrameId(id, \"hex\", isExtended)"
+      },
+      "expected": {
+        "error": "Error: modbus_rtu frames cannot be saved as a catalogue"
+      }
+    },
+    {
+      "name": "framesCatalogOps modbus_rtu is refused decimal",
+      "input": {
+        "frames": [
+          {
+            "id": 259,
+            "len": 8,
+            "protocol": "modbus_rtu"
+          }
+        ],
+        "meta": {
+          "name": "Export",
+          "version": 2,
+          "default_byte_order": "big",
+          "default_interval": 100
+        },
+        "formatId": "formatFrameId(id, \"decimal\", isExtended)"
+      },
+      "expected": {
+        "error": "Error: modbus_rtu frames cannot be saved as a catalogue"
+      }
+    },
+    {
+      "name": "modbusCatalogOps holding base 0",
+      "input": {
+        "registers": [
+          {
+            "frameId": 13000,
+            "dlc": 2
+          },
+          {
+            "frameId": 5000,
+            "dlc": 4
+          },
+          {
+            "frameId": 5002,
+            "dlc": 3
+          },
+          {
+            "frameId": 1,
+            "dlc": 1
+          },
+          {
+            "frameId": 0,
+            "dlc": 0
+          },
+          {
+            "frameId": 7,
+            "dlc": 5
+          }
+        ],
+        "meta": {
+          "name": "Export",
+          "version": 2,
+          "default_byte_order": "big",
+          "default_interval": 100
+        },
+        "config": {
+          "device_address": 3,
+          "register_base": 0,
+          "register_type": "holding",
+          "default_interval": 1000
+        }
+      },
+      "expected": [
+        {
+          "op": "SetMeta",
+          "meta": {
+            "name": "Export",
+            "version": 2,
+            "default_frame": "modbus"
+          }
+        },
+        {
+          "op": "SetModbusConfig",
+          "config": {
+            "device_address": 3,
+            "register_base": 0,
+            "default_interval": 1000
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "modbus",
+          "key": "0",
+          "frame": {
+            "register_number": 0,
+            "register_type": "holding",
+            "length": 1
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "modbus",
+          "key": "1",
+          "frame": {
+            "register_number": 1,
+            "register_type": "holding",
+            "length": 1
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "modbus",
+          "key": "7",
+          "frame": {
+            "register_number": 7,
+            "register_type": "holding",
+            "length": 2
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "modbus",
+          "key": "5000",
+          "frame": {
+            "register_number": 5000,
+            "register_type": "holding",
+            "length": 2
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "modbus",
+          "key": "5002",
+          "frame": {
+            "register_number": 5002,
+            "register_type": "holding",
+            "length": 1
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "modbus",
+          "key": "13000",
+          "frame": {
+            "register_number": 13000,
+            "register_type": "holding",
+            "length": 1
+          }
+        }
+      ]
+    },
+    {
+      "name": "modbusCatalogOps holding base 1",
+      "input": {
+        "registers": [
+          {
+            "frameId": 13000,
+            "dlc": 2
+          },
+          {
+            "frameId": 5000,
+            "dlc": 4
+          },
+          {
+            "frameId": 5002,
+            "dlc": 3
+          },
+          {
+            "frameId": 1,
+            "dlc": 1
+          },
+          {
+            "frameId": 0,
+            "dlc": 0
+          },
+          {
+            "frameId": 7,
+            "dlc": 5
+          }
+        ],
+        "meta": {
+          "name": "Export",
+          "version": 2,
+          "default_byte_order": "big",
+          "default_interval": 100
+        },
+        "config": {
+          "device_address": 3,
+          "register_base": 1,
+          "register_type": "holding",
+          "default_interval": 1000
+        }
+      },
+      "expected": [
+        {
+          "op": "SetMeta",
+          "meta": {
+            "name": "Export",
+            "version": 2,
+            "default_frame": "modbus"
+          }
+        },
+        {
+          "op": "SetModbusConfig",
+          "config": {
+            "device_address": 3,
+            "register_base": 1,
+            "default_interval": 1000
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "modbus",
+          "key": "0",
+          "frame": {
+            "register_number": 0,
+            "register_type": "holding",
+            "length": 1
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "modbus",
+          "key": "1",
+          "frame": {
+            "register_number": 1,
+            "register_type": "holding",
+            "length": 1
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "modbus",
+          "key": "7",
+          "frame": {
+            "register_number": 7,
+            "register_type": "holding",
+            "length": 2
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "modbus",
+          "key": "5000",
+          "frame": {
+            "register_number": 5000,
+            "register_type": "holding",
+            "length": 2
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "modbus",
+          "key": "5002",
+          "frame": {
+            "register_number": 5002,
+            "register_type": "holding",
+            "length": 1
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "modbus",
+          "key": "13000",
+          "frame": {
+            "register_number": 13000,
+            "register_type": "holding",
+            "length": 1
+          }
+        }
+      ]
+    },
+    {
+      "name": "modbusCatalogOps input base 0",
+      "input": {
+        "registers": [
+          {
+            "frameId": 13000,
+            "dlc": 2
+          },
+          {
+            "frameId": 5000,
+            "dlc": 4
+          },
+          {
+            "frameId": 5002,
+            "dlc": 3
+          },
+          {
+            "frameId": 1,
+            "dlc": 1
+          },
+          {
+            "frameId": 0,
+            "dlc": 0
+          },
+          {
+            "frameId": 7,
+            "dlc": 5
+          }
+        ],
+        "meta": {
+          "name": "Export",
+          "version": 2,
+          "default_byte_order": "big",
+          "default_interval": 100
+        },
+        "config": {
+          "device_address": 3,
+          "register_base": 0,
+          "register_type": "input",
+          "default_interval": 1000
+        }
+      },
+      "expected": [
+        {
+          "op": "SetMeta",
+          "meta": {
+            "name": "Export",
+            "version": 2,
+            "default_frame": "modbus"
+          }
+        },
+        {
+          "op": "SetModbusConfig",
+          "config": {
+            "device_address": 3,
+            "register_base": 0,
+            "default_interval": 1000
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "modbus",
+          "key": "0",
+          "frame": {
+            "register_number": 0,
+            "register_type": "input",
+            "length": 1
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "modbus",
+          "key": "1",
+          "frame": {
+            "register_number": 1,
+            "register_type": "input",
+            "length": 1
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "modbus",
+          "key": "7",
+          "frame": {
+            "register_number": 7,
+            "register_type": "input",
+            "length": 2
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "modbus",
+          "key": "5000",
+          "frame": {
+            "register_number": 5000,
+            "register_type": "input",
+            "length": 2
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "modbus",
+          "key": "5002",
+          "frame": {
+            "register_number": 5002,
+            "register_type": "input",
+            "length": 1
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "modbus",
+          "key": "13000",
+          "frame": {
+            "register_number": 13000,
+            "register_type": "input",
+            "length": 1
+          }
+        }
+      ]
+    },
+    {
+      "name": "modbusCatalogOps input base 1",
+      "input": {
+        "registers": [
+          {
+            "frameId": 13000,
+            "dlc": 2
+          },
+          {
+            "frameId": 5000,
+            "dlc": 4
+          },
+          {
+            "frameId": 5002,
+            "dlc": 3
+          },
+          {
+            "frameId": 1,
+            "dlc": 1
+          },
+          {
+            "frameId": 0,
+            "dlc": 0
+          },
+          {
+            "frameId": 7,
+            "dlc": 5
+          }
+        ],
+        "meta": {
+          "name": "Export",
+          "version": 2,
+          "default_byte_order": "big",
+          "default_interval": 100
+        },
+        "config": {
+          "device_address": 3,
+          "register_base": 1,
+          "register_type": "input",
+          "default_interval": 1000
+        }
+      },
+      "expected": [
+        {
+          "op": "SetMeta",
+          "meta": {
+            "name": "Export",
+            "version": 2,
+            "default_frame": "modbus"
+          }
+        },
+        {
+          "op": "SetModbusConfig",
+          "config": {
+            "device_address": 3,
+            "register_base": 1,
+            "default_interval": 1000
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "modbus",
+          "key": "0",
+          "frame": {
+            "register_number": 0,
+            "register_type": "input",
+            "length": 1
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "modbus",
+          "key": "1",
+          "frame": {
+            "register_number": 1,
+            "register_type": "input",
+            "length": 1
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "modbus",
+          "key": "7",
+          "frame": {
+            "register_number": 7,
+            "register_type": "input",
+            "length": 2
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "modbus",
+          "key": "5000",
+          "frame": {
+            "register_number": 5000,
+            "register_type": "input",
+            "length": 2
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "modbus",
+          "key": "5002",
+          "frame": {
+            "register_number": 5002,
+            "register_type": "input",
+            "length": 1
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "modbus",
+          "key": "13000",
+          "frame": {
+            "register_number": 13000,
+            "register_type": "input",
+            "length": 1
+          }
+        }
+      ]
+    },
+    {
+      "name": "modbusCatalogOps coil base 0",
+      "input": {
+        "registers": [
+          {
+            "frameId": 13000,
+            "dlc": 2
+          },
+          {
+            "frameId": 5000,
+            "dlc": 4
+          },
+          {
+            "frameId": 5002,
+            "dlc": 3
+          },
+          {
+            "frameId": 1,
+            "dlc": 1
+          },
+          {
+            "frameId": 0,
+            "dlc": 0
+          },
+          {
+            "frameId": 7,
+            "dlc": 5
+          }
+        ],
+        "meta": {
+          "name": "Export",
+          "version": 2,
+          "default_byte_order": "big",
+          "default_interval": 100
+        },
+        "config": {
+          "device_address": 3,
+          "register_base": 0,
+          "register_type": "coil",
+          "default_interval": 1000
+        }
+      },
+      "expected": [
+        {
+          "op": "SetMeta",
+          "meta": {
+            "name": "Export",
+            "version": 2,
+            "default_frame": "modbus"
+          }
+        },
+        {
+          "op": "SetModbusConfig",
+          "config": {
+            "device_address": 3,
+            "register_base": 0,
+            "default_interval": 1000
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "modbus",
+          "key": "0",
+          "frame": {
+            "register_number": 0,
+            "register_type": "coil",
+            "length": 1
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "modbus",
+          "key": "1",
+          "frame": {
+            "register_number": 1,
+            "register_type": "coil",
+            "length": 1
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "modbus",
+          "key": "7",
+          "frame": {
+            "register_number": 7,
+            "register_type": "coil",
+            "length": 1
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "modbus",
+          "key": "5000",
+          "frame": {
+            "register_number": 5000,
+            "register_type": "coil",
+            "length": 1
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "modbus",
+          "key": "5002",
+          "frame": {
+            "register_number": 5002,
+            "register_type": "coil",
+            "length": 1
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "modbus",
+          "key": "13000",
+          "frame": {
+            "register_number": 13000,
+            "register_type": "coil",
+            "length": 1
+          }
+        }
+      ]
+    },
+    {
+      "name": "modbusCatalogOps coil base 1",
+      "input": {
+        "registers": [
+          {
+            "frameId": 13000,
+            "dlc": 2
+          },
+          {
+            "frameId": 5000,
+            "dlc": 4
+          },
+          {
+            "frameId": 5002,
+            "dlc": 3
+          },
+          {
+            "frameId": 1,
+            "dlc": 1
+          },
+          {
+            "frameId": 0,
+            "dlc": 0
+          },
+          {
+            "frameId": 7,
+            "dlc": 5
+          }
+        ],
+        "meta": {
+          "name": "Export",
+          "version": 2,
+          "default_byte_order": "big",
+          "default_interval": 100
+        },
+        "config": {
+          "device_address": 3,
+          "register_base": 1,
+          "register_type": "coil",
+          "default_interval": 1000
+        }
+      },
+      "expected": [
+        {
+          "op": "SetMeta",
+          "meta": {
+            "name": "Export",
+            "version": 2,
+            "default_frame": "modbus"
+          }
+        },
+        {
+          "op": "SetModbusConfig",
+          "config": {
+            "device_address": 3,
+            "register_base": 1,
+            "default_interval": 1000
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "modbus",
+          "key": "0",
+          "frame": {
+            "register_number": 0,
+            "register_type": "coil",
+            "length": 1
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "modbus",
+          "key": "1",
+          "frame": {
+            "register_number": 1,
+            "register_type": "coil",
+            "length": 1
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "modbus",
+          "key": "7",
+          "frame": {
+            "register_number": 7,
+            "register_type": "coil",
+            "length": 1
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "modbus",
+          "key": "5000",
+          "frame": {
+            "register_number": 5000,
+            "register_type": "coil",
+            "length": 1
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "modbus",
+          "key": "5002",
+          "frame": {
+            "register_number": 5002,
+            "register_type": "coil",
+            "length": 1
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "modbus",
+          "key": "13000",
+          "frame": {
+            "register_number": 13000,
+            "register_type": "coil",
+            "length": 1
+          }
+        }
+      ]
+    },
+    {
+      "name": "modbusCatalogOps discrete base 0",
+      "input": {
+        "registers": [
+          {
+            "frameId": 13000,
+            "dlc": 2
+          },
+          {
+            "frameId": 5000,
+            "dlc": 4
+          },
+          {
+            "frameId": 5002,
+            "dlc": 3
+          },
+          {
+            "frameId": 1,
+            "dlc": 1
+          },
+          {
+            "frameId": 0,
+            "dlc": 0
+          },
+          {
+            "frameId": 7,
+            "dlc": 5
+          }
+        ],
+        "meta": {
+          "name": "Export",
+          "version": 2,
+          "default_byte_order": "big",
+          "default_interval": 100
+        },
+        "config": {
+          "device_address": 3,
+          "register_base": 0,
+          "register_type": "discrete",
+          "default_interval": 1000
+        }
+      },
+      "expected": [
+        {
+          "op": "SetMeta",
+          "meta": {
+            "name": "Export",
+            "version": 2,
+            "default_frame": "modbus"
+          }
+        },
+        {
+          "op": "SetModbusConfig",
+          "config": {
+            "device_address": 3,
+            "register_base": 0,
+            "default_interval": 1000
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "modbus",
+          "key": "0",
+          "frame": {
+            "register_number": 0,
+            "register_type": "discrete",
+            "length": 1
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "modbus",
+          "key": "1",
+          "frame": {
+            "register_number": 1,
+            "register_type": "discrete",
+            "length": 1
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "modbus",
+          "key": "7",
+          "frame": {
+            "register_number": 7,
+            "register_type": "discrete",
+            "length": 1
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "modbus",
+          "key": "5000",
+          "frame": {
+            "register_number": 5000,
+            "register_type": "discrete",
+            "length": 1
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "modbus",
+          "key": "5002",
+          "frame": {
+            "register_number": 5002,
+            "register_type": "discrete",
+            "length": 1
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "modbus",
+          "key": "13000",
+          "frame": {
+            "register_number": 13000,
+            "register_type": "discrete",
+            "length": 1
+          }
+        }
+      ]
+    },
+    {
+      "name": "modbusCatalogOps discrete base 1",
+      "input": {
+        "registers": [
+          {
+            "frameId": 13000,
+            "dlc": 2
+          },
+          {
+            "frameId": 5000,
+            "dlc": 4
+          },
+          {
+            "frameId": 5002,
+            "dlc": 3
+          },
+          {
+            "frameId": 1,
+            "dlc": 1
+          },
+          {
+            "frameId": 0,
+            "dlc": 0
+          },
+          {
+            "frameId": 7,
+            "dlc": 5
+          }
+        ],
+        "meta": {
+          "name": "Export",
+          "version": 2,
+          "default_byte_order": "big",
+          "default_interval": 100
+        },
+        "config": {
+          "device_address": 3,
+          "register_base": 1,
+          "register_type": "discrete",
+          "default_interval": 1000
+        }
+      },
+      "expected": [
+        {
+          "op": "SetMeta",
+          "meta": {
+            "name": "Export",
+            "version": 2,
+            "default_frame": "modbus"
+          }
+        },
+        {
+          "op": "SetModbusConfig",
+          "config": {
+            "device_address": 3,
+            "register_base": 1,
+            "default_interval": 1000
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "modbus",
+          "key": "0",
+          "frame": {
+            "register_number": 0,
+            "register_type": "discrete",
+            "length": 1
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "modbus",
+          "key": "1",
+          "frame": {
+            "register_number": 1,
+            "register_type": "discrete",
+            "length": 1
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "modbus",
+          "key": "7",
+          "frame": {
+            "register_number": 7,
+            "register_type": "discrete",
+            "length": 1
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "modbus",
+          "key": "5000",
+          "frame": {
+            "register_number": 5000,
+            "register_type": "discrete",
+            "length": 1
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "modbus",
+          "key": "5002",
+          "frame": {
+            "register_number": 5002,
+            "register_type": "discrete",
+            "length": 1
+          }
+        },
+        {
+          "op": "SetFrame",
+          "protocol": "modbus",
+          "key": "13000",
+          "frame": {
+            "register_number": 13000,
+            "register_type": "discrete",
+            "length": 1
+          }
+        }
+      ]
+    },
+    {
+      "name": "modbusCatalogOps no registers, version 0",
+      "input": {
+        "registers": [],
+        "meta": {
+          "name": "Zero",
+          "version": 0,
+          "default_byte_order": "little",
+          "default_interval": -5
+        },
+        "config": {
+          "device_address": 247,
+          "register_base": 1,
+          "register_type": "holding",
+          "default_interval": 0
+        }
+      },
+      "expected": [
+        {
+          "op": "SetMeta",
+          "meta": {
+            "name": "Zero",
+            "version": 1,
+            "default_frame": "modbus"
+          }
+        },
+        {
+          "op": "SetModbusConfig",
+          "config": {
+            "device_address": 247,
+            "register_base": 1,
+            "default_interval": 0
+          }
+        }
+      ]
+    }
+  ]
+}

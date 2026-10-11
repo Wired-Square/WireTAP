@@ -11,7 +11,9 @@ import FlexSeparator from "../../components/FlexSeparator";
 import { SecondaryButton, PrimaryButton, Input } from "../../components/forms";
 import { useSettings } from "../../hooks/useSettings";
 import { readClipboardText, writeClipboardText } from "../../api/clipboard";
-import { cleanHex, hexToBytes, numberToHex, decodeGroups } from "./frameUtils";
+import { cleanHex, hexToBytes, numberToHex } from "../../utils/numberUtils";
+import { decodeGroups, type GroupedValue, type GroupOrder, type Grouping } from "../../api/decode";
+import { useAsyncAnswer } from "../../hooks/useAsyncAnswer";
 import { caption, captionMuted, borderDivider, bgSurface } from "../../styles";
 import { borderDefault, bgDataView } from "../../styles/colourTokens";
 import { iconMd, iconSm, iconXs, iconLg, flexRowGap2 } from "../../styles/spacing";
@@ -19,28 +21,15 @@ import { sectionHeaderText } from "../../styles/typography";
 import { Button, IconButton } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { AppIcon } from "../../components/AppIcon";
-export type Endianness = "little" | "big" | "mid-little" | "mid-big";
-export type GroupMode = "1B" | "2B" | "4B" | "8B" | "custom-bits" | "custom-bytes";
+type GroupModeChoice = "1B" | "2B" | "4B" | "8B" | "custom-bits" | "custom-bytes";
 export type CustomUnit = "bits" | "bytes";
 export type InputMode = "hex" | "number" | "string";
 
-export type GroupedValue = {
-  index: number;
-  bits: number;
-  hex: string;
-  unsigned: bigint;
-  signedTwos: bigint;
-  signedOnes: bigint;
-  signedMag: bigint;
-  text: string;
-  binary: string;
-  // For ByteBits component visualization
-  displayHex: string; // Full bytes to display (for sub-byte, shows the containing byte)
-  bitOffset: number; // Starting bit position within the displayed bytes (deprecated, use usedBitRange)
-  startByteIndex: number; // Starting byte index in the original data for labeling
-  usedBitStart: number; // Lowest bit index that is used (inclusive)
-  usedBitEnd: number; // Highest bit index that is used (inclusive)
-};
+function grouping(mode: GroupModeChoice, sizes: string): Grouping {
+  if (mode === "custom-bits") return { text: sizes, unitBits: 1 };
+  if (mode === "custom-bytes") return { text: sizes, unitBits: 8 };
+  return mode;
+}
 
 function stringToHex(str: string): string {
   return Array.from(str)
@@ -113,9 +102,9 @@ function ScalingByteBits(props: ScalingByteBitsProps) {
 export default function FrameCalculator() {
   const { t } = useTranslation("calculator");
   const { settings } = useSettings();
-  const [endianness, setEndianness] = useState<Endianness>("little");
+  const [endianness, setEndianness] = useState<GroupOrder>("little");
   const [rotateInterval, setRotateInterval] = useState<number>(1);
-  const [groupMode, setGroupMode] = useState<GroupMode>("2B");
+  const [groupMode, setGroupMode] = useState<GroupModeChoice>("2B");
   const [customSizeInput, setCustomSizeInput] = useState<string>("1");
   const [inputMode, setInputMode] = useState<InputMode>("hex");
   const [rawInput, setRawInput] = useState<string>("");
@@ -193,9 +182,11 @@ export default function FrameCalculator() {
 
   const bytes = useMemo(() => hexToBytes(cleanHex(hexInput)), [hexInput]);
 
-  const groups = useMemo(() => {
-    return decodeGroups(bytes, groupMode, customSizeInput, endianness);
-  }, [bytes, groupMode, customSizeInput, endianness]);
+  const groups = useAsyncAnswer<GroupedValue[]>(
+    () => decodeGroups(bytes, grouping(groupMode, customSizeInput), endianness),
+    [bytes, groupMode, customSizeInput, endianness],
+    [],
+  );
 
   // Handler for bit toggles - updates the original hex input
   const handleBitToggle = useCallback((groupIndex: number, newHexValue: string) => {
@@ -263,9 +254,9 @@ export default function FrameCalculator() {
     }
   };
 
-  const handleCopyValue = useCallback(async (value: string | number | bigint) => {
+  const handleCopyValue = useCallback(async (value: string) => {
     try {
-      await writeClipboardText(String(value));
+      await writeClipboardText(value);
     } catch (err) {
       console.warn("Copy failed", err);
     }
@@ -273,7 +264,7 @@ export default function FrameCalculator() {
 
   // Rotation logic
   const rotateEndianness = useCallback(() => {
-    const endiannessOrder: Endianness[] = ["little", "big", "mid-little", "mid-big"];
+    const endiannessOrder: GroupOrder[] = ["little", "big", "mid-little", "mid-big"];
     const currentIndex = endiannessOrder.indexOf(endianness);
     const nextIndex = (currentIndex + 1) % endiannessOrder.length;
     setEndianness(endiannessOrder[nextIndex]);
@@ -296,7 +287,7 @@ export default function FrameCalculator() {
     setShowCustomDialog(true);
   }, [groupMode, customSizeInput]);
 
-  const handlePresetSelect = useCallback((mode: GroupMode) => {
+  const handlePresetSelect = useCallback((mode: GroupModeChoice) => {
     setGroupMode(mode);
     setCustomLabel(null);
     setShowCustomDialog(false);
@@ -305,7 +296,7 @@ export default function FrameCalculator() {
   const handleCustomOk = useCallback(() => {
     const trimmed = dialogInput.trim();
     if (trimmed) {
-      const newMode: GroupMode = dialogUnit === "bits" ? "custom-bits" : "custom-bytes";
+      const newMode: GroupModeChoice = dialogUnit === "bits" ? "custom-bits" : "custom-bytes";
       setGroupMode(newMode);
       setCustomSizeInput(trimmed);
       // Create a display label
@@ -569,7 +560,7 @@ export default function FrameCalculator() {
                       <div className="flex justify-between items-center group">
                         <span>{t("labels.unsigned")}</span>
                         <div className={flexRowGap2}>
-                          <span className="font-mono">{g.unsigned.toString()}</span>
+                          <span className="font-mono">{g.unsigned}</span>
                           <IconButton
                             onClick={() => handleCopyValue(g.unsigned)}
                             size="sm"
@@ -583,7 +574,7 @@ export default function FrameCalculator() {
                       <div className="flex justify-between items-center group">
                         <span>Signed (2's)</span>
                         <div className={flexRowGap2}>
-                          <span className="font-mono">{g.signedTwos.toString()}</span>
+                          <span className="font-mono">{g.signedTwos}</span>
                           <IconButton
                             onClick={() => handleCopyValue(g.signedTwos)}
                             size="sm"
@@ -597,7 +588,7 @@ export default function FrameCalculator() {
                       <div className="flex justify-between items-center group">
                         <span>Signed (1's)</span>
                         <div className={flexRowGap2}>
-                          <span className="font-mono">{g.signedOnes.toString()}</span>
+                          <span className="font-mono">{g.signedOnes}</span>
                           <IconButton
                             onClick={() => handleCopyValue(g.signedOnes)}
                             size="sm"
@@ -611,7 +602,7 @@ export default function FrameCalculator() {
                       <div className="flex justify-between items-center group">
                         <span>Sign-Magnitude</span>
                         <div className={flexRowGap2}>
-                          <span className="font-mono">{g.signedMag.toString()}</span>
+                          <span className="font-mono">{g.signedMag}</span>
                           <IconButton
                             onClick={() => handleCopyValue(g.signedMag)}
                             size="sm"
@@ -687,7 +678,7 @@ export default function FrameCalculator() {
               Preset
             </label>
             <div className="grid grid-cols-4 gap-2">
-              {(["1B", "2B", "4B", "8B"] as GroupMode[]).map((mode) => (
+              {(["1B", "2B", "4B", "8B"] as GroupModeChoice[]).map((mode) => (
                 <Button
                   key={mode}
                   onClick={() => handlePresetSelect(mode)}
@@ -915,7 +906,7 @@ export default function FrameCalculator() {
               Raw Value (from hex)
             </label>
             <div className="px-3 py-2 rounded border bg-surface border-default font-mono text-sm">
-              {groups.length > 0 ? groups[0].unsigned.toString() : "—"}
+              {groups.length > 0 ? groups[0].unsigned : "—"}
             </div>
           </div>
 
@@ -971,7 +962,7 @@ export default function FrameCalculator() {
                   </IconButton>
                 </div>
                 <div className={`${caption} mt-2 font-mono`}>
-                  {targetValue} ÷ {rawValue.toString()} = {scale.toPrecision(6)}
+                  {targetValue} ÷ {rawValue} = {scale.toPrecision(6)}
                 </div>
                 <div className={`${caption} mt-1`}>
                   raw × {scale.toPrecision(6)} = physical

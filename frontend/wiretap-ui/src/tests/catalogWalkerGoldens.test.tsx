@@ -34,10 +34,11 @@ vi.mock("../components/BitPreview", () => ({
   },
 }));
 
-import { formatFrameId, parseCanIdToNumber } from "../apps/catalog/utils";
+import { formatFrameId } from "../apps/catalog/utils";
+import { NAME_KEYED_FRAME_ID } from "../generated/wireConstants";
 import { catalogToTree } from "../apps/catalog/tree/catalogToTree";
 import type { TomlNode } from "../apps/catalog/types";
-import type { Catalog } from "../types/catalogModel";
+import type { Catalog, Frame } from "../types/catalogModel";
 import { useCatalogEditorStore } from "../stores/catalogEditorStore";
 import CANFrameView from "../apps/catalog/views/CANFrameView";
 import SerialFrameView from "../apps/catalog/views/SerialFrameView";
@@ -72,15 +73,22 @@ function findNode(nodes: TomlNode[], path: string[]): TomlNode {
 }
 
 function idCases(): GoldenCase[] {
+  const frames: Pick<Frame, "key" | "frameId" | "protocol" | "isExtended">[] = [
+    { key: "0x7FF", frameId: 0x7ff, protocol: "can", isExtended: false },
+    { key: "0x800", frameId: 0x800, protocol: "can", isExtended: true },
+    { key: "0x005", frameId: 0x5, protocol: "can", isExtended: true },
+    { key: "0x100", frameId: 0x100, protocol: "can" },
+    { key: "0x1FFFFFFF", frameId: 0x1fffffff, protocol: "can", isExtended: true },
+    { key: "0x10", frameId: 0x10, protocol: "serial" },
+    { key: "status", frameId: NAME_KEYED_FRAME_ID, protocol: "serial" },
+    { key: "5000", frameId: 5000, protocol: "modbus" },
+    { key: "ems_control", frameId: 13000, protocol: "modbus" },
+  ];
   return [
     {
-      name: "id parsing and the editor's id formatting",
-      input: ["0x7FF", "0x800", "0x1FFFFFFF", "2047", " 256 ", "0X10", "-1", "status", "", "1e3"],
-      expected: ["0x7FF", "0x800", "0x1FFFFFFF", "2047", " 256 ", "0X10", "-1", "status", "", "1e3"].map((id) => ({
-        number: parseCanIdToNumber(id),
-        hex: formatFrameId(id, "hex"),
-        decimal: formatFrameId(id, "decimal"),
-      })),
+      name: "the editor's id formatting, its hex width by the extended flag",
+      input: frames,
+      expected: frames.map((frame) => ({ hex: formatFrameId(frame, "hex"), decimal: formatFrameId(frame, "decimal") })),
     },
   ];
 }

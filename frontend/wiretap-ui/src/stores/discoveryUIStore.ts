@@ -6,11 +6,18 @@
 import { create } from 'zustand';
 import i18n from 'i18next';
 import { saveCatalog } from '../api';
-import { buildCatalog } from '../api/catalog';
-import { draftCatalog, type Draft, type DraftFrame } from '../api/drafting';
+import {
+  draftCatalog,
+  exportModbusCatalog,
+  type Draft,
+  type DraftFrame,
+  type ExportFinding,
+  type ExportMeta,
+  type ModbusExportConfig,
+} from '../api/drafting';
 import { withAppError } from '../utils/appError';
 import { frameNoteLines } from '../utils/analysis/byteNoteText';
-import { catalogProtocol, headOps, modbusCatalogOps, serialReservedSpans, type SerialFrameConfig, type ModbusExportConfig } from '../utils/frameExport';
+import { serialConfigOf, type SerialFrameConfig } from '../utils/frameExport';
 import { parseFrameKey } from '../utils/frameKey';
 import { normalizeMeta } from '../utils/catalogMeta';
 import { configFromCandidate, serialChecksumFromConfig } from '../apps/discovery/views/serial/checksumConfig';
@@ -60,6 +67,8 @@ interface DiscoveryUIState {
   serialConfig: SerialFrameConfig | null;
   /** Modbus-specific export configuration, set when a scan completes */
   modbusExportConfig: ModbusExportConfig | null;
+  /** What the last catalogue export left out. */
+  exportFindings: ExportFinding[];
 
   // Selection set state
   activeSelectionSetId: string | null;
@@ -97,6 +106,7 @@ interface DiscoveryUIState {
   updateSaveMetadata: (metadata: FrameMetadata) => void;
   setSerialConfig: (config: SerialFrameConfig | null) => void;
   setModbusExportConfig: (config: ModbusExportConfig | null) => void;
+  clearExportFindings: () => void;
   saveFrames: (
     decoderDir: string,
     saveFrameIdFormat: 'hex' | 'decimal',
@@ -140,6 +150,7 @@ export const useDiscoveryUIStore = create<DiscoveryUIState>((set, get) => ({
   },
   serialConfig: null,
   modbusExportConfig: null,
+  exportFindings: [],
   activeSelectionSetId: null,
   selectionSetDirty: false,
   activeSelectionSetSelectedIds: null,
@@ -193,6 +204,8 @@ export const useDiscoveryUIStore = create<DiscoveryUIState>((set, get) => ({
     set({ modbusExportConfig: config });
   },
 
+  clearExportFindings: () => set({ exportFindings: [] }),
+
   saveFrames: async (decoderDir, saveFrameIdFormat, selectedFrames, frameInfoMap) => {
     const { draft, toolbox } = useDiscoveryToolboxStore.getState();
 
@@ -207,9 +220,11 @@ export const useDiscoveryUIStore = create<DiscoveryUIState>((set, get) => ({
     const filename = safeFilename.endsWith('.toml') ? safeFilename : `${safeFilename}.toml`;
     const baseDir = decoderDir.replace(/[\\/]+$/, '');
     const path = `${baseDir}/${filename}`;
-    const saveBuilt = async (build: () => Promise<string>) => {
+    const saveBuilt = async (build: () => Promise<{ text: string; findings: ExportFinding[] }>) => {
       const saved = await withAppError('Save Error', 'The catalogue was not saved', async () => {
-        await saveCatalog(path, await build());
+        const { text, findings } = await build();
+        await saveCatalog(path, text);
+        set({ exportFindings: findings });
       });
       if (saved) set({ showSaveDialog: false });
     };
@@ -229,13 +244,13 @@ export const useDiscoveryUIStore = create<DiscoveryUIState>((set, get) => ({
     // Use detected byte order from analysis if available, otherwise use user selection
     const defaultByteOrder = draft?.defaultEndianness ?? saveMetadata.default_byte_order;
 
-    const normalizedMeta = normalizeMeta({
+    const { name, version, default_byte_order, default_interval } = normalizeMeta({
       name: saveMetadata.name,
       version: saveMetadata.version,
       default_byte_order: defaultByteOrder,
       default_interval: defaultInterval,
-      default_frame: detectedProtocol,
     });
+    const meta: ExportMeta = { name, version, default_byte_order, default_interval };
 
     // Modbus protocol: use specialised TOML export
     const { modbusExportConfig } = get();
@@ -244,7 +259,10 @@ export const useDiscoveryUIStore = create<DiscoveryUIState>((set, get) => ({
         frameId: f.frameId,
         dlc: f.length,
       }));
-      await saveBuilt(() => buildCatalog(modbusCatalogOps(registers, normalizedMeta, { ...modbusExportConfig, default_interval: defaultInterval })));
+      await saveBuilt(async () => ({
+        text: await exportModbusCatalog(registers, meta, { ...modbusExportConfig, default_interval: defaultInterval }),
+        findings: [],
+      }));
       return;
     }
 
@@ -266,18 +284,15 @@ export const useDiscoveryUIStore = create<DiscoveryUIState>((set, get) => ({
       }
     }
 
-    const serial = detectedProtocol === 'serial' ? enrichedSerialConfig ?? undefined : undefined;
-    await saveBuilt(() => {
-      const head = headOps(catalogProtocol(selectedFramesList), normalizedMeta, serial);
-      return draftCatalog(draft, head, {
+    await saveBuilt(() =>
+      draftCatalog(draft, meta, enrichedSerialConfig && serialConfigOf(enrichedSerialConfig), {
         frames: selectedFramesList,
         notes: selectedFramesList.map((f) => draftNotes(draft, f)),
-        defaultEndianness: normalizedMeta.default_byte_order,
-        defaultIntervalMs: normalizedMeta.default_interval,
-        serialReserved: serialReservedSpans(serial),
+        defaultEndianness: meta.default_byte_order,
+        defaultIntervalMs: meta.default_interval,
         decimalIds: saveFrameIdFormat === 'decimal',
-      });
-    });
+      }),
+    );
   },
 
   // Selection sets

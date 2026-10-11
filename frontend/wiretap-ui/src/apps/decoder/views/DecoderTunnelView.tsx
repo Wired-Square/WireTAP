@@ -94,7 +94,7 @@ const TransactionRow = memo(function TransactionRow({
       <div className="flex items-center gap-3 flex-wrap">
         <span className={`${textMuted} text-xs`}>{formatHumanUs(t.timestampUs, useLocalTimezone)}</span>
         <span className={`${textDataPurple} font-semibold`}>
-          {formatFrameId(t.frameId, displayFrameIdFormat, t.frameId > 0x7ff)}
+          {formatFrameId(t.frameId, displayFrameIdFormat, t.isExtended)}
         </span>
         <Arrow className={`${iconXs} ${isRequest ? textDataCyan : textDataGreen}`} />
         <span className={isRequest ? textDataCyan : textDataGreen}>

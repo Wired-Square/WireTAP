@@ -19,7 +19,7 @@ import CatalogToolbar from "./layouts/CatalogToolbar";
 import SelectionHeader from "./layouts/SelectionHeader";
 import { catalogToTree } from "./tree/catalogToTree";
 import type { SerialEncoding, TomlNode } from "./types";
-import type { Catalog } from "../../types/catalogModel";
+import type { Catalog, Frame } from "../../types/catalogModel";
 import { findNodeByPath } from "./tree/treeUtils";
 import { formatFrameId } from "./utils";
 import { createRenderTreeNode } from "./tree/renderTreeNode";
@@ -200,7 +200,7 @@ function CatalogEditorInner() {
   }, [parsedTree, selectedPath]);
 
   const formatFrameIdForDisplay = useMemo(
-    () => (id: string) => formatFrameId(id, displayFrameIdFormat),
+    () => (frame: Frame) => formatFrameId(frame, displayFrameIdFormat),
     [displayFrameIdFormat]
   );
 

@@ -536,5 +536,12 @@
     "title": "Function Code Probe",
     "probingDevice": "probing {{device}}…",
     "close": "Close"
+  },
+  "catalogueExport": {
+    "headerFieldOutOfRange": "Saved without the {{field}} header field ({{bytes}} bytes from byte {{start}}): a header mask reaches only bytes 0 to 3.",
+    "fields": {
+      "id": "frame ID",
+      "source_address": "source address"
+    }
   }
 }

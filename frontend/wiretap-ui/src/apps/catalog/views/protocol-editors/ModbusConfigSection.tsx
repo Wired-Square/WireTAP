@@ -1,8 +1,10 @@
 // ui/src/apps/catalog/views/protocol-editors/ModbusConfigSection.tsx
 
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { ModbusConfig, SlaveOption } from "../../types";
-import { parseCanIdToNumber } from "../../utils";
+import { catalogParseId } from "../../../../api/catalog";
+import { tlog } from "../../../../api/settings";
 import { caption, textMedium } from "../../../../styles";
 import { Input, Select } from "../../../../components/forms";
 
@@ -26,7 +28,16 @@ export default function ModbusConfigSection({
   const { t } = useTranslation("catalog");
   // The register comes from a numeric frame key OR an explicit register number.
   // A non-numeric name with no register number is incomplete — warn.
-  const keyIsRegister = parseCanIdToNumber(frameKey) !== null;
+  const [keyIsRegister, setKeyIsRegister] = useState(true);
+  useEffect(() => {
+    let current = true;
+    catalogParseId(frameKey)
+      .then((id) => current && setKeyIsRegister(id !== null))
+      .catch((e) => tlog.info(`[ModbusConfigSection] id parse failed: ${e}`));
+    return () => {
+      current = false;
+    };
+  }, [frameKey]);
   const needsRegisterNumber = !keyIsRegister && config.register_number == null;
   return (
     <div className="space-y-4">

@@ -7,12 +7,12 @@
 // `io/modbus_tcp/scanner.rs`; the reasoning is recorded because most of these
 // numbers came from a specific device misbehaving in a specific way.
 
-import type { ModbusRegisterType } from "../../api/io";
+import type { RegisterType } from "../../api/io";
 
 // Deliberately not `as const`: these seed `useState`, and literal types would
 // pin each piece of state to the value it started with.
 export const MODBUS_SCAN_DEFAULTS: {
-  registerType: ModbusRegisterType;
+  registerType: RegisterType;
   startRegister: number;
   endRegister: number;
   interRequestDelayMs: number;
@@ -58,7 +58,7 @@ export const MODBUS_SCAN_DEFAULTS: {
 /** Modbus caps a single read at 125 registers, or 2000 coils. */
 const MAX_READ_SIZE = { registers: 125, coils: 2000 } as const;
 
-export function maxChunkFor(type: ModbusRegisterType): number {
+export function maxChunkFor(type: RegisterType): number {
   return type === "coil" || type === "discrete" ? MAX_READ_SIZE.coils : MAX_READ_SIZE.registers;
 }
 

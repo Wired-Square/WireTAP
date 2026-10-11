@@ -332,7 +332,7 @@ export function RawFrameRow({
     >
       <span className={`${textMuted} text-xs`}>{timeStr}</span>
       <span className={`${textDataPurple} font-semibold`}>
-        {formatProtocolFrameId(frame.protocol, frame.frameId, displayFrameIdFormat, frame.frameId > 0x7FF)}
+        {formatProtocolFrameId(frame.protocol, frame.frameId, displayFrameIdFormat, frame.isExtended)}
       </span>
       {frame.sourceAddress !== undefined && (
         <span className={`${textDataCyan} text-xs`}>src: 0x{frame.sourceAddress.toString(16).toUpperCase()}</span>
@@ -1305,8 +1305,7 @@ export default function DecoderFramesView({
   const unmatchedContextMenuItems: ContextMenuItem[] = useMemo(() => {
     if (!unmatchedContextMenu) return [];
     const { frame } = unmatchedContextMenu;
-    const isExtended = frame.frameId > 0x7FF;
-    const formattedId = formatProtocolFrameId(frame.protocol, frame.frameId, displayFrameIdFormat, isExtended);
+    const formattedId = formatProtocolFrameId(frame.protocol, frame.frameId, displayFrameIdFormat, frame.isExtended);
     const hexData = frame.bytes.map(b => b.toString(16).toUpperCase().padStart(2, '0')).join(' ');
 
     return [

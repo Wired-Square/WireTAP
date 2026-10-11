@@ -15,11 +15,6 @@ export {
   getAlgorithmInfo,
   getAlgorithmOutputBytes,
 
-  // Byte index utilities (sync for UI, async via IPC available too)
-  resolveByteIndex,
-  resolveByteIndexSync,
-  formatByteIndex,
-
   // Async checksum functions (call Rust via Tauri IPC)
   calculateChecksum,
   validateChecksum,

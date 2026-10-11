@@ -22,12 +22,12 @@ import { borderDefault, textMuted } from "../../styles";
 import CheckboxField from "../../components/forms/CheckboxField";
 import { FieldRow, NumberField, SelectField, registerTypeOptions } from "../../components/modbus/ModbusFields";
 import { MODBUS_SCAN_BOUNDS } from "../../components/modbus/modbusScanDefaults";
-import type { ModbusRangeSpec, ModbusRegisterType } from "../../api/io";
+import type { ModbusRangeSpec, RegisterType } from "../../api/io";
 
 /** The picker's poll settings. `enabled` off means "don't poll". */
 export interface ModbusPollConfigState {
   enabled: boolean;
-  registerType: ModbusRegisterType;
+  registerType: RegisterType;
   start: number;
   end: number;
   intervalMs: number;

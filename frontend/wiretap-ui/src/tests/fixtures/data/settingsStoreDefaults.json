@@ -1,0 +1,236 @@
+{
+  "cases": [
+    {
+      "name": "before a load",
+      "input": null,
+      "expected": {
+        "display": {
+          "frameIdFormat": "hex",
+          "saveFrameIdFormat": "hex",
+          "timeFormat": "human",
+          "timezone": "local",
+          "signalColours": {
+            "none": "#94a3b8",
+            "low": "#f59e0b",
+            "medium": "#3b82f6",
+            "high": "#22c55e"
+          },
+          "binaryOneColour": "#14b8a6",
+          "binaryZeroColour": "#94a3b8",
+          "binaryUnusedColour": "#64748b",
+          "frameEditorColours": [
+            "#22d3ee",
+            "#4ade80",
+            "#facc15",
+            "#c084fc",
+            "#60a5fa",
+            "#f87171",
+            "#67e8f9",
+            "#86efac"
+          ],
+          "themeMode": "auto",
+          "themeColours": {
+            "bgPrimaryLight": "#ffffff",
+            "bgSurfaceLight": "#f8fafc",
+            "textPrimaryLight": "#0f172a",
+            "textSecondaryLight": "#334155",
+            "borderDefaultLight": "#e2e8f0",
+            "dataBgLight": "#f8fafc",
+            "dataTextPrimaryLight": "#0f172a",
+            "bgPrimaryDark": "#0f172a",
+            "bgSurfaceDark": "#1e293b",
+            "textPrimaryDark": "#ffffff",
+            "textSecondaryDark": "#cbd5e1",
+            "borderDefaultDark": "#334155",
+            "dataBgDark": "#111827",
+            "dataTextPrimaryDark": "#e5e7eb",
+            "accentPrimary": "#2563eb",
+            "accentSuccess": "#16a34a",
+            "accentDanger": "#dc2626",
+            "accentWarning": "#d97706"
+          }
+        },
+        "buffers": {
+          "clearCapturesOnStart": true,
+          "captureStorage": "sqlite",
+          "discoveryHistorySize": 100000,
+          "queryResultLimit": 10000,
+          "graphBufferSize": 10000,
+          "decoderMaxUnmatchedFrames": 1000,
+          "decoderMaxFilteredFrames": 1000,
+          "decoderMaxDecodedFrames": 500,
+          "decoderMaxDecodedPerSource": 2000,
+          "transmitMaxHistory": 1000
+        },
+        "general": {
+          "defaultFrameType": "can",
+          "sessionManagerStatsInterval": 60,
+          "preventIdleSleep": true,
+          "keepDisplayAwake": false,
+          "logLevel": "off",
+          "telemetryEnabled": false,
+          "telemetryConsentGiven": false,
+          "usageAnalyticsEnabled": false,
+          "usageAnalyticsConsentGiven": false,
+          "installId": "",
+          "modbusMaxRegisterErrors": 3,
+          "smpPort": 1337,
+          "language": "en-AU"
+        },
+        "mcp": {
+          "serverEnabled": false,
+          "allowControl": false,
+          "allowSessionControl": false,
+          "allowCatalogWrite": false,
+          "allowCatalogModify": false,
+          "allowDashboardWrite": false,
+          "allowUiControl": false,
+          "serverPort": 8787,
+          "serverToken": ""
+        }
+      }
+    },
+    {
+      "name": "a load of a file with no settings",
+      "input": {
+        "io_profiles": []
+      },
+      "expected": {
+        "display": {
+          "frameIdFormat": "hex",
+          "saveFrameIdFormat": "hex",
+          "timeFormat": "human",
+          "timezone": "local",
+          "signalColours": {
+            "none": "#94a3b8",
+            "low": "#f59e0b",
+            "medium": "#3b82f6",
+            "high": "#22c55e"
+          },
+          "binaryOneColour": "#14b8a6",
+          "binaryZeroColour": "#94a3b8",
+          "binaryUnusedColour": "#64748b",
+          "frameEditorColours": [
+            "#22d3ee",
+            "#4ade80",
+            "#facc15",
+            "#c084fc",
+            "#60a5fa",
+            "#f87171",
+            "#67e8f9",
+            "#86efac"
+          ],
+          "themeMode": "auto",
+          "themeColours": {
+            "bgPrimaryLight": "#ffffff",
+            "bgSurfaceLight": "#f8fafc",
+            "textPrimaryLight": "#0f172a",
+            "textSecondaryLight": "#334155",
+            "borderDefaultLight": "#e2e8f0",
+            "dataBgLight": "#f8fafc",
+            "dataTextPrimaryLight": "#0f172a",
+            "bgPrimaryDark": "#0f172a",
+            "bgSurfaceDark": "#1e293b",
+            "textPrimaryDark": "#ffffff",
+            "textSecondaryDark": "#cbd5e1",
+            "borderDefaultDark": "#334155",
+            "dataBgDark": "#111827",
+            "dataTextPrimaryDark": "#e5e7eb",
+            "accentPrimary": "#2563eb",
+            "accentSuccess": "#16a34a",
+            "accentDanger": "#dc2626",
+            "accentWarning": "#d97706"
+          }
+        },
+        "buffers": {
+          "clearCapturesOnStart": true,
+          "captureStorage": "sqlite",
+          "discoveryHistorySize": 100000,
+          "queryResultLimit": 10000,
+          "graphBufferSize": 10000,
+          "decoderMaxUnmatchedFrames": 1000,
+          "decoderMaxFilteredFrames": 1000,
+          "decoderMaxDecodedFrames": 500,
+          "decoderMaxDecodedPerSource": 2000,
+          "transmitMaxHistory": 1000
+        },
+        "general": {
+          "defaultFrameType": "can",
+          "sessionManagerStatsInterval": 60,
+          "preventIdleSleep": true,
+          "keepDisplayAwake": false,
+          "logLevel": "off",
+          "telemetryEnabled": false,
+          "telemetryConsentGiven": false,
+          "usageAnalyticsEnabled": false,
+          "usageAnalyticsConsentGiven": false,
+          "installId": "",
+          "modbusMaxRegisterErrors": 3,
+          "smpPort": 1337,
+          "language": "en-AU"
+        },
+        "mcp": {
+          "serverEnabled": false,
+          "allowControl": false,
+          "allowSessionControl": false,
+          "allowCatalogWrite": false,
+          "allowCatalogModify": false,
+          "allowDashboardWrite": false,
+          "allowUiControl": false,
+          "serverPort": 8787,
+          "serverToken": ""
+        }
+      }
+    },
+    {
+      "name": "every display reset",
+      "input": null,
+      "expected": {
+        "frameIdFormat": "hex",
+        "saveFrameIdFormat": "hex",
+        "timeFormat": "human",
+        "timezone": "local",
+        "signalColours": {
+          "none": "#94a3b8",
+          "low": "#f59e0b",
+          "medium": "#3b82f6",
+          "high": "#22c55e"
+        },
+        "binaryOneColour": "#14b8a6",
+        "binaryZeroColour": "#94a3b8",
+        "binaryUnusedColour": "#64748b",
+        "frameEditorColours": [
+          "#22d3ee",
+          "#4ade80",
+          "#facc15",
+          "#c084fc",
+          "#60a5fa",
+          "#f87171",
+          "#67e8f9",
+          "#86efac"
+        ],
+        "themeMode": "auto",
+        "themeColours": {
+          "bgPrimaryLight": "#ffffff",
+          "bgSurfaceLight": "#f8fafc",
+          "textPrimaryLight": "#0f172a",
+          "textSecondaryLight": "#334155",
+          "borderDefaultLight": "#e2e8f0",
+          "dataBgLight": "#f8fafc",
+          "dataTextPrimaryLight": "#0f172a",
+          "bgPrimaryDark": "#0f172a",
+          "bgSurfaceDark": "#1e293b",
+          "textPrimaryDark": "#ffffff",
+          "textSecondaryDark": "#cbd5e1",
+          "borderDefaultDark": "#334155",
+          "dataBgDark": "#111827",
+          "dataTextPrimaryDark": "#e5e7eb",
+          "accentPrimary": "#2563eb",
+          "accentSuccess": "#16a34a",
+          "accentDanger": "#dc2626",
+          "accentWarning": "#d97706"
+        }
+      }
+    }
+  ]
+}

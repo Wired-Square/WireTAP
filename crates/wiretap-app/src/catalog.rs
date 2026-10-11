@@ -60,6 +60,8 @@ pub async fn dispatch_catalog_command(
             let layout = wiretap_catalog::frame_layout(&cat, protocol, &req("key")?, &path);
             serde_json::to_value(layout).map_err(|e| e.to_string())
         }
+        // A frame key → its numeric id, null for a name.
+        "catalog.parseId" => Ok(serde_json::json!(wiretap_catalog::parse::parse_id(&req("id")?))),
         // TOML → field-path + message validation findings.
         "catalog.validate" => {
             let errors = wiretap_catalog::validate::validate(&content()?);
@@ -986,6 +988,30 @@ mod tests {
             boost["display"],
             serde_json::json!({ "widget": "rotary", "start_angle": -90, "end_angle": 90 })
         );
+    }
+
+    /// The TypeScript parse this replaced refused `0X10` and read ids past `u32`.
+    #[test]
+    fn catalog_parse_id_reads_a_key_as_the_catalogue_does() {
+        for (key, id) in [
+            ("0x7FF", Some(0x7FF)),
+            ("0x800", Some(0x800)),
+            ("0x1FFFFFFF", Some(0x1FFF_FFFF)),
+            ("2047", Some(2047)),
+            (" 256 ", Some(256)),
+            ("0X10", Some(0x10)),
+            ("4294967295", Some(u32::MAX)),
+            ("4294967296", None),
+            ("0x100000000", None),
+            ("-1", None),
+            ("status", None),
+            ("", None),
+            ("0x", None),
+            ("1e3", None),
+        ] {
+            let parsed = command("catalog.parseId", serde_json::json!({ "id": key }));
+            assert_eq!(parsed, serde_json::json!(id), "{key:?}");
+        }
     }
 
     fn try_command(op: &str, params: serde_json::Value) -> Result<serde_json::Value, String> {

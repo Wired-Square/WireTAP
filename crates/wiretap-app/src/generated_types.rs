@@ -54,8 +54,16 @@ fn render() -> BTreeMap<PathBuf, String> {
                 (TypeId::of::<crate::settings::AppSettings>(), setting_ranges()),
             ),
             (
+                PathBuf::from("settingDefaults.ts"),
+                (TypeId::of::<crate::settings::AppSettings>(), setting_defaults()),
+            ),
+            (
                 PathBuf::from("checksumAlgorithms.ts"),
                 (TypeId::of::<wiretap_checksum::ChecksumAlgorithm>(), checksum_algorithms()),
+            ),
+            (
+                PathBuf::from("protocolTraits.ts"),
+                (TypeId::of::<crate::io::Protocol>(), protocol_traits()),
             ),
             (
                 PathBuf::from("canFdLengths.ts"),
@@ -168,6 +176,7 @@ fn render() -> BTreeMap<PathBuf, String> {
     r.visit::<crate::io::framelink::rules::GeneratorDescriptor>();
     r.visit::<crate::io::framelink::rules::TransformerDescriptor>();
     r.visit::<crate::io::framelink::rules::SignalPlacement>();
+    r.visit::<crate::io::framelink::rules::SignalType>();
     r.visit::<crate::io::framelink::rules::FrameLinkIdKind>();
     r.visit::<crate::io_test::IOTestState>();
     r.visit::<crate::io_test::TestConfig>();
@@ -182,6 +191,18 @@ fn render() -> BTreeMap<PathBuf, String> {
     r.visit::<crate::analysis_ts::CandidateSignal>();
     r.visit::<crate::drafting::DraftPreview>();
     r.visit::<crate::drafting::DraftWrite>();
+    r.visit::<crate::drafting::ExportedCatalog>();
+    r.visit::<wiretap_analysis::draft::ExportFrame>();
+    r.visit::<wiretap_catalog::model::SerialConfig>();
+    r.visit::<wiretap_analysis::draft::ExportMeta>();
+    r.visit::<wiretap_analysis::draft::ModbusExportConfig>();
+    r.visit::<wiretap_analysis::draft::ModbusRegister>();
+    r.visit::<crate::decode_views::Grouping>();
+    r.visit::<wiretap_decode::groups::Group>();
+    r.visit::<wiretap_decode::groups::GroupOrder>();
+    r.visit::<crate::decode_views::RegisterRead>();
+    r.visit::<crate::decode_views::RegisterReading>();
+    r.visit::<crate::decode_views::MaskMatch>();
     r.files.into_iter().map(|(path, (_, text))| (path, text)).collect()
 }
 
@@ -235,6 +256,15 @@ fn checksum_algorithms() -> String {
     format!("{HEADER}\nexport const CHECKSUM_OUTPUT_BYTES = {{\n{rows}}} as const;\n")
 }
 
+/// What each frame protocol carries besides its payload, by protocol.
+fn protocol_traits() -> String {
+    let rows: String = crate::io::Protocol::ALL
+        .iter()
+        .map(|p| format!("  {}: {},\n", serde_json::to_value(p).unwrap().as_str().unwrap(), p.trailing_check_bytes()))
+        .collect();
+    format!("{HEADER}\nexport const TRAILING_CHECK_BYTES = {{\n{rows}}} as const;\n")
+}
+
 /// The payload lengths a CAN FD frame can carry, one per length code.
 fn can_fd_lengths() -> String {
     format!("{HEADER}\nexport const CAN_FD_DLC_VALUES = {:?} as const;\n", wiretap_protocol::FD_DLC_LEN)
@@ -270,6 +300,16 @@ fn setting_ranges() -> String {
         .map(|(field, min, max)| format!("  {field}: {{ min: {min}, max: {max} }},\n"))
         .collect();
     format!("{HEADER}\nexport const SETTING_RANGES = {{\n{rows}}} as const;\n")
+}
+
+/// What a fresh settings file holds, less the host's own directories.
+fn setting_defaults() -> String {
+    let mut defaults = serde_json::to_value(crate::settings::AppSettings::default()).unwrap();
+    for dir in ["decoder_dir", "dump_dir", "report_dir"] {
+        defaults[dir] = "".into();
+    }
+    let body = serde_json::to_string_pretty(&defaults).unwrap();
+    format!("{HEADER}\nexport const SETTING_DEFAULTS = {body} as const;\n")
 }
 
 fn committed(dir: &Path) -> BTreeMap<PathBuf, String> {
@@ -394,7 +434,7 @@ fn outputs_serialise_as_declared() {
     assert_serialises_as_declared(&[IOCapabilities::realtime_can()]);
     assert_serialises_as_declared(&[BusMapping::default()]);
     assert_serialises_as_declared(&[SourceConfig::default()]);
-    assert_serialises_as_declared(&[Protocol::Can, Protocol::CanFd, Protocol::Modbus, Protocol::ModbusRtu, Protocol::Serial]);
+    assert_serialises_as_declared(&Protocol::ALL);
     assert_serialises_as_declared(&[TemporalMode::Realtime, TemporalMode::Recorded, TemporalMode::Capture]);
     assert_serialises_as_declared(&[crate::capture_store::CaptureKind::Frames, crate::capture_store::CaptureKind::Bytes]);
     assert_serialises_as_declared(&[
@@ -415,7 +455,9 @@ fn outputs_serialise_as_declared() {
         Log::Reconfigured,
         Log::Cleared,
     ]);
-    assert_serialises_as_declared(&[RegisterType::Holding, RegisterType::Input, RegisterType::Coil, RegisterType::Discrete]);
+    for rt in [RegisterType::Holding, RegisterType::Input, RegisterType::Coil, RegisterType::Discrete] {
+        assert_declared::<wiretap_catalog::RegisterType>(&serde_json::to_value(rt).unwrap());
+    }
     assert_serialises_as_declared(&[modbus_tcp::PollEmitMode::Block, modbus_tcp::PollEmitMode::PerRegister]);
     use modbus_tcp::scanner::FcVerdict;
     assert_serialises_as_declared(&[

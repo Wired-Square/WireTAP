@@ -6,7 +6,7 @@
 export function formatFrameId(
   id: number,
   mode: "hex" | "decimal" = "hex",
-  isExtended?: boolean
+  isExtended?: boolean | null
 ): string {
   if (mode === "decimal") return id.toString(10);
   const pad = isExtended ? 8 : 3;

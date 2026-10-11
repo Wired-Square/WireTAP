@@ -8,7 +8,6 @@
 export {
   calculateChecksum,
   validateChecksum,
-  resolveByteIndex,
   type ChecksumAlgorithm,
   type ChecksumValidationResult,
 } from "../../api/checksums";
@@ -57,45 +56,4 @@ export function getAlgorithmOutputBytes(
   algorithm: ChecksumAlgorithm
 ): number {
   return getAlgorithmInfo(algorithm)?.outputBytes ?? 1;
-}
-
-// ============================================================================
-// Synchronous Byte Index Utilities (for UI display, no IPC needed)
-// ============================================================================
-
-/**
- * Resolve a byte index synchronously, supporting Python-style negative indexing.
- * Negative indices count from the end: -1 = last byte, -2 = second-to-last, etc.
- *
- * Note: This is a synchronous version for UI display. The async version
- * `resolveByteIndex` calls Rust and should be used when precision matters.
- *
- * @param index - The byte index (can be negative)
- * @param frameLength - Total frame length in bytes
- * @returns The resolved absolute byte index
- */
-export function resolveByteIndexSync(index: number, frameLength: number): number {
-  if (index >= 0) {
-    return index;
-  }
-  // Negative: count from end
-  // -1 -> frameLength - 1 (last byte)
-  // -2 -> frameLength - 2 (second-to-last)
-  return Math.max(0, frameLength + index);
-}
-
-/**
- * Format a byte index for display, showing both the value and its meaning.
- * @param index - The byte index (can be negative)
- * @param frameLength - Total frame length in bytes (optional, for resolution)
- */
-export function formatByteIndex(index: number, frameLength?: number): string {
-  if (index >= 0) {
-    return `${index}`;
-  }
-  if (frameLength !== undefined) {
-    const resolved = resolveByteIndexSync(index, frameLength);
-    return `${index} (byte ${resolved})`;
-  }
-  return `${index} (from end)`;
 }

@@ -80,10 +80,14 @@ pub fn validate_serial_checksum(
     ))
 }
 
-/// Resolve a byte index, supporting negative indexing (-1 = last byte).
-#[tauri::command]
-pub fn resolve_byte_index_cmd(index: i32, frame_length: usize) -> usize {
-    resolve_byte_index(index, frame_length)
+/// Each index resolved against each frame length, one row per length; a
+/// negative index counts from the end (-1 = last byte).
+#[tauri::command(rename_all = "snake_case")]
+pub fn resolve_byte_indices(indices: Vec<i32>, frame_lengths: Vec<usize>) -> Vec<Vec<usize>> {
+    frame_lengths
+        .iter()
+        .map(|&length| indices.iter().map(|&index| resolve_byte_index(index, length)).collect())
+        .collect()
 }
 
 /// Rank the checksum configurations that explain a set of frames.
@@ -114,6 +118,15 @@ mod tests {
     use super::*;
     use std::collections::BTreeSet;
     use wiretap_checksum::ALL_NOTES;
+
+    /// The TypeScript copy this replaced clamped the same way: past the start lands on byte 0.
+    #[test]
+    fn byte_indices_resolve_from_the_end_against_each_length() {
+        assert_eq!(
+            resolve_byte_indices(vec![0, 3, -1, -2, -8, -9], vec![8, 1, 0]),
+            [vec![0, 3, 7, 6, 0, 0], vec![0, 3, 0, 0, 0, 0], vec![0, 3, 0, 0, 0, 0]]
+        );
+    }
 
     /// Rust decides *what* the checksum detector says; the frontend decides how.
     ///

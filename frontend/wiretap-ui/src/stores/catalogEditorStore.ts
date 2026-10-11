@@ -312,25 +312,25 @@ function configForms(catalog: Catalog | null) {
     canHeaderFields: Object.entries(can?.fields ?? {}).map(([name, f]): CanHeaderFieldEntry => ({
       name,
       mask: hexMask(f.mask),
-      shift: f.shift,
+      shift: f.shift ?? undefined,
       format: (f.format ?? 'hex') as HeaderFieldFormat,
     })),
     serialEncoding: (serial?.encoding ?? 'slip') as SerialEncoding,
-    serialByteOrder: serial?.byteOrder,
+    serialByteOrder: serial?.byteOrder ?? undefined,
     serialHeaderFields: Object.entries(serial?.fields ?? {}).map(([name, f]): SerialHeaderFieldEntry => ({
       name,
       mask: f.mask,
       endianness: f.endianness ?? 'big',
       format: (f.format ?? 'hex') as HeaderFieldFormat,
     })),
-    serialHeaderLength: serial?.headerLength,
+    serialHeaderLength: serial?.headerLength ?? undefined,
     serialChecksum: serial?.checksum
       ? {
           algorithm: serial.checksum.algorithm as SerialChecksumConfig['algorithm'],
           start_byte: serial.checksum.startByte,
           byte_length: serial.checksum.byteLength,
           calc_start_byte: serial.checksum.calcStartByte,
-          calc_end_byte: serial.checksum.calcEndByte,
+          calc_end_byte: serial.checksum.calcEndByte ?? undefined,
           big_endian: serial.checksum.bigEndian,
         }
       : null,

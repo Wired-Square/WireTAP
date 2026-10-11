@@ -1,5 +1,5 @@
 {
-  "note": "The signal value-type rule: rules.rs check_signal_type refuses a frame def with an `error` signal (the gate any caller meets), and bitGrid.ts validateSignalType shows the same message as the user edits.",
+  "note": "The signal value-type rule: rules.rs check_signal_type refuses a frame def with an `error` signal (the gate any caller meets), and the frame def editor shows the same message from `framelink.signal_type_errors` as the user edits. An unknown value type is refused; the TypeScript copy it replaced let one through as an integer.",
   "rows": [
     {
       "bit_length": 1,
@@ -45,6 +45,11 @@
       "bit_length": 65,
       "value_type": 0,
       "error": "Maximum 64 bits for integer signals"
+    },
+    {
+      "bit_length": 8,
+      "value_type": 5,
+      "error": "Unknown value type 5"
     }
   ]
 }

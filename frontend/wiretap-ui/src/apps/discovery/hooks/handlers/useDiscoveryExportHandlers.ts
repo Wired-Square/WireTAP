@@ -5,21 +5,19 @@
 import { useCallback } from "react";
 import type { FrameMessage } from "../../../../stores/discoveryStore";
 import type { ExportFormat, ExportDataMode } from "../../../../dialogs/ExportFramesDialog";
-import { exportFrameDump, type TimestampedByte } from "../../../../api/capture";
+import { exportByteDump, exportFrameDump } from "../../../../api/capture";
 import { useSessionStore } from "../../../../stores/sessionStore";
 import { withAppError } from "../../../../utils/appError";
 
 export interface UseDiscoveryExportHandlersParams {
   // State
-  liveFrameCount: number;
   framedData: FrameMessage[];
   framedCaptureId: string | null;
   activeCaptureId: string | null;
-  backendByteCount: number;
+  bytesCaptureId: string | null;
   backendFrameCount: number;
   exportDataMode: ExportDataMode;
   captureModeEnabled: boolean;
-  captureModeTotalFrames: number;
   isSerialMode: boolean;
   decoderDir: string;
   saveFrameIdFormat: 'hex' | 'decimal';
@@ -30,35 +28,27 @@ export interface UseDiscoveryExportHandlersParams {
   saveFrames: (decoderDir: string, format: 'hex' | 'decimal') => Promise<void>;
 
   // API functions
-  getCaptureBytesPaginated: (offset: number, limit: number) => Promise<{ bytes: TimestampedByte[] }>;
-  getCaptureFramesPaginatedById: (id: string, offset: number, limit: number) => Promise<{ frames: any[] }>;
   pickFileToSave: (options: any) => Promise<string | null>;
-  saveCatalog: (path: string, content: string) => Promise<void>;
 
   // Dialog controls
   closeExportDialog: () => void;
 }
 
 export function useDiscoveryExportHandlers({
-  liveFrameCount,
   framedData,
   framedCaptureId,
   activeCaptureId,
-  backendByteCount,
+  bytesCaptureId,
   backendFrameCount,
   exportDataMode,
   captureModeEnabled,
-  captureModeTotalFrames,
   isSerialMode,
   decoderDir,
   saveFrameIdFormat,
   dumpDir,
   openSaveDialog,
   saveFrames,
-  getCaptureBytesPaginated,
-  getCaptureFramesPaginatedById,
   pickFileToSave,
-  saveCatalog,
   closeExportDialog,
 }: UseDiscoveryExportHandlersParams) {
   // Handle save frames
@@ -85,59 +75,36 @@ export function useDiscoveryExportHandlers({
       if (!selectedPath) return;
 
       if (exportDataMode === "bytes") {
-        const { exportBytes } = await import("../../../../utils/frameDump");
-        const response = await getCaptureBytesPaginated(0, backendByteCount);
-        const content = exportBytes(
-          response.bytes.map((b: TimestampedByte) => ({ byte: b.byte, timestampUs: b.timestamp_us })),
-          format,
-        );
-        await saveCatalog(
-          selectedPath,
-          content instanceof Uint8Array ? Array.from(content, (b) => String.fromCharCode(b)).join("") : content,
-        );
+        // Bytes live in their own capture, never the session's frames capture.
+        if (!bytesCaptureId) return;
+        await exportByteDump(bytesCaptureId, format === "hex" || format === "bin" ? format : "csv", selectedPath);
       } else {
-        const capture = (captureId: string, count: number) => ({ captureId, count });
         const source =
           captureModeEnabled && activeCaptureId
-            ? capture(activeCaptureId, captureModeTotalFrames)
+            ? { captureId: activeCaptureId }
             : isSerialMode && framedCaptureId && backendFrameCount > 0
-              ? capture(framedCaptureId, backendFrameCount)
+              ? { captureId: framedCaptureId }
               : isSerialMode && framedData.length > 0
                 ? { frames: framedData }
                 : activeCaptureId
-                  ? capture(activeCaptureId, liveFrameCount)
+                  ? { captureId: activeCaptureId }
                   : null;
         if (!source) return;
-
-        if (format === "csv" || format === "candump") {
-          await exportFrameDump(source, format, selectedPath);
-        } else {
-          const framesToExport =
-            "frames" in source
-              ? source.frames
-              : (await getCaptureFramesPaginatedById(source.captureId, 0, source.count)).frames;
-          const { exportToJson } = await import("../../../../utils/frameDump");
-          await saveCatalog(selectedPath, exportToJson(framesToExport));
-        }
+        await exportFrameDump(source, format === "candump" || format === "json" ? format : "csv", selectedPath);
       }
       closeExportDialog();
     });
   }, [
     dumpDir,
     exportDataMode,
-    backendByteCount,
+    bytesCaptureId,
     captureModeEnabled,
-    captureModeTotalFrames,
     isSerialMode,
     framedCaptureId,
     activeCaptureId,
     backendFrameCount,
     framedData,
-    liveFrameCount,
-    getCaptureBytesPaginated,
-    getCaptureFramesPaginatedById,
     pickFileToSave,
-    saveCatalog,
     closeExportDialog,
   ]);
 
