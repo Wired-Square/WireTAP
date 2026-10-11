@@ -1,10 +1,15 @@
-// Discovery's CSV and candump exports, through `wiretap_protocol`'s writers.
+// Discovery's exports: frames as CSV and candump through `wiretap_protocol`'s
+// writers, and as JSON; a byte capture as a hex dump, a CSV or raw binary.
 
-use serde::Deserialize;
+use std::fmt::Write;
+
+use serde::{Deserialize, Serialize};
+use wiretap_decode::frame_id::format_frame_id;
 use wiretap_protocol::can::{CanFrame, Direction};
 use wiretap_protocol::{candump, savvycan};
 
-use crate::{capture_store, io::FrameMessage};
+use crate::capture_store::{self, TimestampedByte};
+use crate::io::FrameMessage;
 
 const REPORTED_REFUSALS: usize = 5;
 
@@ -22,7 +27,19 @@ pub enum FrameSource {
 pub enum DumpFormat {
     Csv,
     Candump,
+    Json,
 }
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ByteDumpFormat {
+    Hex,
+    Csv,
+    Bin,
+}
+
+const HEX_DUMP_LINE_BYTES: usize = 16;
+const HEX_DUMP_LINE_GAP_US: u64 = 1_000;
 
 /// Write the frames to `path`, or refuse the whole export if any frame cannot
 /// be written as it is. Returns the frame count.
@@ -45,10 +62,28 @@ pub async fn export_frame_dump(
     .await
 }
 
+/// Write a byte capture to `path`. Returns the byte count.
+#[tauri::command(rename_all = "snake_case")]
+pub async fn export_byte_dump(
+    capture_id: String,
+    format: ByteDumpFormat,
+    path: String,
+) -> Result<usize, String> {
+    crate::blocking::off_runtime(move || {
+        let bytes = capture_store::get_capture_bytes(&capture_id)?
+            .ok_or_else(|| format!("'{capture_id}' is not a byte capture"))?;
+        std::fs::write(&path, encode_bytes(&bytes, format))
+            .map_err(|e| format!("Failed to write '{path}': {e}"))?;
+        Ok(bytes.len())
+    })
+    .await
+}
+
 pub fn encode(frames: &[FrameMessage], format: DumpFormat) -> Result<String, String> {
     let mut out = String::new();
     let mut refusals = Vec::new();
     match format {
+        DumpFormat::Json => out = json(frames),
         DumpFormat::Csv => {
             let columns =
                 savvycan::data_columns(frames.iter().map(|f| payload(f).len()).max().unwrap_or(0));
@@ -89,6 +124,94 @@ pub fn encode(frames: &[FrameMessage], format: DumpFormat) -> Result<String, Str
     } else {
         Err(refused(&refusals))
     }
+}
+
+#[derive(Serialize)]
+struct JsonFrame<'a> {
+    timestamp_us: u64,
+    frame_id: u32,
+    frame_id_hex: String,
+    bus: u8,
+    dlc: u16,
+    is_extended: bool,
+    is_fd: bool,
+    bytes: &'a [u8],
+    bytes_hex: Vec<String>,
+}
+
+fn json(frames: &[FrameMessage]) -> String {
+    let rows: Vec<_> = frames
+        .iter()
+        .map(|f| JsonFrame {
+            timestamp_us: f.timestamp_us,
+            frame_id: f.frame_id,
+            frame_id_hex: format_frame_id(f.frame_id, f.is_extended),
+            bus: f.bus,
+            dlc: f.dlc,
+            is_extended: f.is_extended,
+            is_fd: f.is_fd,
+            bytes: &f.bytes,
+            bytes_hex: f.bytes.iter().map(|b| format!("{b:02X}")).collect(),
+        })
+        .collect();
+    serde_json::to_string_pretty(&rows).expect("frames serialise")
+}
+
+pub fn encode_bytes(bytes: &[TimestampedByte], format: ByteDumpFormat) -> Vec<u8> {
+    match format {
+        ByteDumpFormat::Bin => bytes.iter().map(|b| b.byte).collect(),
+        ByteDumpFormat::Csv => {
+            let mut out = String::from("timestamp_us,byte_hex,byte_dec\n");
+            for b in bytes {
+                let _ = writeln!(out, "{},{:02X},{}", b.timestamp_us, b.byte, b.byte);
+            }
+            out.into_bytes()
+        }
+        ByteDumpFormat::Hex => hex_dump(bytes).into_bytes(),
+    }
+}
+
+/// One line per 16 bytes, or sooner where a byte comes more than a millisecond
+/// after its line's first: `timestamp_us: XX XX ..  |ascii|`.
+fn hex_dump(bytes: &[TimestampedByte]) -> String {
+    let mut lines = Vec::new();
+    let mut line: Vec<u8> = Vec::new();
+    let mut start = 0;
+    for b in bytes {
+        if line.len() >= HEX_DUMP_LINE_BYTES
+            || (!line.is_empty() && b.timestamp_us.saturating_sub(start) > HEX_DUMP_LINE_GAP_US)
+        {
+            lines.push(hex_dump_line(start, &line));
+            line.clear();
+        }
+        if line.is_empty() {
+            start = b.timestamp_us;
+        }
+        line.push(b.byte);
+    }
+    if !line.is_empty() {
+        lines.push(hex_dump_line(start, &line));
+    }
+    lines.join("\n")
+}
+
+fn hex_dump_line(start: u64, line: &[u8]) -> String {
+    let hex = line
+        .iter()
+        .map(|b| format!("{b:02X}"))
+        .collect::<Vec<_>>()
+        .join(" ");
+    let ascii: String = line
+        .iter()
+        .map(|&b| {
+            if (32..127).contains(&b) {
+                b as char
+            } else {
+                '.'
+            }
+        })
+        .collect();
+    format!("{start}: {hex:<48}  |{ascii}|")
 }
 
 fn payload(f: &FrameMessage) -> &[u8] {
@@ -412,6 +535,70 @@ mod tests {
             "{error}"
         );
         assert!(error.ends_with("(and 2 more)"), "{error}");
+    }
+
+    /// `frameDumpGolden.json` is what the TypeScript writers wrote before these moved here.
+    fn golden(kind: &str) -> Vec<(serde_json::Value, serde_json::Value)> {
+        let golden: serde_json::Value =
+            serde_json::from_str(&fixture("frameDumpGolden.json")).unwrap();
+        golden["cases"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|c| c["name"].as_str().unwrap().split(' ').next() == Some(kind))
+            .map(|c| (c["input"].clone(), c["expected"].clone()))
+            .collect()
+    }
+
+    #[test]
+    fn the_byte_exports_are_what_the_typescript_writer_wrote() {
+        let byte = |b: &serde_json::Value| -> TimestampedByte {
+            let wire = serde_json::json!({ "byte": b["byte"], "timestamp_us": b["timestampUs"] });
+            serde_json::from_value(wire).unwrap()
+        };
+        for (kind, format) in [
+            ("hex", ByteDumpFormat::Hex),
+            ("csv", ByteDumpFormat::Csv),
+            ("bin", ByteDumpFormat::Bin),
+        ] {
+            for (input, expected) in golden(kind) {
+                let bytes: Vec<_> = input.as_array().unwrap().iter().map(byte).collect();
+                let written = encode_bytes(&bytes, format);
+                let expected: Vec<u8> = match expected {
+                    serde_json::Value::String(text) => text.into_bytes(),
+                    values => serde_json::from_value(values).unwrap(),
+                };
+                assert_eq!(written, expected, "{kind} {input}");
+            }
+        }
+    }
+
+    #[test]
+    fn the_json_is_what_the_typescript_writer_wrote_with_the_id_padded_by_its_flag() {
+        for (input, expected) in golden("json") {
+            let frames: Vec<FrameMessage> = match input.as_str() {
+                Some(file) => frames(
+                    file.trim_start_matches("frame-dump/")
+                        .trim_end_matches(".json"),
+                ),
+                None => Vec::new(),
+            };
+            let mut expected = expected.as_str().unwrap().to_string();
+            let unpadded: Vec<serde_json::Value> = serde_json::from_str(&expected).unwrap();
+            for (row, f) in unpadded.iter().zip(&frames) {
+                let field = |hex: &str| format!(r#""frame_id_hex": "{hex}""#);
+                expected = expected.replacen(
+                    &field(row["frame_id_hex"].as_str().unwrap()),
+                    &field(&format_frame_id(f.frame_id, f.is_extended)),
+                    1,
+                );
+            }
+            assert_eq!(
+                encode(&frames, DumpFormat::Json).unwrap(),
+                expected,
+                "{input}"
+            );
+        }
     }
 
     #[test]

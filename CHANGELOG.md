@@ -25,6 +25,7 @@ All notable changes to WireTAP will be documented in this file.
 - **MCP `frame_inventory` takes a `limit` and says when it cut the answer.** It returns at most 10 000 frame ids unless given another limit, as the Query panel does, and `truncated` is true when more may exist; the Query panel notes a cut inventory beside its count.
 - **The SQL preview shows what runs.** For a capture it is the SQLite the query executes, with its values in place; for a WireTAP backend it is the request sent, whose SQL is the server's own. The Results tab shows the statements a finished query ran.
 - **Query CSV exports keep full precision and the mux 16-bit statistics.** Averages and percentages are no longer rounded. Mux statistics add a row for each 16-bit word, and first/last puts the total count in a column instead of a line after a blank one.
+- **Discovery's JSON export pads frame ids by their extended flag, and a binary byte export keeps every byte.** Each `frame_id_hex` now reads as the tables and the other exports write it: `0x07F` for a standard id and `0x0000007F` for an extended one, where both used to read `0x7F`. A binary byte export now holds the bytes as captured; a byte of 0x80 or above used to be written as two.
 
 ### Fixed
 

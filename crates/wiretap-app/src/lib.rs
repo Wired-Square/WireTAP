@@ -296,6 +296,7 @@ pub fn run() {
             byte_roles::serial_structure_cmd,
             adhoc::rank_hypotheses,
             frame_export::export_frame_dump,
+            frame_export::export_byte_dump,
             // Transmit API
             transmit::get_transmit_capable_profiles,
             // IO session-based transmit

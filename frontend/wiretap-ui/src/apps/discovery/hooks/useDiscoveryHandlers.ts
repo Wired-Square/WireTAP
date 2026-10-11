@@ -21,7 +21,7 @@ import {
 } from "../../../hooks/useSelectionSetHandlers";
 import { useTimeHandlers, type TimeHandlers } from "../../../hooks/useTimeHandlers";
 import type { PlaybackSpeed, FrameMessage } from "../../../stores/discoveryStore";
-import type { CaptureFrameInfo, CaptureMetadata, TimestampedByte } from "../../../api/capture";
+import type { CaptureFrameInfo, CaptureMetadata } from "../../../api/capture";
 import type { ExportDataMode } from "../../../dialogs/ExportFramesDialog";
 import type { SelectionSet } from "../../../utils/selectionSets";
 import { type LoadOptions as ManagerLoadOptions } from "../../../hooks/useIOSessionManager";
@@ -37,11 +37,9 @@ export interface UseDiscoveryHandlersParams {
   isStopped: boolean;
   /** Buffer mode from discovery store - used for UI display */
   captureModeEnabled: boolean;
-  captureModeTotalFrames: number;
 
   // Frame state
   /** Frames in the capture being shown. */
-  liveFrameCount: number;
   framedData: FrameMessage[];
   framedCaptureId: string | null;
   frameInfoMap: Map<string, any>;
@@ -49,7 +47,7 @@ export interface UseDiscoveryHandlersParams {
 
   // Serial state
   isSerialMode: boolean;
-  backendByteCount: number;
+  bytesCaptureId: string | null;
   backendFrameCount: number;
 
   // Time state
@@ -110,12 +108,9 @@ export interface UseDiscoveryHandlersParams {
   applySelectionSet: (set: SelectionSet) => void;
 
   // API functions (for export/other features)
-  getCaptureBytesPaginated: (offset: number, limit: number) => Promise<{ bytes: TimestampedByte[] }>;
   activeCaptureId: string | null;
-  getCaptureFramesPaginatedById: (id: string, offset: number, limit: number) => Promise<{ frames: any[] }>;
   captureMetadata: CaptureMetadata | null;
   pickFileToSave: (options: any) => Promise<string | null>;
-  saveCatalog: (path: string, content: string) => Promise<void>;
 
   // Dialog controls
   closeSpeedChangeDialog: () => void;
@@ -188,25 +183,20 @@ export function useDiscoveryHandlers(params: UseDiscoveryHandlersParams): Discov
 
   // Export handlers
   const exportHandlers = useDiscoveryExportHandlers({
-    liveFrameCount: params.liveFrameCount,
     framedData: params.framedData,
     framedCaptureId: params.framedCaptureId,
     activeCaptureId: params.activeCaptureId,
-    backendByteCount: params.backendByteCount,
+    bytesCaptureId: params.bytesCaptureId,
     backendFrameCount: params.backendFrameCount,
     exportDataMode: params.exportDataMode,
     captureModeEnabled: params.captureModeEnabled,
-    captureModeTotalFrames: params.captureModeTotalFrames,
     isSerialMode: params.isSerialMode,
     decoderDir: params.decoderDir,
     saveFrameIdFormat: params.saveFrameIdFormat,
     dumpDir: params.dumpDir,
     openSaveDialog: params.openSaveDialog,
     saveFrames: params.saveFrames,
-    getCaptureBytesPaginated: params.getCaptureBytesPaginated,
-    getCaptureFramesPaginatedById: params.getCaptureFramesPaginatedById,
     pickFileToSave: params.pickFileToSave,
-    saveCatalog: params.saveCatalog,
     closeExportDialog: params.closeExportDialog,
   });
 
