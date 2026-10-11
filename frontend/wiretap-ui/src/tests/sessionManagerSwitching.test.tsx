@@ -34,7 +34,10 @@ vi.mock("../hooks/useIOSession", () => ({
 vi.mock("../stores/sessionStore", async () => {
   const { create } = await import("zustand");
   return {
-    createAndStartMultiSourceSession: vi.fn(async () => ({ busMappings: new Map() })),
+    createAndStartMultiSourceSession: vi.fn(async (o: { sessionId: string | null; profileIds: string[] }) => ({
+      sessionId: o.sessionId ?? `opened:${o.profileIds.join("+")}`,
+      busMappings: new Map(),
+    })),
     useSessionStore: create(() => ({
       pendingJoins: {},
       sessions: {},
@@ -59,6 +62,7 @@ vi.mock("@tauri-apps/api/event", () => ({
 }));
 
 const { useIOSessionManager } = await import("../hooks/useIOSessionManager");
+const { createAndStartMultiSourceSession } = await import("../stores/sessionStore");
 type Manager = ReturnType<typeof useIOSessionManager>;
 
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
@@ -87,7 +91,7 @@ async function run(step: (m: Manager) => Promise<void>) {
 
 /** A stopped Virtual Device session: the multi-source path, then Change source. */
 async function fromVirtualDevice() {
-  expect(await run((m) => m.watchSource([virtualDevice.id], {}))).toMatch(/^walk-v#/);
+  expect(await run((m) => m.watchSource([virtualDevice.id], {}))).toBe("opened:walk-v");
 }
 
 beforeEach(() => {
@@ -135,6 +139,11 @@ describe("useIOSessionManager source switching", () => {
     root = createRoot(document.createElement("div"));
     await act(async () => root.render(<Harness />));
     expect(manager.current.effectiveSessionId).toBe("opened:walk-v");
+  });
+
+  it("connects one device under the session Rust answers, so an open one is joined", async () => {
+    await fromVirtualDevice();
+    expect(createAndStartMultiSourceSession).toHaveBeenLastCalledWith(expect.objectContaining({ sessionId: null }));
   });
 
   it("returns to no source when the picker is skipped after a multi-source session", async () => {

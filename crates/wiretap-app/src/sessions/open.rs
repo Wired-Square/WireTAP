@@ -80,7 +80,7 @@ fn not_found(message: impl Into<String>) -> IoFailure {
 /// Join the session under `session_id`, or create it from `opts` and start it,
 /// then register the subscriber. One call, so nothing can land between the
 /// create, the start and the registration. Without a `session_id`, the session
-/// is the one open on `opts.source_id` alone, else a new one.
+/// is the one open on `opts.source_id`, or on a lone `opts.sources`, alone, else a new one.
 #[tauri::command(rename_all = "snake_case")]
 pub async fn open_session(
     app: tauri::AppHandle,
@@ -103,7 +103,11 @@ pub async fn open_from(
 ) -> Result<OpenedSession, IoFailure> {
     let connect_only = opts.connect_only.unwrap_or(false);
     let replaces = opts.sources.is_some();
-    let source_id = opts.source_id.clone();
+    let alone = match (&opts.source_id, opts.sources.as_deref()) {
+        (Some(source_id), None) => Some((source_id.clone(), None)),
+        (None, Some([only])) => Some((only.profile_id.clone(), only.serial.emit_raw_bytes)),
+        _ => None,
+    };
     let named = (subscriber_id.to_string(), app_name.map(str::to_string));
     let create = |session_id: String| async move {
         match opts.sources.take() {
@@ -117,12 +121,13 @@ pub async fn open_from(
             }
         }
     };
-    match (session_id, source_id) {
+    match (session_id, alone) {
         (Some(id), _) => open_or_join(id, subscriber_id, app_name, connect_only, replaces, create(id.to_string())).await,
-        (None, Some(source_id)) if !replaces => {
-            open_source(&source_id, &source.load()?, subscriber_id, app_name, connect_only, create).await
+        (None, Some((source_id, emit_raw_bytes))) => {
+            let settings = source.load()?;
+            open_source(&source_id, emit_raw_bytes, &settings, subscriber_id, app_name, connect_only, create).await
         }
-        _ => Err(not_found("No session id, and no single source to open")),
+        (None, None) => Err(not_found("No session id, and no single source to open")),
     }
 }
 
@@ -136,6 +141,7 @@ fn source_open_lock(source_id: &str) -> Arc<tokio::sync::Mutex<()>> {
 /// Open `source_id` under the session open on it alone, else under a new one.
 async fn open_source<F: Future<Output = Result<Created, IoFailure>>>(
     source_id: &str,
+    emit_raw_bytes: Option<bool>,
     settings: &AppSettings,
     subscriber_id: &str,
     app_name: Option<&str>,
@@ -144,7 +150,7 @@ async fn open_source<F: Future<Output = Result<Created, IoFailure>>>(
 ) -> Result<OpenedSession, IoFailure> {
     let lock = source_open_lock(source_id);
     let _opening = lock.lock().await;
-    let session_id = session_for_source(source_id, settings).await;
+    let session_id = session_for_source(source_id, settings, emit_raw_bytes).await;
     open_or_join(&session_id, subscriber_id, app_name, connect_only, false, create(session_id.clone())).await
 }
 
@@ -416,7 +422,7 @@ mod tests {
         };
         let opened = futures::future::join_all(
             ["concurrent-a", "concurrent-b", "concurrent-c"]
-                .map(|subscriber| open_source(source, &settings, subscriber, None, false, create)),
+                .map(|subscriber| open_source(source, None, &settings, subscriber, None, false, create)),
         )
         .await;
 
@@ -448,6 +454,36 @@ mod tests {
         assert!(!joined.created);
         assert_eq!(joined.registration.subscriber_count, 2);
         destroy_session(id, false).await.unwrap();
+    }
+
+    struct DefaultSettings;
+
+    impl settings::SettingsSource for DefaultSettings {
+        fn load(&self) -> Result<AppSettings, String> {
+            Ok(AppSettings::default())
+        }
+
+        fn saved_profiles(&self) -> crate::io::ProfileLoader {
+            Arc::new(|| Ok(Vec::new()))
+        }
+    }
+
+    #[tokio::test]
+    async fn one_device_opened_as_sources_joins_the_session_open_on_it_alone() {
+        let (id, profile) = ("f_open_one_device", "p-open-one-device");
+        open(id, "one-device-first").await.unwrap();
+        super::super::register_session_profile(id, profile);
+        let opts = OpenSessionOptions {
+            sources: Some(vec![serde_json::from_value(serde_json::json!({ "profile_id": profile })).unwrap()]),
+            ..Default::default()
+        };
+
+        let joined = open_from(&DefaultSettings, None, "one-device-second", None, opts).await;
+        destroy_session(id, false).await.unwrap();
+
+        let joined = joined.unwrap();
+        assert_eq!((joined.session_id.as_str(), joined.created), (id, false));
+        assert_eq!(joined.registration.subscriber_count, 2);
     }
 
     #[tokio::test]

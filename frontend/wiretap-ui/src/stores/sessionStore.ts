@@ -1317,8 +1317,8 @@ export type { InterfaceFramingConfig } from "../api/io";
  * Options for creating a multi-source session.
  */
 export interface CreateMultiSourceOptions {
-  /** Unique session ID for the merged session (e.g., "discovery-multi") */
-  sessionId: string;
+  /** Unique session ID for the merged session; `null` for one source joins the session already open on it alone */
+  sessionId: string | null;
   /** Listener instance ID for this app (e.g., "discovery_1", "decoder_2") */
   subscriberId: string;
   /** Human-readable app name (e.g., "discovery", "decoder") */
@@ -1599,7 +1599,7 @@ async function leaveNow(sessionId: string, subscriberId: string): Promise<void> 
  */
 export async function createAndStartMultiSourceSession(
   options: CreateMultiSourceOptions
-): Promise<{ busMappings: Map<string, BusMapping[]> }> {
+): Promise<{ sessionId: string; busMappings: Map<string, BusMapping[]> }> {
   const {
     sessionId,
     subscriberId,
@@ -1671,7 +1671,7 @@ export async function createAndStartMultiSourceSession(
   });
 
   const opened = await inOrder(subscriberId, () =>
-    openNow(sessionId, sessionId, subscriberId, appName, { sources, modbusPollsJson: options.modbusPollsJson })
+    openNow(sessionId, sessionId ?? profileIds[0], subscriberId, appName, { sources, modbusPollsJson: options.modbusPollsJson })
   );
-  return { busMappings: new Map(Object.entries(opened.bus_mappings ?? {})) };
+  return { sessionId: opened.session_id, busMappings: new Map(Object.entries(opened.bus_mappings ?? {})) };
 }
