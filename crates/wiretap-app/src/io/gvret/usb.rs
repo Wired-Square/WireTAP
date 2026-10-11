@@ -113,6 +113,7 @@ pub async fn run_source(
 mod tests {
     use super::super::common::MAX_BUSES;
     use super::*;
+    use crate::io::IoFailure;
     use crate::io::can_task::{lost, reopen_failed};
     use crate::io::error::DevicePresence;
     use wiretap_io::can::{CanError, CanEvent, DeviceInfo};
@@ -180,7 +181,7 @@ mod tests {
         };
         let path = "/nonexistent/wiretap-gvret".to_string();
         run_source(3, path, line, vec![], CancellationToken::new(), tx).await;
-        let Some(SourceMessage::Error(3, error)) = rx.recv().await else {
+        let Some(SourceMessage::Error(3, IoFailure { message: error, .. })) = rx.recv().await else {
             panic!("expected an error");
         };
         assert!(error.contains("/nonexistent/wiretap-gvret"), "got: {error}");

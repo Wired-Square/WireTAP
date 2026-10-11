@@ -398,12 +398,12 @@ pub fn encode_stream_ended(
 // 0x04 — Session Error
 // ----------------------------------------------------------------------------
 
-/// Encode a SessionError payload: the [`SESSION_ERROR_SEVERITIES`] byte, then
-/// the rest of the payload is the UTF-8 message.
-pub fn encode_session_error(severity: u8, error: &str) -> Vec<u8> {
-    let mut out = Vec::with_capacity(1 + error.len());
-    out.push(severity);
-    out.extend_from_slice(error.as_bytes());
+/// Encode a SessionError payload: the [`SESSION_ERROR_SEVERITIES`] byte, the
+/// [`IoErrorKind`](crate::io::IoErrorKind) byte, then the UTF-8 message.
+pub fn encode_session_error(severity: u8, error: &crate::io::IoFailure) -> Vec<u8> {
+    let mut out = Vec::with_capacity(2 + error.message.len());
+    out.extend([severity, error.kind.code()]);
+    out.extend_from_slice(error.message.as_bytes());
     out
 }
 
@@ -1217,9 +1217,12 @@ mod tests {
 
     // The TS half is src/tests/wsSessionErrors.test.ts, which decodes these bytes.
     #[test]
-    fn session_error_leads_with_its_severity() {
-        assert_eq!(encode_session_error(1, "boom"), [1, b'b', b'o', b'o', b'm']);
-        assert_eq!(encode_session_error(0, ""), [0]);
+    fn session_error_leads_with_its_severity_and_kind() {
+        use crate::io::{IoErrorKind, IoFailure};
+        let boom = IoFailure::new(IoErrorKind::Other, "boom");
+        assert_eq!(encode_session_error(1, &boom), [1, 11, b'b', b'o', b'o', b'm']);
+        let gone = IoFailure::new(IoErrorKind::DeviceDisconnected, "");
+        assert_eq!(encode_session_error(0, &gone), [0, 8]);
     }
 
     // -----------------------------------------------------------------------

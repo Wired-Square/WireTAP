@@ -147,7 +147,7 @@ pub async fn run_source(
 
     if let Some(br) = bitrate {
         if let Err(e) = configure_interface(&interface, br, enable_fd, data_bitrate) {
-            let _ = tx.send(SourceMessage::Error(source_idx, e)).await;
+            let _ = tx.send(SourceMessage::Error(source_idx, e.into())).await;
             return;
         }
     }
@@ -179,6 +179,7 @@ pub async fn run_source(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::io::IoFailure;
     use std::time::{Duration, UNIX_EPOCH};
     use wiretap_io::can::{CanFrame, CanRead, DeviceInfo, Direction};
 
@@ -261,7 +262,7 @@ mod tests {
             link_lost(3, "socketcan(can0)", error)
         };
         let down = std::io::Error::from(std::io::ErrorKind::NetworkDown);
-        let SourceMessage::Error(3, message) = lost(CanError::Read(down)) else {
+        let SourceMessage::Error(3, IoFailure { message, .. }) = lost(CanError::Read(down)) else {
             panic!("expected an error");
         };
         assert!(message.starts_with("socketcan(can0): "), "got: {message}");

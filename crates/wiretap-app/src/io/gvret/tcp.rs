@@ -109,6 +109,7 @@ pub async fn run_source(
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
+    use crate::io::IoFailure;
     use crate::io::can_task::PortOutage;
     use crate::io::types::{EndReason, TransmitRequest};
     use std::sync::mpsc as std_mpsc;
@@ -396,7 +397,7 @@ pub(crate) mod tests {
         let (port, _commands) = fake_gvret(1, false).await;
         let (_stop, mut rx) = start(port);
         connect_and_read(&mut rx).await;
-        let SourceMessage::Error(3, error) = next(&mut rx, Duration::from_secs(5)).await else {
+        let SourceMessage::Error(3, IoFailure { message: error, .. }) = next(&mut rx, Duration::from_secs(5)).await else {
             panic!("expected an error");
         };
         assert!(error.ends_with("device stopped answering"), "got: {error}");

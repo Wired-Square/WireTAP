@@ -14,7 +14,7 @@ use crate::{
         GvretDeviceInfo,
         probe::DeviceProbeResult,
         ModbusRangeSpec, PollGroup,
-        CanTransmitFrame, TransmitResult,
+        CanTransmitFrame, IoFailure, TransmitResult,
         session_log::{self, SessionLogEntry},
         set_wake_settings as io_set_wake_settings,
     },
@@ -27,7 +27,7 @@ use crate::io::traits::supported_protocols_for_kind;
 use std::collections::HashMap;
 use std::sync::{atomic::AtomicBool, Arc};
 
-use super::open::{refused_on, SessionRefusal};
+use super::open::refused_on;
 use super::ids::{mint_session_id, sources_prefix, SessionPurpose, MODBUS_SCAN_SESSION_PREFIX};
 use super::source_config::{
     allocate_inputs, declared_bus_mappings, resolve_source_configs,
@@ -154,7 +154,7 @@ pub async fn start_reader_session(session_id: String) -> Result<IOState, String>
 /// Stop a reader session
 /// Returns the confirmed state after the operation.
 #[tauri::command(rename_all = "snake_case")]
-pub async fn stop_reader_session(session_id: String) -> Result<IOState, SessionRefusal> {
+pub async fn stop_reader_session(session_id: String) -> Result<IOState, IoFailure> {
     refused_on(&session_id, stop_session(&session_id).await).await
 }
 
@@ -300,13 +300,13 @@ pub async fn reconfigure_reader_session(
 
 /// Seek to a specific timestamp in microseconds
 #[tauri::command(rename_all = "snake_case")]
-pub async fn seek_reader_session(session_id: String, timestamp_us: i64) -> Result<(), SessionRefusal> {
+pub async fn seek_reader_session(session_id: String, timestamp_us: i64) -> Result<(), IoFailure> {
     refused_on(&session_id, seek_session(&session_id, timestamp_us).await).await
 }
 
 /// Seek to a specific frame index (preferred for capture playback - avoids floating-point issues)
 #[tauri::command(rename_all = "snake_case")]
-pub async fn seek_reader_session_by_frame(session_id: String, frame_index: i64) -> Result<(), SessionRefusal> {
+pub async fn seek_reader_session_by_frame(session_id: String, frame_index: i64) -> Result<(), IoFailure> {
     refused_on(&session_id, seek_session_by_frame(&session_id, frame_index).await).await
 }
 

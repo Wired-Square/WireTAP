@@ -5,6 +5,8 @@
 
 use std::fmt;
 
+use serde::Serialize;
+
 /// Structured IO error with device context.
 ///
 /// These error variants capture common failure modes in CAN device communication,
@@ -47,8 +49,92 @@ pub enum IoError {
     /// Read error during streaming
     Read { device: String, details: String },
 
+    /// No session under the id
+    SessionNotFound { session_id: String },
+
     /// Generic IO error for cases that don't fit other variants
     Other { device: Option<String>, details: String },
+}
+
+/// Which [`IoError`] a failure is: one per variant, so the frontend branches on
+/// this rather than on the message. The discriminant is its byte on the wire.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase")]
+#[repr(u8)]
+pub enum IoErrorKind {
+    Connection,
+    DnsResolution,
+    Timeout,
+    Protocol,
+    Transmission,
+    Configuration,
+    DeviceNotFound,
+    DeviceBusy,
+    DeviceDisconnected,
+    Read,
+    SessionNotFound,
+    Other,
+}
+
+impl IoErrorKind {
+    pub const ALL: [Self; 12] = [
+        Self::Connection,
+        Self::DnsResolution,
+        Self::Timeout,
+        Self::Protocol,
+        Self::Transmission,
+        Self::Configuration,
+        Self::DeviceNotFound,
+        Self::DeviceBusy,
+        Self::DeviceDisconnected,
+        Self::Read,
+        Self::SessionNotFound,
+        Self::Other,
+    ];
+
+    pub fn code(self) -> u8 {
+        self as u8
+    }
+}
+
+/// A failure as it reaches the frontend: its kind, in the words it is shown in.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+pub struct IoFailure {
+    pub kind: IoErrorKind,
+    pub message: String,
+}
+
+impl IoFailure {
+    pub fn new(kind: IoErrorKind, message: impl Into<String>) -> Self {
+        Self { kind, message: message.into() }
+    }
+}
+
+impl fmt::Display for IoFailure {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.message)
+    }
+}
+
+impl From<IoError> for IoFailure {
+    fn from(err: IoError) -> Self {
+        Self::new(err.kind(), err.to_string())
+    }
+}
+
+/// An untyped error string, which carries no kind.
+impl From<String> for IoFailure {
+    fn from(message: String) -> Self {
+        Self::new(IoErrorKind::Other, message)
+    }
+}
+
+impl From<IoFailure> for String {
+    fn from(failure: IoFailure) -> String {
+        failure.message
+    }
 }
 
 impl IoError {
@@ -150,8 +236,31 @@ impl IoError {
             Self::DeviceBusy { device } => Some(device),
             Self::DeviceDisconnected { device } => Some(device),
             Self::Read { device, .. } => Some(device),
+            Self::SessionNotFound { .. } => None,
             Self::Other { device, .. } => device.as_deref(),
         }
+    }
+
+    pub fn kind(&self) -> IoErrorKind {
+        match self {
+            Self::Connection { .. } => IoErrorKind::Connection,
+            Self::DnsResolution { .. } => IoErrorKind::DnsResolution,
+            Self::Timeout { .. } => IoErrorKind::Timeout,
+            Self::Protocol { .. } => IoErrorKind::Protocol,
+            Self::Transmission { .. } => IoErrorKind::Transmission,
+            Self::Configuration { .. } => IoErrorKind::Configuration,
+            Self::DeviceNotFound { .. } => IoErrorKind::DeviceNotFound,
+            Self::DeviceBusy { .. } => IoErrorKind::DeviceBusy,
+            Self::DeviceDisconnected { .. } => IoErrorKind::DeviceDisconnected,
+            Self::Read { .. } => IoErrorKind::Read,
+            Self::SessionNotFound { .. } => IoErrorKind::SessionNotFound,
+            Self::Other { .. } => IoErrorKind::Other,
+        }
+    }
+
+    /// The failure in [`user_message`](Self::user_message)'s words.
+    pub(crate) fn for_user(self) -> IoFailure {
+        IoFailure::new(self.kind(), self.user_message())
     }
 }
 
@@ -187,6 +296,9 @@ impl fmt::Display for IoError {
             }
             Self::Read { device, details } => {
                 write!(f, "[{}] read error: {}", device, details)
+            }
+            Self::SessionNotFound { session_id } => {
+                write!(f, "Session '{}' not found", session_id)
             }
             Self::Other { device: Some(d), details } => {
                 write!(f, "[{}] {}", d, details)
@@ -284,7 +396,7 @@ impl IoError {
             // Deliberately avoids the substring "not found". sessionStore's
             // expected-error filter used to drop any message containing it, which is
             // how faults like SocketCAN's "pkexec not found" reached the error state
-            // with no dialog. The filter is anchored now; the wording stays defensive.
+            // with no dialog. The filter reads the kind now; the wording stays defensive.
             Self::DnsResolution { host, details } => format!(
                 "Cannot resolve the hostname {host} — {details}. Check the name is spelled \
                  correctly, and that you are connected to the network or VPN that serves it."
@@ -475,5 +587,24 @@ mod tests {
     fn test_user_message_falls_back_to_display_for_other_variants() {
         let err = IoError::protocol("gvret_usb", "bad frame");
         assert_eq!(err.user_message(), err.to_string());
+    }
+
+    #[test]
+    fn every_kind_is_its_own_byte() {
+        for (code, kind) in IoErrorKind::ALL.into_iter().enumerate() {
+            assert_eq!(usize::from(kind.code()), code);
+        }
+    }
+
+    #[test]
+    fn a_failure_keeps_the_words_and_names_the_variant() {
+        let failure = IoFailure::from(IoError::SessionNotFound { session_id: "f_1".into() });
+        assert_eq!(
+            serde_json::to_value(&failure).unwrap(),
+            serde_json::json!({ "kind": "sessionNotFound", "message": "Session 'f_1' not found" })
+        );
+        let busy = IoError::busy("COM5");
+        assert_eq!(busy.clone().for_user(), IoFailure::new(IoErrorKind::DeviceBusy, busy.user_message()));
+        assert_eq!(IoFailure::from("boom".to_string()).kind, IoErrorKind::Other);
     }
 }

@@ -16,7 +16,7 @@ use super::roster::{
 use super::session_log::{self, SessionLogEvent, Subject};
 use super::{
     emit_capture_orphaned_as_changed, emit_session_lifecycle, emit_to_windows, traits, types, BusMapping, CanTransmitFrame,
-    CaptureSource, IOBroker, IOCapabilities, IOSource, IOState, LifecycleEvent, PlaybackPosition, ProfileLoader,
+    CaptureSource, IOBroker, IOCapabilities, IoError, IOSource, IOState, LifecycleEvent, PlaybackPosition, ProfileLoader,
     SessionLifecyclePayload, SessionTransition, SessionTransitionPayload, SourceConfig, TemporalMode, TransmitPayload,
     TransmitResult, VirtualBusState, CAPTURE_SOURCE_TYPE,
 };
@@ -74,7 +74,7 @@ pub(super) fn session_states() -> MutexGuard<'static, HashMap<String, SessionSta
 }
 
 fn not_found(session_id: &str) -> String {
-    format!("Session '{}' not found", session_id)
+    IoError::SessionNotFound { session_id: session_id.to_string() }.to_string()
 }
 
 /// One operation's hold on a session. Letting go records the session's roster row
@@ -1990,7 +1990,7 @@ mod tests {
         register_subscriber_from(None, id, "w_logged_b", Some("decoder")).await.unwrap();
         register_subscriber_from(None, id, "w_logged_b", Some("decoder")).await.unwrap();
         start_session(id).await.unwrap();
-        emit_session_error(id, "Device unplugged".into());
+        emit_session_error(id, "Device unplugged".to_string());
         emit_stream_ended(id, StreamEndReason::Disconnected, "test");
         unregister_subscriber(id, "w_logged_b").await.unwrap();
         stop_session(id).await.unwrap();

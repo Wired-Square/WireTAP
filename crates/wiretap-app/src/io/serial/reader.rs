@@ -428,7 +428,7 @@ pub async fn run_source(
             let _ = tx
                 .send(SourceMessage::Error(
                     source_idx,
-                    format!("Failed to open {}: {}", port, reason),
+                    format!("Failed to open {}: {}", port, reason).into(),
                 ))
                 .await;
             return;

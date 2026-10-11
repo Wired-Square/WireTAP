@@ -66,7 +66,7 @@ pub enum SourceMessage {
     /// Source ended (source_index, reason)
     Ended(usize, EndReason),
     /// Source error (source_index, error)
-    Error(usize, String),
+    Error(usize, crate::io::IoFailure),
     /// The source lost its device and is waiting for it to return: reported
     /// like an error, but the source lives on and its next `Connected` resumes.
     #[cfg_attr(target_os = "ios", allow(dead_code))]

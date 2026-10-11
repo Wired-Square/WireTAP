@@ -179,6 +179,7 @@ pub async fn run_source(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::io::IoFailure;
     use std::time::{Duration, UNIX_EPOCH};
     use wiretap_io::can::{BusState, CanFrame, CanRead, Direction, ErrorState};
 
@@ -334,7 +335,7 @@ mod tests {
             SourceMessage::Ended(3, EndReason::Disconnected)
         ));
         let timed_out = std::io::Error::from(std::io::ErrorKind::TimedOut);
-        let SourceMessage::Error(3, message) = lost(CanError::Read(timed_out)) else {
+        let SourceMessage::Error(3, IoFailure { message, .. }) = lost(CanError::Read(timed_out)) else {
             panic!("expected an error");
         };
         assert!(message.starts_with("gs_usb(0:5): "), "got: {message}");

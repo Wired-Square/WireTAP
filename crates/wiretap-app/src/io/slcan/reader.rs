@@ -241,6 +241,7 @@ pub async fn run_source(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::io::IoFailure;
     use crate::io::can_task::{lost, reopen_failed};
     use crate::io::error::DevicePresence;
     use std::time::{Duration, UNIX_EPOCH};
@@ -367,7 +368,7 @@ mod tests {
 
     #[tokio::test]
     async fn a_port_that_will_not_open_is_named() {
-        let SourceMessage::Error(3, error) = first_message(500_000).await else {
+        let SourceMessage::Error(3, IoFailure { message: error, .. }) = first_message(500_000).await else {
             panic!("expected an error");
         };
         assert!(error.contains("/nonexistent/wiretap-slcan"), "got: {error}");
@@ -375,7 +376,7 @@ mod tests {
 
     #[tokio::test]
     async fn a_bitrate_slcan_cannot_name_says_which_ones_it_can() {
-        let SourceMessage::Error(3, error) = first_message(300_000).await else {
+        let SourceMessage::Error(3, IoFailure { message: error, .. }) = first_message(300_000).await else {
             panic!("expected an error");
         };
         assert!(

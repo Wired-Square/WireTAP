@@ -67,9 +67,7 @@ pub use broker::{IOBroker, ProfileLoader, SerialOverrides, SourceConfig};
 pub use types::{FramingMode, ModbusRtuOptions};
 pub use mqtt::{MqttConfig, MqttSource};
 
-// Error types
-#[allow(unused_imports)]
-pub use error::IoError;
+pub use error::{IoError, IoErrorKind, IoFailure};
 
 mod roster;
 mod session;
@@ -800,17 +798,18 @@ pub(crate) static EMITTED_LIFECYCLE: std::sync::Mutex<Vec<SessionLifecyclePayloa
 /// Stores the error in both the startup-error map (for subscriber registration)
 /// and the post-session TTL cache (for late-arriving fetches after session
 /// destruction), then emits an empty signal for the frontend to fetch.
-pub fn emit_session_error(session_id: &str, error: String) {
-    store_startup_error(session_id, error.clone());
-    post_session::store_error(session_id, error.clone());
+pub fn emit_session_error(session_id: &str, error: impl Into<IoFailure>) {
+    let error = error.into();
+    store_startup_error(session_id, error.message.clone());
+    post_session::store_error(session_id, error.message.clone());
     crate::ws::dispatch::send_session_error(session_id, ErrorSeverity::Fault, &error);
-    session_log::append_for_session(session_id, SessionLogEvent::Error { message: error });
+    session_log::append_for_session(session_id, SessionLogEvent::Error { message: error.message });
 }
 
 /// Report an error the source carries on through. Nothing is stored for a
 /// joining window, and the frontend does not show it as a fault.
 pub fn emit_routine_session_error(session_id: &str, error: &str) {
-    crate::ws::dispatch::send_session_error(session_id, ErrorSeverity::Routine, error);
+    crate::ws::dispatch::send_session_error(session_id, ErrorSeverity::Routine, &error.to_string().into());
 }
 
 /// How the frontend treats a session error; the discriminant is its byte on the wire.

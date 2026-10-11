@@ -143,7 +143,7 @@ pub async fn run_source(
                             .send(SourceMessage::Error(
                                 source_idx,
                                 IoError::DeviceDisconnected { device: device_id.clone() }
-                                    .user_message(),
+                                    .for_user(),
                             ))
                             .await;
                         return;

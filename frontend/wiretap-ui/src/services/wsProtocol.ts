@@ -7,6 +7,7 @@ import type { FrameMessage } from "../types/frame";
 import type { IOCapabilities, IOStateType, PlaybackPosition, StreamEndedInfo } from "../api/io";
 import type { CaptureKind } from "../generated/CaptureKind";
 import type { DecodedSignalsEntry } from "../generated/DecodedSignalsEntry";
+import type { IoErrorKind } from "../generated/IoErrorKind";
 import type { SessionMode } from "../generated/SessionMode";
 import { trackAlloc } from "./memoryDiag";
 import {
@@ -17,6 +18,7 @@ import {
   IdFlags,
   MsgType,
   PROTOCOL_VERSION,
+  SESSION_ERROR_KINDS,
   SESSION_ERROR_SEVERITIES,
   SESSION_MODES,
   SESSION_STATES,
@@ -352,15 +354,18 @@ export function decodeStreamEnded(payload: DataView): StreamEndedInfo {
 
 export type SessionErrorSeverity = (typeof SESSION_ERROR_SEVERITIES)[number];
 
-// Wire format: severity u8 (an index into SESSION_ERROR_SEVERITIES), then the
-// rest of the payload is the UTF-8 message.
+// Wire format: severity u8 (an index into SESSION_ERROR_SEVERITIES), kind u8
+// (an index into SESSION_ERROR_KINDS), then the rest of the payload is the
+// UTF-8 message.
 export function decodeSessionError(payload: Uint8Array): {
   severity: SessionErrorSeverity;
+  kind: IoErrorKind;
   message: string;
 } {
   return {
     severity: SESSION_ERROR_SEVERITIES[payload[0]] ?? "fault",
-    message: new TextDecoder().decode(payload.subarray(1)),
+    kind: SESSION_ERROR_KINDS[payload[1]] ?? "other",
+    message: new TextDecoder().decode(payload.subarray(2)),
   };
 }
 

@@ -920,8 +920,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         },
       }));
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      if (!msg.includes("not found")) {
+      if (!isSessionNotFound(e)) {
         throw e;
       }
     }

@@ -866,7 +866,7 @@ fn stream_ended_payload(info: &StreamEndedInfo) -> Vec<u8> {
 }
 
 /// Send session error.
-pub fn send_session_error(session_id: &str, severity: crate::io::ErrorSeverity, error: &str) {
+pub fn send_session_error(session_id: &str, severity: crate::io::ErrorSeverity, error: &crate::io::IoFailure) {
     send_to_session(session_id, MsgType::SessionError, || protocol::encode_session_error(severity.code(), error));
 }
 

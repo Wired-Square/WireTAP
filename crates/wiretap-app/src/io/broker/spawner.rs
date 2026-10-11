@@ -122,7 +122,7 @@ pub(super) async fn run_source_reader(
     // One place a source's setup failure is reported, rather than the same
     // send-and-return block copied into every reader.
     if let Err(e) = outcome {
-        let _ = error_tx.send(SourceMessage::Error(source_idx, e)).await;
+        let _ = error_tx.send(SourceMessage::Error(source_idx, e.into())).await;
     }
 }
 

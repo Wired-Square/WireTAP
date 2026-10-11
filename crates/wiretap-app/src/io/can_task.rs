@@ -154,7 +154,7 @@ pub(crate) async fn open_or_report(
     match opening.await {
         Ok(task) => Some(task),
         Err(e) => {
-            let _ = tx.send(SourceMessage::Error(source_idx, failed(e))).await;
+            let _ = tx.send(SourceMessage::Error(source_idx, failed(e).into())).await;
             None
         }
     }
@@ -192,7 +192,7 @@ pub(crate) fn open_failed(device: &str, error: CanError) -> String {
 pub(crate) fn link_lost(source_idx: usize, device: &str, error: CanError) -> SourceMessage {
     match error {
         CanError::Closed => SourceMessage::Ended(source_idx, EndReason::Disconnected),
-        other => SourceMessage::Error(source_idx, format!("{device}: {other}")),
+        other => SourceMessage::Error(source_idx, format!("{device}: {other}").into()),
     }
 }
 
@@ -380,6 +380,7 @@ pub(crate) fn reopen_failed(port: &str) -> CanEvent {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::io::IoFailure;
     use crate::io::types::{PendingTransmit, TransmitSender};
     use wiretap_io::can::Unsupported;
 
@@ -545,12 +546,12 @@ mod tests {
             link_lost(3, DEVICE, CanError::Closed),
             SourceMessage::Ended(3, EndReason::Disconnected)
         ));
-        let SourceMessage::Error(3, unresponsive) = link_lost(3, DEVICE, CanError::Unresponsive)
+        let SourceMessage::Error(3, IoFailure { message: unresponsive, .. }) = link_lost(3, DEVICE, CanError::Unresponsive)
         else {
             panic!("expected an error");
         };
         assert_eq!(unresponsive, format!("{DEVICE}: device stopped answering"));
-        let SourceMessage::Error(3, read) = link_lost(
+        let SourceMessage::Error(3, IoFailure { message: read, .. }) = link_lost(
             3,
             DEVICE,
             CanError::Read(std::io::Error::other("connection reset")),

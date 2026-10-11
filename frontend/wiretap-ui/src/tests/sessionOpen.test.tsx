@@ -100,7 +100,7 @@ describe("opening a session", () => {
 
   it("refuses an id with nothing behind it as not found, and keeps nothing for it", async () => {
     invoke.mockImplementationOnce(async () => {
-      throw { kind: "not_found", message: "No session 'f_open'" };
+      throw { kind: "sessionNotFound", message: "No session 'f_open'" };
     });
 
     const refusal = await open().catch((e: unknown) => e);
@@ -138,5 +138,22 @@ describe("a view on a session", () => {
     await act(async () => root.unmount());
     await act(async () => {});
     expect(invoke.mock.calls.filter(([cmd]) => cmd === "unregister_session_subscriber")).toHaveLength(1);
+  });
+});
+
+describe("stopSession", () => {
+  const refuseStop = (failure: { kind: string; message: string }) =>
+    invoke.mockImplementationOnce(async () => {
+      throw failure;
+    });
+
+  it("ignores a stop on a session that is already gone", async () => {
+    refuseStop({ kind: "sessionNotFound", message: "Session 'f_gone' not found" });
+    await expect(useSessionStore.getState().stopSession("f_gone")).resolves.toBeUndefined();
+  });
+
+  it("reports any other refusal, whatever its words", async () => {
+    refuseStop({ kind: "other", message: "pkexec not found. Install polkit or configure the interface manually." });
+    await expect(useSessionStore.getState().stopSession("f_live")).rejects.toThrow("pkexec not found");
   });
 });

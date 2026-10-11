@@ -13,7 +13,7 @@ use super::spawner::run_source_reader;
 use super::types::{ControlChannels, SourceConfig, SourcePauseFlags, TransmitChannels};
 use super::{MergeCommand, ProfileLoader, VirtualBusCommand, VirtualBusControls, VirtualCmdTx};
 use crate::capture_store::{self, TimestampedByte};
-use crate::io::error::IoError;
+use crate::io::error::{IoError, IoFailure};
 use crate::io::bus_mapping::BusMapping;
 use crate::io::bus_status::{BusStatusBoard, BusStatusMsg};
 use crate::io::types::SourceMessage;
@@ -162,7 +162,7 @@ pub(super) async fn run_merge_task(
     let mut pending_readds = PendingReadds::default();
     // The last error a source reported, kept so the session can end as "error"
     // rather than "complete" when every source has failed.
-    let mut last_source_error: Option<String> = None;
+    let mut last_source_error: Option<IoFailure> = None;
     let mut interrupted: std::collections::HashSet<usize> = std::collections::HashSet::new();
     let mut pending_frames: Vec<FrameMessage> = Vec::new();
     let mut pending_bytes: Vec<TimestampedByte> = Vec::new();
@@ -215,10 +215,10 @@ pub(super) async fn run_merge_task(
                                 .get(&source_idx)
                                 .map(|s| s.display_name.clone())
                                 .unwrap_or_else(|| format!("source {}", source_idx));
-                            let error = IoError::DeviceDisconnected { device }.to_string();
-                            last_source_error = Some(error.clone());
+                            let error = IoFailure::from(IoError::DeviceDisconnected { device });
                             emit_session_error(&session_id, error.clone());
-                            start.failed(source_idx, error);
+                            start.failed(source_idx, error.message.clone());
+                            last_source_error = Some(error);
                         } else {
                             start.ready(source_idx);
                         }
@@ -231,9 +231,9 @@ pub(super) async fn run_merge_task(
                         if let Ok(mut channels) = transmit_channels.lock() {
                             channels.remove(&source_idx);
                         }
-                        last_source_error = Some(error.clone());
                         emit_session_error(&session_id, error.clone());
-                        start.failed(source_idx, error);
+                        start.failed(source_idx, error.message.clone());
+                        last_source_error = Some(error);
                         live.end(source_idx);
                         ready_to_add = pending_readds.source_ended(source_idx);
                         send_bus_status(&session_id, bus_statuses.forget_source(source_idx));
@@ -494,7 +494,7 @@ pub(super) async fn run_merge_task(
     // reported at the time, via emit_session_error.
     if reason == StreamEndReason::Error {
         if let (Some(error), Ok(mut slot)) = (last_source_error, fatal_error.lock()) {
-            slot.get_or_insert(error);
+            slot.get_or_insert(error.message);
         }
     }
     emit_stream_ended(&session_id, reason, "IOBroker");
