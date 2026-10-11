@@ -22,6 +22,7 @@ use tauri::{AppHandle, Emitter};
 use serialport::{DataBits, SerialPort, StopBits};
 use wiretap_io::serial::{LineSettings, Parity};
 
+use crate::blocking::off_runtime;
 use crate::io::serial::utils::parse_line;
 
 const SERIAL_TERMINAL_DATA_EVENT: &str = "serial-terminal-data";
@@ -83,7 +84,7 @@ fn open_port(port: &str, line: LineSettings) -> serialport::Result<Box<dyn Seria
 }
 
 #[tauri::command(rename_all = "snake_case")]
-pub fn serial_terminal_open(
+pub async fn serial_terminal_open(
     app: AppHandle,
     port: String,
     baud_rate: u32,
@@ -92,6 +93,10 @@ pub fn serial_terminal_open(
     parity: Option<String>,
 ) -> Result<String, String> {
     let line = parse_line(baud_rate, data_bits, stop_bits, parity.as_deref())?;
+    off_runtime(move || open_terminal(app, port, line)).await
+}
+
+fn open_terminal(app: AppHandle, port: String, line: LineSettings) -> Result<String, String> {
     let mut reader = open_port(&port, line).map_err(|e| format!("Failed to open {}: {}", port, e))?;
 
     let writer = reader
@@ -157,7 +162,7 @@ pub fn serial_terminal_open(
 }
 
 #[tauri::command(rename_all = "snake_case")]
-pub fn serial_terminal_close(terminal_id: String) -> Result<(), String> {
+pub async fn serial_terminal_close(terminal_id: String) -> Result<(), String> {
     let removed = {
         let mut map = TERMINALS.lock().unwrap();
         map.remove(&terminal_id)
@@ -173,17 +178,21 @@ pub fn serial_terminal_close(terminal_id: String) -> Result<(), String> {
 }
 
 #[tauri::command(rename_all = "snake_case")]
-pub fn serial_terminal_write(terminal_id: String, bytes: Vec<u8>) -> Result<(), String> {
+pub async fn serial_terminal_write(terminal_id: String, bytes: Vec<u8>) -> Result<(), String> {
+    off_runtime(move || write_terminal(&terminal_id, &bytes)).await
+}
+
+fn write_terminal(terminal_id: &str, bytes: &[u8]) -> Result<(), String> {
     let port = {
         let map = TERMINALS.lock().unwrap();
-        map.get(&terminal_id)
+        map.get(terminal_id)
             .map(|t| t.writer.clone())
             .ok_or_else(|| format!("Terminal {} not found", terminal_id))?
     };
     let mut p = port
         .lock()
         .map_err(|e| format!("Port mutex poisoned: {}", e))?;
-    p.write_all(&bytes)
+    p.write_all(bytes)
         .and_then(|_| p.flush())
         .map_err(|e| format!("Write error: {}", e))
 }
@@ -195,10 +204,14 @@ pub fn serial_terminal_write(terminal_id: String, bytes: Vec<u8>) -> Result<(), 
 /// Arduino-style boards, Black Pill flashed with DAPLink, etc. Boards that
 /// instead route reset through DTR are covered by the parallel DTR pulse.
 #[tauri::command(rename_all = "snake_case")]
-pub fn serial_terminal_reset(terminal_id: String) -> Result<(), String> {
+pub async fn serial_terminal_reset(terminal_id: String) -> Result<(), String> {
+    off_runtime(move || reset_terminal(&terminal_id)).await
+}
+
+fn reset_terminal(terminal_id: &str) -> Result<(), String> {
     let port = {
         let map = TERMINALS.lock().unwrap();
-        map.get(&terminal_id)
+        map.get(terminal_id)
             .map(|t| t.writer.clone())
             .ok_or_else(|| format!("Terminal {} not found", terminal_id))?
     };

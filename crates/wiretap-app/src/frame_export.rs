@@ -32,14 +32,17 @@ pub async fn export_frame_dump(
     format: DumpFormat,
     path: String,
 ) -> Result<usize, String> {
-    let frames = match source {
-        FrameSource::Capture { capture_id } => capture_store::get_capture_frames(&capture_id)
-            .ok_or_else(|| format!("'{capture_id}' is not a frame capture"))?,
-        FrameSource::Frames { frames } => frames,
-    };
-    let text = encode(&frames, format)?;
-    std::fs::write(&path, text).map_err(|e| format!("Failed to write '{path}': {e}"))?;
-    Ok(frames.len())
+    crate::blocking::off_runtime(move || {
+        let frames = match source {
+            FrameSource::Capture { capture_id } => capture_store::get_capture_frames(&capture_id)
+                .ok_or_else(|| format!("'{capture_id}' is not a frame capture"))?,
+            FrameSource::Frames { frames } => frames,
+        };
+        let text = encode(&frames, format)?;
+        std::fs::write(&path, text).map_err(|e| format!("Failed to write '{path}': {e}"))?;
+        Ok(frames.len())
+    })
+    .await
 }
 
 pub fn encode(frames: &[FrameMessage], format: DumpFormat) -> Result<String, String> {

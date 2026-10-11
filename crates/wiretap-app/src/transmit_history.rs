@@ -230,32 +230,43 @@ fn session_offset_after(conn: &Connection, session_id: &str, timestamp_us: i64) 
 // Tauri Commands
 // ============================================================================
 
-#[tauri::command]
-pub fn transmit_history_query(session_id: String, offset: usize, limit: usize) -> Result<Vec<TransmitHistoryRow>, String> {
-    Ok(with_db(vec![], |conn| session_rows(conn, &session_id, offset, limit)))
+async fn with_db_off_runtime<T: Send + 'static>(
+    fallback: T,
+    read: impl FnOnce(&Connection) -> T + Send + 'static,
+) -> T {
+    crate::blocking::off_runtime(move || with_db(fallback, read)).await
 }
 
 #[tauri::command]
-pub fn transmit_history_count(session_id: String) -> Result<i64, String> {
-    Ok(with_db(0, |conn| session_count(conn, &session_id)))
+pub async fn transmit_history_query(session_id: String, offset: usize, limit: usize) -> Result<Vec<TransmitHistoryRow>, String> {
+    Ok(with_db_off_runtime(vec![], move |conn| session_rows(conn, &session_id, offset, limit)).await)
 }
 
 #[tauri::command]
-pub fn transmit_history_clear(session_id: String) -> Result<i64, String> {
-    with_db((), |conn| clear_session(conn, &session_id));
+pub async fn transmit_history_count(session_id: String) -> Result<i64, String> {
+    Ok(with_db_off_runtime(0, move |conn| session_count(conn, &session_id)).await)
+}
+
+#[tauri::command]
+pub async fn transmit_history_clear(session_id: String) -> Result<i64, String> {
+    Ok(crate::blocking::off_runtime(move || clear_and_announce(&session_id)).await)
+}
+
+fn clear_and_announce(session_id: &str) -> i64 {
+    with_db((), |conn| clear_session(conn, session_id));
     let revision = next_revision();
     crate::ws::dispatch::send_transmit_updated(revision);
-    Ok(revision)
+    revision
 }
 
 #[tauri::command]
-pub fn transmit_history_time_range(session_id: String) -> Result<Option<(i64, i64)>, String> {
-    Ok(with_db(None, |conn| session_time_range(conn, &session_id)))
+pub async fn transmit_history_time_range(session_id: String) -> Result<Option<(i64, i64)>, String> {
+    Ok(with_db_off_runtime(None, move |conn| session_time_range(conn, &session_id)).await)
 }
 
 #[tauri::command]
-pub fn transmit_history_find_offset(session_id: String, timestamp_us: i64) -> Result<i64, String> {
-    Ok(with_db(0, |conn| session_offset_after(conn, &session_id, timestamp_us)))
+pub async fn transmit_history_find_offset(session_id: String, timestamp_us: i64) -> Result<i64, String> {
+    Ok(with_db_off_runtime(0, move |conn| session_offset_after(conn, &session_id, timestamp_us)).await)
 }
 
 #[cfg(test)]
@@ -295,7 +306,7 @@ mod tests {
         };
         let signals = [
             write("signal_mine"),
-            transmit_history_clear("signal_mine".into()).unwrap(),
+            clear_and_announce("signal_mine"),
             write("signal_agent"),
         ];
         assert!(signals[0] < signals[1] && signals[1] < signals[2], "signals repeated: {signals:?}");

@@ -182,7 +182,9 @@ mod desktop {
         let capture_id = capture_store::get_session_bytes_capture_id(&session_id)
             .ok_or_else(|| "No byte capture found for session".to_string())?;
 
-        let bytes = capture_store::get_capture_bytes(&capture_id)
+        let id = capture_id.clone();
+        let bytes = crate::blocking::off_runtime(move || capture_store::get_capture_bytes(&id))
+            .await
             .ok_or_else(|| format!("Capture '{}' not found or is not a byte capture", capture_id))?;
 
         if bytes.is_empty() {

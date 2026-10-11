@@ -4,6 +4,7 @@
 // reached through the settings.
 
 use crate::analysis::{FrameSource, PayloadQuery, PayloadSource, Sampling};
+use crate::blocking::off_runtime;
 use crate::capture_db::InventoryRow;
 use crate::capture_store::FrameSelection;
 use crate::io::FrameMessage;
@@ -53,7 +54,8 @@ pub struct Capture<'a>(pub &'a str);
 
 impl PayloadSource for Capture<'_> {
     async fn inventory(&self, start_us: Option<i64>, end_us: Option<i64>) -> Result<Vec<InventoryRow>, String> {
-        crate::query::capture::frame_inventory(self.0, start_us, end_us)
+        let id = self.0.to_owned();
+        off_runtime(move || crate::query::capture::frame_inventory(&id, start_us, end_us)).await
     }
 
     async fn payloads(&self, q: PayloadQuery<'_>) -> Result<Vec<Vec<u8>>, String> {
@@ -61,7 +63,9 @@ impl PayloadSource for Capture<'_> {
             Sampling::Spread => crate::capture_db::sample_frame_payloads,
             Sampling::Recent => crate::capture_db::tail_frame_payloads,
         };
-        read(self.0, q.protocol, q.frame_id, q.is_extended, q.limit)
+        let (id, protocol) = (self.0.to_owned(), q.protocol.map(str::to_owned));
+        let (frame_id, is_extended, limit) = (q.frame_id, q.is_extended, q.limit);
+        off_runtime(move || read(&id, protocol.as_deref(), frame_id, is_extended, limit)).await
     }
 }
 
@@ -74,22 +78,23 @@ impl FrameSource for Capture<'_> {
         selection: &FrameSelection,
         newest: Option<usize>,
     ) -> Result<Vec<FrameMessage>, String> {
-        if let Some(n) = newest {
-            return Ok(crate::capture_store::get_capture_frames_tail(self.0, n, selection).frames);
-        }
-        let mut frames = Vec::new();
-        loop {
-            let (page, _, total) = crate::capture_store::get_capture_frames_paginated_filtered(
-                self.0,
-                frames.len(),
-                FRAME_PAGE,
-                selection,
-            );
-            let done = page.is_empty() || frames.len() + page.len() >= total;
-            frames.extend(page);
-            if done {
-                return Ok(frames);
-            }
+        let (id, selection) = (self.0.to_owned(), selection.clone());
+        off_runtime(move || Ok(all_selected_frames(&id, &selection, newest))).await
+    }
+}
+
+fn all_selected_frames(id: &str, selection: &FrameSelection, newest: Option<usize>) -> Vec<FrameMessage> {
+    if let Some(n) = newest {
+        return crate::capture_store::get_capture_frames_tail(id, n, selection).frames;
+    }
+    let mut frames = Vec::new();
+    loop {
+        let (page, _, total) =
+            crate::capture_store::get_capture_frames_paginated_filtered(id, frames.len(), FRAME_PAGE, selection);
+        let done = page.is_empty() || frames.len() + page.len() >= total;
+        frames.extend(page);
+        if done {
+            return frames;
         }
     }
 }

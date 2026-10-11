@@ -471,11 +471,13 @@ fn resolve_decoder_dir(app: &AppHandle) -> Option<PathBuf> {
 /// Rebuild the catalogue cache from the current decoder directory, store it, and
 /// signal all WS clients (CatalogListChanged) to reconcile. Returns the fresh list.
 pub fn refresh_catalog_cache(app: &AppHandle) -> Vec<CatalogFile> {
-    let dir = match resolve_decoder_dir(app) {
-        Some(d) => d,
-        None => return Vec::new(),
+    let Some((dir, catalogs)) = crate::blocking::in_place(|| {
+        let dir = resolve_decoder_dir(app)?;
+        let catalogs = scan_catalogs(&dir, &sync_index(app));
+        Some((dir, catalogs))
+    }) else {
+        return Vec::new();
     };
-    let catalogs = scan_catalogs(&dir, &sync_index(app));
     {
         let cache = app.state::<CatalogCache>();
         let mut st = cache.state.lock().unwrap();

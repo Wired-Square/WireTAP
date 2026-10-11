@@ -1,6 +1,7 @@
 #[macro_use]
 pub(crate) mod logging;
 mod adhoc;
+mod blocking;
 mod boot;
 mod analysis;
 #[cfg(test)]

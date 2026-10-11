@@ -568,7 +568,9 @@ pub async fn list_catalog_sources(app: AppHandle) -> Result<CatalogSourcesView, 
         // boundary. `reconcile` is a fixed point (see `reconcile_is_a_fixed_point`):
         // its relink target came from the present-files list, so the next pass finds
         // nothing missing and returns false, terminating in one extra round trip.
-        write_and_refresh(&app, |r| r.reconcile(dir));
+        if state.reconcile(&app, dir) {
+            crate::catalog::refresh_catalog_cache(&app);
+        }
     }
 
     Ok(state.read(&app, |r| CatalogSourcesView {

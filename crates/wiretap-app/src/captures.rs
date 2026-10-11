@@ -13,6 +13,7 @@
 use tauri::{AppHandle, Emitter};
 
 use crate::{
+    blocking::off_runtime,
     capture_store::{self, CaptureMetadata, CaptureFrameInfo, FrameSelection, ProtocolFrames, TimestampedByte, TailResponse},
     io::{self, FrameMessage},
 };
@@ -99,14 +100,18 @@ pub async fn detect_candump(file_paths: Vec<String>) -> Result<bool, String> {
 /// Import candump logs into one session-owned capture, merged in time order.
 #[tauri::command(rename_all = "snake_case")]
 pub async fn import_candump(session_id: String, file_paths: Vec<String>) -> Result<CandumpImportResult, String> {
-    let import = io::parse_candump_files(&file_paths)?;
-    let name = match file_paths.as_slice() {
+    off_runtime(move || import_candump_files(&session_id, &file_paths)).await
+}
+
+fn import_candump_files(session_id: &str, file_paths: &[String]) -> Result<CandumpImportResult, String> {
+    let import = io::parse_candump_files(file_paths)?;
+    let name = match file_paths {
         [path] => extract_filename(path),
         paths => build_batch_name(paths),
     };
-    capture_store::create_session_capture(&session_id, capture_store::CaptureKind::Frames, name);
-    capture_store::append_frames_to_session(&session_id, import.frames);
-    let metadata = capture_store::finalize_session_captures(&session_id)
+    capture_store::create_session_capture(session_id, capture_store::CaptureKind::Frames, name);
+    capture_store::append_frames_to_session(session_id, import.frames);
+    let metadata = capture_store::finalize_session_captures(session_id)
         .into_iter()
         .next()
         .ok_or_else(|| "Failed to store frames in capture".to_string())?;
@@ -125,7 +130,7 @@ pub async fn preview_csv(
     delimiter: Option<io::Delimiter>,
 ) -> Result<io::CsvPreview, String> {
     let max = max_rows.unwrap_or(20);
-    io::preview_csv_file(&file_path, max, delimiter)
+    off_runtime(move || io::preview_csv_file(&file_path, max, delimiter)).await
 }
 
 #[tauri::command(rename_all = "snake_case")]
@@ -156,28 +161,31 @@ pub async fn import_csv_with_mapping(
         .unwrap_or("unknown")
         .to_string();
 
-    let result = io::parse_csv_with_mapping(&file_path, &mappings, skip_first_row, timestamp_unit, negate_timestamps, delimiter, protocol.unwrap_or_default())?;
+    off_runtime(move || {
+        let result = io::parse_csv_with_mapping(&file_path, &mappings, skip_first_row, timestamp_unit, negate_timestamps, delimiter, protocol.unwrap_or_default())?;
 
-    if result.frames.is_empty() {
-        return Err("File contains no valid frames with the given column mapping".to_string());
-    }
+        if result.frames.is_empty() {
+            return Err("File contains no valid frames with the given column mapping".to_string());
+        }
 
-    let sequence_gaps = result.sequence_gaps;
-    let total_dropped = sequence_gaps.iter().map(|g| g.dropped).sum();
-    let wrap_points = detect_wrap_points(&sequence_gaps);
+        let sequence_gaps = result.sequence_gaps;
+        let total_dropped = sequence_gaps.iter().map(|g| g.dropped).sum();
+        let wrap_points = detect_wrap_points(&sequence_gaps);
 
-    capture_store::create_session_capture(&session_id, capture_store::CaptureKind::Frames, filename);
-    capture_store::append_frames_to_session(&session_id, result.frames);
-    let finalized = capture_store::finalize_session_captures(&session_id);
-    let metadata = finalized.into_iter().next()
-        .ok_or_else(|| "Failed to store frames in capture".to_string())?;
+        capture_store::create_session_capture(&session_id, capture_store::CaptureKind::Frames, filename);
+        capture_store::append_frames_to_session(&session_id, result.frames);
+        let finalized = capture_store::finalize_session_captures(&session_id);
+        let metadata = finalized.into_iter().next()
+            .ok_or_else(|| "Failed to store frames in capture".to_string())?;
 
-    Ok(CsvImportResult {
-        metadata,
-        sequence_gaps,
-        total_dropped,
-        wrap_points,
+        Ok(CsvImportResult {
+            metadata,
+            sequence_gaps,
+            total_dropped,
+            wrap_points,
+        })
     })
+    .await
 }
 
 /// Import multiple data files with shared column mappings into a single capture.
@@ -195,16 +203,19 @@ pub async fn import_csv_batch_with_mapping(
     delimiter: io::Delimiter,
     protocol: Option<io::Protocol>,
 ) -> Result<CsvImportResult, String> {
-    let layout = CsvLayout {
-        mappings: &mappings,
-        timestamp_unit,
-        negate_timestamps,
-        delimiter,
-        protocol: protocol.unwrap_or_default(),
-    };
-    import_csv_batch(&session_id, &file_paths, &skip_first_row_per_file, &layout, |progress| {
-        let _ = app_handle.emit("csv-import-progress", progress);
+    off_runtime(move || {
+        let layout = CsvLayout {
+            mappings: &mappings,
+            timestamp_unit,
+            negate_timestamps,
+            delimiter,
+            protocol: protocol.unwrap_or_default(),
+        };
+        import_csv_batch(&session_id, &file_paths, &skip_first_row_per_file, &layout, |progress| {
+            let _ = app_handle.emit("csv-import-progress", progress);
+        })
     })
+    .await
 }
 
 /// How every file of a batch is read.
@@ -398,8 +409,15 @@ pub async fn get_capture_metadata(capture_id: String) -> Result<Option<CaptureMe
 /// Get all frames from a capture
 #[tauri::command(rename_all = "snake_case")]
 pub async fn get_capture_frames(capture_id: String) -> Result<Vec<FrameMessage>, String> {
-    capture_store::get_capture_frames(&capture_id)
-        .ok_or_else(|| format!("Capture '{}' not found or is not a frame capture", capture_id))
+    all_frames(capture_id).await
+}
+
+async fn all_frames(capture_id: String) -> Result<Vec<FrameMessage>, String> {
+    off_runtime(move || {
+        capture_store::get_capture_frames(&capture_id)
+            .ok_or_else(|| format!("Capture '{}' not found or is not a frame capture", capture_id))
+    })
+    .await
 }
 
 /// Get a page of frames from a capture (for large datasets)
@@ -499,8 +517,7 @@ pub async fn get_capture_metadata_by_id(capture_id: String) -> Result<Option<Cap
 /// Get frames from a specific capture by ID
 #[tauri::command(rename_all = "snake_case")]
 pub async fn get_capture_frames_by_id(capture_id: String) -> Result<Vec<FrameMessage>, String> {
-    capture_store::get_capture_frames(&capture_id)
-        .ok_or_else(|| format!("Capture '{}' not found or is not a frame capture", capture_id))
+    all_frames(capture_id).await
 }
 
 /// Get the newest frame per identity from a specific capture by ID
@@ -513,8 +530,11 @@ pub async fn get_capture_latest_frames(capture_id: String) -> Result<Vec<FrameMe
 /// Get raw bytes from a specific capture by ID
 #[tauri::command(rename_all = "snake_case")]
 pub async fn get_capture_bytes_by_id(capture_id: String) -> Result<Vec<TimestampedByte>, String> {
-    capture_store::get_capture_bytes(&capture_id)
-        .ok_or_else(|| format!("Capture '{}' not found or is not a byte capture", capture_id))
+    off_runtime(move || {
+        capture_store::get_capture_bytes(&capture_id)
+            .ok_or_else(|| format!("Capture '{}' not found or is not a byte capture", capture_id))
+    })
+    .await
 }
 
 /// Mark a capture as active (being rendered by a UI panel)
@@ -612,7 +632,7 @@ pub async fn search_capture_frames(
     selection: Vec<ProtocolFrames>,
 ) -> Result<Vec<usize>, String> {
     let selection = FrameSelection::from_groups(selection);
-    crate::capture_db::search_frames(&capture_id, &query, search_id, search_data, &selection)
+    off_runtime(move || crate::capture_db::search_frames(&capture_id, &query, search_id, search_data, &selection)).await
 }
 
 /// Response for tail-mode byte capture queries

@@ -10,6 +10,7 @@ use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
+use std::future::Future;
 use std::path::{Path, PathBuf};
 use std::sync::RwLock;
 use std::time::{Duration, Instant};
@@ -60,43 +61,35 @@ impl Default for StoreManager {
 static STORE_MANAGER: Lazy<RwLock<StoreManager>> =
     Lazy::new(|| RwLock::new(StoreManager::default()));
 
+const SAVE_DEBOUNCE: Duration = Duration::from_millis(500);
+
 /// Channel for triggering debounced saves
 static SAVE_CHANNEL: Lazy<mpsc::UnboundedSender<()>> = Lazy::new(|| {
-    let (tx, mut rx) = mpsc::unbounded_channel::<()>();
-
-    // Spawn the debounced save task
-    std::thread::spawn(move || {
-        let rt = tokio::runtime::Builder::new_current_thread()
-            .enable_time()
-            .build()
-            .unwrap();
-
-        rt.block_on(async {
-            let debounce_duration = Duration::from_millis(500);
-            let mut pending = false;
-
-            loop {
-                tokio::select! {
-                    result = rx.recv() => {
-                        if result.is_none() {
-                            // Channel closed
-                            break;
-                        }
-                        pending = true;
-                    }
-                    _ = tokio::time::sleep(debounce_duration), if pending => {
-                        pending = false;
-                        if let Err(e) = save_to_disk_internal() {
-                            tlog!("[StoreManager] Failed to save: {}", e);
-                        }
-                    }
-                }
-            }
-        });
-    });
-
+    let (tx, rx) = mpsc::unbounded_channel::<()>();
+    tauri::async_runtime::spawn(save_when_quiet(rx, || async {
+        if let Err(e) = crate::blocking::off_runtime(save_to_disk_internal).await {
+            tlog!("[StoreManager] Failed to save: {}", e);
+        }
+    }));
     tx
 });
+
+/// Saves once `SAVE_DEBOUNCE` has passed with no further request.
+async fn save_when_quiet<F: Future<Output = ()>>(mut requests: mpsc::UnboundedReceiver<()>, save: impl Fn() -> F) {
+    let mut pending = false;
+    loop {
+        tokio::select! {
+            request = requests.recv() => match request {
+                Some(()) => pending = true,
+                None => return,
+            },
+            _ = tokio::time::sleep(SAVE_DEBOUNCE), if pending => {
+                pending = false;
+                save().await;
+            }
+        }
+    }
+}
 
 // ============================================================================
 // Internal Functions
@@ -368,5 +361,32 @@ mod tests {
         fs::write(&path, "not json").unwrap();
         assert!(initialise_at(path).unwrap_err().starts_with("Failed to parse store file"));
         fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_burst_of_changes_saves_once_after_the_last() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        use std::sync::Arc;
+        let saves = Arc::new(AtomicUsize::new(0));
+        let (tx, rx) = mpsc::unbounded_channel();
+        let counted = Arc::clone(&saves);
+        let task = tokio::spawn(save_when_quiet(rx, move || {
+            counted.fetch_add(1, Ordering::SeqCst);
+            async {}
+        }));
+        let quiet_for = |ms| tokio::time::sleep(Duration::from_millis(ms));
+
+        for _ in 0..3 {
+            tx.send(()).unwrap();
+            quiet_for(400).await;
+        }
+        assert_eq!(saves.load(Ordering::SeqCst), 0, "each change restarts the wait");
+        quiet_for(200).await;
+        assert_eq!(saves.load(Ordering::SeqCst), 1);
+        quiet_for(2_000).await;
+        assert_eq!(saves.load(Ordering::SeqCst), 1, "nothing pending, nothing saved");
+
+        drop(tx);
+        tokio::time::timeout(Duration::from_secs(1), task).await.expect("ends when the senders go").unwrap();
     }
 }

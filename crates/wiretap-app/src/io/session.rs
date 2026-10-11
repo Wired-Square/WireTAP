@@ -1337,7 +1337,8 @@ async fn detach_subscriber_to_capture_copy(
             .map(|m| m.name)
             .unwrap_or_else(|| capture_id.clone());
         let copy_name = name_for_copy(&base);
-        match crate::capture_store::copy_capture(&capture_id, copy_name) {
+        let source_id = capture_id.clone();
+        match crate::blocking::off_runtime(move || crate::capture_store::copy_capture(&source_id, copy_name)).await {
             Ok(copied_id) => {
                 tlog!(
                     "[reader] Copied capture '{}' -> '{}' for detached subscriber '{}'",
