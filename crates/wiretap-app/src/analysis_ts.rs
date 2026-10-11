@@ -177,6 +177,7 @@ pub struct StaticByte {
 
 #[derive(Serialize, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(rename = "NoteEndianness")]
 pub enum Endianness {
     Little,
     Big,

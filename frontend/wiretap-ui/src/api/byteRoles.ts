@@ -6,14 +6,14 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { ColumnStats } from "./checksums";
 import type { ByteNotes } from "../generated/ByteNotes";
-import type { Endianness } from "../generated/Endianness";
+import type { NoteEndianness } from "../generated/NoteEndianness";
 import type { MultiBytePattern } from "../generated/MultiBytePattern";
 import type { MuxSelector } from "../generated/MuxSelector";
 import type { ProtocolMirrors } from "../generated/ProtocolMirrors";
 import type { ProtocolFrames } from "../utils/frameKey";
 import type { Draft, Drafted } from "./drafting";
 
-export type { Endianness, MultiBytePattern };
+export type { NoteEndianness, MultiBytePattern };
 
 export type ByteRole =
   | { role: "static"; value: number }
@@ -56,7 +56,7 @@ export interface ByteProfile {
   /** `analysedFrom..maxLen`, over every payload. */
   columns: ByteColumn[];
   patterns: MultiBytePattern[];
-  endianness: Endianness | null;
+  endianness: NoteEndianness | null;
   mux: MuxAnalysis | null;
 }
 

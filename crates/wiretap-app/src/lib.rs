@@ -293,6 +293,7 @@ pub fn run() {
             byte_roles::frame_order_report_cmd,
             drafting::draft_preview_cmd,
             drafting::draft_catalog_cmd,
+            decode_views::interpret_registers_cmd,
             decode_views::can_mask_match_cmd,
             drafting::candidate_signals_cmd,
             byte_roles::serial_structure_cmd,

@@ -12,7 +12,6 @@ vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn(async () => () => {}) })
 import { AutoSummary, txGaugeMax } from "../apps/test-pattern/TestPattern";
 import { INTERFACE_TYPE_NAMES } from "../generated/framelinkNames";
 import { VALUE_TYPES } from "../apps/rules/utils/bitGrid";
-import { interpretPair, interpretRegister, type WordOrder } from "../utils/modbusValues";
 import { CAN_FD_DLC_VALUES } from "../constants";
 import type { AutoPhaseResult, TestMode, TestStatus } from "../api/testPattern";
 import { fixtureJson } from "./catalogGoldens";
@@ -55,15 +54,6 @@ describe("FrameLink value types", () => {
   type Row = { value_type: number; ts: string | null };
   it.each(named(table<Row>("framelinkValueTypes.json"), (r) => r.value_type))("%s", (_, row) => {
     expect(VALUE_TYPES.find((t) => t.value === row.value_type)?.label ?? null).toBe(row.ts);
-  });
-});
-
-describe("Modbus register words", () => {
-  type Row = { name: string; first: number[]; second: number[]; word_order: WordOrder; ts: object };
-  it.each(table<Row>("modbusWords.json").map((row) => [row.name, row] as const))("%s", (_, row) => {
-    const { u16, s16 } = interpretRegister(row.first);
-    const { f32, ...pair } = interpretPair(row.first, row.second, row.word_order);
-    expect({ u16, s16, ...pair, f32: Number.isNaN(f32) ? null : f32 }).toEqual(row.ts);
   });
 });
 
