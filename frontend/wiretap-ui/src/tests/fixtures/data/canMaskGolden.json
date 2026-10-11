@@ -1,0 +1,1467 @@
+{
+  "cases": [
+    {
+      "name": "matchedIdCount 11 0x0",
+      "input": {
+        "mask": 0,
+        "bitWidth": 11
+      },
+      "expected": 2048
+    },
+    {
+      "name": "matchedRange 11 id 0x0 mask 0x0",
+      "input": {
+        "id": 0,
+        "mask": 0,
+        "bitWidth": 11
+      },
+      "expected": {
+        "lo": 0,
+        "hi": 2047
+      }
+    },
+    {
+      "name": "matchedRange 11 id 0x123 mask 0x0",
+      "input": {
+        "id": 291,
+        "mask": 0,
+        "bitWidth": 11
+      },
+      "expected": {
+        "lo": 0,
+        "hi": 2047
+      }
+    },
+    {
+      "name": "matchedRange 11 id 0x7ff mask 0x0",
+      "input": {
+        "id": 2047,
+        "mask": 0,
+        "bitWidth": 11
+      },
+      "expected": {
+        "lo": 0,
+        "hi": 2047
+      }
+    },
+    {
+      "name": "matchedRange 11 id 0x800 mask 0x0",
+      "input": {
+        "id": 2048,
+        "mask": 0,
+        "bitWidth": 11
+      },
+      "expected": {
+        "lo": 0,
+        "hi": 2047
+      }
+    },
+    {
+      "name": "matchedRange 11 id 0x1fffffff mask 0x0",
+      "input": {
+        "id": 536870911,
+        "mask": 0,
+        "bitWidth": 11
+      },
+      "expected": {
+        "lo": 0,
+        "hi": 2047
+      }
+    },
+    {
+      "name": "matchedIdCount 11 0x1",
+      "input": {
+        "mask": 1,
+        "bitWidth": 11
+      },
+      "expected": 1024
+    },
+    {
+      "name": "matchedRange 11 id 0x0 mask 0x1",
+      "input": {
+        "id": 0,
+        "mask": 1,
+        "bitWidth": 11
+      },
+      "expected": {
+        "lo": 0,
+        "hi": 2046
+      }
+    },
+    {
+      "name": "matchedRange 11 id 0x123 mask 0x1",
+      "input": {
+        "id": 291,
+        "mask": 1,
+        "bitWidth": 11
+      },
+      "expected": {
+        "lo": 1,
+        "hi": 2047
+      }
+    },
+    {
+      "name": "matchedRange 11 id 0x7ff mask 0x1",
+      "input": {
+        "id": 2047,
+        "mask": 1,
+        "bitWidth": 11
+      },
+      "expected": {
+        "lo": 1,
+        "hi": 2047
+      }
+    },
+    {
+      "name": "matchedRange 11 id 0x800 mask 0x1",
+      "input": {
+        "id": 2048,
+        "mask": 1,
+        "bitWidth": 11
+      },
+      "expected": {
+        "lo": 0,
+        "hi": 2046
+      }
+    },
+    {
+      "name": "matchedRange 11 id 0x1fffffff mask 0x1",
+      "input": {
+        "id": 536870911,
+        "mask": 1,
+        "bitWidth": 11
+      },
+      "expected": {
+        "lo": 1,
+        "hi": 2047
+      }
+    },
+    {
+      "name": "matchedIdCount 11 0x400",
+      "input": {
+        "mask": 1024,
+        "bitWidth": 11
+      },
+      "expected": 1024
+    },
+    {
+      "name": "matchedRange 11 id 0x0 mask 0x400",
+      "input": {
+        "id": 0,
+        "mask": 1024,
+        "bitWidth": 11
+      },
+      "expected": {
+        "lo": 0,
+        "hi": 1023
+      }
+    },
+    {
+      "name": "matchedRange 11 id 0x123 mask 0x400",
+      "input": {
+        "id": 291,
+        "mask": 1024,
+        "bitWidth": 11
+      },
+      "expected": {
+        "lo": 0,
+        "hi": 1023
+      }
+    },
+    {
+      "name": "matchedRange 11 id 0x7ff mask 0x400",
+      "input": {
+        "id": 2047,
+        "mask": 1024,
+        "bitWidth": 11
+      },
+      "expected": {
+        "lo": 1024,
+        "hi": 2047
+      }
+    },
+    {
+      "name": "matchedRange 11 id 0x800 mask 0x400",
+      "input": {
+        "id": 2048,
+        "mask": 1024,
+        "bitWidth": 11
+      },
+      "expected": {
+        "lo": 0,
+        "hi": 1023
+      }
+    },
+    {
+      "name": "matchedRange 11 id 0x1fffffff mask 0x400",
+      "input": {
+        "id": 536870911,
+        "mask": 1024,
+        "bitWidth": 11
+      },
+      "expected": {
+        "lo": 1024,
+        "hi": 2047
+      }
+    },
+    {
+      "name": "matchedIdCount 11 0x7f0",
+      "input": {
+        "mask": 2032,
+        "bitWidth": 11
+      },
+      "expected": 16
+    },
+    {
+      "name": "matchedRange 11 id 0x0 mask 0x7f0",
+      "input": {
+        "id": 0,
+        "mask": 2032,
+        "bitWidth": 11
+      },
+      "expected": {
+        "lo": 0,
+        "hi": 15
+      }
+    },
+    {
+      "name": "matchedRange 11 id 0x123 mask 0x7f0",
+      "input": {
+        "id": 291,
+        "mask": 2032,
+        "bitWidth": 11
+      },
+      "expected": {
+        "lo": 288,
+        "hi": 303
+      }
+    },
+    {
+      "name": "matchedRange 11 id 0x7ff mask 0x7f0",
+      "input": {
+        "id": 2047,
+        "mask": 2032,
+        "bitWidth": 11
+      },
+      "expected": {
+        "lo": 2032,
+        "hi": 2047
+      }
+    },
+    {
+      "name": "matchedRange 11 id 0x800 mask 0x7f0",
+      "input": {
+        "id": 2048,
+        "mask": 2032,
+        "bitWidth": 11
+      },
+      "expected": {
+        "lo": 0,
+        "hi": 15
+      }
+    },
+    {
+      "name": "matchedRange 11 id 0x1fffffff mask 0x7f0",
+      "input": {
+        "id": 536870911,
+        "mask": 2032,
+        "bitWidth": 11
+      },
+      "expected": {
+        "lo": 2032,
+        "hi": 2047
+      }
+    },
+    {
+      "name": "matchedIdCount 11 0x70f",
+      "input": {
+        "mask": 1807,
+        "bitWidth": 11
+      },
+      "expected": 16
+    },
+    {
+      "name": "matchedRange 11 id 0x0 mask 0x70f",
+      "input": {
+        "id": 0,
+        "mask": 1807,
+        "bitWidth": 11
+      },
+      "expected": {
+        "lo": 0,
+        "hi": 240
+      }
+    },
+    {
+      "name": "matchedRange 11 id 0x123 mask 0x70f",
+      "input": {
+        "id": 291,
+        "mask": 1807,
+        "bitWidth": 11
+      },
+      "expected": {
+        "lo": 259,
+        "hi": 499
+      }
+    },
+    {
+      "name": "matchedRange 11 id 0x7ff mask 0x70f",
+      "input": {
+        "id": 2047,
+        "mask": 1807,
+        "bitWidth": 11
+      },
+      "expected": {
+        "lo": 1807,
+        "hi": 2047
+      }
+    },
+    {
+      "name": "matchedRange 11 id 0x800 mask 0x70f",
+      "input": {
+        "id": 2048,
+        "mask": 1807,
+        "bitWidth": 11
+      },
+      "expected": {
+        "lo": 0,
+        "hi": 240
+      }
+    },
+    {
+      "name": "matchedRange 11 id 0x1fffffff mask 0x70f",
+      "input": {
+        "id": 536870911,
+        "mask": 1807,
+        "bitWidth": 11
+      },
+      "expected": {
+        "lo": 1807,
+        "hi": 2047
+      }
+    },
+    {
+      "name": "matchedIdCount 11 0x7fe",
+      "input": {
+        "mask": 2046,
+        "bitWidth": 11
+      },
+      "expected": 2
+    },
+    {
+      "name": "matchedRange 11 id 0x0 mask 0x7fe",
+      "input": {
+        "id": 0,
+        "mask": 2046,
+        "bitWidth": 11
+      },
+      "expected": {
+        "lo": 0,
+        "hi": 1
+      }
+    },
+    {
+      "name": "matchedRange 11 id 0x123 mask 0x7fe",
+      "input": {
+        "id": 291,
+        "mask": 2046,
+        "bitWidth": 11
+      },
+      "expected": {
+        "lo": 290,
+        "hi": 291
+      }
+    },
+    {
+      "name": "matchedRange 11 id 0x7ff mask 0x7fe",
+      "input": {
+        "id": 2047,
+        "mask": 2046,
+        "bitWidth": 11
+      },
+      "expected": {
+        "lo": 2046,
+        "hi": 2047
+      }
+    },
+    {
+      "name": "matchedRange 11 id 0x800 mask 0x7fe",
+      "input": {
+        "id": 2048,
+        "mask": 2046,
+        "bitWidth": 11
+      },
+      "expected": {
+        "lo": 0,
+        "hi": 1
+      }
+    },
+    {
+      "name": "matchedRange 11 id 0x1fffffff mask 0x7fe",
+      "input": {
+        "id": 536870911,
+        "mask": 2046,
+        "bitWidth": 11
+      },
+      "expected": {
+        "lo": 2046,
+        "hi": 2047
+      }
+    },
+    {
+      "name": "matchedIdCount 11 0x7ff",
+      "input": {
+        "mask": 2047,
+        "bitWidth": 11
+      },
+      "expected": 1
+    },
+    {
+      "name": "matchedRange 11 id 0x0 mask 0x7ff",
+      "input": {
+        "id": 0,
+        "mask": 2047,
+        "bitWidth": 11
+      },
+      "expected": {
+        "lo": 0,
+        "hi": 0
+      }
+    },
+    {
+      "name": "matchedRange 11 id 0x123 mask 0x7ff",
+      "input": {
+        "id": 291,
+        "mask": 2047,
+        "bitWidth": 11
+      },
+      "expected": {
+        "lo": 291,
+        "hi": 291
+      }
+    },
+    {
+      "name": "matchedRange 11 id 0x7ff mask 0x7ff",
+      "input": {
+        "id": 2047,
+        "mask": 2047,
+        "bitWidth": 11
+      },
+      "expected": {
+        "lo": 2047,
+        "hi": 2047
+      }
+    },
+    {
+      "name": "matchedRange 11 id 0x800 mask 0x7ff",
+      "input": {
+        "id": 2048,
+        "mask": 2047,
+        "bitWidth": 11
+      },
+      "expected": {
+        "lo": 0,
+        "hi": 0
+      }
+    },
+    {
+      "name": "matchedRange 11 id 0x1fffffff mask 0x7ff",
+      "input": {
+        "id": 536870911,
+        "mask": 2047,
+        "bitWidth": 11
+      },
+      "expected": {
+        "lo": 2047,
+        "hi": 2047
+      }
+    },
+    {
+      "name": "matchedIdCount 11 0x800",
+      "input": {
+        "mask": 2048,
+        "bitWidth": 11
+      },
+      "expected": 2048
+    },
+    {
+      "name": "matchedRange 11 id 0x0 mask 0x800",
+      "input": {
+        "id": 0,
+        "mask": 2048,
+        "bitWidth": 11
+      },
+      "expected": {
+        "lo": 0,
+        "hi": 2047
+      }
+    },
+    {
+      "name": "matchedRange 11 id 0x123 mask 0x800",
+      "input": {
+        "id": 291,
+        "mask": 2048,
+        "bitWidth": 11
+      },
+      "expected": {
+        "lo": 0,
+        "hi": 2047
+      }
+    },
+    {
+      "name": "matchedRange 11 id 0x7ff mask 0x800",
+      "input": {
+        "id": 2047,
+        "mask": 2048,
+        "bitWidth": 11
+      },
+      "expected": {
+        "lo": 0,
+        "hi": 2047
+      }
+    },
+    {
+      "name": "matchedRange 11 id 0x800 mask 0x800",
+      "input": {
+        "id": 2048,
+        "mask": 2048,
+        "bitWidth": 11
+      },
+      "expected": {
+        "lo": 0,
+        "hi": 2047
+      }
+    },
+    {
+      "name": "matchedRange 11 id 0x1fffffff mask 0x800",
+      "input": {
+        "id": 536870911,
+        "mask": 2048,
+        "bitWidth": 11
+      },
+      "expected": {
+        "lo": 0,
+        "hi": 2047
+      }
+    },
+    {
+      "name": "matchedIdCount 11 0xfff",
+      "input": {
+        "mask": 4095,
+        "bitWidth": 11
+      },
+      "expected": 1
+    },
+    {
+      "name": "matchedRange 11 id 0x0 mask 0xfff",
+      "input": {
+        "id": 0,
+        "mask": 4095,
+        "bitWidth": 11
+      },
+      "expected": {
+        "lo": 0,
+        "hi": 0
+      }
+    },
+    {
+      "name": "matchedRange 11 id 0x123 mask 0xfff",
+      "input": {
+        "id": 291,
+        "mask": 4095,
+        "bitWidth": 11
+      },
+      "expected": {
+        "lo": 291,
+        "hi": 291
+      }
+    },
+    {
+      "name": "matchedRange 11 id 0x7ff mask 0xfff",
+      "input": {
+        "id": 2047,
+        "mask": 4095,
+        "bitWidth": 11
+      },
+      "expected": {
+        "lo": 2047,
+        "hi": 2047
+      }
+    },
+    {
+      "name": "matchedRange 11 id 0x800 mask 0xfff",
+      "input": {
+        "id": 2048,
+        "mask": 4095,
+        "bitWidth": 11
+      },
+      "expected": {
+        "lo": 0,
+        "hi": 0
+      }
+    },
+    {
+      "name": "matchedRange 11 id 0x1fffffff mask 0xfff",
+      "input": {
+        "id": 536870911,
+        "mask": 4095,
+        "bitWidth": 11
+      },
+      "expected": {
+        "lo": 2047,
+        "hi": 2047
+      }
+    },
+    {
+      "name": "matchedIdCount 11 0x1fffffff",
+      "input": {
+        "mask": 536870911,
+        "bitWidth": 11
+      },
+      "expected": 1
+    },
+    {
+      "name": "matchedRange 11 id 0x0 mask 0x1fffffff",
+      "input": {
+        "id": 0,
+        "mask": 536870911,
+        "bitWidth": 11
+      },
+      "expected": {
+        "lo": 0,
+        "hi": 0
+      }
+    },
+    {
+      "name": "matchedRange 11 id 0x123 mask 0x1fffffff",
+      "input": {
+        "id": 291,
+        "mask": 536870911,
+        "bitWidth": 11
+      },
+      "expected": {
+        "lo": 291,
+        "hi": 291
+      }
+    },
+    {
+      "name": "matchedRange 11 id 0x7ff mask 0x1fffffff",
+      "input": {
+        "id": 2047,
+        "mask": 536870911,
+        "bitWidth": 11
+      },
+      "expected": {
+        "lo": 2047,
+        "hi": 2047
+      }
+    },
+    {
+      "name": "matchedRange 11 id 0x800 mask 0x1fffffff",
+      "input": {
+        "id": 2048,
+        "mask": 536870911,
+        "bitWidth": 11
+      },
+      "expected": {
+        "lo": 0,
+        "hi": 0
+      }
+    },
+    {
+      "name": "matchedRange 11 id 0x1fffffff mask 0x1fffffff",
+      "input": {
+        "id": 536870911,
+        "mask": 536870911,
+        "bitWidth": 11
+      },
+      "expected": {
+        "lo": 2047,
+        "hi": 2047
+      }
+    },
+    {
+      "name": "matchedIdCount 11 0xffffffff",
+      "input": {
+        "mask": 4294967295,
+        "bitWidth": 11
+      },
+      "expected": 1
+    },
+    {
+      "name": "matchedRange 11 id 0x0 mask 0xffffffff",
+      "input": {
+        "id": 0,
+        "mask": 4294967295,
+        "bitWidth": 11
+      },
+      "expected": {
+        "lo": 0,
+        "hi": 0
+      }
+    },
+    {
+      "name": "matchedRange 11 id 0x123 mask 0xffffffff",
+      "input": {
+        "id": 291,
+        "mask": 4294967295,
+        "bitWidth": 11
+      },
+      "expected": {
+        "lo": 291,
+        "hi": 291
+      }
+    },
+    {
+      "name": "matchedRange 11 id 0x7ff mask 0xffffffff",
+      "input": {
+        "id": 2047,
+        "mask": 4294967295,
+        "bitWidth": 11
+      },
+      "expected": {
+        "lo": 2047,
+        "hi": 2047
+      }
+    },
+    {
+      "name": "matchedRange 11 id 0x800 mask 0xffffffff",
+      "input": {
+        "id": 2048,
+        "mask": 4294967295,
+        "bitWidth": 11
+      },
+      "expected": {
+        "lo": 0,
+        "hi": 0
+      }
+    },
+    {
+      "name": "matchedRange 11 id 0x1fffffff mask 0xffffffff",
+      "input": {
+        "id": 536870911,
+        "mask": 4294967295,
+        "bitWidth": 11
+      },
+      "expected": {
+        "lo": 2047,
+        "hi": 2047
+      }
+    },
+    {
+      "name": "matchedIdCount 29 0x0",
+      "input": {
+        "mask": 0,
+        "bitWidth": 29
+      },
+      "expected": 536870912
+    },
+    {
+      "name": "matchedRange 29 id 0x0 mask 0x0",
+      "input": {
+        "id": 0,
+        "mask": 0,
+        "bitWidth": 29
+      },
+      "expected": {
+        "lo": 0,
+        "hi": 536870911
+      }
+    },
+    {
+      "name": "matchedRange 29 id 0x18ff0001 mask 0x0",
+      "input": {
+        "id": 419364865,
+        "mask": 0,
+        "bitWidth": 29
+      },
+      "expected": {
+        "lo": 0,
+        "hi": 536870911
+      }
+    },
+    {
+      "name": "matchedRange 29 id 0x1fffffff mask 0x0",
+      "input": {
+        "id": 536870911,
+        "mask": 0,
+        "bitWidth": 29
+      },
+      "expected": {
+        "lo": 0,
+        "hi": 536870911
+      }
+    },
+    {
+      "name": "matchedRange 29 id 0x20000000 mask 0x0",
+      "input": {
+        "id": 536870912,
+        "mask": 0,
+        "bitWidth": 29
+      },
+      "expected": {
+        "lo": 0,
+        "hi": 536870911
+      }
+    },
+    {
+      "name": "matchedRange 29 id 0xffffffff mask 0x0",
+      "input": {
+        "id": 4294967295,
+        "mask": 0,
+        "bitWidth": 29
+      },
+      "expected": {
+        "lo": 0,
+        "hi": 536870911
+      }
+    },
+    {
+      "name": "matchedIdCount 29 0x1",
+      "input": {
+        "mask": 1,
+        "bitWidth": 29
+      },
+      "expected": 268435456
+    },
+    {
+      "name": "matchedRange 29 id 0x0 mask 0x1",
+      "input": {
+        "id": 0,
+        "mask": 1,
+        "bitWidth": 29
+      },
+      "expected": {
+        "lo": 0,
+        "hi": 536870910
+      }
+    },
+    {
+      "name": "matchedRange 29 id 0x18ff0001 mask 0x1",
+      "input": {
+        "id": 419364865,
+        "mask": 1,
+        "bitWidth": 29
+      },
+      "expected": {
+        "lo": 1,
+        "hi": 536870911
+      }
+    },
+    {
+      "name": "matchedRange 29 id 0x1fffffff mask 0x1",
+      "input": {
+        "id": 536870911,
+        "mask": 1,
+        "bitWidth": 29
+      },
+      "expected": {
+        "lo": 1,
+        "hi": 536870911
+      }
+    },
+    {
+      "name": "matchedRange 29 id 0x20000000 mask 0x1",
+      "input": {
+        "id": 536870912,
+        "mask": 1,
+        "bitWidth": 29
+      },
+      "expected": {
+        "lo": 0,
+        "hi": 536870910
+      }
+    },
+    {
+      "name": "matchedRange 29 id 0xffffffff mask 0x1",
+      "input": {
+        "id": 4294967295,
+        "mask": 1,
+        "bitWidth": 29
+      },
+      "expected": {
+        "lo": 1,
+        "hi": 536870911
+      }
+    },
+    {
+      "name": "matchedIdCount 29 0x7ff",
+      "input": {
+        "mask": 2047,
+        "bitWidth": 29
+      },
+      "expected": 262144
+    },
+    {
+      "name": "matchedRange 29 id 0x0 mask 0x7ff",
+      "input": {
+        "id": 0,
+        "mask": 2047,
+        "bitWidth": 29
+      },
+      "expected": {
+        "lo": 0,
+        "hi": 536868864
+      }
+    },
+    {
+      "name": "matchedRange 29 id 0x18ff0001 mask 0x7ff",
+      "input": {
+        "id": 419364865,
+        "mask": 2047,
+        "bitWidth": 29
+      },
+      "expected": {
+        "lo": 1,
+        "hi": 536868865
+      }
+    },
+    {
+      "name": "matchedRange 29 id 0x1fffffff mask 0x7ff",
+      "input": {
+        "id": 536870911,
+        "mask": 2047,
+        "bitWidth": 29
+      },
+      "expected": {
+        "lo": 2047,
+        "hi": 536870911
+      }
+    },
+    {
+      "name": "matchedRange 29 id 0x20000000 mask 0x7ff",
+      "input": {
+        "id": 536870912,
+        "mask": 2047,
+        "bitWidth": 29
+      },
+      "expected": {
+        "lo": 0,
+        "hi": 536868864
+      }
+    },
+    {
+      "name": "matchedRange 29 id 0xffffffff mask 0x7ff",
+      "input": {
+        "id": 4294967295,
+        "mask": 2047,
+        "bitWidth": 29
+      },
+      "expected": {
+        "lo": 2047,
+        "hi": 536870911
+      }
+    },
+    {
+      "name": "matchedIdCount 29 0x1fffff00",
+      "input": {
+        "mask": 536870656,
+        "bitWidth": 29
+      },
+      "expected": 256
+    },
+    {
+      "name": "matchedRange 29 id 0x0 mask 0x1fffff00",
+      "input": {
+        "id": 0,
+        "mask": 536870656,
+        "bitWidth": 29
+      },
+      "expected": {
+        "lo": 0,
+        "hi": 255
+      }
+    },
+    {
+      "name": "matchedRange 29 id 0x18ff0001 mask 0x1fffff00",
+      "input": {
+        "id": 419364865,
+        "mask": 536870656,
+        "bitWidth": 29
+      },
+      "expected": {
+        "lo": 419364864,
+        "hi": 419365119
+      }
+    },
+    {
+      "name": "matchedRange 29 id 0x1fffffff mask 0x1fffff00",
+      "input": {
+        "id": 536870911,
+        "mask": 536870656,
+        "bitWidth": 29
+      },
+      "expected": {
+        "lo": 536870656,
+        "hi": 536870911
+      }
+    },
+    {
+      "name": "matchedRange 29 id 0x20000000 mask 0x1fffff00",
+      "input": {
+        "id": 536870912,
+        "mask": 536870656,
+        "bitWidth": 29
+      },
+      "expected": {
+        "lo": 0,
+        "hi": 255
+      }
+    },
+    {
+      "name": "matchedRange 29 id 0xffffffff mask 0x1fffff00",
+      "input": {
+        "id": 4294967295,
+        "mask": 536870656,
+        "bitWidth": 29
+      },
+      "expected": {
+        "lo": 536870656,
+        "hi": 536870911
+      }
+    },
+    {
+      "name": "matchedIdCount 29 0x1ffffffe",
+      "input": {
+        "mask": 536870910,
+        "bitWidth": 29
+      },
+      "expected": 2
+    },
+    {
+      "name": "matchedRange 29 id 0x0 mask 0x1ffffffe",
+      "input": {
+        "id": 0,
+        "mask": 536870910,
+        "bitWidth": 29
+      },
+      "expected": {
+        "lo": 0,
+        "hi": 1
+      }
+    },
+    {
+      "name": "matchedRange 29 id 0x18ff0001 mask 0x1ffffffe",
+      "input": {
+        "id": 419364865,
+        "mask": 536870910,
+        "bitWidth": 29
+      },
+      "expected": {
+        "lo": 419364864,
+        "hi": 419364865
+      }
+    },
+    {
+      "name": "matchedRange 29 id 0x1fffffff mask 0x1ffffffe",
+      "input": {
+        "id": 536870911,
+        "mask": 536870910,
+        "bitWidth": 29
+      },
+      "expected": {
+        "lo": 536870910,
+        "hi": 536870911
+      }
+    },
+    {
+      "name": "matchedRange 29 id 0x20000000 mask 0x1ffffffe",
+      "input": {
+        "id": 536870912,
+        "mask": 536870910,
+        "bitWidth": 29
+      },
+      "expected": {
+        "lo": 0,
+        "hi": 1
+      }
+    },
+    {
+      "name": "matchedRange 29 id 0xffffffff mask 0x1ffffffe",
+      "input": {
+        "id": 4294967295,
+        "mask": 536870910,
+        "bitWidth": 29
+      },
+      "expected": {
+        "lo": 536870910,
+        "hi": 536870911
+      }
+    },
+    {
+      "name": "matchedIdCount 29 0x1fffffff",
+      "input": {
+        "mask": 536870911,
+        "bitWidth": 29
+      },
+      "expected": 1
+    },
+    {
+      "name": "matchedRange 29 id 0x0 mask 0x1fffffff",
+      "input": {
+        "id": 0,
+        "mask": 536870911,
+        "bitWidth": 29
+      },
+      "expected": {
+        "lo": 0,
+        "hi": 0
+      }
+    },
+    {
+      "name": "matchedRange 29 id 0x18ff0001 mask 0x1fffffff",
+      "input": {
+        "id": 419364865,
+        "mask": 536870911,
+        "bitWidth": 29
+      },
+      "expected": {
+        "lo": 419364865,
+        "hi": 419364865
+      }
+    },
+    {
+      "name": "matchedRange 29 id 0x1fffffff mask 0x1fffffff",
+      "input": {
+        "id": 536870911,
+        "mask": 536870911,
+        "bitWidth": 29
+      },
+      "expected": {
+        "lo": 536870911,
+        "hi": 536870911
+      }
+    },
+    {
+      "name": "matchedRange 29 id 0x20000000 mask 0x1fffffff",
+      "input": {
+        "id": 536870912,
+        "mask": 536870911,
+        "bitWidth": 29
+      },
+      "expected": {
+        "lo": 0,
+        "hi": 0
+      }
+    },
+    {
+      "name": "matchedRange 29 id 0xffffffff mask 0x1fffffff",
+      "input": {
+        "id": 4294967295,
+        "mask": 536870911,
+        "bitWidth": 29
+      },
+      "expected": {
+        "lo": 536870911,
+        "hi": 536870911
+      }
+    },
+    {
+      "name": "matchedIdCount 29 0x10000000",
+      "input": {
+        "mask": 268435456,
+        "bitWidth": 29
+      },
+      "expected": 268435456
+    },
+    {
+      "name": "matchedRange 29 id 0x0 mask 0x10000000",
+      "input": {
+        "id": 0,
+        "mask": 268435456,
+        "bitWidth": 29
+      },
+      "expected": {
+        "lo": 0,
+        "hi": 268435455
+      }
+    },
+    {
+      "name": "matchedRange 29 id 0x18ff0001 mask 0x10000000",
+      "input": {
+        "id": 419364865,
+        "mask": 268435456,
+        "bitWidth": 29
+      },
+      "expected": {
+        "lo": 268435456,
+        "hi": 536870911
+      }
+    },
+    {
+      "name": "matchedRange 29 id 0x1fffffff mask 0x10000000",
+      "input": {
+        "id": 536870911,
+        "mask": 268435456,
+        "bitWidth": 29
+      },
+      "expected": {
+        "lo": 268435456,
+        "hi": 536870911
+      }
+    },
+    {
+      "name": "matchedRange 29 id 0x20000000 mask 0x10000000",
+      "input": {
+        "id": 536870912,
+        "mask": 268435456,
+        "bitWidth": 29
+      },
+      "expected": {
+        "lo": 0,
+        "hi": 268435455
+      }
+    },
+    {
+      "name": "matchedRange 29 id 0xffffffff mask 0x10000000",
+      "input": {
+        "id": 4294967295,
+        "mask": 268435456,
+        "bitWidth": 29
+      },
+      "expected": {
+        "lo": 268435456,
+        "hi": 536870911
+      }
+    },
+    {
+      "name": "matchedIdCount 29 0x20000000",
+      "input": {
+        "mask": 536870912,
+        "bitWidth": 29
+      },
+      "expected": 536870912
+    },
+    {
+      "name": "matchedRange 29 id 0x0 mask 0x20000000",
+      "input": {
+        "id": 0,
+        "mask": 536870912,
+        "bitWidth": 29
+      },
+      "expected": {
+        "lo": 0,
+        "hi": 536870911
+      }
+    },
+    {
+      "name": "matchedRange 29 id 0x18ff0001 mask 0x20000000",
+      "input": {
+        "id": 419364865,
+        "mask": 536870912,
+        "bitWidth": 29
+      },
+      "expected": {
+        "lo": 0,
+        "hi": 536870911
+      }
+    },
+    {
+      "name": "matchedRange 29 id 0x1fffffff mask 0x20000000",
+      "input": {
+        "id": 536870911,
+        "mask": 536870912,
+        "bitWidth": 29
+      },
+      "expected": {
+        "lo": 0,
+        "hi": 536870911
+      }
+    },
+    {
+      "name": "matchedRange 29 id 0x20000000 mask 0x20000000",
+      "input": {
+        "id": 536870912,
+        "mask": 536870912,
+        "bitWidth": 29
+      },
+      "expected": {
+        "lo": 0,
+        "hi": 536870911
+      }
+    },
+    {
+      "name": "matchedRange 29 id 0xffffffff mask 0x20000000",
+      "input": {
+        "id": 4294967295,
+        "mask": 536870912,
+        "bitWidth": 29
+      },
+      "expected": {
+        "lo": 0,
+        "hi": 536870911
+      }
+    },
+    {
+      "name": "matchedIdCount 29 0xffffffff",
+      "input": {
+        "mask": 4294967295,
+        "bitWidth": 29
+      },
+      "expected": 1
+    },
+    {
+      "name": "matchedRange 29 id 0x0 mask 0xffffffff",
+      "input": {
+        "id": 0,
+        "mask": 4294967295,
+        "bitWidth": 29
+      },
+      "expected": {
+        "lo": 0,
+        "hi": 0
+      }
+    },
+    {
+      "name": "matchedRange 29 id 0x18ff0001 mask 0xffffffff",
+      "input": {
+        "id": 419364865,
+        "mask": 4294967295,
+        "bitWidth": 29
+      },
+      "expected": {
+        "lo": 419364865,
+        "hi": 419364865
+      }
+    },
+    {
+      "name": "matchedRange 29 id 0x1fffffff mask 0xffffffff",
+      "input": {
+        "id": 536870911,
+        "mask": 4294967295,
+        "bitWidth": 29
+      },
+      "expected": {
+        "lo": 536870911,
+        "hi": 536870911
+      }
+    },
+    {
+      "name": "matchedRange 29 id 0x20000000 mask 0xffffffff",
+      "input": {
+        "id": 536870912,
+        "mask": 4294967295,
+        "bitWidth": 29
+      },
+      "expected": {
+        "lo": 0,
+        "hi": 0
+      }
+    },
+    {
+      "name": "matchedRange 29 id 0xffffffff mask 0xffffffff",
+      "input": {
+        "id": 4294967295,
+        "mask": 4294967295,
+        "bitWidth": 29
+      },
+      "expected": {
+        "lo": 536870911,
+        "hi": 536870911
+      }
+    },
+    {
+      "name": "matchedIdCount 29 0x80000000",
+      "input": {
+        "mask": 2147483648,
+        "bitWidth": 29
+      },
+      "expected": 536870912
+    },
+    {
+      "name": "matchedRange 29 id 0x0 mask 0x80000000",
+      "input": {
+        "id": 0,
+        "mask": 2147483648,
+        "bitWidth": 29
+      },
+      "expected": {
+        "lo": 0,
+        "hi": 536870911
+      }
+    },
+    {
+      "name": "matchedRange 29 id 0x18ff0001 mask 0x80000000",
+      "input": {
+        "id": 419364865,
+        "mask": 2147483648,
+        "bitWidth": 29
+      },
+      "expected": {
+        "lo": 0,
+        "hi": 536870911
+      }
+    },
+    {
+      "name": "matchedRange 29 id 0x1fffffff mask 0x80000000",
+      "input": {
+        "id": 536870911,
+        "mask": 2147483648,
+        "bitWidth": 29
+      },
+      "expected": {
+        "lo": 0,
+        "hi": 536870911
+      }
+    },
+    {
+      "name": "matchedRange 29 id 0x20000000 mask 0x80000000",
+      "input": {
+        "id": 536870912,
+        "mask": 2147483648,
+        "bitWidth": 29
+      },
+      "expected": {
+        "lo": 0,
+        "hi": 536870911
+      }
+    },
+    {
+      "name": "matchedRange 29 id 0xffffffff mask 0x80000000",
+      "input": {
+        "id": 4294967295,
+        "mask": 2147483648,
+        "bitWidth": 29
+      },
+      "expected": {
+        "lo": 0,
+        "hi": 536870911
+      }
+    },
+    {
+      "name": "popcount 0",
+      "input": 0,
+      "expected": 0
+    },
+    {
+      "name": "popcount 1",
+      "input": 1,
+      "expected": 1
+    },
+    {
+      "name": "popcount 2047",
+      "input": 2047,
+      "expected": 11
+    },
+    {
+      "name": "popcount 536870911",
+      "input": 536870911,
+      "expected": 29
+    },
+    {
+      "name": "popcount 2147483648",
+      "input": 2147483648,
+      "expected": 1
+    },
+    {
+      "name": "popcount 4294967295",
+      "input": 4294967295,
+      "expected": 32
+    },
+    {
+      "name": "popcount -1",
+      "input": -1,
+      "expected": 32
+    }
+  ]
+}

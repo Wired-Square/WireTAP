@@ -1,0 +1,1055 @@
+{
+  "cases": [
+    {
+      "name": "interpretRegister []",
+      "input": [],
+      "expected": {
+        "hex": "",
+        "u16": 0,
+        "s16": 0,
+        "ascii": ""
+      }
+    },
+    {
+      "name": "interpretRegister [1]",
+      "input": [
+        1
+      ],
+      "expected": {
+        "hex": "01",
+        "u16": 1,
+        "s16": 1,
+        "ascii": "."
+      }
+    },
+    {
+      "name": "interpretRegister [255]",
+      "input": [
+        255
+      ],
+      "expected": {
+        "hex": "FF",
+        "u16": 255,
+        "s16": 255,
+        "ascii": "."
+      }
+    },
+    {
+      "name": "interpretRegister [0,0]",
+      "input": [
+        0,
+        0
+      ],
+      "expected": {
+        "hex": "0000",
+        "u16": 0,
+        "s16": 0,
+        "ascii": ".."
+      }
+    },
+    {
+      "name": "interpretRegister [0,65]",
+      "input": [
+        0,
+        65
+      ],
+      "expected": {
+        "hex": "0041",
+        "u16": 65,
+        "s16": 65,
+        "ascii": ".A"
+      }
+    },
+    {
+      "name": "interpretRegister [77,66]",
+      "input": [
+        77,
+        66
+      ],
+      "expected": {
+        "hex": "4D42",
+        "u16": 19778,
+        "s16": 19778,
+        "ascii": "MB"
+      }
+    },
+    {
+      "name": "interpretRegister [9,56]",
+      "input": [
+        9,
+        56
+      ],
+      "expected": {
+        "hex": "0938",
+        "u16": 2360,
+        "s16": 2360,
+        "ascii": ".8"
+      }
+    },
+    {
+      "name": "interpretRegister [127,255]",
+      "input": [
+        127,
+        255
+      ],
+      "expected": {
+        "hex": "7FFF",
+        "u16": 32767,
+        "s16": 32767,
+        "ascii": ".."
+      }
+    },
+    {
+      "name": "interpretRegister [128,0]",
+      "input": [
+        128,
+        0
+      ],
+      "expected": {
+        "hex": "8000",
+        "u16": 32768,
+        "s16": -32768,
+        "ascii": ".."
+      }
+    },
+    {
+      "name": "interpretRegister [255,255]",
+      "input": [
+        255,
+        255
+      ],
+      "expected": {
+        "hex": "FFFF",
+        "u16": 65535,
+        "s16": -1,
+        "ascii": ".."
+      }
+    },
+    {
+      "name": "interpretRegister [32,126]",
+      "input": [
+        32,
+        126
+      ],
+      "expected": {
+        "hex": "207E",
+        "u16": 8318,
+        "s16": 8318,
+        "ascii": " ~"
+      }
+    },
+    {
+      "name": "interpretRegister [127,128]",
+      "input": [
+        127,
+        128
+      ],
+      "expected": {
+        "hex": "7F80",
+        "u16": 32640,
+        "s16": 32640,
+        "ascii": ".."
+      }
+    },
+    {
+      "name": "interpretRegister [18,52,86]",
+      "input": [
+        18,
+        52,
+        86
+      ],
+      "expected": {
+        "hex": "1234",
+        "u16": 4660,
+        "s16": 4660,
+        "ascii": ".4"
+      }
+    },
+    {
+      "name": "interpretPair 65536 big",
+      "input": {
+        "first": [
+          0,
+          1
+        ],
+        "second": [
+          0,
+          0
+        ],
+        "order": "big"
+      },
+      "expected": {
+        "u32": 65536,
+        "s32": 65536,
+        "f32": 9.183549615799121e-41
+      }
+    },
+    {
+      "name": "interpretPair 65536 little",
+      "input": {
+        "first": [
+          0,
+          1
+        ],
+        "second": [
+          0,
+          0
+        ],
+        "order": "little"
+      },
+      "expected": {
+        "u32": 1,
+        "s32": 1,
+        "f32": 1.401298464324817e-45
+      }
+    },
+    {
+      "name": "interpretPair zero big",
+      "input": {
+        "first": [
+          0,
+          0
+        ],
+        "second": [
+          0,
+          0
+        ],
+        "order": "big"
+      },
+      "expected": {
+        "u32": 0,
+        "s32": 0,
+        "f32": 0
+      }
+    },
+    {
+      "name": "interpretPair zero little",
+      "input": {
+        "first": [
+          0,
+          0
+        ],
+        "second": [
+          0,
+          0
+        ],
+        "order": "little"
+      },
+      "expected": {
+        "u32": 0,
+        "s32": 0,
+        "f32": 0
+      }
+    },
+    {
+      "name": "interpretPair negative zero big",
+      "input": {
+        "first": [
+          128,
+          0
+        ],
+        "second": [
+          0,
+          0
+        ],
+        "order": "big"
+      },
+      "expected": {
+        "u32": 2147483648,
+        "s32": -2147483648,
+        "f32": "-0"
+      }
+    },
+    {
+      "name": "interpretPair negative zero little",
+      "input": {
+        "first": [
+          128,
+          0
+        ],
+        "second": [
+          0,
+          0
+        ],
+        "order": "little"
+      },
+      "expected": {
+        "u32": 32768,
+        "s32": 32768,
+        "f32": 4.591774807899561e-41
+      }
+    },
+    {
+      "name": "interpretPair one big",
+      "input": {
+        "first": [
+          63,
+          128
+        ],
+        "second": [
+          0,
+          0
+        ],
+        "order": "big"
+      },
+      "expected": {
+        "u32": 1065353216,
+        "s32": 1065353216,
+        "f32": 1
+      }
+    },
+    {
+      "name": "interpretPair one little",
+      "input": {
+        "first": [
+          63,
+          128
+        ],
+        "second": [
+          0,
+          0
+        ],
+        "order": "little"
+      },
+      "expected": {
+        "u32": 16256,
+        "s32": 16256,
+        "f32": 2.2779507836064226e-41
+      }
+    },
+    {
+      "name": "interpretPair minus two big",
+      "input": {
+        "first": [
+          192,
+          0
+        ],
+        "second": [
+          0,
+          0
+        ],
+        "order": "big"
+      },
+      "expected": {
+        "u32": 3221225472,
+        "s32": -1073741824,
+        "f32": -2
+      }
+    },
+    {
+      "name": "interpretPair minus two little",
+      "input": {
+        "first": [
+          192,
+          0
+        ],
+        "second": [
+          0,
+          0
+        ],
+        "order": "little"
+      },
+      "expected": {
+        "u32": 49152,
+        "s32": 49152,
+        "f32": 6.887662211849341e-41
+      }
+    },
+    {
+      "name": "interpretPair pi big",
+      "input": {
+        "first": [
+          64,
+          73
+        ],
+        "second": [
+          15,
+          219
+        ],
+        "order": "big"
+      },
+      "expected": {
+        "u32": 1078530011,
+        "s32": 1078530011,
+        "f32": 3.1415927410125732
+      }
+    },
+    {
+      "name": "interpretPair pi little",
+      "input": {
+        "first": [
+          64,
+          73
+        ],
+        "second": [
+          15,
+          219
+        ],
+        "order": "little"
+      },
+      "expected": {
+        "u32": 266027081,
+        "s32": 266027081,
+        "f32": 2.1619829021905496e-29
+      }
+    },
+    {
+      "name": "interpretPair 236.5 big",
+      "input": {
+        "first": [
+          67,
+          108
+        ],
+        "second": [
+          128,
+          0
+        ],
+        "order": "big"
+      },
+      "expected": {
+        "u32": 1131184128,
+        "s32": 1131184128,
+        "f32": 236.5
+      }
+    },
+    {
+      "name": "interpretPair 236.5 little",
+      "input": {
+        "first": [
+          67,
+          108
+        ],
+        "second": [
+          128,
+          0
+        ],
+        "order": "little"
+      },
+      "expected": {
+        "u32": 2147500908,
+        "s32": -2147466388,
+        "f32": -2.4186411494246343e-41
+      }
+    },
+    {
+      "name": "interpretPair +inf big",
+      "input": {
+        "first": [
+          127,
+          128
+        ],
+        "second": [
+          0,
+          0
+        ],
+        "order": "big"
+      },
+      "expected": {
+        "u32": 2139095040,
+        "s32": 2139095040,
+        "f32": "Infinity"
+      }
+    },
+    {
+      "name": "interpretPair +inf little",
+      "input": {
+        "first": [
+          127,
+          128
+        ],
+        "second": [
+          0,
+          0
+        ],
+        "order": "little"
+      },
+      "expected": {
+        "u32": 32640,
+        "s32": 32640,
+        "f32": 4.573838187556203e-41
+      }
+    },
+    {
+      "name": "interpretPair -inf big",
+      "input": {
+        "first": [
+          255,
+          128
+        ],
+        "second": [
+          0,
+          0
+        ],
+        "order": "big"
+      },
+      "expected": {
+        "u32": 4286578688,
+        "s32": -8388608,
+        "f32": "-Infinity"
+      }
+    },
+    {
+      "name": "interpretPair -inf little",
+      "input": {
+        "first": [
+          255,
+          128
+        ],
+        "second": [
+          0,
+          0
+        ],
+        "order": "little"
+      },
+      "expected": {
+        "u32": 65408,
+        "s32": 65408,
+        "f32": 9.165612995455763e-41
+      }
+    },
+    {
+      "name": "interpretPair quiet nan big",
+      "input": {
+        "first": [
+          127,
+          192
+        ],
+        "second": [
+          0,
+          0
+        ],
+        "order": "big"
+      },
+      "expected": {
+        "u32": 2143289344,
+        "s32": 2143289344,
+        "f32": "NaN"
+      }
+    },
+    {
+      "name": "interpretPair quiet nan little",
+      "input": {
+        "first": [
+          127,
+          192
+        ],
+        "second": [
+          0,
+          0
+        ],
+        "order": "little"
+      },
+      "expected": {
+        "u32": 32704,
+        "s32": 32704,
+        "f32": 4.582806497727882e-41
+      }
+    },
+    {
+      "name": "interpretPair signalling nan big",
+      "input": {
+        "first": [
+          127,
+          128
+        ],
+        "second": [
+          0,
+          1
+        ],
+        "order": "big"
+      },
+      "expected": {
+        "u32": 2139095041,
+        "s32": 2139095041,
+        "f32": "NaN"
+      }
+    },
+    {
+      "name": "interpretPair signalling nan little",
+      "input": {
+        "first": [
+          127,
+          128
+        ],
+        "second": [
+          0,
+          1
+        ],
+        "order": "little"
+      },
+      "expected": {
+        "u32": 98176,
+        "s32": 98176,
+        "f32": 1.3757387803355324e-40
+      }
+    },
+    {
+      "name": "interpretPair negative nan big",
+      "input": {
+        "first": [
+          255,
+          192
+        ],
+        "second": [
+          0,
+          1
+        ],
+        "order": "big"
+      },
+      "expected": {
+        "u32": 4290772993,
+        "s32": -4194303,
+        "f32": "NaN"
+      }
+    },
+    {
+      "name": "interpretPair negative nan little",
+      "input": {
+        "first": [
+          255,
+          192
+        ],
+        "second": [
+          0,
+          1
+        ],
+        "order": "little"
+      },
+      "expected": {
+        "u32": 131008,
+        "s32": 131008,
+        "f32": 1.8358130921426563e-40
+      }
+    },
+    {
+      "name": "interpretPair smallest denormal big",
+      "input": {
+        "first": [
+          0,
+          0
+        ],
+        "second": [
+          0,
+          1
+        ],
+        "order": "big"
+      },
+      "expected": {
+        "u32": 1,
+        "s32": 1,
+        "f32": 1.401298464324817e-45
+      }
+    },
+    {
+      "name": "interpretPair smallest denormal little",
+      "input": {
+        "first": [
+          0,
+          0
+        ],
+        "second": [
+          0,
+          1
+        ],
+        "order": "little"
+      },
+      "expected": {
+        "u32": 65536,
+        "s32": 65536,
+        "f32": 9.183549615799121e-41
+      }
+    },
+    {
+      "name": "interpretPair largest denormal big",
+      "input": {
+        "first": [
+          0,
+          127
+        ],
+        "second": [
+          255,
+          255
+        ],
+        "order": "big"
+      },
+      "expected": {
+        "u32": 8388607,
+        "s32": 8388607,
+        "f32": 1.1754942106924411e-38
+      }
+    },
+    {
+      "name": "interpretPair largest denormal little",
+      "input": {
+        "first": [
+          0,
+          127
+        ],
+        "second": [
+          255,
+          255
+        ],
+        "order": "little"
+      },
+      "expected": {
+        "u32": 4294901887,
+        "s32": -65409,
+        "f32": "NaN"
+      }
+    },
+    {
+      "name": "interpretPair smallest normal big",
+      "input": {
+        "first": [
+          0,
+          128
+        ],
+        "second": [
+          0,
+          0
+        ],
+        "order": "big"
+      },
+      "expected": {
+        "u32": 8388608,
+        "s32": 8388608,
+        "f32": 1.1754943508222875e-38
+      }
+    },
+    {
+      "name": "interpretPair smallest normal little",
+      "input": {
+        "first": [
+          0,
+          128
+        ],
+        "second": [
+          0,
+          0
+        ],
+        "order": "little"
+      },
+      "expected": {
+        "u32": 128,
+        "s32": 128,
+        "f32": 1.793662034335766e-43
+      }
+    },
+    {
+      "name": "interpretPair max finite big",
+      "input": {
+        "first": [
+          127,
+          127
+        ],
+        "second": [
+          255,
+          255
+        ],
+        "order": "big"
+      },
+      "expected": {
+        "u32": 2139095039,
+        "s32": 2139095039,
+        "f32": 3.4028234663852886e+38
+      }
+    },
+    {
+      "name": "interpretPair max finite little",
+      "input": {
+        "first": [
+          127,
+          127
+        ],
+        "second": [
+          255,
+          255
+        ],
+        "order": "little"
+      },
+      "expected": {
+        "u32": 4294934399,
+        "s32": -32897,
+        "f32": "NaN"
+      }
+    },
+    {
+      "name": "interpretPair u32 max big",
+      "input": {
+        "first": [
+          255,
+          255
+        ],
+        "second": [
+          255,
+          255
+        ],
+        "order": "big"
+      },
+      "expected": {
+        "u32": 4294967295,
+        "s32": -1,
+        "f32": "NaN"
+      }
+    },
+    {
+      "name": "interpretPair u32 max little",
+      "input": {
+        "first": [
+          255,
+          255
+        ],
+        "second": [
+          255,
+          255
+        ],
+        "order": "little"
+      },
+      "expected": {
+        "u32": 4294967295,
+        "s32": -1,
+        "f32": "NaN"
+      }
+    },
+    {
+      "name": "interpretPair i32 min big",
+      "input": {
+        "first": [
+          128,
+          0
+        ],
+        "second": [
+          0,
+          0
+        ],
+        "order": "big"
+      },
+      "expected": {
+        "u32": 2147483648,
+        "s32": -2147483648,
+        "f32": "-0"
+      }
+    },
+    {
+      "name": "interpretPair i32 min little",
+      "input": {
+        "first": [
+          128,
+          0
+        ],
+        "second": [
+          0,
+          0
+        ],
+        "order": "little"
+      },
+      "expected": {
+        "u32": 32768,
+        "s32": 32768,
+        "f32": 4.591774807899561e-41
+      }
+    },
+    {
+      "name": "interpretPair i32 max big",
+      "input": {
+        "first": [
+          127,
+          255
+        ],
+        "second": [
+          255,
+          255
+        ],
+        "order": "big"
+      },
+      "expected": {
+        "u32": 2147483647,
+        "s32": 2147483647,
+        "f32": "NaN"
+      }
+    },
+    {
+      "name": "interpretPair i32 max little",
+      "input": {
+        "first": [
+          127,
+          255
+        ],
+        "second": [
+          255,
+          255
+        ],
+        "order": "little"
+      },
+      "expected": {
+        "u32": 4294934527,
+        "s32": -32769,
+        "f32": "NaN"
+      }
+    },
+    {
+      "name": "interpretPair sungrow low word first big",
+      "input": {
+        "first": [
+          9,
+          56
+        ],
+        "second": [
+          0,
+          1
+        ],
+        "order": "big"
+      },
+      "expected": {
+        "u32": 154664961,
+        "s32": 154664961,
+        "f32": 2.2148196197163135e-33
+      }
+    },
+    {
+      "name": "interpretPair sungrow low word first little",
+      "input": {
+        "first": [
+          9,
+          56
+        ],
+        "second": [
+          0,
+          1
+        ],
+        "order": "little"
+      },
+      "expected": {
+        "u32": 67896,
+        "s32": 67896,
+        "f32": 9.514256053379778e-41
+      }
+    },
+    {
+      "name": "interpretPair short registers big",
+      "input": {
+        "first": [
+          1
+        ],
+        "second": [
+          255
+        ],
+        "order": "big"
+      },
+      "expected": {
+        "u32": 65791,
+        "s32": 65791,
+        "f32": 9.219282726639404e-41
+      }
+    },
+    {
+      "name": "interpretPair short registers little",
+      "input": {
+        "first": [
+          1
+        ],
+        "second": [
+          255
+        ],
+        "order": "little"
+      },
+      "expected": {
+        "u32": 16711681,
+        "s32": 16711681,
+        "f32": 2.3418052921586223e-38
+      }
+    },
+    {
+      "name": "interpretPair empty second big",
+      "input": {
+        "first": [
+          18,
+          52
+        ],
+        "second": [],
+        "order": "big"
+      },
+      "expected": {
+        "u32": 305397760,
+        "s32": 305397760,
+        "f32": 5.679798517591285e-28
+      }
+    },
+    {
+      "name": "interpretPair empty second little",
+      "input": {
+        "first": [
+          18,
+          52
+        ],
+        "second": [],
+        "order": "little"
+      },
+      "expected": {
+        "u32": 4660,
+        "s32": 4660,
+        "f32": 6.530050843753648e-42
+      }
+    },
+    {
+      "name": "interpretPair long registers big",
+      "input": {
+        "first": [
+          18,
+          52,
+          86
+        ],
+        "second": [
+          120,
+          154,
+          188
+        ],
+        "order": "big"
+      },
+      "expected": {
+        "u32": 305428634,
+        "s32": 305428634,
+        "f32": 5.694663807867038e-28
+      }
+    },
+    {
+      "name": "interpretPair long registers little",
+      "input": {
+        "first": [
+          18,
+          52,
+          86
+        ],
+        "second": [
+          120,
+          154,
+          188
+        ],
+        "order": "little"
+      },
+      "expected": {
+        "u32": 2023363124,
+        "s32": 2023363124,
+        "f32": 2.4999466232865e+34
+      }
+    },
+    {
+      "name": "interpretPair default order is big",
+      "input": {
+        "first": [
+          63,
+          128
+        ],
+        "second": [
+          0,
+          0
+        ]
+      },
+      "expected": {
+        "u32": 1065353216,
+        "s32": 1065353216,
+        "f32": 1
+      }
+    }
+  ]
+}
