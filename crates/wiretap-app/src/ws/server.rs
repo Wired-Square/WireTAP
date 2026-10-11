@@ -11,6 +11,7 @@ use tokio::sync::{mpsc, oneshot};
 use tokio::time::{interval, Duration, Instant, MissedTickBehavior};
 use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::WebSocketStream;
+use tokio_util::sync::CancellationToken;
 
 use super::protocol::{
     Header, MsgType, HEADER_SIZE, encode_message, encode_subscribe_ack, encode_subscribe_nack,
@@ -65,11 +66,34 @@ pub struct WsServer {
     tx: mpsc::UnboundedSender<ServerCommand>,
 }
 
+/// Messages a connection may have waiting before it counts as stalled and is closed. Capture
+/// replay at speed 0 sends a 1000-frame batch every 10 ms, three or four messages each, so this
+/// holds over a second of it; a window that is reading never falls that far behind.
+const QUEUE_CAPACITY: usize = 512;
+
+/// Chunks of a stream held for a connection at once, so a long one is never held whole.
+const STREAM_IN_FLIGHT: usize = 2;
+
+/// How long a stream waits for its connection to take a chunk before closing it as stalled.
+const STREAM_STALL: Duration = Duration::from_secs(10);
+
 impl WsServer {
     /// Start the server. Returns (port, token). Stores global instance in `WS_SERVER`.
     pub fn start() -> Result<(u16, String), String> {
         let listener = std::net::TcpListener::bind("127.0.0.1:0")
             .map_err(|e| format!("Failed to bind WS listener: {e}"))?;
+        let server = Self::spawn(listener, QUEUE_CAPACITY)?;
+        let (port, token) = (server.port, server.token.clone());
+        tlog!("[ws] Server started on 127.0.0.1:{port}");
+
+        WS_SERVER
+            .set(server)
+            .map_err(|_| "WS server already started".to_string())?;
+
+        Ok((port, token))
+    }
+
+    fn spawn(listener: std::net::TcpListener, queue_capacity: usize) -> Result<Self, String> {
         let port = listener
             .local_addr()
             .map_err(|e| format!("Failed to get local addr: {e}"))?
@@ -94,22 +118,10 @@ impl WsServer {
         tauri::async_runtime::spawn(async move {
             let tcp_listener = TcpListener::from_std(listener)
                 .expect("Failed to convert std TcpListener to tokio");
-            accept_loop(tcp_listener, token_for_accept, cmd_tx_for_accept).await;
+            accept_loop(tcp_listener, token_for_accept, cmd_tx_for_accept, queue_capacity).await;
         });
 
-        tlog!("[ws] Server started on 127.0.0.1:{port}");
-
-        let server = WsServer {
-            port,
-            token: token.clone(),
-            tx: cmd_tx,
-        };
-
-        WS_SERVER
-            .set(server)
-            .map_err(|_| "WS server already started".to_string())?;
-
-        Ok((port, token))
+        Ok(WsServer { port, token, tx: cmd_tx })
     }
 
     /// Send a binary message to all connections subscribed to this channel.
@@ -119,6 +131,14 @@ impl WsServer {
 
     pub fn send_to_conn(&self, conn_id: usize, data: Vec<u8>) {
         let _ = self.tx.send(ServerCommand::SendToConn { conn_id, data });
+    }
+
+    /// What is sent through the stream reaches `conn_id` after everything already sent to it
+    /// and before anything sent to it after this call.
+    pub fn stream_to_conn(&self, conn_id: usize) -> ConnStream {
+        let (chunks, rx) = mpsc::channel(STREAM_IN_FLIGHT);
+        let _ = self.tx.send(ServerCommand::StreamToConn { conn_id, chunks: rx });
+        ConnStream { conn_id, chunks, server: self.tx.clone() }
     }
 
     /// Send a binary message to all authenticated connections (channel 0 / global).
@@ -141,15 +161,37 @@ impl WsServer {
     }
 }
 
+pub struct ConnStream {
+    conn_id: usize,
+    chunks: mpsc::Sender<Vec<u8>>,
+    server: mpsc::UnboundedSender<ServerCommand>,
+}
+
+impl ConnStream {
+    /// Waits while the connection is behind; false once it is gone, or once it has taken
+    /// nothing for `STREAM_STALL`, when it is closed as stalled. Not for an async worker.
+    pub fn send(&self, data: Vec<u8>) -> bool {
+        let sent = tauri::async_runtime::block_on(async { tokio::time::timeout(STREAM_STALL, self.chunks.send(data)).await });
+        match sent {
+            Ok(sent) => sent.is_ok(),
+            Err(_) => {
+                let _ = self.server.send(ServerCommand::Close { conn_id: self.conn_id, reason: "stream stalled" });
+                false
+            }
+        }
+    }
+}
+
 // ============================================================================
 // Server commands
 // ============================================================================
 
 enum ServerCommand {
-    /// A new connection's write-half is ready.
+    /// A new connection's writer is running.
     NewConnection {
         conn_id: usize,
-        sender: SplitSink,
+        queue: mpsc::Sender<Outbound>,
+        closer: CancellationToken,
     },
     /// Send message to all connections subscribed to this channel.
     SendToChannel { channel: u8, data: Vec<u8> },
@@ -167,8 +209,10 @@ enum ServerCommand {
     Unsubscribe { conn_id: usize, channel: u8 },
     /// Send message to a specific connection.
     SendToConn { conn_id: usize, data: Vec<u8> },
+    StreamToConn { conn_id: usize, chunks: mpsc::Receiver<Vec<u8>> },
     /// Connection closed.
     ConnectionClosed { conn_id: usize },
+    Close { conn_id: usize, reason: &'static str },
     /// Record activity on a connection (for heartbeat timeout).
     Activity { conn_id: usize },
     /// Touch IO listener heartbeats for all sessions a connection is subscribed to.
@@ -244,12 +288,72 @@ impl ChannelMap {
 // Connection state
 // ============================================================================
 
+/// What a connection's writer sends: a message, or a stream whose chunks all go before the next.
+enum Outbound {
+    Message(Message),
+    Stream(mpsc::Receiver<Vec<u8>>),
+}
+
 struct Connection {
-    sender: SplitSink,
+    queue: mpsc::Sender<Outbound>,
+    closer: CancellationToken,
     authenticated: bool,
     subscribed_channels: HashSet<u8>,
     last_activity: Instant,
-    send_warned: bool,
+}
+
+impl Connection {
+    /// False when the queue is full: the connection has stalled. A gone writer is not a stall —
+    /// its read task reports the close.
+    fn enqueue(&self, item: Outbound) -> bool {
+        !matches!(self.queue.try_send(item), Err(mpsc::error::TrySendError::Full(_)))
+    }
+
+    fn queued(&self) -> usize {
+        self.queue.max_capacity() - self.queue.capacity()
+    }
+}
+
+struct Connections {
+    by_id: HashMap<usize, Connection>,
+    channel_map: ChannelMap,
+    /// How many connections subscribe to each channel.
+    channel_refcount: HashMap<u8, usize>,
+}
+
+impl Connections {
+    /// Send to every connection `to` picks, closing any that has stalled.
+    fn send(&mut self, msg: Message, to: impl Fn(usize, &Connection) -> bool) {
+        let stalled: Vec<usize> = self
+            .by_id
+            .iter()
+            .filter(|&(id, conn)| to(*id, conn) && !conn.enqueue(Outbound::Message(msg.clone())))
+            .map(|(id, _)| *id)
+            .collect();
+        for conn_id in stalled {
+            self.close(conn_id, "outbound queue full");
+        }
+    }
+
+    fn remove(&mut self, conn_id: usize) -> Option<Connection> {
+        crate::adhoc::forget_connection(conn_id);
+        let conn = self.by_id.remove(&conn_id)?;
+        if conn.authenticated {
+            AUTH_CONN_COUNT.fetch_sub(1, Ordering::Relaxed);
+        }
+        for ch in &conn.subscribed_channels {
+            decrement_refcount(&mut self.channel_refcount, &mut self.channel_map, *ch);
+        }
+        Some(conn)
+    }
+
+    /// Drop the socket; the client reconnects and subscribes again.
+    fn close(&mut self, conn_id: usize, reason: &str) {
+        if let Some(conn) = self.remove(conn_id) {
+            conn.closer.cancel();
+            tlog!("[ws] Connection {conn_id} closed: {reason} ({} queued)", conn.queued());
+        }
+    }
 }
 
 // ============================================================================
@@ -260,10 +364,11 @@ async fn connection_manager_task(
     mut cmd_rx: mpsc::UnboundedReceiver<ServerCommand>,
     cmd_tx: mpsc::UnboundedSender<ServerCommand>,
 ) {
-    let mut connections: HashMap<usize, Connection> = HashMap::new();
-    let mut channel_map = ChannelMap::new();
-    // Track how many connections subscribe to each channel
-    let mut channel_refcount: HashMap<u8, usize> = HashMap::new();
+    let mut conns = Connections {
+        by_id: HashMap::new(),
+        channel_map: ChannelMap::new(),
+        channel_refcount: HashMap::new(),
+    };
 
     let mut heartbeat_interval = interval(Duration::from_secs(30));
     heartbeat_interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
@@ -272,19 +377,19 @@ async fn connection_manager_task(
         tokio::select! {
             Some(cmd) = cmd_rx.recv() => {
                 match cmd {
-                    ServerCommand::NewConnection { conn_id, sender } => {
-                        connections.insert(conn_id, Connection {
-                            sender,
+                    ServerCommand::NewConnection { conn_id, queue, closer } => {
+                        conns.by_id.insert(conn_id, Connection {
+                            queue,
+                            closer,
                             authenticated: false,
                             subscribed_channels: HashSet::new(),
                             last_activity: Instant::now(),
-                            send_warned: false,
                         });
                         tlog!("[ws] Connection {conn_id} registered");
                     }
 
                     ServerCommand::Authenticated { conn_id } => {
-                        if let Some(conn) = connections.get_mut(&conn_id) {
+                        if let Some(conn) = conns.by_id.get_mut(&conn_id) {
                             if !conn.authenticated {
                                 AUTH_CONN_COUNT.fetch_add(1, Ordering::Relaxed);
                             }
@@ -294,44 +399,40 @@ async fn connection_manager_task(
                     }
 
                     ServerCommand::SendToConn { conn_id, data } => {
-                        if let Some(conn) = connections.get_mut(&conn_id) {
-                            send_or_warn(conn, Message::Binary(data.into())).await;
+                        conns.send(Message::Binary(data.into()), |id, _| id == conn_id);
+                    }
+
+                    ServerCommand::StreamToConn { conn_id, chunks } => {
+                        if conns.by_id.get(&conn_id).is_some_and(|conn| !conn.enqueue(Outbound::Stream(chunks))) {
+                            conns.close(conn_id, "outbound queue full");
                         }
                     }
 
                     ServerCommand::SendToChannel { channel, data } => {
-                        let msg = Message::Binary(data.into());
-                        for conn in connections.values_mut() {
-                            if conn.authenticated && conn.subscribed_channels.contains(&channel) {
-                                send_or_warn(conn, msg.clone()).await;
-                            }
-                        }
+                        conns.send(Message::Binary(data.into()), |_, conn| {
+                            conn.authenticated && conn.subscribed_channels.contains(&channel)
+                        });
                     }
 
                     ServerCommand::SendGlobal { data } => {
-                        let msg = Message::Binary(data.into());
-                        for conn in connections.values_mut() {
-                            if conn.authenticated {
-                                send_or_warn(conn, msg.clone()).await;
-                            }
-                        }
+                        conns.send(Message::Binary(data.into()), |_, conn| conn.authenticated);
                     }
 
                     ServerCommand::Subscribe { conn_id, session_id, reply } => {
-                        let result = channel_map.allocate(&session_id);
+                        let result = conns.channel_map.allocate(&session_id);
                         match &result {
                             Ok(ch) => {
-                                if let Some(conn) = connections.get_mut(&conn_id) {
+                                if let Some(conn) = conns.by_id.get_mut(&conn_id) {
                                     conn.subscribed_channels.insert(*ch);
                                     conn.last_activity = Instant::now();
-                                    *channel_refcount.entry(*ch).or_insert(0) += 1;
+                                    *conns.channel_refcount.entry(*ch).or_insert(0) += 1;
 
                                     let ack = encode_message(
                                         MsgType::SubscribeAck,
                                         0,
                                         &encode_subscribe_ack(*ch, &session_id),
                                     );
-                                    send_or_warn(conn, Message::Binary(ack.into())).await;
+                                    conns.send(Message::Binary(ack.into()), |id, _| id == conn_id);
                                 }
                                 // Update shared channel map for non-blocking lookups
                                 if let Ok(mut map) = CHANNEL_MAP.write() {
@@ -347,14 +448,12 @@ async fn connection_manager_task(
                                 tlog!("[ws] Connection {conn_id} subscribed to session '{session_id}' on channel {ch}");
                             }
                             Err(e) => {
-                                if let Some(conn) = connections.get_mut(&conn_id) {
-                                    let nack = encode_message(
-                                        MsgType::SubscribeNack,
-                                        0,
-                                        &encode_subscribe_nack(&session_id, e),
-                                    );
-                                    send_or_warn(conn, Message::Binary(nack.into())).await;
-                                }
+                                let nack = encode_message(
+                                    MsgType::SubscribeNack,
+                                    0,
+                                    &encode_subscribe_nack(&session_id, e),
+                                );
+                                conns.send(Message::Binary(nack.into()), |id, _| id == conn_id);
                                 tlog!("[ws] Connection {conn_id} subscribe failed for '{session_id}': {e}");
                             }
                         }
@@ -362,37 +461,32 @@ async fn connection_manager_task(
                     }
 
                     ServerCommand::Unsubscribe { conn_id, channel } => {
-                        if let Some(conn) = connections.get_mut(&conn_id) {
+                        if let Some(conn) = conns.by_id.get_mut(&conn_id) {
                             conn.subscribed_channels.remove(&channel);
                             conn.last_activity = Instant::now();
-                            decrement_refcount(&mut channel_refcount, &mut channel_map, channel);
+                            decrement_refcount(&mut conns.channel_refcount, &mut conns.channel_map, channel);
                             tlog!("[ws] Connection {conn_id} unsubscribed from channel {channel}");
                         }
                     }
 
                     ServerCommand::ConnectionClosed { conn_id } => {
-                        crate::adhoc::forget_connection(conn_id);
-                        if let Some(conn) = connections.remove(&conn_id) {
-                            if conn.authenticated {
-                                AUTH_CONN_COUNT.fetch_sub(1, Ordering::Relaxed);
-                            }
-                            for ch in &conn.subscribed_channels {
-                                decrement_refcount(&mut channel_refcount, &mut channel_map, *ch);
-                            }
+                        if conns.remove(conn_id).is_some() {
                             tlog!("[ws] Connection {conn_id} closed");
                         }
                     }
 
+                    ServerCommand::Close { conn_id, reason } => conns.close(conn_id, reason),
+
                     ServerCommand::Activity { conn_id } => {
-                        if let Some(conn) = connections.get_mut(&conn_id) {
+                        if let Some(conn) = conns.by_id.get_mut(&conn_id) {
                             conn.last_activity = Instant::now();
                         }
                     }
 
                     ServerCommand::HeartbeatListeners { conn_id } => {
-                        if let Some(conn) = connections.get(&conn_id) {
+                        if let Some(conn) = conns.by_id.get(&conn_id) {
                             let session_ids: Vec<String> = conn.subscribed_channels.iter()
-                                .filter_map(|ch| channel_map.channel_to_session.get(ch).cloned())
+                                .filter_map(|ch| conns.channel_map.channel_to_session.get(ch).cloned())
                                 .collect();
                             if !session_ids.is_empty() {
                                 tauri::async_runtime::spawn(touch_subscriber_heartbeats(session_ids));
@@ -429,39 +523,23 @@ async fn connection_manager_task(
 
             _ = heartbeat_interval.tick() => {
                 let now = Instant::now();
-                let heartbeat = encode_message(MsgType::Heartbeat, 0, &[]);
-                let msg = Message::Binary(heartbeat.into());
 
                 // Collect IDs of timed-out connections
                 // 2x the IO subscriber timeout: the socket must outlive IO
                 // suspension so a display-sleep wake resumes on the same
                 // connection without a reconnect/resubscribe round trip.
                 let conn_timeout = Duration::from_secs(2 * crate::io::HEARTBEAT_TIMEOUT_SECS);
-                let timed_out: Vec<usize> = connections.iter()
+                let timed_out: Vec<usize> = conns.by_id.iter()
                     .filter(|(_, conn)| conn.authenticated && now.duration_since(conn.last_activity) > conn_timeout)
                     .map(|(id, _)| *id)
                     .collect();
 
                 for conn_id in timed_out {
-                    crate::adhoc::forget_connection(conn_id);
-                    if let Some(mut conn) = connections.remove(&conn_id) {
-                        if conn.authenticated {
-                            AUTH_CONN_COUNT.fetch_sub(1, Ordering::Relaxed);
-                        }
-                        for ch in &conn.subscribed_channels {
-                            decrement_refcount(&mut channel_refcount, &mut channel_map, *ch);
-                        }
-                        let _ = conn.sender.close().await;
-                        tlog!("[ws] Connection {conn_id} timed out (no activity for {}s)", conn_timeout.as_secs());
-                    }
+                    conns.close(conn_id, &format!("timed out (no activity for {}s)", conn_timeout.as_secs()));
                 }
 
-                // Send heartbeat to remaining authenticated connections
-                for conn in connections.values_mut() {
-                    if conn.authenticated {
-                        send_or_warn(conn, msg.clone()).await;
-                    }
-                }
+                let heartbeat = encode_message(MsgType::Heartbeat, 0, &[]);
+                conns.send(Message::Binary(heartbeat.into()), |_, conn| conn.authenticated);
             }
 
             else => break,
@@ -495,13 +573,33 @@ fn decrement_refcount(
     }
 }
 
-async fn send_or_warn(conn: &mut Connection, msg: Message) {
-    if let Err(e) = conn.sender.send(msg).await {
-        if !conn.send_warned {
-            tlog!("[ws] Send failed (will suppress further warnings): {e}");
-            conn.send_warned = true;
-        }
+/// Writes a connection's queue to its socket, so a slow one holds up no other. Ends when the
+/// manager drops the queue, the socket fails or `closer` fires, and then fires `closer` itself.
+async fn connection_write_task(
+    conn_id: usize,
+    mut sink: SplitSink,
+    mut outbound: mpsc::Receiver<Outbound>,
+    closer: CancellationToken,
+) {
+    let written = closer
+        .run_until_cancelled(async {
+            while let Some(item) = outbound.recv().await {
+                match item {
+                    Outbound::Message(msg) => sink.send(msg).await?,
+                    Outbound::Stream(mut chunks) => {
+                        while let Some(chunk) = chunks.recv().await {
+                            sink.send(Message::Binary(chunk.into())).await?;
+                        }
+                    }
+                }
+            }
+            Ok::<_, tokio_tungstenite::tungstenite::Error>(())
+        })
+        .await;
+    if let Some(Err(e)) = written {
+        tlog!("[ws] Connection {conn_id}: send failed: {e}");
     }
+    closer.cancel();
 }
 
 // ============================================================================
@@ -512,6 +610,7 @@ async fn accept_loop(
     listener: TcpListener,
     token: String,
     cmd_tx: mpsc::UnboundedSender<ServerCommand>,
+    queue_capacity: usize,
 ) {
     loop {
         match listener.accept().await {
@@ -526,15 +625,13 @@ async fn accept_loop(
                     match tokio_tungstenite::accept_async(stream).await {
                         Ok(ws_stream) => {
                             let (write, read) = ws_stream.split();
+                            let (queue, outbound) = mpsc::channel(queue_capacity);
+                            let closer = CancellationToken::new();
+                            tauri::async_runtime::spawn(connection_write_task(conn_id, write, outbound, closer.clone()));
+                            let _ = cmd_tx.send(ServerCommand::NewConnection { conn_id, queue, closer: closer.clone() });
 
-                            // Register the write-half with the connection manager
-                            let _ = cmd_tx.send(ServerCommand::NewConnection {
-                                conn_id,
-                                sender: write,
-                            });
-
-                            // Run the per-connection read loop
-                            connection_read_task(conn_id, read, token, cmd_tx).await;
+                            closer.run_until_cancelled(connection_read_task(conn_id, read, token, cmd_tx.clone())).await;
+                            let _ = cmd_tx.send(ServerCommand::ConnectionClosed { conn_id });
                         }
                         Err(e) => {
                             tlog!("[ws] WebSocket handshake failed for connection {conn_id}: {e}");
@@ -694,8 +791,6 @@ async fn connection_read_task(
             }
         }
     }
-
-    let _ = cmd_tx.send(ServerCommand::ConnectionClosed { conn_id });
 }
 
 // ============================================================================
@@ -748,18 +843,25 @@ pub(crate) mod outbox {
 
     type Sent = (Recipient, Vec<u8>);
 
+    struct Outbox {
+        commands: mpsc::UnboundedReceiver<ServerCommand>,
+        /// Streams still open: another test may be mid-way through one.
+        streams: Vec<(usize, mpsc::Receiver<Vec<u8>>)>,
+        unread: Vec<Sent>,
+    }
+
     /// The queue and what was read off it for another test: tests run in parallel, so one
     /// test's read must not drop the messages another is about to ask for.
-    static SENT: OnceLock<Mutex<(mpsc::UnboundedReceiver<ServerCommand>, Vec<Sent>)>> = OnceLock::new();
+    static SENT: OnceLock<Mutex<Outbox>> = OnceLock::new();
 
     pub(crate) fn subscribe(session_id: &str, channel: u8) {
         SENT.get_or_init(|| {
-            let (tx, rx) = mpsc::unbounded_channel();
+            let (tx, commands) = mpsc::unbounded_channel();
             assert!(
                 WS_SERVER.set(WsServer { port: 0, token: String::new(), tx }).is_ok(),
                 "no real server runs under test"
             );
-            Mutex::new((rx, Vec::new()))
+            Mutex::new(Outbox { commands, streams: Vec::new(), unread: Vec::new() })
         });
         CHANNEL_MAP.write().unwrap().insert(session_id.to_string(), channel);
     }
@@ -767,14 +869,22 @@ pub(crate) mod outbox {
     /// Every message sent so far on `channel` of type `kind`: its recipient and payload.
     pub(crate) fn sent(channel: u8, kind: MsgType) -> Vec<Sent> {
         let mut guard = SENT.get().expect("subscribe first").lock().unwrap();
-        let (rx, unread) = &mut *guard;
-        while let Ok(cmd) = rx.try_recv() {
+        let Outbox { commands, streams, unread } = &mut *guard;
+        while let Ok(cmd) = commands.try_recv() {
             match cmd {
                 ServerCommand::SendToConn { conn_id, data } => unread.push((Recipient::Conn(conn_id), data)),
                 ServerCommand::SendToChannel { channel, data } => unread.push((Recipient::Channel(channel), data)),
+                ServerCommand::StreamToConn { conn_id, chunks } => streams.push((conn_id, chunks)),
                 _ => {}
             }
         }
+        streams.retain_mut(|(conn_id, chunks)| loop {
+            match chunks.try_recv() {
+                Ok(data) => unread.push((Recipient::Conn(*conn_id), data)),
+                Err(mpsc::error::TryRecvError::Empty) => break true,
+                Err(mpsc::error::TryRecvError::Disconnected) => break false,
+            }
+        });
         let (wanted, rest): (Vec<Sent>, Vec<Sent>) = std::mem::take(unread)
             .into_iter()
             .partition(|(_, data)| Header::decode(data).is_ok_and(|h| h.channel == channel && h.msg_type == kind));
@@ -817,6 +927,118 @@ mod tests {
         assert_eq!(map.allocate("one-too-many"), Err("No channels available (254 sessions active)".to_string()));
         map.release(100);
         assert_eq!(map.allocate("one-too-many"), Ok(100));
+    }
+
+    #[test]
+    fn a_connection_holds_its_capacity_then_counts_as_stalled() {
+        let (queue, _outbound) = mpsc::channel(3);
+        let conn = Connection {
+            queue,
+            closer: CancellationToken::new(),
+            authenticated: true,
+            subscribed_channels: HashSet::new(),
+            last_activity: Instant::now(),
+        };
+        let msg = || Outbound::Message(Message::Binary(vec![0].into()));
+        assert!((0..3).all(|_| conn.enqueue(msg())));
+        assert!(!conn.enqueue(msg()));
+        assert_eq!(conn.queued(), 3);
+    }
+
+    fn within<T>(limit: Duration, work: impl std::future::Future<Output = T>) -> T {
+        tauri::async_runtime::block_on(async { tokio::time::timeout(limit, work).await.expect("finished in time") })
+    }
+
+    type Client = WebSocketStream<tokio_tungstenite::MaybeTlsStream<TcpStream>>;
+
+    /// The next message of `kind`, skipping heartbeats and the like; `None` once the server has closed.
+    async fn next_of(client: &mut Client, kind: MsgType) -> Option<Vec<u8>> {
+        loop {
+            match client.next().await? {
+                Ok(Message::Binary(data)) if Header::decode(&data).is_ok_and(|h| h.msg_type == kind) => {
+                    return Some(data[HEADER_SIZE..].to_vec());
+                }
+                Ok(Message::Close(_)) | Err(_) => return None,
+                Ok(_) => {}
+            }
+        }
+    }
+
+    /// An authenticated window subscribed to `session`, and the session's channel.
+    async fn join(server: &WsServer, session: &str) -> (Client, u8) {
+        let (mut client, _) = tokio_tungstenite::connect_async(format!("ws://127.0.0.1:{}", server.port))
+            .await
+            .expect("connects");
+        client.send(Message::Binary(encode_message(MsgType::Auth, 0, server.token.as_bytes()).into())).await.unwrap();
+        next_of(&mut client, MsgType::Auth).await.expect("authenticated");
+        client.send(Message::Binary(encode_message(MsgType::Subscribe, 0, session.as_bytes()).into())).await.unwrap();
+        let ack = next_of(&mut client, MsgType::SubscribeAck).await.expect("subscribed");
+        (client, ack[0])
+    }
+
+    #[test]
+    fn a_window_that_stops_reading_is_closed_and_the_others_keep_receiving() {
+        const SENT: u32 = 400;
+        let server = WsServer::spawn(std::net::TcpListener::bind("127.0.0.1:0").unwrap(), 8).unwrap();
+        within(Duration::from_secs(20), async {
+            let session = "ws-one-window-stops-reading";
+            let (mut reading, channel) = join(&server, session).await;
+            let (mut stalled, _) = join(&server, session).await;
+
+            for n in 0..SENT {
+                let mut batch = n.to_be_bytes().to_vec();
+                batch.resize(128 * 1024, 0);
+                server.send_to_channel(channel, encode_message(MsgType::FrameData, channel, &batch));
+                let got = next_of(&mut reading, MsgType::FrameData).await.expect("the reading window stays open");
+                assert_eq!(got[..4], n.to_be_bytes());
+            }
+
+            let mut seen = 0;
+            while next_of(&mut stalled, MsgType::FrameData).await.is_some() {
+                seen += 1;
+            }
+            assert!(seen < SENT, "closed after {seen} of {SENT}");
+        });
+    }
+
+    #[test]
+    fn a_stream_goes_out_whole_before_what_was_queued_after_it() {
+        within(Duration::from_secs(10), async {
+            let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let url = format!("ws://{}", listener.local_addr().unwrap());
+            let accepted = async { tokio_tungstenite::accept_async(listener.accept().await.unwrap().0).await.unwrap() };
+            let (connected, accepted) = tokio::join!(tokio_tungstenite::connect_async(url), accepted);
+            let (mut client, _) = connected.unwrap();
+            let (sink, _read) = accepted.split();
+            let (queue, outbound) = mpsc::channel(4);
+            let closer = CancellationToken::new();
+            let writer = tokio::spawn(connection_write_task(1, sink, outbound, closer.clone()));
+
+            let byte = |b: u8| Outbound::Message(Message::Binary(vec![b].into()));
+            let (chunks, stream) = mpsc::channel(STREAM_IN_FLIGHT);
+            for item in [byte(0), Outbound::Stream(stream), byte(9)] {
+                assert!(queue.try_send(item).is_ok());
+            }
+            tokio::spawn(async move {
+                for n in 1..=5u8 {
+                    tokio::time::sleep(Duration::from_millis(5)).await;
+                    chunks.send(vec![n]).await.unwrap();
+                }
+            });
+
+            let mut got = Vec::new();
+            while got.len() < 7 {
+                match client.next().await {
+                    Some(Ok(Message::Binary(data))) => got.push(data[0]),
+                    other => panic!("{other:?}"),
+                }
+            }
+            assert_eq!(got, [0, 1, 2, 3, 4, 5, 9]);
+
+            drop(queue);
+            writer.await.unwrap();
+            assert!(closer.is_cancelled(), "a finished writer ends the read side too");
+        });
     }
 
     #[test]
