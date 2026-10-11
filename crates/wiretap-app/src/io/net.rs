@@ -27,7 +27,7 @@ pub const DNS_TIMEOUT: Duration = Duration::from_secs(5);
 /// is a couple of minutes of a session that looks like it is still connecting.
 ///
 /// A fixed value rather than a profile field: neither `mqtt` nor `wiretap`
-/// declares a `timeout` in `device_kinds`, and inventing one for two kinds when
+/// declares a `timeout` in the kind table, and inventing one for two kinds when
 /// the setting would be identical everywhere is not worth the settings surface.
 /// It bounds the connect only; a slow *response* from a broker or backend that
 /// answered is a different problem with a different fix.

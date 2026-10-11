@@ -12,6 +12,3 @@ pub mod reader; // pub for Tauri command access (list_serial_ports)
 pub(crate) mod utils;
 
 pub use reader::run_source;
-
-// Re-export profile parsing for multi-source
-pub use utils::parse_profile_for_source;

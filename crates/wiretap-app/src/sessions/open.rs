@@ -6,7 +6,7 @@ use once_cell::sync::Lazy;
 
 use serde::{Deserialize, Serialize};
 
-use crate::io::device_kinds::{self, conn_f64, conn_i64, conn_str, req_str};
+use crate::io::device_kinds;
 use crate::io::{
     create_session, current_session_of_app, destroy_session_by, get_session_state, register_subscriber_from,
     session_exists, settle_session, start_session, BackendApiConfig, BackendApiSource, BackendApiSourceOptions, BusMapping,
@@ -260,17 +260,17 @@ fn profile_reader(
     match profile.kind.as_str() {
         "wiretap" => {
             let config = BackendApiConfig {
-                base_url: req_str(profile, "url")?.trim_end_matches('/').to_string(),
+                base_url: profile.req_str("url")?.trim_end_matches('/').to_string(),
                 api_key: credentials::resolve_secret(profile, "api_key").unwrap_or_default(),
-                database: req_str(profile, "database")?,
+                database: profile.req_str("database")?,
                 protocol: crate::apiclient::archive_protocol(&profile.connection)?,
             };
             let options = BackendApiSourceOptions {
-                start: opts.start_time.or_else(|| conn_str(profile, "start")),
-                end: opts.end_time.or_else(|| conn_str(profile, "end")),
-                limit: opts.limit.or_else(|| conn_i64(profile, "limit")),
-                speed: opts.speed.or_else(|| conn_f64(profile, "speed")).unwrap_or(0.0),
-                batch_size: conn_i64(profile, "batch_size").unwrap_or(1000) as i32,
+                start: opts.start_time.or_else(|| profile.conn_str("start")),
+                end: opts.end_time.or_else(|| profile.conn_str("end")),
+                limit: opts.limit.or_else(|| profile.conn_i64("limit")),
+                speed: opts.speed.or_else(|| profile.conn_f64("speed")).unwrap_or(0.0),
+                batch_size: profile.conn_i64("batch_size").unwrap_or(1000) as i32,
             };
             Ok(Box::new(BackendApiSource::new(session_id.to_string(), config, options)))
         }
@@ -284,9 +284,9 @@ fn profile_reader(
                 .unwrap_or("wiretap/#")
                 .to_string();
             let config = MqttConfig {
-                host: req_str(profile, "host")?,
-                port: device_kinds::req_i64(profile, "port")? as u16,
-                username: conn_str(profile, "username"),
+                host: profile.req_str("host")?,
+                port: profile.req_i64("port")? as u16,
+                username: profile.conn_str("username"),
                 password: credentials::resolve_secret(profile, "password"),
                 topic,
                 client_id: None,
@@ -324,7 +324,7 @@ async fn create_from_sources(
             )
             .into());
         }
-        if !device_kinds::spec(&config.profile_kind).is_some_and(|s| s.available) {
+        if !device_kinds::traits(&config.profile_kind).is_some_and(|s| s.available) {
             return Err(format!(
                 "Profile '{}' uses {}, which this platform cannot open.",
                 config.profile_id, config.profile_kind

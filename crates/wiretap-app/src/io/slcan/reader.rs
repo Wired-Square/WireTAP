@@ -20,7 +20,6 @@ use wiretap_io::serial::LineSettings;
 use wiretap_protocol::slcan::{bitrate_command, data_bitrate_command, DATA_BITRATES, NOMINAL_BITRATES};
 
 use crate::io::bus_mapping::BusMapping;
-use crate::io::device_kinds::{req_bool, req_i64};
 use crate::io::can_task::{
     announce_on_event, can_options, link_lost, open_or_report, serve, PortOutage,
     PORT_REOPEN, PROBE_TIMEOUT,
@@ -175,9 +174,9 @@ fn on_event(
 /// no command for one. The library refuses the same at open, but only once the
 /// session has already reported Running.
 pub fn slcan_rates(profile: &IOProfile) -> Result<(u32, Option<u32>), String> {
-    let bitrate = req_i64(profile, "bitrate")? as u32;
-    let data_bitrate = req_bool(profile, "enable_fd")?
-        .then(|| req_i64(profile, "data_bitrate").map(|bps| bps as u32))
+    let bitrate = profile.req_i64("bitrate")? as u32;
+    let data_bitrate = profile.req_bool("enable_fd")?
+        .then(|| profile.req_i64("data_bitrate").map(|bps| bps as u32))
         .transpose()?;
     nameable(bitrate, bitrate_command, &NOMINAL_BITRATES)?;
     if let Some(bps) = data_bitrate {

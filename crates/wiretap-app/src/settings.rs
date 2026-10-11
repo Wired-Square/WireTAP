@@ -6,22 +6,7 @@ use tauri::{AppHandle, Emitter, Manager};
 /// `WINDOW_EVENTS.SETTINGS_CHANGED` in `src/events/registry.ts`.
 const SETTINGS_CHANGED_EVENT: &str = "settings:changed";
 
-#[derive(Debug, Default, Serialize, Deserialize, Clone)]
-pub struct IOProfile {
-    pub id: String,
-    pub name: String,
-    pub kind: String, // "mqtt", "wiretap", "gvret_tcp"
-    pub connection: HashMap<String, serde_json::Value>,
-    #[serde(default)]
-    pub preferred_catalog: Option<String>,
-    /// A device created ad-hoc in the source picker. It lives in the in-memory
-    /// registry (`io::ephemeral`) for this run only: `load_settings` overlays it
-    /// onto `io_profiles` so every profile consumer sees it, and `save_settings`
-    /// drops it again so it never reaches settings.json. Skipped on serialise
-    /// when false, so saved profiles round-trip byte-identically.
-    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
-    pub ephemeral: bool,
-}
+pub use wiretap_io::profile::IOProfile;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AppSettings {
@@ -653,22 +638,23 @@ fn fill_empty_strings(settings: &mut AppSettings) {
 /// write profile naming a merged-away interface follows it to the device.
 fn merge_framelink_interfaces(settings: &mut AppSettings) {
     use serde_json::Value;
-    type Connection = HashMap<String, Value>;
+    use wiretap_io::profile::ConnValue;
+    type Connection = HashMap<String, ConnValue>;
 
-    fn present<'a>(c: &'a Connection, key: &str) -> Option<&'a Value> {
+    fn present<'a>(c: &'a Connection, key: &str) -> Option<&'a ConnValue> {
         c.get(key).filter(|v| !v.is_null())
     }
-    fn spelt(v: Option<&Value>) -> String {
+    fn spelt(v: Option<&ConnValue>) -> String {
         match v {
             None => "undefined".to_string(),
-            Some(Value::String(s)) => s.clone(),
-            Some(v) => v.to_string(),
+            Some(ConnValue::Str(s)) => s.clone(),
+            Some(v) => serde_json::to_string(v).expect("a connection value serialises"),
         }
     }
     let legacy = |p: &IOProfile| {
         p.kind == "framelink"
             && present(&p.connection, "interface_index").is_some()
-            && !p.connection.get("interfaces").is_some_and(Value::is_array)
+            && p.connection.get("interfaces").and_then(ConnValue::as_list).is_none()
     };
 
     let profiles = &settings.io_profiles;
@@ -691,8 +677,8 @@ fn merge_framelink_interfaces(settings: &mut AppSettings) {
     for (_, members) in &groups {
         let first = &profiles[members[0]];
         let fc = &first.connection;
-        let interface_name = present(fc, "interface_name").and_then(Value::as_str).unwrap_or("");
-        let device_id = present(fc, "device_id").and_then(Value::as_str);
+        let interface_name = present(fc, "interface_name").and_then(ConnValue::as_str).unwrap_or("");
+        let device_id = present(fc, "device_id").and_then(ConnValue::as_str);
         let name = match first.name.strip_suffix(interface_name).filter(|_| !interface_name.is_empty()) {
             Some(stem) => [stem.trim(), device_id.unwrap_or("")]
                 .into_iter()
@@ -717,13 +703,14 @@ fn merge_framelink_interfaces(settings: &mut AppSettings) {
                 let index = &c["interface_index"];
                 serde_json::json!({
                     "index": index,
-                    "iface_type": present(c, "interface_type").cloned().unwrap_or_else(|| 1.into()),
+                    "iface_type": present(c, "interface_type").cloned().unwrap_or(ConnValue::Int(1)),
                     "name": present(c, "interface_name").cloned().unwrap_or_else(|| format!("IF{}", spelt(Some(index))).into()),
                 })
             })
             .collect();
         interfaces.sort_by(|a, b| a["index"].as_f64().partial_cmp(&b["index"].as_f64()).unwrap_or(std::cmp::Ordering::Equal));
-        connection.insert("interfaces".into(), interfaces.into());
+        let interfaces = serde_json::from_value(Value::Array(interfaces)).expect("JSON is a connection value");
+        connection.insert("interfaces".into(), interfaces);
 
         for &i in &members[1..] {
             survivor.insert(profiles[i].id.clone(), first.id.clone());
@@ -867,7 +854,7 @@ pub(crate) fn load_settings_at(config_dir: &Path, documents: Option<&Path>) -> R
 /// refused to transmit on it.
 fn canonicalise_kinds(profiles: &mut [IOProfile]) {
     for p in profiles.iter_mut() {
-        let canonical = crate::io::device_kinds::canonical_kind(&p.kind);
+        let canonical = wiretap_io::profile::canonical_kind(&p.kind);
         if canonical != p.kind {
             p.kind = canonical.to_string();
         }
@@ -1641,5 +1628,101 @@ mod tests {
                 assert_eq!((clamped(field, 0), clamped(field, top)), (Some(0), Some(top)), "{field} is clamped but not in the table");
             }
         }
+    }
+}
+
+/// Reads a real settings file, so it prints key paths and type names only: the
+/// file holds credentials.
+#[cfg(test)]
+mod round_trip {
+    use serde_json::Value;
+
+    use super::{AppSettings, IOProfile};
+
+    fn shape(v: Option<&Value>) -> String {
+        match v {
+            None => "absent".into(),
+            Some(Value::Null) => "null".into(),
+            Some(Value::Bool(_)) => "bool".into(),
+            Some(Value::Number(n)) if n.is_i64() => "number(int)".into(),
+            Some(Value::Number(n)) if n.is_u64() => "number(uint)".into(),
+            Some(Value::Number(_)) => "number(float)".into(),
+            Some(Value::String(_)) => "string".into(),
+            Some(Value::Array(items)) => format!("array[{}]", items.len()),
+            Some(Value::Object(_)) => "object".into(),
+        }
+    }
+
+    fn differences(path: &str, a: Option<&Value>, b: Option<&Value>, out: &mut Vec<String>) {
+        match (a, b) {
+            (Some(Value::Object(x)), Some(Value::Object(y))) => {
+                let keys: std::collections::BTreeSet<&String> = x.keys().chain(y.keys()).collect();
+                for key in keys {
+                    differences(&format!("{path}.{key}"), x.get(key), y.get(key), out);
+                }
+            }
+            (Some(Value::Array(x)), Some(Value::Array(y))) if x.len() == y.len() => {
+                for (i, (x, y)) in x.iter().zip(y).enumerate() {
+                    differences(&format!("{path}[{i}]"), Some(x), Some(y), out);
+                }
+            }
+            (a, b) if a != b => {
+                let (sa, sb) = (shape(a), shape(b));
+                out.push(if sa == sb {
+                    format!("{path}: {sa}, value differs")
+                } else {
+                    format!("{path}: {sa} vs {sb}")
+                });
+            }
+            _ => {}
+        }
+    }
+
+    /// The settings file at `$WIRETAP_SETTINGS_ROUNDTRIP`, read without `migrate`,
+    /// writes every profile's connection map back as it was.
+    #[test]
+    #[ignore = "reads the file named by WIRETAP_SETTINGS_ROUNDTRIP"]
+    fn a_real_settings_file_round_trips_unchanged() {
+        let path = std::env::var_os("WIRETAP_SETTINGS_ROUNDTRIP")
+            .expect("WIRETAP_SETTINGS_ROUNDTRIP names a settings file");
+        let text = std::fs::read_to_string(path).expect("the settings file reads");
+        let a: Value = serde_json::from_str(&text)
+            .unwrap_or_else(|e| panic!("not JSON at {}:{}", e.line(), e.column()));
+        let b = match serde_json::from_value::<AppSettings>(a.clone()) {
+            Ok(settings) => serde_json::to_value(&settings.io_profiles).unwrap(),
+            Err(_) => {
+                eprintln!("AppSettings did not parse; comparing io_profiles alone");
+                let profiles: Vec<IOProfile> = serde_json::from_value(a["io_profiles"].clone())
+                    .unwrap_or_else(|_| panic!("io_profiles did not parse as IOProfile"));
+                serde_json::to_value(&profiles).unwrap()
+            }
+        };
+        let a = a["io_profiles"].as_array().expect("io_profiles is an array");
+        let b = b.as_array().unwrap();
+        assert_eq!(a.len(), b.len(), "profile count");
+
+        let mut out = Vec::new();
+        for (i, (a, b)) in a.iter().zip(b).enumerate() {
+            let path = format!("io_profiles[{i}].connection");
+            differences(&path, a.get("connection"), b.get("connection"), &mut out);
+        }
+        assert!(out.is_empty(), "{} connection paths differ:\n{}", out.len(), out.join("\n"));
+        eprintln!("{} profiles' connection maps round-trip unchanged", a.len());
+    }
+
+    #[test]
+    fn a_difference_names_its_path_and_types_but_never_its_value() {
+        let a = serde_json::json!({ "port": 23, "secret": "hunter2", "list": [1, 2] });
+        let b = serde_json::json!({ "port": 23.0, "secret": "hunter3", "list": [1] });
+        let mut out = Vec::new();
+        differences("c", Some(&a), Some(&b), &mut out);
+        assert_eq!(
+            out,
+            [
+                "c.list: array[2] vs array[1]",
+                "c.port: number(int) vs number(float)",
+                "c.secret: string, value differs",
+            ]
+        );
     }
 }

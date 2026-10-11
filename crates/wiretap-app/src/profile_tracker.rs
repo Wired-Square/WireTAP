@@ -7,7 +7,6 @@
 // Multi-handle devices (GVRET, the WireTAP backend, etc.) can be used by multiple
 // sessions simultaneously - each session opens its own connection.
 
-use crate::io::device_kinds::conn_str;
 use crate::sessions::get_sessions_for_profile;
 use crate::settings::IOProfile;
 
@@ -20,7 +19,7 @@ use crate::settings::IOProfile;
 /// The session being `replacing`, about to be torn down for the same id, does not count.
 pub fn can_use_profile(profile_id: &str, profile_kind: &str, replacing: Option<&str>) -> Result<(), String> {
     // Multi-handle profiles can always be used by multiple sessions
-    if !crate::io::device_kinds::spec(profile_kind).is_some_and(|s| s.single_handle) {
+    if !crate::io::device_kinds::traits(profile_kind).is_some_and(|s| s.single_handle) {
         return Ok(());
     }
 
@@ -49,7 +48,7 @@ fn gs_usb_adapter(profile: &IOProfile) -> Option<String> {
         let field = |key| profile.connection.get(key).and_then(|v| v.as_i64().or_else(|| v.as_str()?.trim().parse().ok()));
         Some(format!("{}:{}", field("bus")?, field("address")?))
     };
-    conn_str(profile, "serial").or_else(at)
+    profile.conn_str("serial").or_else(at)
 }
 
 /// Refuse a gs_usb profile whose adapter another live session holds, or another

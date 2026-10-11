@@ -25,7 +25,8 @@ use crate::io::types::{
 };
 use crate::io::FrameMessage;
 
-use super::utils::{probe_serial_presence, SerialSourceConfig};
+use super::utils::probe_serial_presence;
+use wiretap_io::profile::SerialSourceConfig;
 
 /// How often the read loop looks for a framing or catalogue change.
 const POLL: Duration = Duration::from_millis(50);

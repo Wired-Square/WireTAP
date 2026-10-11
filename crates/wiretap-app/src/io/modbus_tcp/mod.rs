@@ -19,16 +19,15 @@ pub use scanner::{
 
 /// Read `host`/`port`/`unit_id` off a Modbus profile's connection map.
 ///
-/// The values come from `io::device_kinds`, which is also what the form seeds
+/// The values come from the kind table in `wiretap_io::profile`, which is also what the form seeds
 /// from — this function used to carry its own `127.0.0.1`/502/1 while the form
 /// pre-filled `192.168.1.100`, so a profile with a blank host was dialled
 /// somewhere the user had never been shown.
 pub fn modbus_endpoint(profile: &crate::settings::IOProfile) -> (String, u16, u8) {
-    use crate::io::device_kinds::{conn_i64, conn_str};
     (
-        conn_str(profile, "host").unwrap_or_default(),
-        conn_i64(profile, "port").unwrap_or_default() as u16,
-        conn_i64(profile, "unit_id").unwrap_or_default() as u8,
+        profile.conn_str("host").unwrap_or_default(),
+        profile.conn_i64("port").unwrap_or_default() as u16,
+        profile.conn_i64("unit_id").unwrap_or_default() as u8,
     )
 }
 

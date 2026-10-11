@@ -18,6 +18,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tokio::sync::Mutex;
 use wiretap_analysis::source::InventoryRow;
+use wiretap_io::profile::ConnValue;
 use wiretap_gateway::{
     DatabaseActivityResult, Event, EventPatch, EventsResponse, FrameFilter, ImportResult,
     InventoryEntry, InventoryResponse, NewEvent, PayloadsParams, PayloadsResponse, Protocol,
@@ -87,7 +88,7 @@ pub struct RunningQueryInfo {
 
 /// The profile's archive protocol, absent meaning CAN. There is no serial
 /// archive reader yet, so a profile naming one is refused here.
-pub fn archive_protocol(conn: &HashMap<String, Value>) -> Result<Protocol, String> {
+pub fn archive_protocol(conn: &HashMap<String, ConnValue>) -> Result<Protocol, String> {
     match conn.get("protocol").and_then(|v| v.as_str()) {
         None | Some("") | Some("can") => Ok(Protocol::Can),
         Some("modbus") => Ok(Protocol::Modbus),
@@ -805,8 +806,8 @@ mod tests {
     use super::*;
     use wiretap_gateway::{ByteChangesParams, PatternSearchParams};
 
-    fn conn(pairs: &[(&str, Value)]) -> HashMap<String, Value> {
-        pairs.iter().map(|(k, v)| (k.to_string(), v.clone())).collect()
+    fn conn(pairs: &[(&str, Value)]) -> HashMap<String, ConnValue> {
+        pairs.iter().map(|(k, v)| (k.to_string(), serde_json::from_value(v.clone()).unwrap())).collect()
     }
 
     #[test]
@@ -1098,7 +1099,7 @@ mod tests {
         let profile = |kind: &str| IOProfile {
             id: "upload-target".into(),
             kind: kind.into(),
-            connection: [("url".to_string(), json!(format!("{base_url}/"))), ("api_key".to_string(), json!("inline"))]
+            connection: [("url".to_string(), format!("{base_url}/").into()), ("api_key".to_string(), "inline".into())]
                 .into(),
             ..Default::default()
         };

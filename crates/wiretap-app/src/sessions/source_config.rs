@@ -9,7 +9,8 @@ use crate::{
     settings::{AppSettings, IOProfile},
 };
 #[cfg(not(target_os = "ios"))]
-use crate::io::device_kinds::{self, conn_i64, conn_str};
+use crate::io::device_kinds;
+use wiretap_io::profile::ConnValue;
 use crate::io::traits::supported_protocols_for_kind;
 
 use crate::io::probe::get_cached_probe;
@@ -33,7 +34,7 @@ fn apply_serial_overrides(
     if config.profile_kind != "serial" {
         return;
     }
-    let (framing, emit_raw_bytes) = device_kinds::resolve_serial_framing(
+    let (framing, emit_raw_bytes) = wiretap_io::profile::resolve_serial_framing(
         profile,
         config.serial.framing_encoding,
         config.serial.emit_raw_bytes,
@@ -141,7 +142,7 @@ fn parse_interfaces_from_profile(
     let Some(interfaces) = profile
         .connection
         .get("interfaces")
-        .and_then(|v| v.as_array())
+        .and_then(|v| v.as_list())
         .filter(|a| !a.is_empty())
     else {
         // Never configured in Settings, but a probe counted the buses
@@ -151,7 +152,7 @@ fn parse_interfaces_from_profile(
     let mappings: Vec<BusMapping> = interfaces
         .iter()
         .filter_map(|item| {
-            let obj = item.as_object()?;
+            let obj = item.as_map()?;
             let device_bus = obj.get("device_bus")?.as_u64()? as u8;
             let enabled = obj.get("enabled").and_then(|v| v.as_bool()).unwrap_or(true);
             let protocol = protocol_from_str(obj.get("protocol").and_then(|v| v.as_str()));
@@ -208,24 +209,24 @@ fn parse_virtual_interfaces(
     profile: &IOProfile,
     bus_override: Option<u8>,
 ) -> Option<Vec<BusMapping>> {
-    let traffic_type = conn_str(profile, "traffic_type");
+    let traffic_type = profile.conn_str("traffic_type");
     let protocol = protocol_from_str(traffic_type.as_deref());
     let prefix = interface_prefix(protocol);
 
     let buses: Vec<u8> = match profile
         .connection
         .get("interfaces")
-        .and_then(|v| v.as_array())
+        .and_then(|v| v.as_list())
         .filter(|a| !a.is_empty())
     {
         Some(interfaces) => interfaces
             .iter()
-            .filter_map(|item| coerce_u8(item.as_object()?.get("bus")?))
+            .filter_map(|item| coerce_u8(item.get("bus")?))
             .collect(),
         // Legacy profile: a bus count instead of an interface list
         None => {
             let (min, max) = device_kinds::VIRTUAL_BUS_COUNT_RANGE;
-            let count = (conn_i64(profile, "bus_count").unwrap_or(1) as u8).clamp(min, max);
+            let count = (profile.conn_i64("bus_count").unwrap_or(1) as u8).clamp(min, max);
             (0..count).collect()
         }
     };
@@ -259,10 +260,10 @@ fn interface_prefix(protocol: Protocol) -> &'static str {
 }
 
 /// Settings values arrive as either JSON numbers or strings, depending on
-/// which form wrote them. For whole-profile fields prefer `device_kinds::conn_*`,
+/// which form wrote them. For whole-profile fields prefer `IOProfile::conn_*`,
 /// which also consult the kind table's declared default; this is for values
 /// inside an `interfaces[]` entry, which those helpers cannot address.
-fn coerce_u8(value: &serde_json::Value) -> Option<u8> {
+fn coerce_u8(value: &ConnValue) -> Option<u8> {
     value
         .as_u64()
         .or_else(|| value.as_str().and_then(|s| s.parse().ok()))
@@ -279,7 +280,7 @@ fn declares_buses(profile: &IOProfile) -> bool {
     let has_interfaces = profile
         .connection
         .get("interfaces")
-        .and_then(|v| v.as_array())
+        .and_then(|v| v.as_list())
         .is_some_and(|a| !a.is_empty());
 
     has_interfaces
@@ -322,7 +323,7 @@ pub fn profile_bus_mappings(profile: &IOProfile) -> Vec<BusMapping> {
 
 /// Create default single-bus mapping for devices without interface configuration.
 fn create_default_bus_mapping(profile: &IOProfile, bus_override: Option<u8>) -> Vec<BusMapping> {
-    let output_bus = bus_override.unwrap_or_else(|| conn_i64(profile, "bus_override").unwrap_or_default() as u8);
+    let output_bus = bus_override.unwrap_or_else(|| profile.conn_i64("bus_override").unwrap_or_default() as u8);
 
     // The protocol this kind's single bus carries; the traits follow from it.
     let (device_bus, interface_id, protocol) = match profile.kind.as_str() {
@@ -332,21 +333,21 @@ fn create_default_bus_mapping(profile: &IOProfile, bus_override: Option<u8>) -> 
         "gvret_tcp" | "gvret_usb" | "slcan" | "gs_usb" | "socketcan" => (0, "can0".to_string(), can_protocol_for(profile)),
         "framelink" => {
             // Grouped profile with interfaces[] array
-            if let Some(interfaces) = profile.connection.get("interfaces").and_then(|v| v.as_array()) {
+            if let Some(interfaces) = profile.connection.get("interfaces").and_then(|v| v.as_list()) {
                 return interfaces.iter().enumerate().map(|(idx, iface)| {
-                    let iface_index = iface.get("index").and_then(|v| v.as_u64()).unwrap_or(0) as u8;
-                    let iface_type = iface.get("iface_type").and_then(|v| v.as_u64()).unwrap_or(1) as u8;
+                    let iface_index = iface.get("index").and_then(ConnValue::as_u64).unwrap_or(0) as u8;
+                    let iface_type = iface.get("iface_type").and_then(ConnValue::as_u64).unwrap_or(1) as u8;
                     let out_bus = bus_override.map(|b| b + idx as u8).unwrap_or(idx as u8);
                     framelink_bus_mapping(iface_index, iface_type, out_bus)
                 }).collect();
             }
             // Legacy single-interface fallback
-            let iface_index = conn_i64(profile, "interface_index").unwrap_or_default() as u8;
-            let iface_type = conn_i64(profile, "interface_type").unwrap_or(1) as u8;
+            let iface_index = profile.conn_i64("interface_index").unwrap_or_default() as u8;
+            let iface_type = profile.conn_i64("interface_type").unwrap_or(1) as u8;
             return vec![framelink_bus_mapping(iface_index, iface_type, output_bus)];
         }
         kind => {
-            let protocol = device_kinds::spec(kind).map_or(Protocol::Can, |s| s.protocol);
+            let protocol = device_kinds::traits(kind).map_or(Protocol::Can, |s| s.protocol);
             (0, format!("{}0", interface_prefix(protocol)), protocol)
         }
     };
@@ -363,7 +364,7 @@ fn create_default_bus_mapping(profile: &IOProfile, bus_override: Option<u8>) -> 
 
 /// Classic CAN or CAN FD, from the profile's `enable_fd` switch.
 fn can_protocol_for(profile: &IOProfile) -> Protocol {
-    match device_kinds::conn_bool(profile, "enable_fd") {
+    match profile.conn_bool("enable_fd") {
         Some(true) => Protocol::CanFd,
         _ => Protocol::Can,
     }

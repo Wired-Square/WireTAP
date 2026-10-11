@@ -92,8 +92,8 @@ mod tests {
             name: id.into(),
             kind: kind.into(),
             connection: [
-                ("traffic_type".to_string(), serde_json::json!("can")),
-                ("signal_generator".to_string(), serde_json::json!(false)),
+                ("traffic_type".to_string(), "can".into()),
+                ("signal_generator".to_string(), false.into()),
             ]
             .into(),
             ..Default::default()

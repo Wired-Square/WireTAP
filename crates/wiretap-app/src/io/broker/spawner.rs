@@ -9,9 +9,7 @@ use tokio_util::sync::CancellationToken;
 use tokio::time::{Duration, interval};
 
 use super::types::{SerialOverrides, SourceConfig};
-use crate::io::device_kinds::{
-    self, conn_bool, conn_f64, conn_i64, conn_str, req_bool, req_f64, req_i64, req_str,
-};
+use crate::io::device_kinds;
 use crate::io::bus_mapping::{apply_bus_mapping, BusMapping};
 use crate::io::can_task::received_frame;
 use crate::io::gvret::run_gvret_tcp_source;
@@ -24,9 +22,9 @@ use crate::io::modbus_tcp::PollGroup;
 use crate::io::virtual_device::{traffic, VirtualTrafficType};
 use crate::io::{now_us, FrameMessage};
 #[cfg(not(target_os = "ios"))]
-use crate::io::serial::{parse_profile_for_source, run_source as run_serial_source};
+use crate::io::serial::run_source as run_serial_source;
+use wiretap_io::profile::SerialSourceConfig;
 #[cfg(not(target_os = "ios"))]
-use crate::io::serial::utils::line_settings;
 #[cfg(not(target_os = "ios"))]
 use crate::io::slcan::{reader::slcan_rates, run_slcan_source};
 use crate::io::framelink::reader::run_source as run_framelink_source;
@@ -137,9 +135,9 @@ async fn run_gvret_tcp_reader(
     stop: CancellationToken,
     tx: mpsc::Sender<SourceMessage>,
 ) -> Result<(), String> {
-    let host = req_str(profile, "host")?;
-    let port = req_i64(profile, "port")? as u16;
-    let timeout_sec = req_f64(profile, "timeout")?;
+    let host = profile.req_str("host")?;
+    let port = profile.req_i64("port")? as u16;
+    let timeout_sec = profile.req_f64("timeout")?;
 
     run_gvret_tcp_source(source_idx, host, port, timeout_sec, bus_mappings, stop, tx).await;
     Ok(())
@@ -153,9 +151,9 @@ async fn run_gvret_usb_reader(
     stop: CancellationToken,
     tx: mpsc::Sender<SourceMessage>,
 ) -> Result<(), String> {
-    let port = req_str(profile, "port")?;
+    let port = profile.req_str("port")?;
 
-    run_gvret_usb_source(source_idx, port, line_settings(profile)?, bus_mappings, stop, tx)
+    run_gvret_usb_source(source_idx, port, profile.line_settings()?, bus_mappings, stop, tx)
         .await;
     Ok(())
 }
@@ -168,14 +166,14 @@ async fn run_slcan_reader(
     stop: CancellationToken,
     tx: mpsc::Sender<SourceMessage>,
 ) -> Result<(), String> {
-    let port = req_str(profile, "port")?;
+    let port = profile.req_str("port")?;
     let (bitrate, data_bitrate) = slcan_rates(profile)?;
-    let silent_mode = req_bool(profile, "silent_mode")?;
+    let silent_mode = profile.req_bool("silent_mode")?;
 
     run_slcan_source(
         source_idx,
         port,
-        line_settings(profile)?,
+        profile.line_settings()?,
         bitrate,
         silent_mode,
         data_bitrate,
@@ -195,18 +193,18 @@ async fn run_gs_usb_reader(
     stop: CancellationToken,
     tx: mpsc::Sender<SourceMessage>,
 ) -> Result<(), String> {
-    let bus = req_i64(profile, "bus")? as u8;
-    let address = req_i64(profile, "address")? as u8;
+    let bus = profile.req_i64("bus")? as u8;
+    let address = profile.req_i64("address")? as u8;
     // No default: a serial number identifies one adapter among several, and
     // absent means "take whichever is there".
-    let serial = conn_str(profile, "serial");
-    let bitrate = req_i64(profile, "bitrate")? as u32;
-    let sample_point = req_f64(profile, "sample_point")? as f32;
-    let listen_only = req_bool(profile, "listen_only")?;
-    let channel = req_i64(profile, "channel")? as u8;
-    let enable_fd = req_bool(profile, "enable_fd")?;
-    let data_bitrate = req_i64(profile, "data_bitrate")? as u32;
-    let data_sample_point = req_f64(profile, "data_sample_point")? as f32;
+    let serial = profile.conn_str("serial");
+    let bitrate = profile.req_i64("bitrate")? as u32;
+    let sample_point = profile.req_f64("sample_point")? as f32;
+    let listen_only = profile.req_bool("listen_only")?;
+    let channel = profile.req_i64("channel")? as u8;
+    let enable_fd = profile.req_bool("enable_fd")?;
+    let data_bitrate = profile.req_i64("data_bitrate")? as u32;
+    let data_sample_point = profile.req_f64("data_sample_point")? as f32;
 
     run_gs_usb_source(
         source_idx,
@@ -236,13 +234,13 @@ async fn run_socketcan_reader(
     stop: CancellationToken,
     tx: mpsc::Sender<SourceMessage>,
 ) -> Result<(), String> {
-    let interface = req_str(profile, "interface")?;
+    let interface = profile.req_str("interface")?;
 
     // The two bitrates stay optional: absent means "leave the interface as the
     // system configured it", which is a different instruction from any rate.
-    let bitrate = conn_i64(profile, "bitrate").map(|v| v as u32);
-    let data_bitrate = conn_i64(profile, "data_bitrate").map(|v| v as u32);
-    let enable_fd = req_bool(profile, "enable_fd")?;
+    let bitrate = profile.conn_i64("bitrate").map(|v| v as u32);
+    let data_bitrate = profile.conn_i64("data_bitrate").map(|v| v as u32);
+    let enable_fd = profile.req_bool("enable_fd")?;
 
     run_socketcan_source(
         source_idx,
@@ -269,7 +267,7 @@ async fn run_serial_reader(
     tx: mpsc::Sender<SourceMessage>,
 ) -> Result<(), String> {
     // Fully resolved — the overrides go in, so nothing is left to re-apply here.
-    let config = parse_profile_for_source(profile, overrides)?;
+    let config = SerialSourceConfig::from_profile(profile, overrides)?;
 
     // The WS decode path frames these messages a second time, and has to be told
     // the same vendor codes or it discards what the port framed.
@@ -307,9 +305,9 @@ async fn run_framelink_reader(
     stop: CancellationToken,
     tx: mpsc::Sender<SourceMessage>,
 ) -> Result<(), String> {
-    let host = req_str(profile, "host")?;
-    let port = req_i64(profile, "port")? as u16;
-    let timeout = req_f64(profile, "timeout")?;
+    let host = profile.req_str("host")?;
+    let port = profile.req_i64("port")? as u16;
+    let timeout = profile.req_f64("timeout")?;
 
     run_framelink_source(source_idx, host, port, timeout, bus_mappings, stop, tx).await;
     Ok(())
@@ -335,7 +333,7 @@ async fn run_virtual_reader(
 ) -> Result<(), String> {
     use std::collections::HashMap;
 
-    let traffic = VirtualTrafficType::from_setting(conn_str(profile, "traffic_type").as_deref());
+    let traffic = VirtualTrafficType::from_setting(profile.conn_str("traffic_type").as_deref());
 
     // Parse per-bus interface configs from connection.interfaces array.
     // Falls back to legacy bus_count / frame_rate_hz / signal_generator fields.
@@ -353,7 +351,7 @@ async fn run_virtual_reader(
     let interfaces: Vec<IfaceConfig> = profile
         .connection
         .get("interfaces")
-        .and_then(|v| v.as_array())
+        .and_then(|v| v.as_list())
         .map(|arr| {
             arr.iter()
                 .map(|item| {
@@ -364,11 +362,11 @@ async fn run_virtual_reader(
                     let signal_generator = item
                         .get("signal_generator")
                         .and_then(|v| v.as_bool().or_else(|| v.as_str().map(|s| s != "false")))
-                        .unwrap_or(device_kinds::VIRTUAL_SIGNAL_GENERATOR);
+                        .unwrap_or(wiretap_io::profile::VIRTUAL_SIGNAL_GENERATOR);
                     let frame_rate_hz = item
                         .get("frame_rate_hz")
                         .and_then(|v| v.as_f64().or_else(|| v.as_str().and_then(|s| s.parse().ok())))
-                        .unwrap_or(device_kinds::VIRTUAL_FRAME_RATE_HZ)
+                        .unwrap_or(wiretap_io::profile::VIRTUAL_FRAME_RATE_HZ)
                         .clamp(rate_min, rate_max);
                     IfaceConfig { bus, signal_generator, frame_rate_hz }
                 })
@@ -377,12 +375,12 @@ async fn run_virtual_reader(
         .unwrap_or_else(|| {
             // Legacy fallback: one interface per bus, from the top-level fields,
             // which the table declares.
-            let frame_rate_hz = conn_f64(profile, "frame_rate_hz")
-                .unwrap_or(device_kinds::VIRTUAL_FRAME_RATE_HZ)
+            let frame_rate_hz = profile.conn_f64("frame_rate_hz")
+                .unwrap_or(wiretap_io::profile::VIRTUAL_FRAME_RATE_HZ)
                 .clamp(rate_min, rate_max);
-            let signal_generator = conn_bool(profile, "signal_generator")
-                .unwrap_or(device_kinds::VIRTUAL_SIGNAL_GENERATOR);
-            let bus_count = conn_i64(profile, "bus_count")
+            let signal_generator = profile.conn_bool("signal_generator")
+                .unwrap_or(wiretap_io::profile::VIRTUAL_SIGNAL_GENERATOR);
+            let bus_count = profile.conn_i64("bus_count")
                 .unwrap_or(1)
                 .clamp(bus_min as i64, bus_max as i64) as u8;
             (0..bus_count)
@@ -718,6 +716,10 @@ mod tests {
     use std::sync::atomic::AtomicUsize;
     use std::sync::Mutex;
 
+    fn interfaces(list: serde_json::Value) -> wiretap_io::profile::ConnValue {
+        serde_json::from_value(list).unwrap()
+    }
+
     const BURST: usize = 500;
     const ECHO_ID: u32 = 0x1ABC_DEF0;
 
@@ -754,7 +756,7 @@ mod tests {
             kind: "virtual".into(),
             connection: [(
                 "interfaces".to_string(),
-                serde_json::json!([{ "bus": 0, "signal_generator": true, "frame_rate_hz": 1000.0 }]),
+                interfaces(serde_json::json!([{ "bus": 0, "signal_generator": true, "frame_rate_hz": 1000.0 }])),
             )]
             .into(),
             preferred_catalog: None,
@@ -888,7 +890,7 @@ mod tests {
         profile.connection.insert("traffic_type".into(), "serial".into());
         profile.connection.insert(
             "interfaces".into(),
-            serde_json::json!([{ "bus": 0, "signal_generator": false, "frame_rate_hz": 1.0 }]),
+            interfaces(serde_json::json!([{ "bus": 0, "signal_generator": false, "frame_rate_hz": 1.0 }])),
         );
         let mappings = vec![BusMapping { output_bus: 3, ..Default::default() }.with_protocol(Protocol::Serial)];
         let stop = CancellationToken::new();
@@ -928,7 +930,7 @@ mod tests {
         let mut profile = loopback_profile();
         profile.connection.insert(
             "interfaces".into(),
-            serde_json::json!([{ "bus": 0, "signal_generator": false, "frame_rate_hz": 1.0 }]),
+            interfaces(serde_json::json!([{ "bus": 0, "signal_generator": false, "frame_rate_hz": 1.0 }])),
         );
         let mappings = vec![BusMapping { output_bus: 3, ..Default::default() }];
         let stop = CancellationToken::new();
@@ -971,7 +973,7 @@ mod tests {
                     let mut profile = loopback_profile();
                     profile.connection.insert(
                         "interfaces".into(),
-                        serde_json::json!([{ "bus": 0, "signal_generator": false, "frame_rate_hz": 1.0 }]),
+                        interfaces(serde_json::json!([{ "bus": 0, "signal_generator": false, "frame_rate_hz": 1.0 }])),
                     );
                     let (tx, mut rx) = mpsc::channel(1024);
                     let (transmit_tx, transmit_rx) = tokio::sync::oneshot::channel();

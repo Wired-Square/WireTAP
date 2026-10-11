@@ -1378,9 +1378,9 @@ pub(crate) mod tests {
             name: "Virtual loopback".into(),
             kind: "virtual".into(),
             connection: [
-                ("traffic_type".to_string(), serde_json::json!("can")),
-                ("loopback".to_string(), serde_json::json!(true)),
-                ("signal_generator".to_string(), serde_json::json!(false)),
+                ("traffic_type".to_string(), "can".into()),
+                ("loopback".to_string(), true.into()),
+                ("signal_generator".to_string(), false.into()),
             ]
             .into(),
             preferred_catalog: None,

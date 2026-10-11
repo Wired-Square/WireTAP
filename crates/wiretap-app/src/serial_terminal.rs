@@ -91,8 +91,7 @@ pub async fn serial_terminal_open(
     stop_bits: Option<u8>,
     parity: Option<String>,
 ) -> Result<String, String> {
-    let line = LineSettings::parse(baud_rate, data_bits, stop_bits, parity.as_deref())
-        .map_err(|e| e.to_string())?;
+    let line = LineSettings::parse(baud_rate, data_bits, stop_bits, parity.as_deref())?;
     off_runtime(move || open_terminal(app, port, line)).await
 }
 

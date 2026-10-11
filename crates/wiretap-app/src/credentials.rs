@@ -105,7 +105,7 @@ pub fn split_secrets(
             store(&account_name(&profile.id, field), &value)?;
             profile
                 .connection
-                .insert(format!("_{field}_stored"), serde_json::Value::Bool(true));
+                .insert(format!("_{field}_stored"), true.into());
         }
     }
     Ok(())

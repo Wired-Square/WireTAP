@@ -482,7 +482,7 @@ impl IOBroker {
         let routes = self.current_transmit_routes();
         let has_can_transmit_routes = routes
             .values()
-            .any(|route| super::device_kinds::spec(&route.profile_kind).is_some_and(|s| s.can_tx));
+            .any(|route| super::device_kinds::traits(&route.profile_kind).is_some_and(|s| s.can_tx));
 
         // The routed output buses are exactly the enabled ones, already deduped
         let mut buses: Vec<u8> = routes.keys().copied().collect();
@@ -550,7 +550,7 @@ impl IOBroker {
         let mut frame = None;
         let data = match route.profile_kind.as_str() {
             "framelink" => encode_framelink_can_tx(&routed_frame),
-            kind if super::device_kinds::spec(kind).is_some_and(|s| s.can_tx) => {
+            kind if super::device_kinds::traits(kind).is_some_and(|s| s.can_tx) => {
                 frame = Some(can_frame(&routed_frame));
                 Vec::new()
             }
@@ -1167,8 +1167,8 @@ mod bus_status_tests {
             name: "Virtual".into(),
             kind: "virtual".into(),
             connection: [
-                ("traffic_type".to_string(), serde_json::json!("can")),
-                ("signal_generator".to_string(), serde_json::json!(false)),
+                ("traffic_type".to_string(), "can".into()),
+                ("signal_generator".to_string(), false.into()),
             ]
             .into(),
             preferred_catalog: None,

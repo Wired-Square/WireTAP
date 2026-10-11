@@ -102,8 +102,8 @@ mod tests {
             name: "Meter".into(),
             kind: "modbus_tcp".into(),
             connection: [
-                ("host".to_string(), serde_json::json!(host)),
-                ("port".to_string(), serde_json::json!(502)),
+                ("host".to_string(), host.into()),
+                ("port".to_string(), 502i64.into()),
             ]
             .into(),
             ..Default::default()
