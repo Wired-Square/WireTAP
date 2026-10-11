@@ -8,10 +8,13 @@ use wiretap_protocol::dlc::{dlc_to_len, len_to_dlc};
 
 const FIXTURES: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../frontend/wiretap-ui/src/tests/fixtures/data");
 
-pub(crate) fn rows(file: &str) -> Vec<Value> {
+pub(crate) fn fixture(file: &str) -> Value {
     let text = std::fs::read_to_string(format!("{FIXTURES}/{file}")).expect("fixture");
-    let table: Value = serde_json::from_str(&text).expect("json");
-    table["rows"].as_array().expect("rows").clone()
+    serde_json::from_str(&text).expect("json")
+}
+
+pub(crate) fn rows(file: &str) -> Vec<Value> {
+    fixture(file)["rows"].as_array().expect("rows").clone()
 }
 
 fn uint(v: &Value) -> u64 {

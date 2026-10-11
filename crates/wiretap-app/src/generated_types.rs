@@ -191,6 +191,7 @@ fn render() -> BTreeMap<PathBuf, String> {
     r.visit::<crate::analysis_ts::CandidateSignal>();
     r.visit::<crate::drafting::DraftPreview>();
     r.visit::<crate::drafting::DraftWrite>();
+    r.visit::<crate::decode_views::MaskMatch>();
     r.files.into_iter().map(|(path, (_, text))| (path, text)).collect()
 }
 

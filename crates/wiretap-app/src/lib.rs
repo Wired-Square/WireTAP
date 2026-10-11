@@ -26,6 +26,7 @@ mod checksum_discovery;
 mod checksums;
 mod credentials;
 mod dbquery;
+mod decode_views;
 mod query;
 mod device_scan;
 #[cfg(not(target_os = "ios"))]
@@ -292,6 +293,7 @@ pub fn run() {
             byte_roles::frame_order_report_cmd,
             drafting::draft_preview_cmd,
             drafting::draft_catalog_cmd,
+            decode_views::can_mask_match_cmd,
             drafting::candidate_signals_cmd,
             byte_roles::serial_structure_cmd,
             adhoc::rank_hypotheses,

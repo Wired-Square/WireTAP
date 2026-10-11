@@ -18,26 +18,3 @@ export function isValidHex(input: string): boolean {
   if (trimmed === "") return false;
   return /^[0-9a-fA-F]+$/.test(trimmed);
 }
-
-export function popcount(value: number): number {
-  let v = value >>> 0;
-  let count = 0;
-  while (v !== 0) {
-    count += v & 1;
-    v >>>= 1;
-  }
-  return count;
-}
-
-export function matchedIdCount(mask: number, bitWidth: number): number {
-  const widthMask = bitWidth >= 32 ? 0xFFFFFFFF : (1 << bitWidth) - 1;
-  const dontCareBits = bitWidth - popcount(mask & widthMask);
-  return Math.pow(2, dontCareBits);
-}
-
-export function matchedRange(id: number, mask: number, bitWidth: number): { lo: number; hi: number } {
-  const widthMask = bitWidth >= 32 ? 0xFFFFFFFF : (1 << bitWidth) - 1;
-  const lo = (id & mask & widthMask) >>> 0;
-  const hi = (lo | (~mask & widthMask)) >>> 0;
-  return { lo, hi };
-}
