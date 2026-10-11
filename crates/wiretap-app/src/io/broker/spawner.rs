@@ -13,6 +13,7 @@ use crate::io::device_kinds::{
     self, conn_bool, conn_f64, conn_i64, conn_str, req_bool, req_f64, req_i64, req_str,
 };
 use crate::io::bus_mapping::{apply_bus_mapping, BusMapping};
+use crate::io::can_task::received_frame;
 use crate::io::gvret::run_gvret_tcp_source;
 #[cfg(not(target_os = "ios"))]
 use crate::io::gvret::run_gvret_usb_source;
@@ -404,7 +405,7 @@ async fn run_virtual_reader(
         ))
         .await;
 
-    // Spawn loopback task: receives encoded frames and echoes them back via the merge channel
+    // Loopback: what is sent comes back as received, on its output bus.
     let tx_loopback = tx.clone();
     let loopback_stop = stop.clone();
     let serial_echo_bus = (traffic == VirtualTrafficType::Serial).then(|| {
@@ -416,33 +417,15 @@ async fn run_virtual_reader(
     let runtime = tokio::runtime::Handle::current();
     tokio::task::spawn_blocking(move || runtime.block_on(async move {
         while let Some(req) = next_request(&mut transmit_rx, &loopback_stop).await {
-            let data = &req.data;
             if let Some(bus) = serial_echo_bus {
                 let timestamp_us = now_us();
-                let entries = data.iter().map(|&byte| ByteEntry { byte, timestamp_us, bus }).collect();
+                let entries = req.data.iter().map(|&byte| ByteEntry { byte, timestamp_us, bus }).collect();
                 let _ = tx_loopback.send(SourceMessage::Bytes(source_idx, entries)).await;
-            } else if data.len() >= 8 {
-                // Decode virtual frame format: frame_id(4 LE) + bus(1) + is_extended(1) + is_fd(1) + dlc(1) + data
-                let frame_id = u32::from_le_bytes([data[0], data[1], data[2], data[3]]);
-                let bus = data[4];
-                let is_extended = data[5] != 0;
-                let is_fd = data[6] != 0;
-                let dlc = data[7];
-                let frame_data = data.get(8..).unwrap_or(&[]).to_vec();
-                let ts = now_us();
+            } else if let Some(sent) = req.frame {
                 let mut frame = FrameMessage {
-                    protocol: "can".to_string(),
-                    timestamp_us: ts,
-                    frame_id,
-                    bus,
-                    dlc: dlc.into(),
-                    bytes: frame_data,
-                    is_extended,
-                    is_fd,
-                    source_address: None,
-                    incomplete: None,
+                    timestamp_us: now_us(),
                     direction: Some("rx".to_string()),
-                    ..Default::default()
+                    ..received_frame(sent)
                 };
                 if apply_bus_mapping(&mut frame, &echo_mappings) {
                     let _ = tx_loopback.send(SourceMessage::Frames(source_idx, vec![frame])).await;
@@ -730,6 +713,7 @@ mod tests {
     use super::*;
     use crate::io::types::TransmitRequest;
     use crate::io::Protocol;
+    use wiretap_io::can::CanFrame;
     use std::sync::mpsc as std_mpsc;
     use std::sync::atomic::AtomicUsize;
     use std::sync::Mutex;
@@ -779,11 +763,9 @@ mod tests {
     }
 
     fn loopback_request(n: usize) -> TransmitRequest {
-        let mut data = ECHO_ID.to_le_bytes().to_vec();
-        data.extend_from_slice(&[0, 1, 0, 8]);
-        data.extend_from_slice(&(n as u64).to_le_bytes());
+        let frame = CanFrame::data(0, ECHO_ID, true, false, false, (n as u64).to_le_bytes().to_vec());
         let (result_tx, _) = std_mpsc::sync_channel(1);
-        TransmitRequest { data, frame: None, result_tx, wait_for_room: false }
+        TransmitRequest { data: Vec::new(), frame: Some(frame), result_tx, wait_for_room: false }
     }
 
     async fn burst_and_stop(stop: CancellationToken, progress: Arc<Progress>) {

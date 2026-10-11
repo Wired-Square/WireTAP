@@ -550,17 +550,6 @@ impl IOBroker {
         let mut frame = None;
         let data = match route.profile_kind.as_str() {
             "framelink" => encode_framelink_can_tx(&routed_frame),
-            "virtual" => {
-                // Simple binary loopback encoding: frame_id(4 LE) + bus(1) + is_extended(1) + is_fd(1) + dlc(1) + data
-                let mut buf = Vec::with_capacity(8 + routed_frame.data.len());
-                buf.extend_from_slice(&routed_frame.frame_id.to_le_bytes());
-                buf.push(routed_frame.bus);
-                buf.push(routed_frame.is_extended as u8);
-                buf.push(routed_frame.is_fd as u8);
-                buf.push(routed_frame.data.len() as u8);
-                buf.extend_from_slice(&routed_frame.data);
-                buf
-            }
             kind if super::device_kinds::spec(kind).is_some_and(|s| s.can_tx) => {
                 frame = Some(can_frame(&routed_frame));
                 Vec::new()

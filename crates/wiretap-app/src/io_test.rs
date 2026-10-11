@@ -1660,7 +1660,7 @@ pub(crate) mod tests {
     }
 
     #[tokio::test]
-    async fn a_virtual_loopback_echo_keeps_the_id_bus_and_fd_but_drops_brs() {
+    async fn a_virtual_loopback_echo_keeps_the_id_bus_fd_and_brs() {
         const SESSION: &str = "test_virtual_codec";
         open_virtual_loopback(SESSION).await;
         let sent = io::CanTransmitFrame {
@@ -1688,7 +1688,7 @@ pub(crate) mod tests {
         assert!(transmitted.unwrap().success);
         let echo = echo.expect("the frame came back");
         assert_eq!((echo.frame_id, echo.bus, echo.dlc, echo.bytes), (sent.frame_id, 0, 12, sent.data));
-        assert_eq!((echo.is_extended, echo.is_fd, echo.is_brs), (true, true, false));
+        assert_eq!((echo.is_extended, echo.is_fd, echo.is_brs), (true, true, true));
         assert_eq!(echo.direction.as_deref(), Some("rx"));
     }
 }
