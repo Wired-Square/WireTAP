@@ -58,11 +58,6 @@ export function isMessageProtocol(protocol: string): boolean {
   return protocol === "modbus_rtu";
 }
 
-/** Trailing check bytes a message protocol carries; 0 where the frame has none. */
-export function trailingCheckBytes(protocol: string | undefined): number {
-  return protocol === "modbus_rtu" ? 2 : 0;
-}
-
 /**
  * The family a frame protocol belongs to for grouping: CAN FD frames share the
  * CAN tab and table, so a mixed classic/FD stream is one family.

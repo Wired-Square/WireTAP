@@ -58,6 +58,10 @@ fn render() -> BTreeMap<PathBuf, String> {
                 (TypeId::of::<wiretap_checksum::ChecksumAlgorithm>(), checksum_algorithms()),
             ),
             (
+                PathBuf::from("protocolTraits.ts"),
+                (TypeId::of::<crate::io::Protocol>(), protocol_traits()),
+            ),
+            (
                 PathBuf::from("canFdLengths.ts"),
                 (TypeId::of::<crate::io::CanTransmitFrame>(), can_fd_lengths()),
             ),
@@ -235,6 +239,15 @@ fn checksum_algorithms() -> String {
     format!("{HEADER}\nexport const CHECKSUM_OUTPUT_BYTES = {{\n{rows}}} as const;\n")
 }
 
+/// What each frame protocol carries besides its payload, by protocol.
+fn protocol_traits() -> String {
+    let rows: String = crate::io::Protocol::ALL
+        .iter()
+        .map(|p| format!("  {}: {},\n", serde_json::to_value(p).unwrap().as_str().unwrap(), p.trailing_check_bytes()))
+        .collect();
+    format!("{HEADER}\nexport const TRAILING_CHECK_BYTES = {{\n{rows}}} as const;\n")
+}
+
 /// The payload lengths a CAN FD frame can carry, one per length code.
 fn can_fd_lengths() -> String {
     format!("{HEADER}\nexport const CAN_FD_DLC_VALUES = {:?} as const;\n", wiretap_protocol::FD_DLC_LEN)
@@ -394,7 +407,7 @@ fn outputs_serialise_as_declared() {
     assert_serialises_as_declared(&[IOCapabilities::realtime_can()]);
     assert_serialises_as_declared(&[BusMapping::default()]);
     assert_serialises_as_declared(&[SourceConfig::default()]);
-    assert_serialises_as_declared(&[Protocol::Can, Protocol::CanFd, Protocol::Modbus, Protocol::ModbusRtu, Protocol::Serial]);
+    assert_serialises_as_declared(&Protocol::ALL);
     assert_serialises_as_declared(&[TemporalMode::Realtime, TemporalMode::Recorded, TemporalMode::Capture]);
     assert_serialises_as_declared(&[crate::capture_store::CaptureKind::Frames, crate::capture_store::CaptureKind::Bytes]);
     assert_serialises_as_declared(&[

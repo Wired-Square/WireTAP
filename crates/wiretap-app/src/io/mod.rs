@@ -280,6 +280,19 @@ pub enum Protocol {
     Serial,
 }
 
+impl Protocol {
+    pub const ALL: [Protocol; 5] =
+        [Protocol::Can, Protocol::CanFd, Protocol::Modbus, Protocol::ModbusRtu, Protocol::Serial];
+
+    /// The check bytes that end each frame: a Modbus RTU message keeps its CRC.
+    pub fn trailing_check_bytes(self) -> usize {
+        match self {
+            Protocol::ModbusRtu => wiretap_checksum::ChecksumAlgorithm::Crc16Modbus.output_bytes(),
+            _ => 0,
+        }
+    }
+}
+
 /// Combined interface traits for formal session/interface characterization
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[cfg_attr(test, derive(ts_rs::TS))]
