@@ -2,13 +2,14 @@
 //
 // The single source of truth for the application settings shape: the
 // `AppSettings` type, the IO-profile discriminated union and its connection
-// types/guards, the default constants, and one `normalizeSettings` routine.
+// types/guards, the defaults Rust serves, and one `normalizeSettings` routine.
 //
 // This is a neutral module that neither `hooks/useSettings.ts` nor
 // `apps/settings/stores/settingsStore.ts` depend on each other for — both import
 // from here (and re-export for their existing consumers), which breaks the old
 // import cycle between them and removes the duplicated type + default definitions.
 
+import { SETTING_DEFAULTS } from "../generated/settingDefaults";
 import type { Protocol } from "../utils/profileTraits";
 
 // ============================================================================
@@ -375,55 +376,43 @@ export interface AppSettings {
 }
 
 // ============================================================================
-// Defaults for the store's state before the first load, kept in step with the
-// Rust `AppSettings` defaults in crates/wiretap-app/src/settings.rs.
+// Defaults, as Rust writes a fresh settings file
 // ============================================================================
 
-export const DEFAULT_BUFFER_STORAGE = "sqlite";
-export const DEFAULT_CLEAR_BUFFERS_ON_START = true;
-export const DEFAULT_DISCOVERY_HISTORY_BUFFER = 100_000;
-export const DEFAULT_QUERY_RESULT_LIMIT = 10_000;
-export const DEFAULT_GRAPH_BUFFER_SIZE = 10_000;
-export const DEFAULT_DECODER_MAX_UNMATCHED_FRAMES = 1000;
-export const DEFAULT_DECODER_MAX_FILTERED_FRAMES = 1000;
-export const DEFAULT_DECODER_MAX_DECODED_FRAMES = 500;
-export const DEFAULT_DECODER_MAX_DECODED_PER_SOURCE = 2000;
-export const DEFAULT_TRANSMIT_MAX_HISTORY = 1000;
-export const DEFAULT_MODBUS_MAX_REGISTER_ERRORS = 3;
+export { SETTING_DEFAULTS };
+
+const D = SETTING_DEFAULTS;
+
+export const defaultSettings = (): AppSettings => structuredClone(D) as unknown as AppSettings;
 
 export const defaultSignalColours: SignalColours = {
-  none: "#94a3b8",
-  low: "#f59e0b",
-  medium: "#3b82f6",
-  high: "#22c55e",
+  none: D.signal_colour_none,
+  low: D.signal_colour_low,
+  medium: D.signal_colour_medium,
+  high: D.signal_colour_high,
 };
 
-export function defaultFrameEditorColours(): string[] {
-  return ["#22d3ee", "#4ade80", "#facc15", "#c084fc", "#60a5fa", "#f87171", "#67e8f9", "#86efac"];
-}
+export const defaultFrameEditorColours = (): string[] => [...D.frame_editor_colours];
 
 export const defaultThemeColours: ThemeColours = {
-  // Light mode
-  bgPrimaryLight: "#ffffff", // white
-  bgSurfaceLight: "#f8fafc", // slate-50
-  textPrimaryLight: "#0f172a", // slate-900
-  textSecondaryLight: "#334155", // slate-700
-  borderDefaultLight: "#e2e8f0", // slate-200
-  dataBgLight: "#f8fafc", // slate-50
-  dataTextPrimaryLight: "#0f172a", // slate-900
-  // Dark mode
-  bgPrimaryDark: "#0f172a", // slate-900
-  bgSurfaceDark: "#1e293b", // slate-800
-  textPrimaryDark: "#ffffff", // white
-  textSecondaryDark: "#cbd5e1", // slate-300
-  borderDefaultDark: "#334155", // slate-700
-  dataBgDark: "#111827", // gray-900
-  dataTextPrimaryDark: "#e5e7eb", // gray-200
-  // Accent colours (mode-independent)
-  accentPrimary: "#2563eb", // blue-600
-  accentSuccess: "#16a34a", // green-600
-  accentDanger: "#dc2626", // red-600
-  accentWarning: "#d97706", // amber-600
+  bgPrimaryLight: D.theme_bg_primary_light,
+  bgSurfaceLight: D.theme_bg_surface_light,
+  textPrimaryLight: D.theme_text_primary_light,
+  textSecondaryLight: D.theme_text_secondary_light,
+  borderDefaultLight: D.theme_border_default_light,
+  dataBgLight: D.theme_data_bg_light,
+  dataTextPrimaryLight: D.theme_data_text_primary_light,
+  bgPrimaryDark: D.theme_bg_primary_dark,
+  bgSurfaceDark: D.theme_bg_surface_dark,
+  textPrimaryDark: D.theme_text_primary_dark,
+  textSecondaryDark: D.theme_text_secondary_dark,
+  borderDefaultDark: D.theme_border_default_dark,
+  dataBgDark: D.theme_data_bg_dark,
+  dataTextPrimaryDark: D.theme_data_text_primary_dark,
+  accentPrimary: D.theme_accent_primary,
+  accentSuccess: D.theme_accent_success,
+  accentDanger: D.theme_accent_danger,
+  accentWarning: D.theme_accent_warning,
 };
 
 // ============================================================================

@@ -54,6 +54,10 @@ fn render() -> BTreeMap<PathBuf, String> {
                 (TypeId::of::<crate::settings::AppSettings>(), setting_ranges()),
             ),
             (
+                PathBuf::from("settingDefaults.ts"),
+                (TypeId::of::<crate::settings::AppSettings>(), setting_defaults()),
+            ),
+            (
                 PathBuf::from("checksumAlgorithms.ts"),
                 (TypeId::of::<wiretap_checksum::ChecksumAlgorithm>(), checksum_algorithms()),
             ),
@@ -283,6 +287,16 @@ fn setting_ranges() -> String {
         .map(|(field, min, max)| format!("  {field}: {{ min: {min}, max: {max} }},\n"))
         .collect();
     format!("{HEADER}\nexport const SETTING_RANGES = {{\n{rows}}} as const;\n")
+}
+
+/// What a fresh settings file holds, less the host's own directories.
+fn setting_defaults() -> String {
+    let mut defaults = serde_json::to_value(crate::settings::AppSettings::default()).unwrap();
+    for dir in ["decoder_dir", "dump_dir", "report_dir"] {
+        defaults[dir] = "".into();
+    }
+    let body = serde_json::to_string_pretty(&defaults).unwrap();
+    format!("{HEADER}\nexport const SETTING_DEFAULTS = {body} as const;\n")
 }
 
 fn committed(dir: &Path) -> BTreeMap<PathBuf, String> {

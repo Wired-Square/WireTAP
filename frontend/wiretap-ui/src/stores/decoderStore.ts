@@ -3,11 +3,8 @@
 import { create } from 'zustand';
 import { tlog } from '../api/settings';
 import { LRUMap } from '../utils/LRUMap';
-import {
-  useSettingsStore,
-  DEFAULT_DECODER_MAX_DECODED_FRAMES,
-  DEFAULT_DECODER_MAX_DECODED_PER_SOURCE,
-} from '../apps/settings/stores/settingsStore';
+import { useSettingsStore } from '../apps/settings/stores/settingsStore';
+import { SETTING_DEFAULTS } from '../generated/settingDefaults';
 
 /** Maximum number of unique values to track per header field */
 const MAX_HEADER_FIELD_VALUES = 256;
@@ -67,8 +64,8 @@ function getDecoderLimits() {
 // 100ms decode flush, which causes JSC GC pressure that crashes the WebView
 // after ~2 hours of streaming. Components subscribe to `decodedVersion` for
 // reactivity and read from these via getter functions.
-let _decoded: LRUMap<number, DecodedFrame> = new LRUMap(DEFAULT_DECODER_MAX_DECODED_FRAMES);
-let _decodedPerSource: LRUMap<string, DecodedFrame> = new LRUMap(DEFAULT_DECODER_MAX_DECODED_PER_SOURCE);
+let _decoded: LRUMap<number, DecodedFrame> = new LRUMap(SETTING_DEFAULTS.decoder_max_decoded_frames);
+let _decodedPerSource: LRUMap<string, DecodedFrame> = new LRUMap(SETTING_DEFAULTS.decoder_max_decoded_per_source);
 let _unmatchedFrames: UnmatchedFrame[] = [];
 let _filteredFrames: FilteredFrame[] = [];
 let _tunnelTransactions: TunnelTransaction[] = [];

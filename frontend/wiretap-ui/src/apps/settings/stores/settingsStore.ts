@@ -24,8 +24,8 @@ import { rebaseSettings, stableStringify } from '../../../settings/rebaseSetting
 // Types
 export type SettingsSection = "general" | "privacy" | "locations" | "data-io" | "devices" | "captures" | "catalogs" | "selection-sets" | "dashboard-layouts" | "display" | "mcp";
 
-// The settings shape, IO-profile union + connection types/guards, default
-// constants and normalisation live in the neutral settings/appSettings module.
+// The settings shape, IO-profile union + connection types/guards, Rust's
+// defaults and normalisation live in the neutral settings/appSettings module.
 // Import what the store uses locally; re-export the pieces that existing store
 // consumers still import from here.
 import {
@@ -33,17 +33,8 @@ import {
   defaultSignalColours,
   defaultThemeColours,
   defaultFrameEditorColours,
-  DEFAULT_BUFFER_STORAGE,
-  DEFAULT_CLEAR_BUFFERS_ON_START,
-  DEFAULT_DISCOVERY_HISTORY_BUFFER,
-  DEFAULT_QUERY_RESULT_LIMIT,
-  DEFAULT_GRAPH_BUFFER_SIZE,
-  DEFAULT_DECODER_MAX_UNMATCHED_FRAMES,
-  DEFAULT_DECODER_MAX_FILTERED_FRAMES,
-  DEFAULT_DECODER_MAX_DECODED_FRAMES,
-  DEFAULT_DECODER_MAX_DECODED_PER_SOURCE,
-  DEFAULT_TRANSMIT_MAX_HISTORY,
-  DEFAULT_MODBUS_MAX_REGISTER_ERRORS,
+  defaultSettings,
+  SETTING_DEFAULTS,
 } from '../../../settings/appSettings';
 import type {
   AppSettings,
@@ -54,21 +45,7 @@ import type {
   DefaultFrameType,
 } from '../../../settings/appSettings';
 
-export {
-  defaultThemeColours,
-  defaultFrameEditorColours,
-  DEFAULT_BUFFER_STORAGE,
-  DEFAULT_CLEAR_BUFFERS_ON_START,
-  DEFAULT_DISCOVERY_HISTORY_BUFFER,
-  DEFAULT_QUERY_RESULT_LIMIT,
-  DEFAULT_GRAPH_BUFFER_SIZE,
-  DEFAULT_DECODER_MAX_UNMATCHED_FRAMES,
-  DEFAULT_DECODER_MAX_FILTERED_FRAMES,
-  DEFAULT_DECODER_MAX_DECODED_FRAMES,
-  DEFAULT_DECODER_MAX_DECODED_PER_SOURCE,
-  DEFAULT_TRANSMIT_MAX_HISTORY,
-  DEFAULT_MODBUS_MAX_REGISTER_ERRORS,
-};
+export { defaultThemeColours };
 export type {
   AppSettings,
   IOProfile,
@@ -452,6 +429,8 @@ function carriedValidations(before: SettingsState['locations'], next: AppSetting
 
 const readSettings = async () => normalizeSettings(await loadSettingsApi());
 
+const D = SETTING_DEFAULTS;
+
 type SettingsSlices = Pick<SettingsState, 'locations' | 'ioProfiles' | 'display' | 'buffers' | 'general' | 'mcp'>;
 
 function settingsSlices(normalized: AppSettings, validations: DirectoryValidations): SettingsSlices {
@@ -481,11 +460,11 @@ function settingsSlices(normalized: AppSettings, validations: DirectoryValidatio
         medium: normalized.signal_colour_medium || defaultSignalColours.medium,
         high: normalized.signal_colour_high || defaultSignalColours.high,
       },
-      binaryOneColour: normalized.binary_one_colour || '#14b8a6',
-      binaryZeroColour: normalized.binary_zero_colour || '#94a3b8',
-      binaryUnusedColour: normalized.binary_unused_colour || '#64748b',
+      binaryOneColour: normalized.binary_one_colour || D.binary_one_colour,
+      binaryZeroColour: normalized.binary_zero_colour || D.binary_zero_colour,
+      binaryUnusedColour: normalized.binary_unused_colour || D.binary_unused_colour,
       frameEditorColours: normalized.frame_editor_colours ?? defaultFrameEditorColours(),
-      themeMode: normalized.theme_mode || 'auto',
+      themeMode: normalized.theme_mode || D.theme_mode,
       themeColours: {
         bgPrimaryLight: normalized.theme_bg_primary_light || defaultThemeColours.bgPrimaryLight,
         bgSurfaceLight: normalized.theme_bg_surface_light || defaultThemeColours.bgSurfaceLight,
@@ -508,122 +487,52 @@ function settingsSlices(normalized: AppSettings, validations: DirectoryValidatio
       },
     },
     buffers: {
-      clearCapturesOnStart: normalized.clear_captures_on_start ?? DEFAULT_CLEAR_BUFFERS_ON_START,
-      captureStorage: normalized.buffer_storage ?? DEFAULT_BUFFER_STORAGE,
-      discoveryHistorySize: normalized.discovery_history_buffer ?? DEFAULT_DISCOVERY_HISTORY_BUFFER,
-      queryResultLimit: normalized.query_result_limit ?? DEFAULT_QUERY_RESULT_LIMIT,
-      graphBufferSize: normalized.graph_buffer_size ?? DEFAULT_GRAPH_BUFFER_SIZE,
-      decoderMaxUnmatchedFrames: normalized.decoder_max_unmatched_frames ?? DEFAULT_DECODER_MAX_UNMATCHED_FRAMES,
-      decoderMaxFilteredFrames: normalized.decoder_max_filtered_frames ?? DEFAULT_DECODER_MAX_FILTERED_FRAMES,
-      decoderMaxDecodedFrames: normalized.decoder_max_decoded_frames ?? DEFAULT_DECODER_MAX_DECODED_FRAMES,
-      decoderMaxDecodedPerSource: normalized.decoder_max_decoded_per_source ?? DEFAULT_DECODER_MAX_DECODED_PER_SOURCE,
-      transmitMaxHistory: normalized.transmit_max_history ?? DEFAULT_TRANSMIT_MAX_HISTORY,
+      clearCapturesOnStart: normalized.clear_captures_on_start ?? D.clear_captures_on_start,
+      captureStorage: normalized.buffer_storage ?? D.buffer_storage,
+      discoveryHistorySize: normalized.discovery_history_buffer ?? D.discovery_history_buffer,
+      queryResultLimit: normalized.query_result_limit ?? D.query_result_limit,
+      graphBufferSize: normalized.graph_buffer_size ?? D.graph_buffer_size,
+      decoderMaxUnmatchedFrames: normalized.decoder_max_unmatched_frames ?? D.decoder_max_unmatched_frames,
+      decoderMaxFilteredFrames: normalized.decoder_max_filtered_frames ?? D.decoder_max_filtered_frames,
+      decoderMaxDecodedFrames: normalized.decoder_max_decoded_frames ?? D.decoder_max_decoded_frames,
+      decoderMaxDecodedPerSource: normalized.decoder_max_decoded_per_source ?? D.decoder_max_decoded_per_source,
+      transmitMaxHistory: normalized.transmit_max_history ?? D.transmit_max_history,
     },
     general: {
-      defaultFrameType: normalized.default_frame_type ?? 'can',
-      sessionManagerStatsInterval: normalized.session_manager_stats_interval ?? 60,
-      preventIdleSleep: normalized.prevent_idle_sleep ?? true,
-      keepDisplayAwake: normalized.keep_display_awake ?? false,
-      logLevel: normalized.log_level ?? "off",
-      telemetryEnabled: normalized.telemetry_enabled ?? false,
-      telemetryConsentGiven: normalized.telemetry_consent_given ?? false,
-      usageAnalyticsEnabled: normalized.usage_analytics_enabled ?? false,
-      usageAnalyticsConsentGiven: normalized.usage_analytics_consent_given ?? false,
-      installId: normalized.install_id ?? "",
-      modbusMaxRegisterErrors: normalized.modbus_max_register_errors ?? DEFAULT_MODBUS_MAX_REGISTER_ERRORS,
-      smpPort: normalized.smp_port ?? 1337,
-      language: normalized.language ?? "en-AU",
+      defaultFrameType: normalized.default_frame_type ?? D.default_frame_type,
+      sessionManagerStatsInterval: normalized.session_manager_stats_interval ?? D.session_manager_stats_interval,
+      preventIdleSleep: normalized.prevent_idle_sleep ?? D.prevent_idle_sleep,
+      keepDisplayAwake: normalized.keep_display_awake ?? D.keep_display_awake,
+      logLevel: normalized.log_level ?? D.log_level,
+      telemetryEnabled: normalized.telemetry_enabled ?? D.telemetry_enabled,
+      telemetryConsentGiven: normalized.telemetry_consent_given ?? D.telemetry_consent_given,
+      usageAnalyticsEnabled: normalized.usage_analytics_enabled ?? D.usage_analytics_enabled,
+      usageAnalyticsConsentGiven: normalized.usage_analytics_consent_given ?? D.usage_analytics_consent_given,
+      installId: normalized.install_id ?? D.install_id,
+      modbusMaxRegisterErrors: normalized.modbus_max_register_errors ?? D.modbus_max_register_errors,
+      smpPort: normalized.smp_port ?? D.smp_port,
+      language: normalized.language ?? D.language,
     },
     mcp: {
-      serverEnabled: normalized.mcp_server_enabled ?? false,
-      allowControl: normalized.mcp_allow_control ?? false,
-      allowSessionControl: normalized.mcp_allow_session_control ?? false,
-      allowCatalogWrite: normalized.mcp_allow_catalog_write ?? false,
-      allowCatalogModify: normalized.mcp_allow_catalog_modify ?? false,
-      allowDashboardWrite: normalized.mcp_allow_dashboard_write ?? false,
-      allowUiControl: normalized.mcp_allow_ui_control ?? false,
-      serverPort: normalized.mcp_server_port ?? 8787,
-      serverToken: normalized.mcp_server_token ?? "",
+      serverEnabled: normalized.mcp_server_enabled ?? D.mcp_server_enabled,
+      allowControl: normalized.mcp_allow_control ?? D.mcp_allow_control,
+      allowSessionControl: normalized.mcp_allow_session_control ?? D.mcp_allow_session_control,
+      allowCatalogWrite: normalized.mcp_allow_catalog_write ?? D.mcp_allow_catalog_write,
+      allowCatalogModify: normalized.mcp_allow_catalog_modify ?? D.mcp_allow_catalog_modify,
+      allowDashboardWrite: normalized.mcp_allow_dashboard_write ?? D.mcp_allow_dashboard_write,
+      allowUiControl: normalized.mcp_allow_ui_control ?? D.mcp_allow_ui_control,
+      serverPort: normalized.mcp_server_port ?? D.mcp_server_port,
+      serverToken: normalized.mcp_server_token ?? D.mcp_server_token,
     },
   };
 }
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({
-  // Initial state
-  locations: {
-    configPath: '',
-    decoderDir: '',
-    dumpDir: '',
-    reportDir: '',
-    decoderValidation: null,
-    dumpValidation: null,
-    reportValidation: null,
-  },
-
-  ioProfiles: {
-    profiles: [],
-    defaultReadProfile: null,
-    defaultWriteProfiles: [],
-  },
+  ...settingsSlices(defaultSettings(), { decoderValidation: null, dumpValidation: null, reportValidation: null }),
 
   selectionSets: [],
 
   dashboardLayouts: [],
-
-  display: {
-    frameIdFormat: 'hex',
-    saveFrameIdFormat: 'hex',
-    timeFormat: 'human',
-    timezone: 'local',
-    signalColours: { ...defaultSignalColours },
-    binaryOneColour: '#14b8a6',
-    binaryZeroColour: '#94a3b8',
-    binaryUnusedColour: '#64748b',
-    frameEditorColours: defaultFrameEditorColours(),
-    themeMode: 'auto',
-    themeColours: { ...defaultThemeColours },
-  },
-
-  buffers: {
-    clearCapturesOnStart: DEFAULT_CLEAR_BUFFERS_ON_START,
-    captureStorage: DEFAULT_BUFFER_STORAGE,
-    discoveryHistorySize: DEFAULT_DISCOVERY_HISTORY_BUFFER,
-    queryResultLimit: DEFAULT_QUERY_RESULT_LIMIT,
-    graphBufferSize: DEFAULT_GRAPH_BUFFER_SIZE,
-    decoderMaxUnmatchedFrames: DEFAULT_DECODER_MAX_UNMATCHED_FRAMES,
-    decoderMaxFilteredFrames: DEFAULT_DECODER_MAX_FILTERED_FRAMES,
-    decoderMaxDecodedFrames: DEFAULT_DECODER_MAX_DECODED_FRAMES,
-    decoderMaxDecodedPerSource: DEFAULT_DECODER_MAX_DECODED_PER_SOURCE,
-    transmitMaxHistory: DEFAULT_TRANSMIT_MAX_HISTORY,
-  },
-
-  general: {
-    defaultFrameType: 'can',
-    sessionManagerStatsInterval: 60,
-    preventIdleSleep: true,
-    keepDisplayAwake: false,
-    logLevel: "off",
-    telemetryEnabled: false,
-    telemetryConsentGiven: false,
-    usageAnalyticsEnabled: false,
-    usageAnalyticsConsentGiven: false,
-    installId: "",
-    modbusMaxRegisterErrors: DEFAULT_MODBUS_MAX_REGISTER_ERRORS,
-    smpPort: 1337,
-    language: "en-AU",
-  },
-
-  mcp: {
-    serverEnabled: false,
-    allowControl: false,
-    allowSessionControl: false,
-    allowCatalogWrite: false,
-    allowCatalogModify: false,
-    allowDashboardWrite: false,
-    allowUiControl: false,
-    serverPort: 8787,
-    serverToken: "",
-  },
 
   ui: {
     currentSection: 'general',
@@ -648,12 +557,12 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 
       // Update backend wake settings cache (desktop)
       setWakeSettingsApi(
-        normalized.prevent_idle_sleep ?? true,
-        normalized.keep_display_awake ?? false
+        normalized.prevent_idle_sleep ?? D.prevent_idle_sleep,
+        normalized.keep_display_awake ?? D.keep_display_awake
       ).catch(console.error);
 
       // Set iOS screen wake state on startup (no-op on other platforms)
-      setIOSScreenWake(normalized.keep_display_awake ?? false).catch(console.error);
+      setIOSScreenWake(normalized.keep_display_awake ?? D.keep_display_awake).catch(console.error);
 
     } catch (error) {
       console.error('Failed to load settings:', error);
@@ -936,21 +845,21 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 
   resetBinaryOneColour: () => {
     set((state) => ({
-      display: { ...state.display, binaryOneColour: '#14b8a6' },
+      display: { ...state.display, binaryOneColour: D.binary_one_colour },
     }));
     scheduleSave(get().saveSettings);
   },
 
   resetBinaryZeroColour: () => {
     set((state) => ({
-      display: { ...state.display, binaryZeroColour: '#94a3b8' },
+      display: { ...state.display, binaryZeroColour: D.binary_zero_colour },
     }));
     scheduleSave(get().saveSettings);
   },
 
   resetBinaryUnusedColour: () => {
     set((state) => ({
-      display: { ...state.display, binaryUnusedColour: '#64748b' },
+      display: { ...state.display, binaryUnusedColour: D.binary_unused_colour },
     }));
     scheduleSave(get().saveSettings);
   },
