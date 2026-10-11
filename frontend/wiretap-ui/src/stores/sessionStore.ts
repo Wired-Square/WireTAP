@@ -456,10 +456,13 @@ function invokeCallbacks<A extends unknown[]>(
   }
 }
 
-/** An attach's redecode of what was already delivered goes to the subscriber that attached, and no other. */
-export function deliverDecodedBacklog(callbacks: Map<string, SessionCallbacks>, payload: DataView) {
+/**
+ * An attach's redecode of what was already delivered goes to the subscriber that attached, and no
+ * other. Its first page replaces what that subscriber holds; the rest add to it.
+ */
+export function deliverDecodedBacklog(callbacks: Map<string, SessionCallbacks>, payload: DataView, first = true) {
   const { subscriber, decoded } = decodeDecodedBacklog(payload);
-  callbacks.get(subscriber)?.onDecoded?.(decoded, true);
+  callbacks.get(subscriber)?.onDecoded?.(decoded, first);
 }
 
 export function applyFrameInventory(
@@ -511,6 +514,11 @@ function setupSessionEventSubscribers(sessionId: string, eventListeners: Session
   eventListeners.wsUnlistenFunctions.push(
     wsTransport.onSessionMessage(sessionId, MsgType.DecodedBacklog, (payload) =>
       deliverDecodedBacklog(eventListeners.callbacks, payload)
+    )
+  );
+  eventListeners.wsUnlistenFunctions.push(
+    wsTransport.onSessionMessage(sessionId, MsgType.DecodedBacklogMore, (payload) =>
+      deliverDecodedBacklog(eventListeners.callbacks, payload, false)
     )
   );
 

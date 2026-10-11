@@ -136,6 +136,9 @@ wire_enum! {
         FrameInventory   = 0x22,
         // The whole Query queue as JSON (`QueryQueue`) after every change.
         QueryQueue       = 0x23,
+        // The rest of a DecodedBacklog, in order and laid out the same; the subscriber adds
+        // it to what the first replaced.
+        DecodedBacklogMore = 0x24,
         // Reverse RPC: server (Rust/MCP) → frontend request, frontend → server reply.
         BridgeRequest    = 0x30,
         BridgeResponse   = 0x31,

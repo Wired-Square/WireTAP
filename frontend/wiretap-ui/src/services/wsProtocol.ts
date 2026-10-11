@@ -241,7 +241,7 @@ export function decodeDecodedSignals(payload: DataView): DecodedSignalsEntry[] {
   }
 }
 
-/** Decode a DecodedBacklog: the attaching subscriber's id (u16 BE length + UTF-8), then a DecodedSignals batch. */
+/** Decode a DecodedBacklog or DecodedBacklogMore: the attaching subscriber's id (u16 BE length + UTF-8), then a DecodedSignals batch. */
 export function decodeDecodedBacklog(payload: DataView): { subscriber: string; decoded: DecodedSignalsEntry[] } {
   const nameEnd = 2 + payload.getUint16(0);
   return {

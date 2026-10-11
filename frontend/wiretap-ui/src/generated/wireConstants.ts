@@ -42,6 +42,7 @@ export const MsgType = {
   CommandResponse: 0x21,
   FrameInventory: 0x22,
   QueryQueue: 0x23,
+  DecodedBacklogMore: 0x24,
   BridgeRequest: 0x30,
   BridgeResponse: 0x31,
   Heartbeat: 0xfe,

@@ -40,4 +40,17 @@ describe("an attach's decoded backlog", () => {
     expect(received.decoder).toEqual([]);
     expect(received.dashboard).toEqual([[[entry], true]]);
   });
+
+  it("replaces with its first page and adds the rest", () => {
+    const received: [DecodedSignalsEntry[], boolean][] = [];
+    const callbacks = new Map<string, SessionCallbacks>([
+      ["main_decoder", { onDecoded: (decoded, backlog) => received.push([decoded, backlog]) }],
+    ]);
+    const [first, more] = [1, 2].map((t) => ({ maskedFrameId: 0x100, t, signals: [] }));
+
+    deliverDecodedBacklog(callbacks, backlogPayload("main_decoder", [first]));
+    deliverDecodedBacklog(callbacks, backlogPayload("main_decoder", [more]), false);
+
+    expect(received).toEqual([[[first], true], [[more], false]]);
+  });
 });

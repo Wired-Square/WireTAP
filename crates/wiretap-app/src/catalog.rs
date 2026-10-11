@@ -112,8 +112,11 @@ pub async fn dispatch_catalog_command(
             crate::ws::dispatch::attach_catalog(&session_id, path, cat);
             // Decode frames already delivered before this attach (e.g. a capture replay
             // that started before the catalogue bound) so they don't show "No signals".
-            if let Some(subscriber) = params.get("subscriber").and_then(|v| v.as_str()) {
-                crate::ws::dispatch::redecode_delivered(&session_id, conn_id, subscriber);
+            if let Some(subscriber) = params.get("subscriber").and_then(|v| v.as_str()).map(str::to_string) {
+                crate::blocking::off_runtime(move || {
+                    crate::ws::dispatch::redecode_delivered(&session_id, conn_id, &subscriber)
+                })
+                .await;
             }
             Ok(serde_json::json!({ "attached": true, "frames": frame_count, "catalog": catalog }))
         }

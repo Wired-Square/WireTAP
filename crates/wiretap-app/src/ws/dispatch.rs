@@ -385,7 +385,23 @@ fn encode_decoded_batch(
     verdicts: Option<&MirrorVerdicts>,
     tunnels: Option<&SharedTunnels>,
     with_unrouted: bool,
+    history: Option<&mut History>,
+) -> Vec<u8> {
+    encode_decoded_page(session_id, frames, catalog, verdicts, tunnels, with_unrouted, history, &mut 0)
+}
+
+/// [`encode_decoded_batch`] for one page of a longer run, leaving the first `unrendered`
+/// completed tunnel messages out and counting them off.
+#[allow(clippy::too_many_arguments)]
+fn encode_decoded_page(
+    session_id: &str,
+    frames: &[FrameMessage],
+    catalog: &wiretap_catalog::Catalog,
+    verdicts: Option<&MirrorVerdicts>,
+    tunnels: Option<&SharedTunnels>,
+    with_unrouted: bool,
     mut history: Option<&mut History>,
+    unrendered: &mut usize,
 ) -> Vec<u8> {
     let mask = wiretap_catalog::decode::frame_id_mask(catalog);
 
@@ -400,6 +416,10 @@ fn encode_decoded_batch(
             let masked_id = mask.map_or(f.frame_id, |m| f.frame_id & m);
             for msg in feed_tunnels(tunnels, catalog, session_id, f, masked_id) {
                 let latency = shared.latency_us(f.bus, masked_id, &msg, f.timestamp_us);
+                if *unrendered > 0 {
+                    *unrendered -= 1;
+                    continue;
+                }
                 if completed.len() == MAX_RENDERED_TUNNEL_MESSAGES {
                     completed.pop_front();
                 }
@@ -625,7 +645,7 @@ pub fn send_new_frames(session_id: &str) {
 
     let new_offset = offset + frames.len();
 
-    send_frames(session_id, &frames);
+    deliver_frames(session_id, &frames);
 
     // Push live counts so the frontend renders Frames/Unique straight from the
     // backend (no TS-side counting). total is the capture count; unique is the
@@ -729,19 +749,38 @@ pub fn clear_frame_offset(session_id: &str) {
     crate::adhoc::forget_session(session_id);
 }
 
+/// Frames re-decoded per `DecodedBacklog` message.
+const BACKLOG_PAGE_FRAMES: usize = 2_000;
+
 /// Decode the frames already delivered to this session's client (everything up to the
 /// current send offset) against the attached catalogue and push DecodedSignals — without
 /// re-sending the FrameData. `send_new_frames` only decodes frames *past* the offset, so a
 /// catalogue attached after frames were delivered (e.g. a capture replay that started
 /// streaming before the decoder bound its catalogue) would otherwise leave those frames
 /// undecoded. Called right after `attach_catalog`, and sent only to `conn_id`, the window
-/// that attached, as a `DecodedBacklog` for `subscriber`, the app in it that attached, to
+/// that attached, for `subscriber`, the app in it that attached: a `DecodedBacklog` to
 /// replace what it holds with — sent even when empty, so rows from the previous catalogue
-/// go too.
+/// go too — then a `DecodedBacklogMore` per further page. Blocks; not for an async worker.
 pub fn redecode_delivered(session_id: &str, conn_id: usize, subscriber: &str) {
-    let Some(catalog) = attached_catalog(session_id) else { return };
     let Some(server) = ws_server() else { return };
     let Some(channel) = server.channel_for_session(session_id) else { return };
+    let Ok(name_len) = u16::try_from(subscriber.len()) else { return };
+    let mut backlog = None;
+    redecode_pages(session_id, BACKLOG_PAGE_FRAMES, |decoded, first| {
+        let kind = if first { MsgType::DecodedBacklog } else { MsgType::DecodedBacklogMore };
+        let payload = [&name_len.to_be_bytes(), subscriber.as_bytes(), &decoded].concat();
+        backlog
+            .get_or_insert_with(|| server.stream_to_conn(conn_id))
+            .send(protocol::encode_message(kind, channel, &payload))
+    });
+}
+
+/// The backlog `page` frames at a time, each page's decode handed to `send` with whether it
+/// is the first; `send` answering false stops it. The delivery lock is held throughout: the
+/// tunnels, mirror verdicts and history are fed in frame order, so no newer batch may be
+/// decoded, or sent, between two pages.
+fn redecode_pages(session_id: &str, page: usize, mut send: impl FnMut(Vec<u8>, bool) -> bool) {
+    let Some(catalog) = attached_catalog(session_id) else { return };
     let Some(capture_id) = crate::capture_store::get_session_frame_capture_id(session_id) else {
         return;
     };
@@ -756,40 +795,95 @@ pub fn redecode_delivered(session_id: &str, conn_id: usize, subscriber: &str) {
         return; // nothing delivered yet — send_new_frames will decode going forward
     }
 
-    // Unread still sends the empty backlog, so the old catalogue's rows go.
-    let (frames, _, _) = crate::capture_store::get_capture_frames_paginated(&capture_id, 0, offset)
-        .unwrap_or_else(|e| {
-            tlog!("[ws] {session_id}: delivered frames not read, nothing re-decoded: {e}");
-            Default::default()
-        });
-    let verdicts = mirror_verdicts(session_id, &frames);
-    // These frames are about to be replayed through the tunnels. Attaching a
-    // catalogue builds them fresh, so they are already empty in practice — the
-    // reset keeps that true for any future caller.
+    // Only the newest tunnel messages are rendered, so count them all first.
     reset_tunnels(session_id);
     let tunnels = tunnel_decoders(session_id);
+    let mut unrendered = 0;
+    if let Some(shared) = &tunnels {
+        let mask = wiretap_catalog::decode::frame_id_mask(&catalog);
+        let completed: usize = delivered_pages(&capture_id, offset, page)
+            .map_while(Result::ok)
+            .flatten()
+            .map(|f| {
+                let masked_id = mask.map_or(f.frame_id, |m| f.frame_id & m);
+                feed_tunnels(Some(shared), &catalog, session_id, &f, masked_id).len()
+            })
+            .sum();
+        unrendered = completed.saturating_sub(MAX_RENDERED_TUNNEL_MESSAGES);
+        reset_tunnels(session_id);
+    }
+
     let shared = crate::dashboard_history::get(session_id);
-    let mut history = shared.as_ref().and_then(|h| h.lock().ok());
-    if let Some(history) = history.as_deref_mut() {
+    if let Some(mut history) = shared.as_ref().and_then(|h| h.lock().ok()) {
         history.drop_catalogue_series();
     }
-    let decoded = encode_decoded_batch(
-        session_id,
-        &frames,
-        &catalog,
-        verdicts.as_ref(),
-        tunnels.as_ref(),
-        false,
-        history.as_deref_mut(),
-    );
-    drop(history);
-    let Ok(name_len) = u16::try_from(subscriber.len()) else { return };
-    let payload = [&name_len.to_be_bytes(), subscriber.as_bytes(), &decoded].concat();
-    server.send_to_conn(conn_id, protocol::encode_message(MsgType::DecodedBacklog, channel, &payload));
+    let mut first = true;
+    for frames in delivered_pages(&capture_id, offset, page) {
+        let frames = match frames {
+            Ok(frames) => frames,
+            Err(e) => {
+                tlog!("[ws] {session_id}: delivered frames not read, the rest not re-decoded: {e}");
+                break;
+            }
+        };
+        let verdicts = mirror_verdicts(session_id, &frames);
+        let mut history = shared.as_ref().and_then(|h| h.lock().ok());
+        let decoded = encode_decoded_page(
+            session_id,
+            &frames,
+            &catalog,
+            verdicts.as_ref(),
+            tunnels.as_ref(),
+            false,
+            history.as_deref_mut(),
+            &mut unrendered,
+        );
+        drop(history);
+        if (first || !decoded.is_empty()) && !send(decoded, first) {
+            return;
+        }
+        first = false;
+    }
+    // Unread still sends the empty backlog, so the old catalogue's rows go.
+    if first {
+        send(Vec::new(), true);
+    }
+}
+
+/// The first `count` frames of a capture, `page` at a time, each read under the database lock
+/// on its own.
+fn delivered_pages(
+    capture_id: &str,
+    count: usize,
+    page: usize,
+) -> impl Iterator<Item = Result<Vec<FrameMessage>, String>> + '_ {
+    let (mut after_rowid, mut left) = (0, count);
+    std::iter::from_fn(move || {
+        if left == 0 {
+            return None;
+        }
+        match crate::capture_db::read_frame_chunk(capture_id, after_rowid, page.min(left)) {
+            Ok(rows) => {
+                after_rowid = rows.last()?.0;
+                left -= rows.len();
+                Some(Ok(rows.into_iter().map(|(_, frame)| frame).collect()))
+            }
+            Err(e) => {
+                left = 0;
+                Some(Err(e))
+            }
+        }
+    })
 }
 
 /// Send a batch of frames to all WebSocket subscribers for this session.
 pub fn send_frames(session_id: &str, frames: &[FrameMessage]) {
+    let lock = delivery_lock(session_id);
+    let _delivering = lock.lock();
+    deliver_frames(session_id, frames);
+}
+
+fn deliver_frames(session_id: &str, frames: &[FrameMessage]) {
     let Some(server) = ws_server() else { return };
     let Some(channel) = server.channel_for_session(session_id) else { return };
     let shared = crate::dashboard_history::get(session_id);
@@ -1692,7 +1786,7 @@ bit_length = 8
         const JOINING: usize = 7_001;
         const CHANNEL: u8 = 201;
         let session = "joining-window-backlog";
-        let _db = crate::capture_db::use_own_database();
+        crate::capture_db::use_in_memory_database();
         crate::capture_store::create_session_capture(
             session,
             crate::capture_store::CaptureKind::Frames,
@@ -1760,6 +1854,97 @@ bit_length = 8
         crate::adhoc::dispatch_adhoc_command("adhoc.clear", json!({ "session_id": session }), WINDOW).unwrap();
         detach_catalog(session);
         assert_eq!(values("Level"), json!([]));
+    }
+
+    fn json_entries(decoded: &[u8]) -> Vec<serde_json::Value> {
+        if decoded.is_empty() { Vec::new() } else { serde_json::from_slice(decoded).expect("JSON array") }
+    }
+
+    /// Each page's entries' stamps, and whether it was sent as the first.
+    fn backlog_pages(session: &str, page: usize, mut on_page: impl FnMut()) -> Vec<(Vec<u64>, bool)> {
+        let mut pages = Vec::new();
+        redecode_pages(session, page, |decoded, first| {
+            on_page();
+            pages.push((json_entries(&decoded).iter().map(|e| e["t"].as_u64().expect("t")).collect(), first));
+            true
+        });
+        pages
+    }
+
+    #[test]
+    fn a_long_backlog_goes_out_page_by_page_in_order_before_newer_frames() {
+        use crate::ws::server::outbox;
+        const CHANNEL: u8 = 204;
+        let session = "paged-backlog";
+        crate::capture_db::use_in_memory_database();
+        crate::capture_store::create_session_capture(session, CaptureKind::Frames, session.to_string());
+        let level = |t| can(0x100, t, vec![t as u8; 8]);
+        crate::capture_store::append_frames_to_session(session, (1..=7).map(level).collect());
+        attach_catalog(session, None, wiretap_catalog::Catalog::parse(ROUTED).expect("catalogue parses"));
+        outbox::subscribe(session, CHANNEL);
+        send_new_frames(session);
+        assert_eq!(outbox::sent(CHANNEL, MsgType::FrameData).len(), 1);
+
+        let delivered = Arc::new(Mutex::new(Vec::new()));
+        let mut newer = None;
+        let pages = backlog_pages(session, 3, || {
+            newer.get_or_insert_with(|| {
+                let delivered = delivered.clone();
+                std::thread::spawn(move || {
+                    crate::capture_store::append_frames_to_session(session, vec![level(8)]);
+                    send_new_frames(session);
+                    delivered.lock().unwrap().push("newer");
+                })
+            });
+            std::thread::sleep(std::time::Duration::from_millis(20));
+            delivered.lock().unwrap().push("page");
+        });
+        newer.expect("a page was sent").join().unwrap();
+        detach_catalog(session);
+
+        assert_eq!(pages, [(vec![1, 2, 3], true), (vec![4, 5, 6], false), (vec![7], false)]);
+        assert_eq!(*delivered.lock().unwrap(), ["page", "page", "page", "newer"]);
+        assert_eq!(outbox::sent(CHANNEL, MsgType::FrameData).len(), 1, "the newer frames went once the backlog had");
+    }
+
+    #[test]
+    fn a_backlog_that_decodes_nothing_is_still_sent_once() {
+        use crate::ws::server::outbox;
+        let session = "empty-backlog";
+        let _db = crate::capture_db::use_own_database();
+        crate::capture_store::create_session_capture(session, CaptureKind::Frames, session.to_string());
+        crate::capture_store::append_frames_to_session(session, (1..=5).map(|t| can(0x2A5, t, vec![0; 8])).collect());
+        attach_catalog(session, None, wiretap_catalog::Catalog::parse(ROUTED).expect("catalogue parses"));
+        outbox::subscribe(session, 205);
+        send_new_frames(session);
+
+        let pages = backlog_pages(session, 2, || {});
+        detach_catalog(session);
+        assert_eq!(pages, [(vec![], true)]);
+    }
+
+    #[test]
+    fn a_paged_backlog_renders_only_the_newest_tunnel_messages() {
+        use crate::ws::server::outbox;
+        const REQUESTS: u64 = MAX_RENDERED_TUNNEL_MESSAGES as u64 + 100;
+        let session = "paged-tunnel-backlog";
+        let _db = crate::capture_db::use_own_database();
+        crate::capture_store::create_session_capture(session, CaptureKind::Frames, session.to_string());
+        let request = rtu(&[0x01, 0x04, 0x4D, 0xE2, 0x00, 0x02]);
+        crate::capture_store::append_frames_to_session(session, (1..=REQUESTS).map(|t| can(0x1E0, t, request.clone())).collect());
+        attach_catalog(session, None, tunnel_catalogue(""));
+        outbox::subscribe(session, 206);
+        send_new_frames(session);
+
+        let mut rendered = Vec::new();
+        redecode_pages(session, 64, |decoded, _| {
+            rendered.extend(json_entries(&decoded).iter().filter(|e| e["tunnel"].as_array().is_some_and(|t| !t.is_empty())).map(|e| e["t"].as_u64()));
+            true
+        });
+        detach_catalog(session);
+
+        assert_eq!(rendered.len(), MAX_RENDERED_TUNNEL_MESSAGES);
+        assert_eq!(rendered[0], Some(REQUESTS - MAX_RENDERED_TUNNEL_MESSAGES as u64 + 1));
     }
 
     #[test]
