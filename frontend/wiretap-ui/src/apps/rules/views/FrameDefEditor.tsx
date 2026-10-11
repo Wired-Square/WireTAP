@@ -18,13 +18,12 @@ import {
   normaliseRange,
   serialiseFrameDef,
   canSave,
-  validateSignalType,
   getSignalColours,
   BYTE_ORDER_LE,
   VALUE_TYPE_UNSIGNED,
 } from "../utils/bitGrid";
 import BitGrid from "../components/BitGrid";
-import { useBitOwners, useNextFrameLinkId } from "../hooks/useFrameLinkAnswers";
+import { useBitOwners, useNextFrameLinkId, useSignalTypeErrors } from "../hooks/useFrameLinkAnswers";
 import { INTERFACE_TYPE_NAMES } from "../../../generated/framelinkNames";
 import SignalList from "../components/SignalList";
 import SignalProperties from "../components/SignalProperties";
@@ -174,19 +173,10 @@ export default function FrameDefEditor({
 
   const [scrollToByte, setScrollToByte] = useState<number | null>(null);
 
-  // Validation error for the currently selected signal
-  const validationError = useMemo(() => {
-    if (state.selectedSignalIndex === null) return null;
-    const signal = state.signals[state.selectedSignalIndex];
-    if (!signal) return null;
-    return validateSignalType(signal.bitLength, signal.valueType);
-  }, [state.selectedSignalIndex, state.signals]);
-
-  // Whether any signal has a validation error (blocks save)
-  const hasAnyValidationError = useMemo(
-    () => state.signals.some((s) => validateSignalType(s.bitLength, s.valueType) !== null),
-    [state.signals],
-  );
+  const signalTypeErrors = useSignalTypeErrors(state.signals);
+  const validationError =
+    state.selectedSignalIndex === null ? null : (signalTypeErrors?.[state.selectedSignalIndex] ?? null);
+  const hasAnyValidationError = signalTypeErrors === null || signalTypeErrors.some((e) => e !== null);
 
   const ownerMap = useBitOwners(state.signals, payloadBytes);
   const usedSignalIds = useMemo(() => new Set(state.signals.map((s) => s.signalId)), [state.signals]);

@@ -1,7 +1,7 @@
 // Copyright 2026 Wired Square Pty Ltd
 
 import { useEffect, useState } from "react";
-import { framelinkBitOwners, framelinkNextId, type FrameLinkIdKind } from "../../../api/framelinkRules";
+import { framelinkBitOwners, framelinkNextId, framelinkSignalTypeErrors, type FrameLinkIdKind } from "../../../api/framelinkRules";
 import { tlog } from "../../../api/settings";
 import type { PlacedSignal } from "../utils/bitGrid";
 
@@ -31,6 +31,14 @@ export function useBitOwners(signals: PlacedSignal[], payloadBytes: number): (nu
   const placements = signals.map((s) => ({ start_bit: s.startBit, bit_length: s.bitLength, byte_order: s.byteOrder }));
   const key = JSON.stringify([placements, payloadBytes]);
   return useAnswer(key, () => framelinkBitOwners(placements, payloadBytes)) ?? NO_OWNERS;
+}
+
+/** Each signal's value-type error, null until Rust has answered for these signals. */
+export function useSignalTypeErrors(signals: PlacedSignal[]): (string | null)[] | null {
+  const types = signals.map((s) => ({ bit_length: s.bitLength, value_type: s.valueType }));
+  const key = JSON.stringify(types);
+  const answer = useAnswer(key, async () => ({ key, errors: await framelinkSignalTypeErrors(types) }));
+  return answer?.key === key ? answer.errors : null;
 }
 
 export function useNextFrameLinkId(used: Set<number>, kind: FrameLinkIdKind): number | null {

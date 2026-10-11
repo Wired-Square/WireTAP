@@ -176,6 +176,7 @@ fn render() -> BTreeMap<PathBuf, String> {
     r.visit::<crate::io::framelink::rules::GeneratorDescriptor>();
     r.visit::<crate::io::framelink::rules::TransformerDescriptor>();
     r.visit::<crate::io::framelink::rules::SignalPlacement>();
+    r.visit::<crate::io::framelink::rules::SignalType>();
     r.visit::<crate::io::framelink::rules::FrameLinkIdKind>();
     r.visit::<crate::io_test::IOTestState>();
     r.visit::<crate::io_test::TestConfig>();
