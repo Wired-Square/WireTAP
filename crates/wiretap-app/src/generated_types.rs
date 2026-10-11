@@ -196,12 +196,7 @@ fn render() -> BTreeMap<PathBuf, String> {
     r.visit::<wiretap_catalog::model::Catalog>();
     r.visit::<wiretap_catalog::model::ValidationError>();
     r.visit::<wiretap_catalog::FrameLayout>();
-    r.visit::<wiretap_catalog::edit::CanConfigFields>();
-    r.visit::<wiretap_catalog::edit::FrameFields>();
-    r.visit::<wiretap_catalog::edit::MetaFields>();
-    r.visit::<wiretap_catalog::edit::ModbusConfigFields>();
-    r.visit::<wiretap_catalog::edit::MuxFields>();
-    r.visit::<wiretap_catalog::edit::SerialConfigFields>();
+    r.visit::<wiretap_catalog::edit::EditOp>();
     r.visit::<wiretap_analysis::draft::ExportMeta>();
     r.visit::<wiretap_analysis::draft::ModbusExportConfig>();
     r.visit::<wiretap_analysis::draft::ModbusRegister>();
