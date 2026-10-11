@@ -537,7 +537,7 @@ mod tests {
         let elapsed = started.elapsed();
         let position = crate::io::get_playback_position(session_id);
         let capture = capture_store::get_session_frame_capture_id(session_id).unwrap();
-        let frames = capture_store::get_capture_frames(&capture).unwrap_or_default();
+        let frames = capture_store::get_capture_frames(&capture).unwrap().unwrap_or_default();
         crate::io::destroy_session(session_id, false).await.ok();
         ended.expect("the stream ended");
         let requests = requests.lock().unwrap().clone();

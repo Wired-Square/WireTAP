@@ -184,7 +184,7 @@ mod desktop {
 
         let id = capture_id.clone();
         let bytes = crate::blocking::off_runtime(move || capture_store::get_capture_bytes(&id))
-            .await
+            .await?
             .ok_or_else(|| format!("Capture '{}' not found or is not a byte capture", capture_id))?;
 
         if bytes.is_empty() {

@@ -614,12 +614,14 @@ pub fn send_new_frames(session_id: &str) {
         return;
     }
 
-    let (frames, _indices, _total) =
-        crate::capture_store::get_capture_frames_paginated(&capture_id, offset, new_count);
-
-    if frames.is_empty() {
-        return;
-    }
+    let frames = match crate::capture_store::get_capture_frames_paginated(&capture_id, offset, new_count) {
+        Ok((frames, _, _)) if !frames.is_empty() => frames,
+        Ok(_) => return,
+        Err(e) => {
+            tlog!("[ws] {session_id}: new frames not read, retrying on the next signal: {e}");
+            return;
+        }
+    };
 
     let new_offset = offset + frames.len();
 
@@ -754,8 +756,12 @@ pub fn redecode_delivered(session_id: &str, conn_id: usize, subscriber: &str) {
         return; // nothing delivered yet — send_new_frames will decode going forward
     }
 
-    let (frames, _indices, _total) =
-        crate::capture_store::get_capture_frames_paginated(&capture_id, 0, offset);
+    // Unread still sends the empty backlog, so the old catalogue's rows go.
+    let (frames, _, _) = crate::capture_store::get_capture_frames_paginated(&capture_id, 0, offset)
+        .unwrap_or_else(|e| {
+            tlog!("[ws] {session_id}: delivered frames not read, nothing re-decoded: {e}");
+            Default::default()
+        });
     let verdicts = mirror_verdicts(session_id, &frames);
     // These frames are about to be replayed through the tunnels. Attaching a
     // catalogue builds them fresh, so they are already empty in practice — the

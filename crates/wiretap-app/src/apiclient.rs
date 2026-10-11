@@ -582,7 +582,7 @@ async fn import_capture(
 
     while offset < total {
         let (frames, _indices, count) =
-            crate::capture_store::get_capture_frames_paginated(capture_id, offset, IMPORT_PAGE);
+            crate::capture_store::get_capture_frames_paginated(capture_id, offset, IMPORT_PAGE)?;
         total = count;
         if frames.is_empty() {
             break;

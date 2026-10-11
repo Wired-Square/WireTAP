@@ -34,7 +34,7 @@ pub async fn export_frame_dump(
 ) -> Result<usize, String> {
     crate::blocking::off_runtime(move || {
         let frames = match source {
-            FrameSource::Capture { capture_id } => capture_store::get_capture_frames(&capture_id)
+            FrameSource::Capture { capture_id } => capture_store::get_capture_frames(&capture_id)?
                 .ok_or_else(|| format!("'{capture_id}' is not a frame capture"))?,
             FrameSource::Frames { frames } => frames,
         };

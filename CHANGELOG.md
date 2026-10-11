@@ -28,6 +28,7 @@ All notable changes to WireTAP will be documented in this file.
 
 ### Fixed
 
+- **A capture that cannot be read now says why instead of reading as empty.** An export, a replay, an upload to a WireTAP backend and the MCP capture tools now report the database's error. An upload used to stop early and report success with frames missing, and an export said the capture was not a frame capture.
 - **A Virtual Device's loopback keeps BRS and RTR.** A CAN FD frame sent with bit-rate switch, or a remote frame, now comes back with the flag set, so the Test Pattern's Loopback mode and Discovery see the frame that was sent.
 - **Payload Changes profiles the same sample as MCP `get_discovery_analysis`.** On a live session the panel profiled only the frames Discovery held in memory, so its byte roles and percentages could differ from the tool's. It now reads each frame's most recent 5000 payloads from the session's capture, live or not, as the tool does.
 - **The Test Pattern's TX gauge fills on a full run, and a stopped suite no longer reads ALL PASS.** The gauge's scale is now the number of frames the run will send, which stops short of the end to let replies arrive, so a complete run reaches full scale; a sweep's scale is its number of length codes. A full suite stopped part-way now reports STOPPED rather than ALL PASS.

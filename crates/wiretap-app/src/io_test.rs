@@ -1676,7 +1676,7 @@ pub(crate) mod tests {
         let capture = crate::capture_store::get_session_frame_capture_id(SESSION).unwrap();
         let echo = tokio::time::timeout(Duration::from_secs(2), async {
             loop {
-                if let Some(frame) = crate::capture_store::get_capture_frames(&capture).and_then(|f| f.into_iter().next()) {
+                if let Some(frame) = crate::capture_store::get_capture_frames(&capture).unwrap().and_then(|f| f.into_iter().next()) {
                     return frame;
                 }
                 tokio::time::sleep(Duration::from_millis(10)).await;

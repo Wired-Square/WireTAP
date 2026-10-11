@@ -79,22 +79,22 @@ impl FrameSource for Capture<'_> {
         newest: Option<usize>,
     ) -> Result<Vec<FrameMessage>, String> {
         let (id, selection) = (self.0.to_owned(), selection.clone());
-        off_runtime(move || Ok(all_selected_frames(&id, &selection, newest))).await
+        off_runtime(move || all_selected_frames(&id, &selection, newest)).await
     }
 }
 
-fn all_selected_frames(id: &str, selection: &FrameSelection, newest: Option<usize>) -> Vec<FrameMessage> {
+fn all_selected_frames(id: &str, selection: &FrameSelection, newest: Option<usize>) -> Result<Vec<FrameMessage>, String> {
     if let Some(n) = newest {
-        return crate::capture_store::get_capture_frames_tail(id, n, selection).frames;
+        return Ok(crate::capture_store::get_capture_frames_tail(id, n, selection)?.frames);
     }
     let mut frames = Vec::new();
     loop {
         let (page, _, total) =
-            crate::capture_store::get_capture_frames_paginated_filtered(id, frames.len(), FRAME_PAGE, selection);
+            crate::capture_store::get_capture_frames_paginated_filtered(id, frames.len(), FRAME_PAGE, selection)?;
         let done = page.is_empty() || frames.len() + page.len() >= total;
         frames.extend(page);
         if done {
-            return frames;
+            return Ok(frames);
         }
     }
 }

@@ -1094,54 +1094,47 @@ pub fn clear_and_refill_capture(capture_id: &str, new_frames: Vec<FrameMessage>)
 
 /// Get frames from a specific capture.
 /// Returns None if capture doesn't exist or is not a frame capture.
-pub fn get_capture_frames(id: &str) -> Option<Vec<FrameMessage>> {
-    let registry = registry();
-    let cap = registry.captures.get(id)?;
-    if cap.metadata.kind != CaptureKind::Frames {
-        return None;
+pub fn get_capture_frames(id: &str) -> Result<Option<Vec<FrameMessage>>, String> {
+    if !is_frame_capture(id) {
+        return Ok(None);
     }
-    drop(registry);
-
-    capture_db::get_all_frames(id).ok()
+    capture_db::get_all_frames(id).map(Some)
 }
 
 /// The newest frame per identity in a frame capture. See `capture_db::get_latest_frames`.
-pub fn get_capture_latest_frames(id: &str) -> Option<Vec<FrameMessage>> {
-    let registry = registry();
-    let cap = registry.captures.get(id)?;
-    if cap.metadata.kind != CaptureKind::Frames {
-        return None;
+pub fn get_capture_latest_frames(id: &str) -> Result<Option<Vec<FrameMessage>>, String> {
+    if !is_frame_capture(id) {
+        return Ok(None);
     }
-    drop(registry);
+    capture_db::get_latest_frames(id).map(Some)
+}
 
-    capture_db::get_latest_frames(id).ok()
+fn is_frame_capture(id: &str) -> bool {
+    let registry = registry();
+    matches!(registry.captures.get(id), Some(b) if b.metadata.kind == CaptureKind::Frames)
 }
 
 /// Get a page of frames from a specific capture.
 /// Returns (frames, buffer_indices, total_count).
-pub fn get_capture_frames_paginated(id: &str, offset: usize, limit: usize) -> (Vec<FrameMessage>, Vec<usize>, usize) {
+pub fn get_capture_frames_paginated(
+    id: &str,
+    offset: usize,
+    limit: usize,
+) -> Result<(Vec<FrameMessage>, Vec<usize>, usize), String> {
     let total = {
         let registry = registry();
         match registry.captures.get(id) {
             Some(b) if b.metadata.kind == CaptureKind::Frames => b.metadata.count,
-            _ => return (Vec::new(), Vec::new(), 0),
+            _ => return Ok((Vec::new(), Vec::new(), 0)),
         }
     };
 
     if offset >= total {
-        return (Vec::new(), Vec::new(), total);
+        return Ok((Vec::new(), Vec::new(), total));
     }
 
-    match capture_db::get_frames_paginated(id, offset, limit) {
-        Ok((frames, rowids)) => {
-            let indices = rowids.into_iter().map(|r| r as usize).collect();
-            (frames, indices, total)
-        }
-        Err(e) => {
-            tlog!("[CaptureStore] Failed to get paginated frames: {}", e);
-            (Vec::new(), Vec::new(), total)
-        }
-    }
+    let (frames, rowids) = capture_db::get_frames_paginated(id, offset, limit)?;
+    Ok((frames, rowids.into_iter().map(|r| r as usize).collect(), total))
 }
 
 /// Get a page of frames filtered by selected IDs.
@@ -1151,29 +1144,17 @@ pub fn get_capture_frames_paginated_filtered(
     offset: usize,
     limit: usize,
     selection: &FrameSelection,
-) -> (Vec<FrameMessage>, Vec<usize>, usize) {
-    {
-        let registry = registry();
-        match registry.captures.get(id) {
-            Some(b) if b.metadata.kind == CaptureKind::Frames => {},
-            _ => return (Vec::new(), Vec::new(), 0),
-        }
+) -> Result<(Vec<FrameMessage>, Vec<usize>, usize), String> {
+    if !is_frame_capture(id) {
+        return Ok((Vec::new(), Vec::new(), 0));
     }
 
     if selection.is_empty() {
         return get_capture_frames_paginated(id, offset, limit);
     }
 
-    match capture_db::get_frames_paginated_filtered(id, offset, limit, selection) {
-        Ok((frames, rowids, total)) => {
-            let indices = rowids.into_iter().map(|r| r as usize).collect();
-            (frames, indices, total)
-        }
-        Err(e) => {
-            tlog!("[CaptureStore] Failed to get filtered paginated frames: {}", e);
-            (Vec::new(), Vec::new(), 0)
-        }
-    }
+    let (frames, rowids, total) = capture_db::get_frames_paginated_filtered(id, offset, limit, selection)?;
+    Ok((frames, rowids.into_iter().map(|r| r as usize).collect(), total))
 }
 
 /// Response from tail fetch operation
@@ -1200,7 +1181,7 @@ impl TailResponse {
 
 /// Get the most recent N frames from a capture, optionally filtered by frame IDs.
 /// Returns the frames in chronological order (oldest first) for display.
-pub fn get_capture_frames_tail(id: &str, limit: usize, selection: &FrameSelection) -> TailResponse {
+pub fn get_capture_frames_tail(id: &str, limit: usize, selection: &FrameSelection) -> Result<TailResponse, String> {
     // The registry tracks the count, the end time and the distinct frame ids for every
     // capture. The live view refetches this on each frame-count signal, so answering from
     // RAM keeps a COUNT(*) and a MAX() scan of the whole capture off that path.
@@ -1214,28 +1195,21 @@ pub fn get_capture_frames_tail(id: &str, limit: usize, selection: &FrameSelectio
                 let covers = selection.covers(&b.inventory);
                 (b.metadata.count, b.metadata.end_time_us, covers)
             }
-            _ => return TailResponse::empty(),
+            _ => return Ok(TailResponse::empty()),
         }
     };
 
-    let result = if selection.is_empty() || covers_everything {
-        capture_db::get_frames_tail_rows(id, limit).map(|(frames, rowids)| (frames, rowids, total))
+    let (frames, rowids, total_filtered_count) = if selection.is_empty() || covers_everything {
+        capture_db::get_frames_tail_rows(id, limit).map(|(frames, rowids)| (frames, rowids, total))?
     } else {
-        capture_db::get_frames_tail_filtered(id, limit, selection)
+        capture_db::get_frames_tail_filtered(id, limit, selection)?
     };
-
-    match result {
-        Ok((frames, rowids, total_filtered_count)) => TailResponse {
-            frames,
-            capture_indices: rowids.into_iter().map(|r| r as usize).collect(),
-            total_filtered_count,
-            capture_end_time_us: end_time_us,
-        },
-        Err(e) => {
-            tlog!("[CaptureStore] Failed to get tail frames: {}", e);
-            TailResponse::empty()
-        }
-    }
+    Ok(TailResponse {
+        frames,
+        capture_indices: rowids.into_iter().map(|r| r as usize).collect(),
+        total_filtered_count,
+        capture_end_time_us: end_time_us,
+    })
 }
 
 /// Frame info extracted from a capture
@@ -1253,22 +1227,11 @@ pub struct CaptureFrameInfo {
 }
 
 /// Get unique frame IDs and their metadata from a capture.
-pub fn get_capture_frame_info(id: &str) -> Vec<CaptureFrameInfo> {
-    {
-        let registry = registry();
-        match registry.captures.get(id) {
-            Some(b) if b.metadata.kind == CaptureKind::Frames => {},
-            _ => return Vec::new(),
-        }
+pub fn get_capture_frame_info(id: &str) -> Result<Vec<CaptureFrameInfo>, String> {
+    if !is_frame_capture(id) {
+        return Ok(Vec::new());
     }
-
-    match capture_db::get_frame_info(id) {
-        Ok(info) => info,
-        Err(e) => {
-            tlog!("[CaptureStore] Failed to get frame info: {}", e);
-            Vec::new()
-        }
-    }
+    capture_db::get_frame_info(id)
 }
 
 /// Find the offset for a given timestamp in a capture.
@@ -1276,22 +1239,11 @@ pub fn find_capture_offset_for_timestamp(
     id: &str,
     target_time_us: u64,
     selection: &FrameSelection,
-) -> usize {
-    {
-        let registry = registry();
-        match registry.captures.get(id) {
-            Some(b) if b.metadata.kind == CaptureKind::Frames => {},
-            _ => return 0,
-        }
+) -> Result<usize, String> {
+    if !is_frame_capture(id) {
+        return Ok(0);
     }
-
-    match capture_db::find_offset_for_timestamp(id, target_time_us, selection) {
-        Ok(offset) => offset,
-        Err(e) => {
-            tlog!("[CaptureStore] Failed to find offset for timestamp: {}", e);
-            0
-        }
-    }
+    capture_db::find_offset_for_timestamp(id, target_time_us, selection)
 }
 
 // ============================================================================
@@ -1345,12 +1297,11 @@ pub fn append_raw_bytes_to_capture(capture_id: &str, new_bytes: Vec<TimestampedB
 
 /// Get raw bytes from a specific capture.
 /// Returns None if capture doesn't exist or is not a byte capture.
-pub fn get_capture_bytes(id: &str) -> Option<Vec<TimestampedByte>> {
+pub fn get_capture_bytes(id: &str) -> Result<Option<Vec<TimestampedByte>>, String> {
     if !is_byte_capture(id) {
-        return None;
+        return Ok(None);
     }
-
-    capture_db::get_all_bytes(id).ok()
+    capture_db::get_all_bytes(id).map(Some)
 }
 
 /// Whether `id` names a capture that holds bytes. Byte queries return empty rather
@@ -1362,46 +1313,28 @@ fn is_byte_capture(id: &str) -> bool {
 
 /// Get a page of bytes from a specific capture.
 /// Returns (bytes, total_count).
-pub fn get_capture_bytes_paginated(id: &str, offset: usize, limit: usize) -> (Vec<TimestampedByte>, usize) {
+pub fn get_capture_bytes_paginated(id: &str, offset: usize, limit: usize) -> Result<(Vec<TimestampedByte>, usize), String> {
     if !is_byte_capture(id) {
-        return (Vec::new(), 0);
+        return Ok((Vec::new(), 0));
     }
-
-    match capture_db::get_bytes_paginated(id, offset, limit) {
-        Ok((bytes, total)) => (bytes, total),
-        Err(e) => {
-            tlog!("[CaptureStore] Failed to get paginated bytes: {}", e);
-            (Vec::new(), 0)
-        }
-    }
+    capture_db::get_bytes_paginated(id, offset, limit)
 }
 
 /// Get the last `limit` bytes from a specific capture, oldest first.
 /// The caller takes the total from `get_capture_count`, which is O(1).
-pub fn get_capture_bytes_tail(id: &str, limit: usize) -> Vec<TimestampedByte> {
+pub fn get_capture_bytes_tail(id: &str, limit: usize) -> Result<Vec<TimestampedByte>, String> {
     if !is_byte_capture(id) {
-        return Vec::new();
+        return Ok(Vec::new());
     }
-
-    capture_db::get_bytes_tail_rows(id, limit).unwrap_or_else(|e| {
-        tlog!("[CaptureStore] Failed to get bytes tail: {}", e);
-        Vec::new()
-    })
+    capture_db::get_bytes_tail_rows(id, limit)
 }
 
 /// Find the byte offset for a given timestamp in a specific byte capture.
-pub fn find_capture_bytes_offset_for_timestamp_by_id(capture_id: &str, target_time_us: u64) -> usize {
+pub fn find_capture_bytes_offset_for_timestamp_by_id(capture_id: &str, target_time_us: u64) -> Result<usize, String> {
     if !is_byte_capture(capture_id) {
-        return 0;
+        return Ok(0);
     }
-
-    match capture_db::find_bytes_offset_for_timestamp(capture_id, target_time_us) {
-        Ok(offset) => offset,
-        Err(e) => {
-            tlog!("[CaptureStore] Failed to find bytes offset for timestamp: {}", e);
-            0
-        }
-    }
+    capture_db::find_bytes_offset_for_timestamp(capture_id, target_time_us)
 }
 
 // ============================================================================
@@ -1688,10 +1621,10 @@ mod tests {
         crate::capture_db::use_own_connection(rusqlite::Connection::open_in_memory().unwrap())
     }
 
-    /// Pinned as-is: a failed query answers like an empty capture, and the registry keeps
-    /// counting what the database never stored. D9 turns these into errors.
+    /// A failed query is an error, not an empty page, while the registry keeps counting
+    /// what the database never stored.
     #[test]
-    fn a_failed_frame_query_answers_an_empty_page() {
+    fn a_failed_frame_query_is_an_error() {
         let _db = failing_database();
         let id = create_standalone_capture(CaptureKind::Frames, "failing frames".into());
         let frame = FrameMessage { protocol: "can".into(), frame_id: 0x100, timestamp_us: 1, ..Default::default() };
@@ -1700,34 +1633,40 @@ mod tests {
         let one = FrameSelection::from_groups(groups(&[("can", &[0x100])]));
 
         assert_eq!(get_capture_count(&id), 3);
-        let (frames, indices, total) = get_capture_frames_paginated(&id, 0, 10);
-        assert!(frames.is_empty() && indices.is_empty());
-        assert_eq!(total, 3, "the page keeps the registry's total");
-        let (frames, _, total) = get_capture_frames_paginated_filtered(&id, 0, 10, &one);
-        assert!(frames.is_empty());
-        assert_eq!(total, 0);
-        let tail = get_capture_frames_tail(&id, 10, &everything);
-        assert!(tail.frames.is_empty());
-        assert_eq!((tail.total_filtered_count, tail.capture_end_time_us), (0, None));
-        assert!(get_capture_frame_info(&id).is_empty());
-        assert_eq!(find_capture_offset_for_timestamp(&id, 1, &one), 0);
-        assert!(get_capture_frames(&id).is_none());
-        assert!(get_capture_latest_frames(&id).is_none());
+        assert!(get_capture_frames_paginated(&id, 0, 10).is_err());
+        assert!(get_capture_frames_paginated_filtered(&id, 0, 10, &one).is_err());
+        assert!(get_capture_frames_tail(&id, 10, &everything).is_err());
+        assert!(get_capture_frame_info(&id).is_err());
+        assert!(find_capture_offset_for_timestamp(&id, 1, &one).is_err());
+        assert!(get_capture_frames(&id).is_err());
+        assert!(get_capture_latest_frames(&id).is_err());
     }
 
     #[test]
-    fn a_failed_byte_query_answers_an_empty_page() {
+    fn a_failed_byte_query_is_an_error() {
         let _db = failing_database();
         let id = create_standalone_capture(CaptureKind::Bytes, "failing bytes".into());
         append_raw_bytes_to_capture(&id, vec![TimestampedByte { byte: 0xAA, timestamp_us: 1, bus: 0 }]);
 
         assert_eq!(get_capture_count(&id), 1);
-        let (bytes, total) = get_capture_bytes_paginated(&id, 0, 10);
-        assert!(bytes.is_empty());
-        assert_eq!(total, 0);
-        assert!(get_capture_bytes_tail(&id, 10).is_empty());
-        assert_eq!(find_capture_bytes_offset_for_timestamp_by_id(&id, 1), 0);
-        assert!(get_capture_bytes(&id).is_none());
+        assert!(get_capture_bytes_paginated(&id, 0, 10).is_err());
+        assert!(get_capture_bytes_tail(&id, 10).is_err());
+        assert!(find_capture_bytes_offset_for_timestamp_by_id(&id, 1).is_err());
+        assert!(get_capture_bytes(&id).is_err());
+    }
+
+    /// A capture that is not there, or holds the other kind, is still an empty answer.
+    #[test]
+    fn a_query_of_no_such_capture_answers_empty() {
+        let _db = failing_database();
+        let one = FrameSelection::from_groups(groups(&[("can", &[0x100])]));
+        assert!(matches!(get_capture_frames_paginated("absent", 0, 10), Ok((f, _, 0)) if f.is_empty()));
+        assert!(matches!(get_capture_frames_paginated_filtered("absent", 0, 10, &one), Ok((f, _, 0)) if f.is_empty()));
+        assert_eq!(get_capture_frame_info("absent"), Ok(Vec::new()));
+        assert_eq!(find_capture_offset_for_timestamp("absent", 1, &one), Ok(0));
+        assert!(matches!(get_capture_frames("absent"), Ok(None)));
+        assert!(matches!(get_capture_bytes("absent"), Ok(None)));
+        assert!(matches!(get_capture_bytes_tail("absent", 10), Ok(b) if b.is_empty()));
     }
 
     /// Pinned as-is (registered): hydrate reads a failed count as "no data" and deletes

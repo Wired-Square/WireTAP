@@ -534,7 +534,7 @@ impl WireTapTools {
         Parameters(p): Parameters<GetFramesParams>,
     ) -> Result<CallToolResult, McpError> {
         let (frames, _idx, total) =
-            crate::capture_store::get_capture_frames_paginated(&p.capture_id, p.offset, p.count);
+            crate::capture_store::get_capture_frames_paginated(&p.capture_id, p.offset, p.count).map_err(err)?;
         ok_json(json!({ "total": total, "offset": p.offset, "frames": frames }))
     }
 
@@ -549,6 +549,7 @@ impl WireTapTools {
             (None, _) => Vec::new(),
             (Some(frame_id), Some(protocol)) => vec![ProtocolFrames::ids(protocol, vec![frame_id])],
             (Some(frame_id), None) => crate::capture_store::get_capture_frame_info(&p.capture_id)
+                .map_err(err)?
                 .into_iter()
                 .filter(|info| info.frame_id == frame_id)
                 .map(|info| ProtocolFrames::ids(info.protocol, vec![frame_id]))
@@ -559,7 +560,8 @@ impl WireTapTools {
             p.offset,
             p.count,
             &FrameSelection::from_groups(groups),
-        );
+        )
+        .map_err(err)?;
         ok_json(json!({ "total": total, "offset": p.offset, "frames": frames }))
     }
 
@@ -790,7 +792,8 @@ impl WireTapTools {
             &capture_id,
             DECODED_TAIL_FRAMES,
             &FrameSelection::default(),
-        );
+        )
+        .map_err(err)?;
         let frames = decode_tail(&catalog, &tail.frames, wanted);
         ok_json(json!({ "frameCount": frames.len(), "frames": frames }))
     }
@@ -819,7 +822,7 @@ impl WireTapTools {
             .filter(|ids| !ids.is_empty())
             .map(|ids| ids.into_iter().collect());
         let frames =
-            crate::capture_store::get_capture_latest_frames(&capture_id).unwrap_or_default();
+            crate::capture_store::get_capture_latest_frames(&capture_id).map_err(err)?.unwrap_or_default();
         let frames = latest_by_key(frames, wanted.as_ref());
         ok_json(json!({ "frameCount": frames.len(), "frames": frames }))
     }
