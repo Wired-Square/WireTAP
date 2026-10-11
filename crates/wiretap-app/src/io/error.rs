@@ -6,7 +6,8 @@
 use std::fmt;
 
 use serde::Serialize;
-use wiretap_io::can::{CanError, ResolveError, TransportError};
+use wiretap_io::can::{CanError, TransportError};
+use wiretap_io::net::ResolveError;
 #[cfg(not(target_os = "ios"))]
 use wiretap_io::serial::SerialError;
 
@@ -442,16 +443,24 @@ impl IoError {
 // ============================================================================
 
 impl IoError {
-    /// A failed TCP connect, worded as `resolve_host_port` words a DNS failure.
+    pub(crate) fn from_resolve(host: &str, reason: &ResolveError) -> Self {
+        Self::dns_resolution(
+            host,
+            match reason {
+                ResolveError::NoAddresses => "the name resolved to no addresses".to_string(),
+                ResolveError::TimedOut => "the DNS resolver did not respond".to_string(),
+                ResolveError::Io(e) => e.to_string(),
+            },
+        )
+    }
+
     pub(crate) fn from_transport(device: &str, error: &TransportError) -> Self {
         match error {
-            TransportError::Resolve { endpoint, reason } => Self::dns_resolution(
-                endpoint.rsplit_once(':').map_or(endpoint.as_str(), |(host, _)| host),
-                match reason {
-                    ResolveError::NoAddresses => "the name resolved to no addresses".to_string(),
-                    ResolveError::TimedOut => "the DNS resolver did not respond".to_string(),
-                    ResolveError::Io(e) => e.to_string(),
-                },
+            TransportError::Resolve { endpoint, reason } => Self::from_resolve(
+                endpoint
+                    .rsplit_once(':')
+                    .map_or(endpoint.as_str(), |(host, _)| host),
+                reason,
             ),
             TransportError::ConnectTimeout { .. } | TransportError::Timeout { .. } => {
                 Self::timeout(device, "connect")

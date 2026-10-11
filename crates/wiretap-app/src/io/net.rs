@@ -33,27 +33,17 @@ pub const DNS_TIMEOUT: Duration = Duration::from_secs(5);
 /// answered is a different problem with a different fix.
 pub const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 
-/// Resolve a `host` (IP literal or DNS name) and `port` to a [`SocketAddr`].
-///
-/// Parsing `"host:port"` straight into a [`SocketAddr`] only accepts numeric IP
-/// literals, so any DNS hostname fails with "invalid socket address syntax". This
-/// resolves through the system resolver and returns the first address, letting
-/// every transport accept hostnames identically.
+/// The first address `host` (an IP literal or a DNS name) resolves to on `port`.
 ///
 /// **Resolve with this helper first, then connect to the returned address.**
 /// Passing a `(host, port)` tuple to `TcpStream::connect` resolves inside the
 /// connect future, which is what makes a DNS failure and an unreachable host
 /// indistinguishable.
 pub async fn resolve_host_port(host: &str, port: u16) -> Result<SocketAddr, IoError> {
-    let dns_err = |details: &str| IoError::dns_resolution(host, details);
-
-    match tokio::time::timeout(DNS_TIMEOUT, tokio::net::lookup_host((host, port))).await {
-        Ok(Ok(mut addrs)) => addrs
-            .next()
-            .ok_or_else(|| dns_err("the name resolved to no addresses")),
-        Ok(Err(e)) => Err(dns_err(&e.to_string())),
-        Err(_) => Err(dns_err("the DNS resolver did not respond")),
-    }
+    wiretap_io::net::resolve(host, port, DNS_TIMEOUT)
+        .await
+        .map(|addrs| addrs[0])
+        .map_err(|reason| IoError::from_resolve(host, &reason))
 }
 
 // ============================================================================
@@ -63,12 +53,6 @@ pub async fn resolve_host_port(host: &str, port: u16) -> Result<SocketAddr, IoEr
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[tokio::test]
-    async fn resolves_an_ip_literal_without_touching_dns() {
-        let addr = resolve_host_port("127.0.0.1", 8080).await.unwrap();
-        assert_eq!(addr.to_string(), "127.0.0.1:8080");
-    }
 
     #[tokio::test]
     async fn an_unresolvable_name_is_a_dns_error_not_a_connection_error() {
