@@ -18,10 +18,8 @@ use wiretap_protocol::dlc_to_len;
 use crate::io::bus_mapping::{apply_bus_mappings_batch, output_bus, BusMapping};
 use crate::io::bus_status::BusStatus;
 #[cfg(not(target_os = "ios"))]
-use crate::io::error::DevicePresence;
-use crate::io::error::IoError;
-#[cfg(not(target_os = "ios"))]
-use crate::io::serial::utils::{outage_message, PortLoss};
+use crate::io::error::{outage, DevicePresence};
+use crate::io::error::IoFailure;
 use crate::io::types::{
     next_request, transmit_channel, EndReason, SourceMessage, TransmitReceiver,
 };
@@ -149,12 +147,12 @@ pub(crate) async fn open_or_report(
     opening: impl Future<Output = Result<CanTask, CanError>>,
     source_idx: usize,
     tx: &mpsc::Sender<SourceMessage>,
-    failed: impl FnOnce(CanError) -> String,
+    failed: impl FnOnce(CanError) -> IoFailure,
 ) -> Option<CanTask> {
     match opening.await {
         Ok(task) => Some(task),
         Err(e) => {
-            let _ = tx.send(SourceMessage::Error(source_idx, failed(e).into())).await;
+            let _ = tx.send(SourceMessage::Error(source_idx, failed(e))).await;
             None
         }
     }
@@ -178,32 +176,12 @@ pub(crate) fn announce_on_event(
     }
 }
 
-pub(crate) fn open_failed(device: &str, error: CanError) -> String {
-    match error {
-        CanError::Open { source, .. } => {
-            IoError::connection(device, source.to_string()).to_string()
-        }
-        other => format!("{device}: {other}"),
-    }
-}
-
 /// A closed link ends the source as disconnected; any other loss, an
 /// unanswered keepalive included, is an error.
 pub(crate) fn link_lost(source_idx: usize, device: &str, error: CanError) -> SourceMessage {
     match error {
         CanError::Closed => SourceMessage::Ended(source_idx, EndReason::Disconnected),
-        other => SourceMessage::Error(source_idx, format!("{device}: {other}").into()),
-    }
-}
-
-#[cfg(not(target_os = "ios"))]
-impl From<CanError> for PortLoss {
-    fn from(error: CanError) -> Self {
-        match error {
-            CanError::Closed => Self::Closed,
-            CanError::Read(e) => Self::Read(e),
-            other => Self::Other(other.to_string()),
-        }
+        other => SourceMessage::Error(source_idx, IoFailure::from_can(device, other)),
     }
 }
 
@@ -237,9 +215,9 @@ impl<'a> PortOutage<'a> {
             CanEvent::Disconnected { .. } if self.waiting => Ok(Vec::new()),
             CanEvent::Disconnected { error, .. } => {
                 self.waiting = true;
-                let message = outage_message(self.port, error.into(), presence);
-                tlog!("[can] Source {} {}", self.source_idx, message);
-                Ok(vec![SourceMessage::Interrupted(self.source_idx, message)])
+                let failure = outage(self.port, error.into(), presence);
+                tlog!("[can] Source {} {}", self.source_idx, failure);
+                Ok(vec![SourceMessage::Interrupted(self.source_idx, failure)])
             }
             CanEvent::Connected(_) => {
                 if std::mem::take(&mut self.waiting) {
@@ -380,7 +358,7 @@ pub(crate) fn reopen_failed(port: &str) -> CanEvent {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::io::IoFailure;
+    use crate::io::IoErrorKind;
     use crate::io::types::{PendingTransmit, TransmitSender};
     use wiretap_io::can::Unsupported;
 
@@ -546,19 +524,22 @@ mod tests {
             link_lost(3, DEVICE, CanError::Closed),
             SourceMessage::Ended(3, EndReason::Disconnected)
         ));
-        let SourceMessage::Error(3, IoFailure { message: unresponsive, .. }) = link_lost(3, DEVICE, CanError::Unresponsive)
+        let SourceMessage::Error(3, unresponsive) = link_lost(3, DEVICE, CanError::Unresponsive)
         else {
             panic!("expected an error");
         };
-        assert_eq!(unresponsive, format!("{DEVICE}: device stopped answering"));
-        let SourceMessage::Error(3, IoFailure { message: read, .. }) = link_lost(
+        assert_eq!(
+            unresponsive,
+            IoFailure::new(IoErrorKind::DeviceDisconnected, format!("{DEVICE}: device stopped answering"))
+        );
+        let SourceMessage::Error(3, read) = link_lost(
             3,
             DEVICE,
             CanError::Read(std::io::Error::other("connection reset")),
         ) else {
             panic!("expected an error");
         };
-        assert!(read.contains("connection reset"), "got: {read}");
+        assert_eq!(read, IoFailure::new(IoErrorKind::Read, format!("{DEVICE}: read failed: connection reset")));
     }
 
     #[cfg(not(target_os = "ios"))]
@@ -572,7 +553,7 @@ mod tests {
             |_| panic!("a loss is the outage's"),
         );
         match messages.unwrap().as_slice() {
-            [SourceMessage::Interrupted(3, message)] => message.clone(),
+            [SourceMessage::Interrupted(3, failure)] => failure.message.clone(),
             _ => panic!("expected one interruption"),
         }
     }
@@ -606,15 +587,16 @@ mod tests {
 
     #[test]
     fn a_port_that_will_not_open_names_the_device() {
-        let failed = open_failed(
+        let failed = IoFailure::from_can(
             DEVICE,
             CanError::Open {
                 device: PORT.into(),
                 source: std::io::Error::from(std::io::ErrorKind::NotFound),
             },
         );
+        assert_eq!(failed.kind, IoErrorKind::Connection);
         assert!(
-            failed.starts_with(&format!("[{DEVICE}] connection failed")),
+            failed.message.starts_with(&format!("[{DEVICE}] connection failed")),
             "got: {failed}"
         );
     }

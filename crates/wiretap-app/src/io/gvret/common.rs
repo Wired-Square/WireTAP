@@ -12,7 +12,8 @@ use std::time::Duration;
 use wiretap_io::can::{CanError, CanEvent, DeviceInfo};
 
 use crate::io::bus_mapping::{gvret_protocols, reconcile_with_device, BusMapping};
-use crate::io::can_task::{announce_on_event, open_failed};
+use crate::io::can_task::announce_on_event;
+use crate::io::{IoErrorKind, IoFailure};
 use crate::io::types::SourceMessage;
 
 // ============================================================================
@@ -148,15 +149,13 @@ pub fn mappings_from_num_buses(
 
 /// A link lost during the handshake reads as it did when the desktop asked
 /// GET_NUMBUSES itself.
-pub fn handshake_failed(device: &str, error: CanError) -> String {
-    let outcome = match error {
-        CanError::Closed => NumBusesOutcome::Closed,
-        CanError::Read(e) => NumBusesOutcome::Failed(e.to_string()),
-        other => return open_failed(device, other),
+pub fn handshake_failed(device: &str, error: CanError) -> IoFailure {
+    let (kind, outcome) = match error {
+        CanError::Closed => (IoErrorKind::DeviceDisconnected, NumBusesOutcome::Closed),
+        CanError::Read(e) => (IoErrorKind::Read, NumBusesOutcome::Failed(e.to_string())),
+        other => return IoFailure::from_can(device, other),
     };
-    mappings_from_num_buses(outcome, &[], device)
-        .err()
-        .unwrap_or_default()
+    IoFailure::new(kind, mappings_from_num_buses(outcome, &[], device).err().unwrap_or_default())
 }
 
 /// A GVRET source on either link, as the broker sees it.
@@ -442,11 +441,13 @@ mod tests {
     #[test]
     fn a_link_lost_in_the_handshake_says_how() {
         let closed = handshake_failed(DEVICE, CanError::Closed);
-        assert!(closed.contains("closed the connection"), "got: {closed}");
+        assert_eq!(closed.kind, IoErrorKind::DeviceDisconnected);
+        assert!(closed.message.contains("closed the connection"), "got: {closed}");
         let reset = handshake_failed(
             DEVICE,
             CanError::Read(std::io::Error::other("connection reset")),
         );
-        assert!(reset.contains("connection reset"), "got: {reset}");
+        assert_eq!(reset.kind, IoErrorKind::Read);
+        assert!(reset.message.contains("connection reset"), "got: {reset}");
     }
 }

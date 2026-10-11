@@ -208,7 +208,10 @@ fn wire_constants() -> String {
         names("SESSION_STATES", &SESSION_STATES),
         names("STREAM_END_REASONS", &STREAM_END_REASONS),
         names("SESSION_ERROR_SEVERITIES", &SESSION_ERROR_SEVERITIES),
-        names("SESSION_ERROR_KINDS", &crate::io::IoErrorKind::ALL.map(|kind| serde_json::to_value(kind).unwrap().as_str().unwrap().to_owned())),
+        names(
+            "SESSION_ERROR_KINDS",
+            &crate::io::IoErrorKind::ALL.map(|kind| serde_json::to_value(kind).unwrap().as_str().unwrap().to_owned()),
+        ),
         names("SESSION_TRANSITIONS", &SESSION_TRANSITIONS),
         names("SESSION_MODES", &SESSION_MODES),
         format!("export const SESSION_LOG_CAPACITY = {};\n", crate::io::session_log::SESSION_LOG_CAPACITY),

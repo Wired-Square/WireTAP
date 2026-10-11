@@ -13,9 +13,10 @@ use wiretap_io::can::{CanError, CanEvent};
 
 use crate::io::bus_mapping::BusMapping;
 use crate::io::can_task::{
-    announce_on_event, can_options, link_lost, open_failed, open_or_report, serve,
+    announce_on_event, can_options, link_lost, open_or_report, serve,
 };
 use crate::io::types::SourceMessage;
+use crate::io::IoFailure;
 
 // ============================================================================
 // Interface Configuration
@@ -159,7 +160,7 @@ pub async fn run_source(
         fd: true,
     };
     let opening = open_socketcan(options, can_options(false, None));
-    let Some(task) = open_or_report(opening, source_idx, &tx, |e| open_failed(&device, e)).await
+    let Some(task) = open_or_report(opening, source_idx, &tx, |e| IoFailure::from_can(&device, e)).await
     else {
         return;
     };
@@ -179,7 +180,6 @@ pub async fn run_source(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::io::IoFailure;
     use std::time::{Duration, UNIX_EPOCH};
     use wiretap_io::can::{CanFrame, CanRead, DeviceInfo, Direction};
 

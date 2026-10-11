@@ -6,6 +6,9 @@
 use std::fmt;
 
 use serde::Serialize;
+use wiretap_io::can::{CanError, ResolveError, TransportError};
+#[cfg(not(target_os = "ios"))]
+use wiretap_io::serial::SerialError;
 
 /// Structured IO error with device context.
 ///
@@ -434,6 +437,117 @@ impl IoError {
 }
 
 // ============================================================================
+// From `wiretap_io`'s CAN, serial and TCP errors: the kind from the app's
+// taxonomy, the words as each was shown before.
+// ============================================================================
+
+impl IoError {
+    /// A failed TCP connect, worded as `resolve_host_port` words a DNS failure.
+    pub(crate) fn from_transport(device: &str, error: &TransportError) -> Self {
+        match error {
+            TransportError::Resolve { endpoint, reason } => Self::dns_resolution(
+                endpoint.rsplit_once(':').map_or(endpoint.as_str(), |(host, _)| host),
+                match reason {
+                    ResolveError::NoAddresses => "the name resolved to no addresses".to_string(),
+                    ResolveError::TimedOut => "the DNS resolver did not respond".to_string(),
+                    ResolveError::Io(e) => e.to_string(),
+                },
+            ),
+            TransportError::ConnectTimeout { .. } | TransportError::Timeout { .. } => {
+                Self::timeout(device, "connect")
+            }
+            other => Self::connection(device, other.to_string()),
+        }
+    }
+}
+
+impl IoFailure {
+    /// A CAN task's failure to open, or the loss that ended it, on `device`.
+    pub(crate) fn from_can(device: &str, error: CanError) -> Self {
+        let kind = match &error {
+            CanError::Open { source, .. } => {
+                return IoError::connection(device, source.to_string()).into()
+            }
+            CanError::Connect(e) => return IoError::from_transport(device, e).for_user(),
+            CanError::Handshake(_) => IoErrorKind::Protocol,
+            CanError::Config(_) => IoErrorKind::Configuration,
+            CanError::Closed | CanError::Unresponsive => IoErrorKind::DeviceDisconnected,
+            CanError::Read(_) => IoErrorKind::Read,
+            _ => IoErrorKind::Other,
+        };
+        Self::new(kind, format!("{device}: {error}"))
+    }
+
+    /// A serial port that would not open.
+    #[cfg(not(target_os = "ios"))]
+    pub(crate) fn from_serial_open(port: &str, error: SerialError) -> Self {
+        let (kind, reason) = match error {
+            SerialError::Open { source, .. } => {
+                let reason = source.to_string();
+                (IoError::from_io_error(port, "open", source).kind(), reason)
+            }
+            other => (IoErrorKind::Configuration, other.to_string()),
+        };
+        Self::new(kind, format!("Failed to open {port}: {reason}"))
+    }
+}
+
+/// How a port was lost mid-session, whichever reader lost it.
+#[cfg(not(target_os = "ios"))]
+pub(crate) enum PortLoss {
+    Closed,
+    Read(std::io::Error),
+    Other(String),
+}
+
+#[cfg(not(target_os = "ios"))]
+impl From<SerialError> for PortLoss {
+    fn from(error: SerialError) -> Self {
+        match error {
+            SerialError::Closed => Self::Closed,
+            SerialError::Read(e) => Self::Read(e),
+            other => Self::Other(other.to_string()),
+        }
+    }
+}
+
+#[cfg(not(target_os = "ios"))]
+impl From<CanError> for PortLoss {
+    fn from(error: CanError) -> Self {
+        match error {
+            CanError::Closed => Self::Closed,
+            CanError::Read(e) => Self::Read(e),
+            other => Self::Other(other.to_string()),
+        }
+    }
+}
+
+/// A zero-byte read is the device going away; any other read error is told
+/// apart as "in use" or "gone" by whether the port still enumerates.
+#[cfg(not(target_os = "ios"))]
+pub(crate) fn outage(
+    port: &str,
+    loss: PortLoss,
+    presence: impl FnOnce(&str) -> DevicePresence,
+) -> IoFailure {
+    let (kind, why) = match loss {
+        PortLoss::Closed => (IoErrorKind::DeviceDisconnected, "device disconnected".to_string()),
+        PortLoss::Read(e) => match IoError::from_device_error(port, &e, presence(port)) {
+            IoError::DeviceDisconnected { .. } => {
+                (IoErrorKind::DeviceDisconnected, "device disconnected".to_string())
+            }
+            IoError::DeviceBusy { .. } => (
+                IoErrorKind::DeviceBusy,
+                "device unavailable, it may be in use by another application".to_string(),
+            ),
+            _ => (IoErrorKind::Read, format!("read failed: {e}")),
+        },
+        PortLoss::Other(why) => (IoErrorKind::Other, why),
+    };
+    IoFailure::new(kind, format!("{port}: {why}, waiting for it to return"))
+}
+
+// ============================================================================
 // Tests
 // ============================================================================
 
@@ -606,5 +720,22 @@ mod tests {
         let busy = IoError::busy("COM5");
         assert_eq!(busy.clone().for_user(), IoFailure::new(IoErrorKind::DeviceBusy, busy.user_message()));
         assert_eq!(IoFailure::from("boom".to_string()).kind, IoErrorKind::Other);
+    }
+
+    #[cfg(not(target_os = "ios"))]
+    #[test]
+    fn a_port_that_will_not_open_says_why_in_the_words_it_always_has() {
+        let missing = SerialError::Open {
+            path: "/dev/x".into(),
+            source: std::io::Error::new(std::io::ErrorKind::NotFound, "no such port"),
+        };
+        assert_eq!(
+            IoFailure::from_serial_open("/dev/x", missing),
+            IoFailure::new(IoErrorKind::DeviceNotFound, "Failed to open /dev/x: no such port")
+        );
+        assert_eq!(
+            IoFailure::from_serial_open("/dev/x", SerialError::UnsupportedBaud(7)),
+            IoFailure::new(IoErrorKind::Configuration, "Failed to open /dev/x: 7 baud is not supported")
+        );
     }
 }

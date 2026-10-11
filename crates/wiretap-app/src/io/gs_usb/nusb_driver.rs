@@ -13,10 +13,10 @@ use wiretap_io::can::{CanError, CanEvent, CanOptions, DeviceInfo};
 use super::{GsUsbDeviceInfo, GsUsbProbeResult};
 use crate::io::bus_mapping::BusMapping;
 use crate::io::can_task::{
-    announce_on_event, can_options, link_lost, mapped_bus_state, open_failed, open_or_report,
+    announce_on_event, can_options, link_lost, mapped_bus_state, open_or_report,
     serve, PROBE_TIMEOUT,
 };
-use crate::io::error::IoError;
+use crate::io::error::{IoError, IoFailure};
 use crate::io::types::SourceMessage;
 
 // ============================================================================
@@ -47,7 +47,7 @@ pub async fn probe_device(
         Err(CanError::Open { source, .. }) if source.kind() == io::ErrorKind::NotFound => {
             Err(IoError::not_found(&device).to_string())
         }
-        Err(e) => Err(open_failed(&device, e)),
+        Err(e) => Err(IoFailure::from_can(&device, e).message),
     }
 }
 
@@ -151,7 +151,7 @@ pub async fn run_source(
     gs.data = enable_fd.then_some((data_bitrate, Some(data_sample_point)));
 
     let opening = gsusb::open(gs, gs_usb_options(listen_only));
-    let Some(task) = open_or_report(opening, source_idx, &tx, |e| open_failed(&device, e)).await
+    let Some(task) = open_or_report(opening, source_idx, &tx, |e| IoFailure::from_can(&device, e)).await
     else {
         return;
     };
@@ -179,7 +179,6 @@ pub async fn run_source(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::io::IoFailure;
     use std::time::{Duration, UNIX_EPOCH};
     use wiretap_io::can::{BusState, CanFrame, CanRead, Direction, ErrorState};
 

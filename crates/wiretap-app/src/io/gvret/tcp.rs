@@ -7,12 +7,11 @@ use std::time::Duration;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 use wiretap_io::can::gvret::{open as open_gvret, probe, GvretOptions, Link};
-use wiretap_io::can::{tcp_endpoint, CanError, ResolveError, TransportError};
+use wiretap_io::can::tcp_endpoint;
 
 use super::common::{handshake_failed, probed_bus_count, GvretDeviceInfo, Stream};
 use crate::io::bus_mapping::BusMapping;
 use crate::io::can_task::{can_options, link_lost, open_or_report, serve};
-use crate::io::error::IoError;
 use crate::io::types::SourceMessage;
 
 /// The device label both the probe and the streaming path identify themselves by.
@@ -35,37 +34,12 @@ pub async fn probe_gvret_tcp(
 ) -> Result<GvretDeviceInfo, String> {
     let timeout = Duration::from_secs_f64(timeout_sec);
     probed_bus_count(probe(tcp_link(host, port, timeout), timeout).await)
-        .map_err(|e| open_failed(host, &gvret_tcp_device(host, port), e))
+        .map_err(|e| handshake_failed(&gvret_tcp_device(host, port), e).into())
 }
 
 // ============================================================================
 // Multi-Source Streaming
 // ============================================================================
-
-/// Worded as `resolve_host_port` and the probe word a failed connect.
-fn connect_failed(host: &str, device: &str, error: TransportError) -> IoError {
-    match error {
-        TransportError::Resolve { reason, .. } => IoError::dns_resolution(
-            host,
-            match reason {
-                ResolveError::NoAddresses => "the name resolved to no addresses".to_string(),
-                ResolveError::TimedOut => "the DNS resolver did not respond".to_string(),
-                ResolveError::Io(e) => e.to_string(),
-            },
-        ),
-        TransportError::ConnectTimeout { .. } | TransportError::Timeout { .. } => {
-            IoError::timeout(device, "connect")
-        }
-        other => IoError::connection(device, other.to_string()),
-    }
-}
-
-fn open_failed(host: &str, device: &str, error: CanError) -> String {
-    match error {
-        CanError::Connect(e) => connect_failed(host, device, e).user_message(),
-        other => handshake_failed(device, other),
-    }
-}
 
 /// Run GVRET TCP source and send frames to merge task
 pub async fn run_source(
@@ -81,7 +55,7 @@ pub async fn run_source(
     let link = tcp_link(&host, port, Duration::from_secs_f64(timeout_sec));
     let opening = open_gvret(link, GvretOptions::default(), can_options(false, None));
     let Some(task) =
-        open_or_report(opening, source_idx, &tx, |e| open_failed(&host, &device, e)).await
+        open_or_report(opening, source_idx, &tx, |e| handshake_failed(&device, e)).await
     else {
         return;
     };
@@ -109,7 +83,8 @@ pub async fn run_source(
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
-    use crate::io::IoFailure;
+    use crate::io::{IoError, IoErrorKind, IoFailure};
+    use wiretap_io::can::{CanError, ResolveError, TransportError};
     use crate::io::can_task::PortOutage;
     use crate::io::types::{EndReason, TransmitRequest};
     use std::sync::mpsc as std_mpsc;
@@ -132,35 +107,27 @@ pub(crate) mod tests {
 
     #[test]
     fn a_failed_open_says_what_failed() {
-        let closed = open_failed("10.0.0.9", DEVICE, CanError::Closed);
-        assert!(closed.contains("closed the connection"), "got: {closed}");
-        let reset = open_failed(
-            "10.0.0.9",
-            DEVICE,
-            CanError::Read(std::io::Error::other("connection reset")),
-        );
-        assert!(reset.contains("connection reset"), "got: {reset}");
-        let dns = open_failed(
-            "gvret.invalid",
+        let closed = handshake_failed(DEVICE, CanError::Closed);
+        assert!(closed.message.contains("closed the connection"), "got: {closed}");
+        let reset = handshake_failed(DEVICE, CanError::Read(std::io::Error::other("connection reset")));
+        assert!(reset.message.contains("connection reset"), "got: {reset}");
+        let dns = handshake_failed(
             DEVICE,
             CanError::Connect(TransportError::Resolve {
                 endpoint: "gvret.invalid:23".into(),
                 reason: ResolveError::NoAddresses,
             }),
         );
-        assert!(
-            dns.starts_with("Cannot resolve the hostname gvret.invalid"),
-            "got: {dns}"
-        );
-        let slow = open_failed(
-            "10.0.0.9",
+        assert_eq!(dns.kind, IoErrorKind::DnsResolution);
+        assert!(dns.message.starts_with("Cannot resolve the hostname gvret.invalid —"), "got: {dns}");
+        let slow = handshake_failed(
             DEVICE,
             CanError::Connect(TransportError::ConnectTimeout {
                 addr: "10.0.0.9:23".parse().unwrap(),
                 after: Duration::from_secs(1),
             }),
         );
-        assert_eq!(slow, IoError::timeout(DEVICE, "connect").user_message());
+        assert_eq!(slow, IoError::timeout(DEVICE, "connect").for_user());
     }
 
     // --- against a fake device on 127.0.0.1 ------------------------------------

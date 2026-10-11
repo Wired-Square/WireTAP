@@ -12,12 +12,12 @@ use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 use wiretap_catalog::{Catalog, RtuTap, TappedMessage};
 use wiretap_io::serial::{
-    self, ports, Access, LineSettings, PortInfo, PortKind, SerialError, SerialEvent,
+    self, ports, Access, LineSettings, PortInfo, PortKind, SerialEvent,
     SerialOptions, SerialWriter, WriteRefused,
 };
 
 use crate::io::bus_mapping::{apply_bus_mapping, BusMapping};
-use crate::io::error::DevicePresence;
+use crate::io::error::{outage, DevicePresence, IoFailure};
 use crate::io::types::{
     next_request, transmit_channel, ByteEntry, EndReason, ModbusRtuOptions, SetFramingRequest,
     SourceMessage, TransmitReceiver,
@@ -27,7 +27,7 @@ use crate::io::FrameMessage;
 use super::framer::{
     residue, rtu_frame, FrameIdConfig, FramingEncoding, SerialFrame, SerialFramer,
 };
-use super::utils::{framing_from_mode, outage_message, probe_serial_presence, SerialSourceConfig};
+use super::utils::{framing_from_mode, probe_serial_presence, SerialSourceConfig};
 
 /// How often the read loop looks for a framing or catalogue change.
 const POLL: Duration = Duration::from_millis(50);
@@ -228,11 +228,11 @@ impl LiveLine {
             SerialEvent::Disconnected { .. } if self.waiting_for_device => Vec::new(),
             SerialEvent::Disconnected { error, .. } => {
                 self.waiting_for_device = true;
-                let message = outage_message(&self.port, error.into(), presence);
-                tlog!("[serial] Source {} {}", self.source_idx, message);
+                let failure = outage(&self.port, error.into(), presence);
+                tlog!("[serial] Source {} {}", self.source_idx, failure);
                 self.finish()
                     .into_iter()
-                    .chain([SourceMessage::Interrupted(self.source_idx, message)])
+                    .chain([SourceMessage::Interrupted(self.source_idx, failure)])
                     .collect()
             }
         }
@@ -421,15 +421,8 @@ pub async fn run_source(
     let mut task = match serial::open(&port, config.line, options) {
         Ok(task) => task,
         Err(e) => {
-            let reason = match e {
-                SerialError::Open { source, .. } => source.to_string(),
-                e => e.to_string(),
-            };
             let _ = tx
-                .send(SourceMessage::Error(
-                    source_idx,
-                    format!("Failed to open {}: {}", port, reason).into(),
-                ))
+                .send(SourceMessage::Error(source_idx, IoFailure::from_serial_open(&port, e)))
                 .await;
             return;
         }
@@ -541,6 +534,8 @@ fn serial_port_info(port: PortInfo) -> SerialPortInfo {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::io::IoErrorKind;
+    use wiretap_io::serial::SerialError;
     use crate::io::serial::DelimiterOptions;
     use crate::io::types::ModbusRtuOptions;
     use wiretap_io::serial::Parity as LineParity;
@@ -614,9 +609,12 @@ mod tests {
         let mut line = live(FramingEncoding::Raw, false);
 
         match &line.on_event(lost(SerialError::Closed), |_| unreachable!())[..] {
-            [SourceMessage::Interrupted(0, message)] => assert_eq!(
-                message,
-                "/dev/test: device disconnected, waiting for it to return"
+            [SourceMessage::Interrupted(0, failure)] => assert_eq!(
+                *failure,
+                IoFailure::new(
+                    IoErrorKind::DeviceDisconnected,
+                    "/dev/test: device disconnected, waiting for it to return"
+                )
             ),
             _ => panic!("one interruption, and no ending"),
         }
@@ -636,18 +634,24 @@ mod tests {
                 })
                 .pop()
             {
-                Some(SourceMessage::Interrupted(0, message)) => message,
+                Some(SourceMessage::Interrupted(0, failure)) => failure,
                 _ => panic!("a read error interrupts the source"),
             }
         };
         assert_eq!(
             message(DevicePresence::Present),
-            "/dev/test: device unavailable, it may be in use by another application, \
-             waiting for it to return"
+            IoFailure::new(
+                IoErrorKind::DeviceBusy,
+                "/dev/test: device unavailable, it may be in use by another application, \
+                 waiting for it to return"
+            )
         );
         assert_eq!(
             message(DevicePresence::Absent),
-            "/dev/test: device disconnected, waiting for it to return"
+            IoFailure::new(
+                IoErrorKind::DeviceDisconnected,
+                "/dev/test: device disconnected, waiting for it to return"
+            )
         );
     }
 

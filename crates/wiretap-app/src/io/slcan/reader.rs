@@ -22,11 +22,12 @@ use wiretap_protocol::slcan::{bitrate_command, data_bitrate_command, DATA_BITRAT
 use crate::io::bus_mapping::BusMapping;
 use crate::io::device_kinds::{req_bool, req_i64};
 use crate::io::can_task::{
-    announce_on_event, can_options, link_lost, open_failed, open_or_report, serve, PortOutage,
+    announce_on_event, can_options, link_lost, open_or_report, serve, PortOutage,
     PORT_REOPEN, PROBE_TIMEOUT,
 };
 use crate::io::serial::utils::probe_serial_presence;
 use crate::io::types::SourceMessage;
+use crate::io::IoFailure;
 use crate::settings::IOProfile;
 
 // ============================================================================
@@ -136,7 +137,7 @@ fn probe_result(device: &str, probed: Result<DeviceInfo, CanError>) -> SlcanProb
             supports_fd: None,
             error: Some(match e {
                 CanError::Handshake(_) => "No response from device".to_string(),
-                other => open_failed(device, other),
+                other => IoFailure::from_can(device, other).message,
             }),
         },
     }
@@ -212,7 +213,7 @@ pub async fn run_source(
         data_bitrate,
     };
     let opening = open_slcan(options, can_options(silent_mode, PORT_REOPEN));
-    let Some(task) = open_or_report(opening, source_idx, &tx, |e| open_failed(&device, e)).await
+    let Some(task) = open_or_report(opening, source_idx, &tx, |e| IoFailure::from_can(&device, e)).await
     else {
         return;
     };
@@ -241,7 +242,6 @@ pub async fn run_source(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::io::IoFailure;
     use crate::io::can_task::{lost, reopen_failed};
     use crate::io::error::DevicePresence;
     use std::time::{Duration, UNIX_EPOCH};
@@ -325,7 +325,7 @@ mod tests {
                 .expect("an outage never ends the source")
         };
         let unplugged = source(lost(CanError::Closed));
-        let [SourceMessage::Interrupted(3, message)] = unplugged.as_slice() else {
+        let [SourceMessage::Interrupted(3, IoFailure { message, .. })] = unplugged.as_slice() else {
             panic!("expected one interruption and no ending");
         };
         assert_eq!(

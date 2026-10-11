@@ -57,7 +57,7 @@ pub async fn probe_gvret_usb(port: &str, line: LineSettings) -> Result<GvretDevi
         line,
     };
     probed_bus_count(probe(link, PROBE_TIMEOUT).await)
-        .map_err(|e| handshake_failed(&gvret_usb_device(port), e))
+        .map_err(|e| handshake_failed(&gvret_usb_device(port), e).into())
 }
 
 // ============================================================================
@@ -153,7 +153,7 @@ mod tests {
         assert_eq!(buses(&source(connected(2))), 2);
 
         let unplugged = source(lost(CanError::Closed));
-        let [SourceMessage::Interrupted(3, message)] = unplugged.as_slice() else {
+        let [SourceMessage::Interrupted(3, IoFailure { message, .. })] = unplugged.as_slice() else {
             panic!("expected one interruption and no ending");
         };
         assert_eq!(
