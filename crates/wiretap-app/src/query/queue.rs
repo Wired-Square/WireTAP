@@ -120,7 +120,7 @@ async fn cancel_running(id: &str) {
     let running = state().running.clone();
     if let Some((running_id, cancel)) = running.filter(|(r, _)| r == id) {
         cancel.store(true, Ordering::Relaxed);
-        crate::apiclient::cancel_query(&running_id).await;
+        crate::apiclient::gateway().cancel(&running_id).await;
     }
 }
 

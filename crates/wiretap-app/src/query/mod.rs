@@ -264,8 +264,9 @@ pub(crate) mod tests {
                 capture::statements(SQL_CAPTURE, &with_default_limit(spec.clone())).iter().map(|s| s.inlined()).collect();
             assert_eq!(executed, outcome.sql, "{name}");
             assert_eq!(previewed, outcome.sql, "{name}");
-            let api = crate::apiclient::test_api(Protocol::Can);
-            let request = gateway::request(&api, &with_default_limit(spec), None, false).unwrap().text();
+            let request = gateway::text(
+                &gateway::request(Protocol::Can, &with_default_limit(spec), None, false).unwrap(),
+            );
             cases.push(json!({ "name": name, "capture": outcome.sql, "gateway": request.lines().collect::<Vec<_>>() }));
         }
         crate::capture_db::trace_statements(None);

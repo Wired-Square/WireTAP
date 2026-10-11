@@ -7,16 +7,15 @@
 use std::collections::HashMap;
 use std::path::Path;
 
-use reqwest::StatusCode;
 use serde::Serialize;
 use tauri::{AppHandle, Manager};
+use wiretap_gateway::client::{AssignOutcome, GatewayClient};
 use wiretap_gateway::{
-    ActiveCatalog, AssignCatalog, AssignedCatalog, AssignmentConflict, CatalogFinding,
-    CatalogRejected, Daemon, DaemonDevice, DaemonList, Provenance, ProvenanceBase, StoredCatalog,
-    UnassignParams,
+    ActiveCatalog, AssignCatalog, CatalogFinding, Daemon, DaemonDevice, DaemonList, Provenance,
+    ProvenanceBase, StoredCatalog, UnassignParams,
 };
 
-use crate::apiclient::{describe, http, resolve_by_id, send, urlencoding, Endpoint};
+use crate::apiclient::{resolve_by_id, text};
 use crate::catalog_share::registry::{
     git_blob_sha, git_blob_sha_of_file, CatalogEntry, CatalogSourceRegistry, LocalState,
 };
@@ -96,6 +95,21 @@ impl From<CatalogFinding> for CatalogueFinding {
 
 fn findings(list: Vec<CatalogFinding>) -> Vec<CatalogueFinding> {
     list.into_iter().map(Into::into).collect()
+}
+
+impl From<AssignOutcome> for AssignmentOutcome {
+    fn from(outcome: AssignOutcome) -> Self {
+        match outcome {
+            AssignOutcome::Done { warnings } => Self::Done {
+                warnings: findings(warnings),
+            },
+            AssignOutcome::Rejected(r) => Self::Rejected {
+                error: r.error,
+                findings: findings(r.findings),
+            },
+            AssignOutcome::Conflict(c) => Self::Conflict { current: c.current },
+        }
+    }
 }
 
 struct LibraryEntry {
@@ -198,76 +212,8 @@ fn assign_request(
     })
 }
 
-async fn list_daemons(ep: &Endpoint) -> Result<DaemonList, String> {
-    send(http().get(format!("{}/v1/admin/daemons", ep.base_url)).bearer_auth(&ep.api_key)).await
-}
-
-async fn fetch_catalogue(ep: &Endpoint, blob_sha: &str) -> Result<StoredCatalog, String> {
-    let url = format!("{}/v1/admin/catalogs/{}", ep.base_url, urlencoding(blob_sha));
-    send(http().get(url).bearer_auth(&ep.api_key)).await
-}
-
-async fn put_assignment(ep: &Endpoint, body: &AssignCatalog) -> Result<AssignmentOutcome, String> {
-    let url = format!("{}/v1/admin/assignments", ep.base_url);
-    outcome(request(http().put(url).bearer_auth(&ep.api_key).json(body)).await?).await
-}
-
-async fn delete_assignment(ep: &Endpoint, params: &UnassignParams) -> Result<AssignmentOutcome, String> {
-    let mut url = format!(
-        "{}/v1/admin/assignments?daemon_id={}&interface={}",
-        ep.base_url,
-        urlencoding(&params.daemon_id),
-        urlencoding(&params.interface)
-    );
-    if let Some(expected) = &params.expected {
-        url.push_str(&format!("&expected={}", urlencoding(expected)));
-    }
-    let resp = request(http().delete(url).bearer_auth(&ep.api_key)).await?;
-    // A gateway before the change to an idempotent DELETE answers 404 when nothing is assigned.
-    if resp.status() == StatusCode::NOT_FOUND {
-        return Ok(AssignmentOutcome::Done { warnings: Vec::new() });
-    }
-    outcome(resp).await
-}
-
-async fn request(req: reqwest::RequestBuilder) -> Result<reqwest::Response, String> {
-    req.send().await.map_err(|e| format!("API request failed: {}", describe(&e)))
-}
-
-/// A 200 with no body is a `DELETE`'s 204; any other answer the admin API does
-/// not define comes back as its `error` text.
-async fn outcome(resp: reqwest::Response) -> Result<AssignmentOutcome, String> {
-    let status = resp.status();
-    let body = resp.bytes().await.map_err(|e| format!("API response failed: {}", describe(&e)))?;
-    match status {
-        StatusCode::CONFLICT => {
-            if let Ok(c) = serde_json::from_slice::<AssignmentConflict>(&body) {
-                return Ok(AssignmentOutcome::Conflict { current: c.current });
-            }
-        }
-        StatusCode::BAD_REQUEST => {
-            if let Ok(r) = serde_json::from_slice::<CatalogRejected>(&body) {
-                return Ok(AssignmentOutcome::Rejected { error: r.error, findings: findings(r.findings) });
-            }
-        }
-        s if s.is_success() && body.is_empty() => {
-            return Ok(AssignmentOutcome::Done { warnings: Vec::new() });
-        }
-        s if s.is_success() => {
-            return serde_json::from_slice::<AssignedCatalog>(&body)
-                .map(|a| AssignmentOutcome::Done { warnings: findings(a.warnings) })
-                .map_err(|e| format!("API response decode failed: {e}"));
-        }
-        _ => {}
-    }
-    Err(serde_json::from_slice::<serde_json::Value>(&body)
-        .ok()
-        .and_then(|v| v.get("error").and_then(|e| e.as_str()).map(String::from))
-        .unwrap_or_else(|| format!("HTTP {status}")))
-}
-
-async fn endpoint(app: &AppHandle, profile_id: &str) -> Result<Endpoint, String> {
-    Ok(resolve_by_id(app, profile_id).await?.endpoint())
+async fn client(app: &AppHandle, profile_id: &str) -> Result<GatewayClient, String> {
+    Ok(resolve_by_id(app, profile_id).await?.client)
 }
 
 async fn read_library(app: &AppHandle) -> Library {
@@ -292,8 +238,15 @@ fn library_file(app: &AppHandle, filename: &str) -> Result<(String, Vec<u8>), St
 }
 
 #[tauri::command]
-pub async fn gateway_list_daemons(app: AppHandle, profile_id: String) -> Result<Vec<GatewayDaemon>, String> {
-    let list = list_daemons(&endpoint(&app, &profile_id).await?).await?;
+pub async fn gateway_list_daemons(
+    app: AppHandle,
+    profile_id: String,
+) -> Result<Vec<GatewayDaemon>, String> {
+    let list = client(&app, &profile_id)
+        .await?
+        .daemons()
+        .await
+        .map_err(text)?;
     Ok(daemon_views(list, &read_library(&app).await))
 }
 
@@ -307,7 +260,7 @@ pub async fn gateway_assign_catalogue(
     filename: String,
     expected: String,
 ) -> Result<AssignmentOutcome, String> {
-    let ep = endpoint(&app, &profile_id).await?;
+    let client = client(&app, &profile_id).await?;
     let (filename, bytes) = library_file(&app, &filename)?;
     let body = app.state::<CatalogSourceRegistry>().read(&app, |r| {
         let tracked: Vec<_> = r
@@ -316,7 +269,11 @@ pub async fn gateway_assign_catalogue(
             .collect();
         assign_request(daemon_id, interface, bytes, &tracked, Some(expected))
     })?;
-    put_assignment(&ep, &body).await
+    client
+        .assign_catalogue(&body)
+        .await
+        .map(Into::into)
+        .map_err(text)
 }
 
 #[tauri::command]
@@ -327,8 +284,17 @@ pub async fn gateway_clear_assignment(
     interface: String,
     expected: String,
 ) -> Result<AssignmentOutcome, String> {
-    let ep = endpoint(&app, &profile_id).await?;
-    delete_assignment(&ep, &UnassignParams { daemon_id, interface, expected: Some(expected) }).await
+    let params = UnassignParams {
+        daemon_id,
+        interface,
+        expected: Some(expected),
+    };
+    client(&app, &profile_id)
+        .await?
+        .unassign_catalogue(&params)
+        .await
+        .map(Into::into)
+        .map_err(text)
 }
 
 /// Copy a catalogue the gateway stores into the decoder library, returning its path.
@@ -339,7 +305,11 @@ pub async fn gateway_copy_catalogue(
     blob_sha: String,
     name: Option<String>,
 ) -> Result<String, String> {
-    let stored = fetch_catalogue(&endpoint(&app, &profile_id).await?, &blob_sha).await?;
+    let stored = client(&app, &profile_id)
+        .await?
+        .stored_catalogue(&blob_sha)
+        .await
+        .map_err(text)?;
     let filename = copy_filename(&stored, name.as_deref());
     crate::catalog::import_catalog(app, filename, stored.content).await
 }
@@ -377,12 +347,12 @@ mod tests {
     }
 
     /// A one-request HTTP server on 127.0.0.1 answering `status` with `body`.
-    async fn mock(status: u16, body: &str) -> (Endpoint, tokio::task::JoinHandle<Request>) {
+    async fn mock(status: u16, body: &str) -> (GatewayClient, tokio::task::JoinHandle<Request>) {
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let ep = Endpoint {
-            base_url: format!("http://{}", listener.local_addr().unwrap()),
-            api_key: "admin-key".into(),
-        };
+        let ep = crate::apiclient::gateway().with_endpoint(
+            &format!("http://{}", listener.local_addr().unwrap()),
+            "admin-key",
+        );
         let body = body.to_string();
         let served = tokio::spawn(async move {
             let (mut sock, _) = listener.accept().await.unwrap();
@@ -476,7 +446,7 @@ mod tests {
               "assignment": null, "active": null },
         ]}]});
         let (ep, served) = mock(200, &body.to_string()).await;
-        let views = daemon_views(list_daemons(&ep).await.unwrap(), &library());
+        let views = daemon_views(ep.daemons().await.unwrap(), &library());
         let request = served.await.unwrap();
         assert_eq!((request.method.as_str(), request.target.as_str()), ("GET", "/v1/admin/daemons"));
         assert_eq!(request.authorisation.as_deref(), Some("Bearer admin-key"));
@@ -514,7 +484,7 @@ mod tests {
             "warnings": [{ "field": "frame.0x100", "message": "no signals" }],
         });
         let (ep, served) = mock(200, &answer.to_string()).await;
-        let outcome = put_assignment(&ep, &request).await.unwrap();
+        let outcome = AssignmentOutcome::from(ep.assign_catalogue(&request).await.unwrap());
         let sent_request = served.await.unwrap();
 
         assert_eq!((sent_request.method.as_str(), sent_request.target.as_str()), ("PUT", "/v1/admin/assignments"));
@@ -562,7 +532,7 @@ mod tests {
         let (ep, served) =
             mock(409, &json!({ "error": "the assignment changed since it was read", "current": B }).to_string()).await;
         let params = UnassignParams { daemon_id: "debian".into(), interface: "/dev/ttyUSB0".into(), expected: Some(A.into()) };
-        let outcome = delete_assignment(&ep, &params).await.unwrap();
+        let outcome = AssignmentOutcome::from(ep.unassign_catalogue(&params).await.unwrap());
         let request = served.await.unwrap();
         assert_eq!(request.method, "DELETE");
         assert_eq!(
@@ -578,7 +548,7 @@ mod tests {
         let (ep, _served) = mock(400, &body.to_string()).await;
         let request = assign_request("d".into(), "i".into(), b"x = 1".to_vec(), &[], None).unwrap();
         assert_eq!(
-            put_assignment(&ep, &request).await.unwrap(),
+            AssignmentOutcome::from(ep.assign_catalogue(&request).await.unwrap()),
             AssignmentOutcome::Rejected {
                 error: "meta.name: missing".into(),
                 findings: vec![CatalogueFinding { field: "meta.name".into(), message: "missing".into() }],
@@ -590,14 +560,30 @@ mod tests {
     async fn a_clear_of_nothing_is_done_and_other_failures_come_back_as_their_error() {
         let params = UnassignParams { daemon_id: "d".into(), interface: "i".into(), expected: None };
         let (ep, served) = mock(204, "").await;
-        assert_eq!(delete_assignment(&ep, &params).await.unwrap(), AssignmentOutcome::Done { warnings: vec![] });
-        assert_eq!(served.await.unwrap().target, "/v1/admin/assignments?daemon_id=d&interface=i");
+        assert_eq!(
+            ep.unassign_catalogue(&params).await.unwrap(),
+            AssignOutcome::Done { warnings: vec![] }
+        );
+        assert_eq!(
+            served.await.unwrap().target,
+            "/v1/admin/assignments?daemon_id=d&interface=i"
+        );
 
-        let (ep, _served) = mock(404, &json!({ "error": "nothing is assigned there" }).to_string()).await;
-        assert_eq!(delete_assignment(&ep, &params).await.unwrap(), AssignmentOutcome::Done { warnings: vec![] });
+        let (ep, _served) = mock(
+            404,
+            &json!({ "error": "nothing is assigned there" }).to_string(),
+        )
+        .await;
+        assert_eq!(
+            ep.unassign_catalogue(&params).await.unwrap(),
+            AssignOutcome::Done { warnings: vec![] }
+        );
 
         let (ep, _served) = mock(403, &json!({ "error": "admin role required" }).to_string()).await;
-        assert_eq!(list_daemons(&ep).await.unwrap_err(), "admin role required");
+        assert_eq!(
+            ep.daemons().await.unwrap_err().to_string(),
+            "admin role required"
+        );
     }
 
     #[test]
@@ -619,7 +605,7 @@ mod tests {
         let content = "[meta]\r\nname = \"Site\"\r\n";
         let body = json!({ "blob_sha": A, "content": content, "provenance": { "path": "cats/site.toml" }, "created_at_us": 1 });
         let (ep, served) = mock(200, &body.to_string()).await;
-        let stored = fetch_catalogue(&ep, A).await.unwrap();
+        let stored = ep.stored_catalogue(A).await.unwrap();
         assert_eq!(served.await.unwrap().target, format!("/v1/admin/catalogs/{A}"));
         assert_eq!(stored.content, content);
     }

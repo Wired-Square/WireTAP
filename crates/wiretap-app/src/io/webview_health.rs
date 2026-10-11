@@ -424,7 +424,7 @@ async fn log_session_status() {
             suspended
         )
     });
-    let running_queries = crate::apiclient::running_queries().await;
+    let running_queries = crate::apiclient::gateway().running();
 
     if lines.is_empty() && running_queries.is_empty() {
         return; // Don't log if nothing active
@@ -439,8 +439,11 @@ async fn log_session_status() {
         for (id, query) in running_queries {
             let elapsed = query.started_at.elapsed().as_secs();
             tlog!(
-                "[session status]   '{}': type={}, profile={}, running for {}s",
-                id, query.query_type, query.profile_id, elapsed
+                "[session status]   '{}': path={}, profile={}, running for {}s",
+                id,
+                query.path,
+                query.label,
+                elapsed
             );
         }
     }

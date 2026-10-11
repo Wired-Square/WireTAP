@@ -12,12 +12,13 @@
 use async_trait::async_trait;
 use std::collections::VecDeque;
 use std::time::Duration;
-use wiretap_gateway::{FrameBatch, FrameBatchRow, Protocol as ArchiveProtocol};
+use wiretap_gateway::client::{ArchiveFrame, ClientError, FrameCursor};
+use wiretap_gateway::{FramesQuery, Protocol as ArchiveProtocol};
 
 use wiretap_io::replay::{Pacer, PlaybackControl, Playout, Unlimited};
 
 use super::base::{publish_position, RecordedSourceState};
-use crate::apiclient::{frame_tag, protocol_query};
+use crate::apiclient::{frame_tag, gateway};
 use crate::capture_store::{self, CaptureKind};
 use crate::io::{
     emit_capture_changed, emit_session_error, emit_stream_ended, signal_frames_ready,
@@ -159,111 +160,69 @@ impl IOSource for BackendApiSource {
 }
 
 // ---------------------------------------------------------------------------
-// HTTP cursor fetcher
+// Gateway pages
 // ---------------------------------------------------------------------------
 
-/// Owns the HTTP cursor state for one stream (no lifetime coupling — just
-/// owned strings — unlike the DB portal, hence a separate loop is cheap).
-struct CursorFetcher {
-    client: reqwest::Client,
-    base_url: String,
-    api_key: String,
-    database: String,
+struct Pages {
+    cursor: FrameCursor,
     protocol: ArchiveProtocol,
-    start: Option<String>,
-    end: Option<String>,
-    page_size: u32,
-    cursor: Option<String>,
-    exhausted: bool,
-    remaining: Option<i64>, // honours options.limit across pages
 }
 
-impl CursorFetcher {
-    fn frames_url(&self) -> String {
-        let mut url = format!(
-            "{}/v1/db/{}/frames?limit={}{}",
-            self.base_url,
-            self.database,
-            self.page_size,
-            protocol_query(self.protocol, false)
-        );
-        if let Some(s) = &self.start {
-            url.push_str(&format!("&start={}", crate::apiclient::urlencoding(s)));
+impl Pages {
+    fn new(config: &BackendApiConfig, options: &BackendApiSourceOptions) -> Self {
+        let query = FramesQuery {
+            start: options.start.clone(),
+            end: options.end.clone(),
+            after: None,
+            limit: Some(options.batch_size.clamp(1, 5000) as u32),
+            protocol: None,
+        };
+        let cursor = gateway()
+            .with_endpoint(&config.base_url, &config.api_key)
+            .db(&config.database, config.protocol)
+            .frames(query);
+        let cursor = match options.limit {
+            Some(limit) => cursor.at_most(limit.max(0) as usize),
+            None => cursor,
+        };
+        Self {
+            cursor,
+            protocol: config.protocol,
         }
-        if let Some(e) = &self.end {
-            url.push_str(&format!("&end={}", crate::apiclient::urlencoding(e)));
-        }
-        if let Some(c) = &self.cursor {
-            url.push_str(&format!("&after={}", crate::apiclient::urlencoding(c)));
-        }
-        url
     }
 
-    /// Fetch the next page; returns parsed frames (empty once exhausted).
     async fn next_page(&mut self) -> Result<Vec<FrameMessage>, String> {
-        if self.exhausted || self.remaining == Some(0) {
-            return Ok(Vec::new());
-        }
-        let resp = self
-            .client
-            .get(self.frames_url())
-            .bearer_auth(&self.api_key)
-            .send()
-            .await
-            .map_err(|e| format!("frame fetch failed: {}", crate::apiclient::describe(&e)))?;
-        let batch: FrameBatch = crate::apiclient::parse(resp)
-            .await
-            .map_err(|e| format!("frame fetch failed: {e}"))?;
-
-        self.cursor = batch.next_cursor;
-        if self.cursor.is_none() {
-            self.exhausted = true;
-        }
-
-        let mut frames = batch
-            .frames
+        let page = self.cursor.next_page().await.map_err(fetch_error)?;
+        Ok(page
             .into_iter()
-            .map(|row| frame_from_row(self.protocol, row))
-            .collect::<Result<Vec<_>, _>>()?;
-        if let Some(rem) = self.remaining.as_mut() {
-            if frames.len() as i64 > *rem {
-                frames.truncate(*rem as usize);
-                self.exhausted = true;
-            }
-            *rem -= frames.len() as i64;
-        }
-        Ok(frames)
+            .map(|f| frame_message(self.protocol, f))
+            .collect())
     }
 }
 
-/// The row's `dlc` is the archive's CAN length code, and an older gateway serves
-/// no `len`, so the length comes from the payload instead — but for an RTR,
-/// whose code is the length it asks for.
-fn frame_from_row(protocol: ArchiveProtocol, row: FrameBatchRow) -> Result<FrameMessage, String> {
-    let bytes =
-        hex::decode(&row.data_hex).map_err(|e| format!("bad data_hex '{}': {e}", row.data_hex))?;
-    let dlc = if row.is_rtr {
-        wiretap_protocol::dlc_to_len(row.dlc as u8, false)
-    } else {
-        bytes.len()
-    };
-    Ok(FrameMessage {
+fn fetch_error(e: ClientError) -> String {
+    match e {
+        ClientError::Transport(cause) => format!("frame fetch failed: {cause}"),
+        ClientError::BadHex(_) => e.to_string(),
+        e => format!("frame fetch failed: {e}"),
+    }
+}
+
+fn frame_message(protocol: ArchiveProtocol, f: ArchiveFrame) -> FrameMessage {
+    FrameMessage {
         protocol: frame_tag(protocol).to_string(),
-        timestamp_us: row.ts_us as u64,
-        frame_id: row.id,
-        bus: row.bus,
-        dlc: dlc as u16,
-        bytes,
-        is_extended: row.extended,
-        is_fd: row.is_fd,
-        is_rtr: row.is_rtr,
-        is_brs: row.is_brs,
-        is_esi: row.is_esi,
-        source_address: None,
-        incomplete: None,
-        direction: None,
+        timestamp_us: f.ts_us as u64,
+        frame_id: f.id,
+        bus: f.bus,
+        dlc: f.len,
+        bytes: f.data,
+        is_extended: f.extended,
+        is_fd: f.is_fd,
+        is_rtr: f.is_rtr,
+        is_brs: f.is_brs,
+        is_esi: f.is_esi,
         ..Default::default()
-    })
+    }
 }
 
 /// Played frames land in the session's capture, the position counting them.
@@ -304,33 +263,17 @@ async fn run_api_stream(
     const REFILL_THRESHOLD: usize = 200;
     const UNLIMITED: Unlimited = Unlimited { batch: 50, yield_ms: 2 };
 
-    let mut fetcher = CursorFetcher {
-        // The same client the query path uses — one pool for one gateway, and it
-        // carries `net::CONNECT_TIMEOUT`, which reqwest needs because it resolves
-        // inside itself where `resolve_host_port` cannot reach. Connect only: a
-        // page of frames may legitimately take a while to come back.
-        client: crate::apiclient::http().clone(),
-        base_url: config.base_url.clone(),
-        api_key: config.api_key.clone(),
-        database: config.database.clone(),
-        protocol: config.protocol,
-        start: options.start.clone(),
-        end: options.end.clone(),
-        page_size: options.batch_size.clamp(1, 5000) as u32,
-        cursor: None,
-        exhausted: false,
-        remaining: options.limit,
-    };
+    let mut fetcher = Pages::new(&config, &options);
 
     let mut frame_queue: VecDeque<FrameMessage> = VecDeque::new();
 
     // Refill helper: pull pages until the buffer reaches target or exhausted
     async fn refill(
-        fetcher: &mut CursorFetcher,
+        fetcher: &mut Pages,
         queue: &mut VecDeque<FrameMessage>,
         target: usize,
     ) -> Result<(), String> {
-        while queue.len() < target && !fetcher.exhausted {
+        while queue.len() < target && !fetcher.cursor.is_done() {
             let page = fetcher.next_page().await?;
             if page.is_empty() {
                 break;
@@ -369,14 +312,14 @@ async fn run_api_stream(
 
         pacer.keep_time(&control).await;
 
-        if frame_queue.len() < REFILL_THRESHOLD && !fetcher.exhausted {
+        if frame_queue.len() < REFILL_THRESHOLD && !fetcher.cursor.is_done() {
             refill(&mut fetcher, &mut frame_queue, BUFFER_SIZE).await?;
         }
 
         let frame = match frame_queue.pop_front() {
             Some(f) => f,
             None => {
-                if fetcher.exhausted {
+                if fetcher.cursor.is_done() {
                     break;
                 }
                 tokio::time::sleep(Duration::from_millis(10)).await;
@@ -416,57 +359,6 @@ async fn run_api_stream(
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn row(json: serde_json::Value) -> FrameBatchRow {
-        serde_json::from_value(json).unwrap()
-    }
-
-    #[test]
-    fn an_fd_row_takes_its_length_from_the_payload_not_the_length_code() {
-        let frame = frame_from_row(
-            ArchiveProtocol::Can,
-            row(serde_json::json!({
-                "ts_us": 1, "id": 0x123, "extended": false, "dlc": 15, "is_fd": true,
-                "bus": 0, "dir": "rx", "data_hex": "ab".repeat(64),
-            })),
-        )
-        .unwrap();
-        assert_eq!(frame.dlc, 64);
-        assert_eq!(frame.bytes.len(), 64);
-    }
-
-    fn can_row(extra: serde_json::Value) -> FrameMessage {
-        let mut json = serde_json::json!({
-            "ts_us": 1, "id": 0x123, "extended": false, "dlc": 0, "is_fd": false,
-            "bus": 0, "dir": "rx", "data_hex": "",
-        });
-        json.as_object_mut().unwrap().extend(extra.as_object().unwrap().clone());
-        frame_from_row(ArchiveProtocol::Can, row(json)).unwrap()
-    }
-
-    #[test]
-    fn a_remote_row_asks_for_its_length_code_with_no_payload() {
-        let frame = can_row(serde_json::json!({ "dlc": 4, "is_rtr": true }));
-        assert!(frame.is_rtr);
-        assert_eq!(frame.dlc, 4);
-        assert!(frame.bytes.is_empty());
-    }
-
-    #[test]
-    fn an_fd_row_keeps_its_brs_and_esi() {
-        let frame = can_row(serde_json::json!({
-            "dlc": 9, "is_fd": true, "is_brs": true, "is_esi": true, "data_hex": "00".repeat(12),
-        }));
-        assert!(frame.is_brs && frame.is_esi && !frame.is_rtr);
-        assert_eq!(frame.dlc, 12);
-    }
-
-    #[test]
-    fn a_row_from_an_older_gateway_has_no_flags() {
-        let frame = can_row(serde_json::json!({ "dlc": 2, "data_hex": "abcd" }));
-        assert!(!frame.is_rtr && !frame.is_brs && !frame.is_esi);
-        assert_eq!(frame.dlc, 2);
-    }
 
     /// A gateway serving `pages` in turn, each `(rows, next_cursor)`, that
     /// records the path of every request.
@@ -588,19 +480,5 @@ mod tests {
 
         assert_eq!(streamed.frames.len(), 30);
         assert!(streamed.elapsed >= Duration::from_millis(350), "finished in {:?}", streamed.elapsed);
-    }
-
-    #[test]
-    fn a_modbus_message_over_255_bytes_counts_every_byte() {
-        let frame = frame_from_row(
-            ArchiveProtocol::Modbus,
-            row(serde_json::json!({
-                "ts_us": 1, "id": 0x0103, "extended": false, "dlc": 256, "is_fd": false,
-                "bus": 0, "dir": "rx", "data_hex": "00".repeat(256),
-            })),
-        )
-        .unwrap();
-        assert_eq!(frame.protocol, "modbus_rtu");
-        assert_eq!(frame.dlc, 256);
     }
 }
