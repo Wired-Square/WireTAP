@@ -281,7 +281,7 @@ pub fn run() {
             // Checksum calculation API
             checksums::calculate_checksum_cmd,
             checksums::validate_checksum_cmd,
-            checksums::resolve_byte_index_cmd,
+            checksums::resolve_byte_indices,
             checksums::sweep_checksum_specs_cmd,
             checksums::detect_checksum_cmd,
             checksum_discovery::discover_checksums_cmd,

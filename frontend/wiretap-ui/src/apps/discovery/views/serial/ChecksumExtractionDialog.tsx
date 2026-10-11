@@ -12,7 +12,8 @@ import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { flexRowGap2 } from '../../../../styles/spacing';
 import Dialog, { DialogBody, DialogFooter } from '../../../../components/Dialog';
-import { resolveByteIndexSync, type ChecksumAlgorithm } from '../../../../utils/analysis/checksums';
+import type { ChecksumAlgorithm } from '../../../../utils/analysis/checksums';
+import { useResolvedByteIndices } from '../../../../hooks/useResolvedByteIndices';
 import {
   detectChecksum,
   sweepChecksumSpecs,
@@ -108,6 +109,11 @@ export default function ChecksumExtractionDialog({
   /** The set detection actually ran on — the match rate must agree with it. */
   const [frames, setFrames] = useState<number[][]>(sampleFrames);
   const [matchRate, setMatchRate] = useState<{ matches: number; total: number }>({ matches: 0, total: 0 });
+  const previewFrames = frames.slice(0, 5);
+  const resolve = useResolvedByteIndices(
+    [config.startByte, config.calcStartByte, config.calcEndByte],
+    previewFrames.map((frame) => frame.length),
+  );
 
   // Track whether we've initialized for this dialog open session
   const hasInitializedRef = useRef(false);
@@ -284,17 +290,18 @@ export default function ChecksumExtractionDialog({
 
         {/* Sample frames preview */}
         <div className={`space-y-2 font-mono text-sm ${bgDataView} p-3 rounded max-h-40 overflow-y-auto`}>
-          {frames.slice(0, 5).map((frame, frameIdx) => {
-            const checksumStart = resolveByteIndexSync(config.startByte, frame.length);
-            const calcEnd = resolveByteIndexSync(config.calcEndByte, frame.length);
+          {previewFrames.map((frame, frameIdx) => {
+            const checksumStart = resolve(config.startByte, frame.length);
+            const calcStart = resolve(config.calcStartByte, frame.length);
+            const calcEnd = resolve(config.calcEndByte, frame.length);
 
             return (
               <div key={frameIdx} className={flexRowGap2}>
                 <span className={`${textMuted} w-6 text-right`}>{frameIdx + 1}.</span>
                 <div className="flex gap-1 flex-wrap">
                   {frame.map((byte, byteIdx) => {
-                    const isChecksum = byteIdx >= checksumStart && byteIdx < checksumStart + config.numBytes;
-                    const isCalcData = byteIdx >= config.calcStartByte && byteIdx < calcEnd;
+                    const isChecksum = checksumStart !== null && byteIdx >= checksumStart && byteIdx < checksumStart + config.numBytes;
+                    const isCalcData = calcStart !== null && calcEnd !== null && byteIdx >= calcStart && byteIdx < calcEnd;
                     // Mark constant trailing columns, so it is visible why a
                     // position was passed over rather than merely asserted.
                     const isConstant = detection?.tailColumns.some(

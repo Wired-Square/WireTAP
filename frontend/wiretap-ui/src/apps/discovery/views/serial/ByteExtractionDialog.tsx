@@ -7,7 +7,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { flexRowGap2 } from '../../../../styles/spacing';
 import Dialog, { DialogBody, DialogFooter } from '../../../../components/Dialog';
-import { resolveByteIndexSync } from '../../../../utils/analysis/checksums';
+import { useResolvedByteIndices } from '../../../../hooks/useResolvedByteIndices';
 import { type ExtractionConfig } from './serialTypes';
 import { byteToHex } from '../../../../utils/byteUtils';
 import { extractSerialIds, toFrameIdConfig } from '../../../../api/capture';
@@ -90,13 +90,12 @@ export default function ByteExtractionDialog({
     }
   };
 
-  // Check if byte is in current selection range (handles negative indices)
-  const isByteSelected = (byteIndex: number, frameLength: number) => {
-    const resolvedStart = resolveByteIndexSync(startByte, frameLength);
-    return byteIndex >= resolvedStart && byteIndex < resolvedStart + numBytes;
-  };
-
   const previewFrames = useMemo(() => sampleFrames.slice(0, 5), [sampleFrames]);
+  const resolve = useResolvedByteIndices([startByte], previewFrames.map((frame) => frame.length));
+  const isByteSelected = (byteIndex: number, frameLength: number) => {
+    const resolvedStart = resolve(startByte, frameLength);
+    return resolvedStart !== null && byteIndex >= resolvedStart && byteIndex < resolvedStart + numBytes;
+  };
   const [previewIds, setPreviewIds] = useState<(number | null)[]>([]);
   useEffect(() => {
     if (!isOpen) return;

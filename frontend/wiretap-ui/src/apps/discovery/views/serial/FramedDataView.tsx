@@ -11,7 +11,7 @@ import { useDiscoveryUIStore } from '../../../../stores/discoveryUIStore';
 import { useCaptureFrameView } from '../../hooks/useCaptureFrameView';
 import type { ProtocolFrames } from '../../../../utils/frameKey';
 import type { SerialFrameConfig } from '../../../../utils/frameExport';
-import { resolveByteIndexSync } from '../../../../utils/analysis/checksums';
+import { useResolvedByteIndices, type ByteIndexResolver } from '../../../../hooks/useResolvedByteIndices';
 import {
   type ExtractionConfig,
   type ChecksumConfig,
@@ -135,39 +135,24 @@ interface ColoredHexBytesProps {
   srcConfig: ExtractionConfig | null;
   checksumConfig: ChecksumConfig | null;
   incomplete?: boolean;
+  resolve: ByteIndexResolver;
 }
 
-function ColoredHexBytes({ bytes, idConfig, srcConfig, checksumConfig, incomplete }: ColoredHexBytesProps) {
+function ColoredHexBytes({ bytes, idConfig, srcConfig, checksumConfig, incomplete, resolve }: ColoredHexBytesProps) {
   // Build array of byte colors
   const byteColors = useMemo(() => {
     const colors: string[] = new Array(bytes.length).fill(incomplete ? 'text-orange' : 'text-green');
-
-    // Color ID bytes (cyan)
-    if (idConfig) {
-      const start = resolveByteIndexSync(idConfig.startByte, bytes.length);
-      for (let i = start; i < start + idConfig.numBytes && i < bytes.length; i++) {
-        colors[i] = 'text-cyan';
-      }
-    }
-
-    // Color source bytes (purple) - may overlap with ID
-    if (srcConfig) {
-      const start = resolveByteIndexSync(srcConfig.startByte, bytes.length);
-      for (let i = start; i < start + srcConfig.numBytes && i < bytes.length; i++) {
-        colors[i] = 'text-purple';
-      }
-    }
-
-    // Color checksum bytes (amber) - typically at end of frame
-    if (checksumConfig) {
-      const start = resolveByteIndexSync(checksumConfig.startByte, bytes.length);
-      for (let i = start; i < start + checksumConfig.numBytes && i < bytes.length; i++) {
-        colors[i] = 'text-amber';
-      }
-    }
-
+    const paint = (config: ExtractionConfig | null, colour: string) => {
+      const start = config ? resolve(config.startByte, bytes.length) : null;
+      if (config === null || start === null) return;
+      for (let i = start; i < start + config.numBytes && i < bytes.length; i++) colors[i] = colour;
+    };
+    // Later regions paint over earlier ones: source over id, checksum over both.
+    paint(idConfig, 'text-cyan');
+    paint(srcConfig, 'text-purple');
+    paint(checksumConfig, 'text-amber');
     return colors;
-  }, [bytes.length, idConfig, srcConfig, checksumConfig, incomplete]);
+  }, [bytes.length, idConfig, srcConfig, checksumConfig, incomplete, resolve]);
 
   return (
     <span className="break-all">
@@ -398,6 +383,10 @@ export default function FramedDataView({ captureId, sessionId, onAccept, onApply
     return () => { cancelled = true; };
   }, [frames, idConfig, srcConfig]);
   const hasSourceAddresses = processedFrames.some(f => f.source_address !== undefined);
+  const resolve = useResolvedByteIndices(
+    [idConfig, srcConfig, checksumConfig].flatMap((c) => (c ? [c.startByte] : [])),
+    processedFrames.map((f) => f.bytes.length),
+  );
 
   // Custom byte renderer with extraction region coloring
   const renderColoredBytes = useCallback((frame: FrameRow) => {
@@ -408,9 +397,10 @@ export default function FramedDataView({ captureId, sessionId, onAccept, onApply
         srcConfig={srcConfig}
         checksumConfig={checksumConfig}
         incomplete={frame.incomplete}
+        resolve={resolve}
       />
     );
-  }, [idConfig, srcConfig, checksumConfig]);
+  }, [idConfig, srcConfig, checksumConfig, resolve]);
 
   return (
     <div className="flex flex-col h-full overflow-hidden">

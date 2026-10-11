@@ -121,7 +121,6 @@ export {
 export {
   calculateChecksum,
   validateChecksum,
-  resolveByteIndex,
   type ChecksumAlgorithm,
   type ChecksumValidationResult,
 } from "./checksums";

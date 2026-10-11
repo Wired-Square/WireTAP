@@ -6,7 +6,8 @@ import { h3, helpText } from "../../../styles";
 import type { TomlNode, ChecksumAlgorithm } from "../types";
 import { useCatalogEditorStore } from "../../../stores/catalogEditorStore";
 import { frameAt } from "../model";
-import { CHECKSUM_ALGORITHMS, resolveByteIndexSync } from "../checksums";
+import { CHECKSUM_ALGORITHMS } from "../checksums";
+import { useResolvedByteIndices } from "../../../hooks/useResolvedByteIndices";
 import { Card } from "../../../components/Card";
 export type ChecksumFields = {
   name: string;
@@ -39,10 +40,16 @@ export default function ChecksumEditDialog({
   onSave,
 }: ChecksumEditDialogProps) {
   const frameLength = useCatalogEditorStore((s) => (selectedNode && frameAt(s.tree.catalog, selectedNode.path)?.length) || 8);
+  const resolve = useResolvedByteIndices([fields.start_byte, fields.calc_start_byte, fields.calc_end_byte], [frameLength]);
 
   if (!open || !selectedNode) {
     return null;
   }
+
+  const checksumStart = resolve(fields.start_byte, frameLength);
+  const calcStart = resolve(fields.calc_start_byte, frameLength);
+  const calcEnd = resolve(fields.calc_end_byte, frameLength);
+  const calcRangeEmpty = calcStart !== null && calcEnd !== null && calcStart >= calcEnd;
 
   // Get algorithm info for UI hints
   const selectedAlgorithm = CHECKSUM_ALGORITHMS.find((a) => a.id === fields.algorithm);
@@ -112,7 +119,7 @@ export default function ChecksumEditDialog({
               </FormField>
               {fields.start_byte < 0 && (
                 <p className="mt-1 text-xs text-purple">
-                  → byte {resolveByteIndexSync(fields.start_byte, frameLength)}
+                  → byte {checksumStart ?? "…"}
                 </p>
               )}
             </div>
@@ -174,7 +181,7 @@ export default function ChecksumEditDialog({
               </FormField>
               {fields.calc_start_byte < 0 && (
                 <p className="mt-1 text-xs text-blue">
-                  → byte {resolveByteIndexSync(fields.calc_start_byte, frameLength)}
+                  → byte {calcStart ?? "…"}
                 </p>
               )}
             </div>
@@ -193,72 +200,55 @@ export default function ChecksumEditDialog({
               </FormField>
               {fields.calc_end_byte < 0 && (
                 <p className="mt-1 text-xs text-blue">
-                  → byte {resolveByteIndexSync(fields.calc_end_byte, frameLength)}
+                  → byte {calcEnd ?? "…"}
                 </p>
               )}
             </div>
           </div>
-          {(() => {
-            const resolvedStart = resolveByteIndexSync(fields.calc_start_byte, frameLength);
-            const resolvedEnd = resolveByteIndexSync(fields.calc_end_byte, frameLength);
-            if (resolvedStart >= resolvedEnd) {
-              return (
-                <p className="mt-2 text-xs text-red">
-                  End byte must be greater than start byte (resolved: {resolvedStart} to {resolvedEnd})
-                </p>
-              );
-            }
-            return (
-              <p className={`mt-2 ${helpText}`}>
-                Calculating over bytes {resolvedStart} to {resolvedEnd - 1} (
-                {Math.max(0, resolvedEnd - resolvedStart)} bytes total)
-              </p>
-            );
-          })()}
+          {calcStart !== null && calcEnd !== null && (calcRangeEmpty ? (
+            <p className="mt-2 text-xs text-red">
+              End byte must be greater than start byte (resolved: {calcStart} to {calcEnd})
+            </p>
+          ) : (
+            <p className={`mt-2 ${helpText}`}>
+              Calculating over bytes {calcStart} to {calcEnd - 1} ({calcEnd - calcStart} bytes total)
+            </p>
+          ))}
         </Card>
 
         {/* Byte Layout Visualization */}
         <div className="p-4 bg-surface rounded-lg">
           <h3 className={`${h3} mb-3`}>Byte Layout Preview</h3>
-          {(() => {
-            const resolvedStartByte = resolveByteIndexSync(fields.start_byte, frameLength);
-            const resolvedCalcStart = resolveByteIndexSync(fields.calc_start_byte, frameLength);
-            const resolvedCalcEnd = resolveByteIndexSync(fields.calc_end_byte, frameLength);
+          <div className="flex flex-wrap gap-1 font-mono text-xs">
+            {Array.from({ length: frameLength }).map((_, i) => {
+              const isChecksumByte =
+                checksumStart !== null && i >= checksumStart && i < checksumStart + fields.byte_length;
+              const isCalcByte = calcStart !== null && calcEnd !== null && i >= calcStart && i < calcEnd;
 
-            return (
-              <div className="flex flex-wrap gap-1 font-mono text-xs">
-                {Array.from({ length: frameLength }).map((_, i) => {
-                  const isChecksumByte =
-                    i >= resolvedStartByte && i < resolvedStartByte + fields.byte_length;
-                  const isCalcByte =
-                    i >= resolvedCalcStart && i < resolvedCalcEnd;
+              let bgClass = "bg-tertiary text-muted";
+              if (isChecksumByte) {
+                bgClass = "bg-purple text-purple";
+              } else if (isCalcByte) {
+                bgClass = "bg-info text-info";
+              }
 
-                  let bgClass = "bg-tertiary text-muted";
-                  if (isChecksumByte) {
-                    bgClass = "bg-purple text-purple";
-                  } else if (isCalcByte) {
-                    bgClass = "bg-info text-info";
+              return (
+                <div
+                  key={i}
+                  className={`w-7 h-7 flex items-center justify-center rounded ${bgClass}`}
+                  title={
+                    isChecksumByte
+                      ? "Checksum location"
+                      : isCalcByte
+                        ? "Included in calculation"
+                        : `Byte ${i}`
                   }
-
-                  return (
-                    <div
-                      key={i}
-                      className={`w-7 h-7 flex items-center justify-center rounded ${bgClass}`}
-                      title={
-                        isChecksumByte
-                          ? "Checksum location"
-                          : isCalcByte
-                            ? "Included in calculation"
-                            : `Byte ${i}`
-                      }
-                    >
-                      {i}
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          })()}
+                >
+                  {i}
+                </div>
+              );
+            })}
+          </div>
           <div className="flex items-center gap-4 mt-2 text-xs text-muted">
             <div className="flex items-center gap-1">
               <div className="w-3 h-3 rounded bg-purple"></div>
@@ -289,7 +279,9 @@ export default function ChecksumEditDialog({
           disabled={
             !fields.name.trim() ||
             !fields.algorithm ||
-            resolveByteIndexSync(fields.calc_start_byte, frameLength) >= resolveByteIndexSync(fields.calc_end_byte, frameLength)
+            calcStart === null ||
+            calcEnd === null ||
+            calcRangeEmpty
           }
         >
           {editingIndex !== null ? "Update Checksum" : "Add Checksum"}

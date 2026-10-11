@@ -86,22 +86,9 @@ export async function validateChecksum(
   });
 }
 
-/**
- * Resolve a byte index, supporting negative indexing.
- * Negative indices count from the end: -1 = last byte, -2 = second-to-last, etc.
- *
- * @param index - The byte index (can be negative)
- * @param frameLength - Total frame length in bytes
- * @returns The resolved absolute byte index
- */
-export async function resolveByteIndex(
-  index: number,
-  frameLength: number
-): Promise<number> {
-  return invoke<number>("resolve_byte_index_cmd", {
-    index,
-    frameLength,
-  });
+/** Each index resolved against each frame length, one row per length; a negative index counts from the end. */
+export async function resolveByteIndices(indices: number[], frameLengths: number[]): Promise<number[][]> {
+  return invoke<number[][]>("resolve_byte_indices", { indices, frame_lengths: frameLengths });
 }
 
 /** One point in the checksum candidate space. */

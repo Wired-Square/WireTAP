@@ -6,14 +6,6 @@ import { formatFrameId as formatHexId } from "../../utils/frameIds";
 
 export type FormattedId = { primary: string; secondary?: string };
 
-export function parseCanIdToNumber(id: string | number | null | undefined): number | null {
-  if (id === null || id === undefined) return null;
-  const str = String(id).trim();
-  if (/^0x[0-9a-fA-F]+$/.test(str)) return parseInt(str, 16);
-  if (/^\d+$/.test(str)) return parseInt(str, 10);
-  return null;
-}
-
 /** A catalogue frame's id in both radixes, its hex width by the extended flag; a frame keyed by a name shows its key. */
 export function formatFrameId(
   frame: Pick<Frame, "key" | "frameId" | "protocol" | "isExtended">,
