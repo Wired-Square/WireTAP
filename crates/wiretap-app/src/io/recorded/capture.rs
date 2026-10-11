@@ -11,8 +11,11 @@ use std::sync::{
 };
 use std::time::Duration;
 
-use super::base::{PlaybackControl, RecordedSourceState};
-use crate::io::{emit_session_error, post_session, signal_frames_ready, signal_playback_position, FrameMessage, IOCapabilities, IOSource, IOState, PlaybackPosition, SignalThrottle, StreamEndReason, TemporalMode};
+use super::base::{
+    publish_position, publish_position_now, Pacer, PlaybackControl, Playout, RecordedSourceState,
+    Unlimited,
+};
+use crate::io::{emit_session_error, post_session, signal_frames_ready, FrameMessage, IOCapabilities, IOSource, IOState, PlaybackPosition, SignalThrottle, StreamEndReason, TemporalMode};
 use crate::{capture_db, capture_store};
 
 /// `source_type()` for a session replaying a capture.
@@ -22,6 +25,8 @@ pub const CAPTURE_SOURCE_TYPE: &str = "capture";
 const NO_SEEK: i64 = i64::MIN;
 /// Sentinel value meaning "no frame seek requested"
 const NO_SEEK_FRAME: i64 = -1;
+/// Frames read from the capture at a time.
+const CHUNK_SIZE: usize = 2000;
 
 /// Capture Source - streams frames from the SQLite-backed capture store
 pub struct CaptureSource {
@@ -80,8 +85,7 @@ impl CaptureSource {
         }
         let Some(position) = position else { return };
         let session_id = self.reader_state.session_id();
-        crate::io::store_playback_position(session_id, position);
-        signal_playback_position(session_id);
+        publish_position_now(session_id, position);
         signal_frames_ready(session_id);
     }
 }
@@ -298,8 +302,7 @@ pub fn step_frame(
                 frame_index: new_idx,
                 frame_count: Some(total_frames),
             };
-            crate::io::store_playback_position(session_id, position);
-            signal_playback_position(session_id);
+            publish_position_now(session_id, position);
 
             Ok(Some(StepResult {
                 frame_index: new_idx,
@@ -346,6 +349,7 @@ fn load_chunk(
 
 /// Handle a seek operation (frame-based or timestamp-based).
 /// Returns true if a seek was handled.
+#[allow(clippy::too_many_arguments)]
 fn handle_seek(
     session_id: &str,
     buf_id: &str,
@@ -357,57 +361,45 @@ fn handle_seek(
     chunk_idx: &mut usize,
     frame_index: &mut usize,
     last_consumed_rowid: &mut i64,
-    batch_buffer: &mut Vec<FrameMessage>,
-    playback_baseline_secs: &mut f64,
-    wall_clock_baseline: &mut std::time::Instant,
-    last_frame_time_secs: &mut Option<f64>,
+    pacer: &mut Pacer,
 ) -> bool {
+    // Playback moves to `rowid`, frame `target_idx`, and is published there; the
+    // frame's time is read from the reloaded chunk unless it is given.
+    let mut land = |rowid: i64, target_idx: usize, timestamp_us: Option<u64>| {
+        let is_reverse = control.is_reverse();
+        // In reverse mode, the main loop pre-decrements before capturing actual_index,
+        // so set frame_index one higher so pre-decrement yields target_idx.
+        *frame_index = if is_reverse { target_idx + 1 } else { target_idx };
+        *last_consumed_rowid = rowid;
+        *chunk = load_chunk(buf_id, if is_reverse { rowid + 1 } else { rowid - 1 }, CHUNK_SIZE, is_reverse);
+        *chunk_idx = 0;
+        pacer.batch.clear();
+        crate::ws::dispatch::reset_decode_state(session_id);
+
+        if let Some(timestamp_us) = timestamp_us.or_else(|| chunk.first().map(|(_, f)| f.timestamp_us)) {
+            pacer.restart_at(timestamp_us as f64 / 1_000_000.0);
+            let position = PlaybackPosition {
+                timestamp_us: timestamp_us as i64,
+                frame_index: target_idx,
+                frame_count: Some(total_frames),
+            };
+            publish_position_now(session_id, position);
+        }
+        signal_frames_ready(session_id);
+    };
+
     // Check for frame-based seek (takes priority)
     let seek_frame = seek_target_frame.load(Ordering::Relaxed);
     if seek_frame != NO_SEEK_FRAME {
         seek_target_frame.store(NO_SEEK_FRAME, Ordering::Relaxed);
         let target_idx = (seek_frame as usize).min(total_frames.saturating_sub(1));
-        let is_paused = control.is_paused();
-
         tlog!(
             "[Capture:{}] Seeking to frame {} (by index, paused={})",
-            session_id, target_idx, is_paused
+            session_id, target_idx, control.is_paused()
         );
-
         if let Ok(Some((rowid, frame))) = capture_db::get_frame_at_index(buf_id, target_idx) {
-            let is_reverse = control.is_reverse();
-            // In reverse mode, the main loop pre-decrements before capturing actual_index,
-            // so set frame_index one higher so pre-decrement yields target_idx.
-            *frame_index = if is_reverse { target_idx + 1 } else { target_idx };
-            *last_consumed_rowid = rowid;
-
-            // Reload chunk from seek position
-            *chunk = load_chunk(buf_id, if is_reverse { rowid + 1 } else { rowid - 1 }, 2000, is_reverse);
-            *chunk_idx = 0;
-
-            // Discard pending batch
-            batch_buffer.clear();
-            crate::ws::dispatch::reset_decode_state(session_id);
-
-            // Reset timing baselines
-            let seek_time_secs = frame.timestamp_us as f64 / 1_000_000.0;
-            *playback_baseline_secs = seek_time_secs;
-            *wall_clock_baseline = std::time::Instant::now();
-            *last_frame_time_secs = None;
-
-            // Store and signal playback position (seek — always signal immediately)
-            let position = PlaybackPosition {
-                timestamp_us: frame.timestamp_us as i64,
-                frame_index: target_idx,
-                frame_count: Some(total_frames),
-            };
-            crate::io::store_playback_position(session_id, position);
-            signal_playback_position(session_id);
-
-            // Signal frontend to fetch current state from capture
-            signal_frames_ready(session_id);
+            land(rowid, target_idx, Some(frame.timestamp_us));
         }
-
         return true;
     }
 
@@ -415,56 +407,57 @@ fn handle_seek(
     let seek_target = seek_target_us.load(Ordering::Relaxed);
     if seek_target != NO_SEEK {
         seek_target_us.store(NO_SEEK, Ordering::Relaxed);
-        let is_paused = control.is_paused();
-
         if let Ok(Some(rowid)) = capture_db::find_rowid_for_timestamp(buf_id, seek_target as u64) {
-            // Compute 0-based frame index for this rowid
             let target_idx = capture_db::count_frames_before_rowid(buf_id, rowid).unwrap_or(0);
-
             tlog!(
                 "[Capture:{}] Seeking to frame {} (timestamp {}us, paused={})",
-                session_id, target_idx, seek_target, is_paused
+                session_id, target_idx, seek_target, control.is_paused()
             );
-
-            let is_reverse = control.is_reverse();
-            // In reverse mode, the main loop pre-decrements before capturing actual_index,
-            // so set frame_index one higher so pre-decrement yields target_idx.
-            *frame_index = if is_reverse { target_idx + 1 } else { target_idx };
-            *last_consumed_rowid = rowid;
-
-            // Reload chunk from seek position
-            *chunk = load_chunk(buf_id, if is_reverse { rowid + 1 } else { rowid - 1 }, 2000, is_reverse);
-            *chunk_idx = 0;
-
-            // Discard pending batch
-            batch_buffer.clear();
-            crate::ws::dispatch::reset_decode_state(session_id);
-
-            // Get frame at this rowid for timing info
-            if let Some((_, ref frame)) = chunk.first() {
-                let seek_time_secs = frame.timestamp_us as f64 / 1_000_000.0;
-                *playback_baseline_secs = seek_time_secs;
-                *wall_clock_baseline = std::time::Instant::now();
-                *last_frame_time_secs = None;
-
-                // Store and signal playback position (seek — always signal immediately)
-                let position = PlaybackPosition {
-                    timestamp_us: frame.timestamp_us as i64,
-                    frame_index: target_idx,
-                    frame_count: Some(total_frames),
-                };
-                crate::io::store_playback_position(session_id, position);
-                signal_playback_position(session_id);
-            }
-
-            // Signal frontend to fetch current state from capture
-            signal_frames_ready(session_id);
+            land(rowid, target_idx, None);
         }
-
         return true;
     }
 
     false
+}
+
+/// Played frames go to the session's subscribers, at the capture's own index.
+struct ToSubscribers<'a> {
+    session_id: &'a str,
+    throttle: SignalThrottle,
+    frame_index: usize,
+    total_frames: usize,
+}
+
+impl Playout for ToSubscribers<'_> {
+    fn frames(&mut self, frames: Vec<FrameMessage>) {
+        crate::ws::dispatch::send_frames(self.session_id, &frames);
+    }
+
+    fn position(&mut self, timestamp_us: i64, _emitted: i64) {
+        let position = PlaybackPosition {
+            timestamp_us,
+            frame_index: self.frame_index,
+            frame_count: Some(self.total_frames),
+        };
+        publish_position(self.session_id, position, &mut self.throttle);
+    }
+}
+
+/// The stream reached the end it was playing towards: it pauses there, alive for
+/// a step, seek or resume.
+fn pause_at_end(session_id: &str, buf_id: &str, control: &PlaybackControl, completed_flag: &AtomicBool) {
+    completed_flag.store(true, Ordering::Relaxed);
+    control.pause();
+    let stream_ended_info = post_session::StreamEndedInfo {
+        reason: StreamEndReason::Paused,
+        capture_available: true,
+        capture_id: Some(buf_id.to_string()),
+        capture_kind: Some(capture_store::CaptureKind::Frames),
+        count: capture_store::get_capture_count(buf_id),
+        time_range: None,
+    };
+    crate::io::publish_stream_ended(session_id, stream_ended_info);
 }
 
 async fn run_capture_stream(
@@ -510,24 +503,10 @@ async fn run_capture_stream(
         metadata.as_ref().map(|m| m.name.as_str()).unwrap_or("unknown")
     );
 
-    // Streaming constants. Each recorded source paces itself — the backend API
-    // source buffers far less per batch because its frames arrive over HTTP.
-    const CHUNK_SIZE: usize = 2000;
-    /// Frames per batch during high-speed playback (>1x).
-    const HIGH_SPEED_BATCH_SIZE: usize = 50;
-    /// Minimum inter-frame delay (ms), to avoid busy-spinning while paced.
-    const MIN_DELAY_MS: f64 = 1.0;
-    /// Interval (ms) between forced batch emissions while paced.
-    const PACING_INTERVAL_MS: u64 = 50;
-    /// Frames buffered per batch at unlimited speed (0 / instant replay).
-    const NO_LIMIT_BATCH_SIZE: usize = 1000;
-    /// Yield interval (ms) between batches at unlimited speed.
-    const NO_LIMIT_YIELD_MS: u64 = 10;
+    /// Frames batched at unlimited speed (0 / instant replay), and the yield (ms) after each batch.
+    const UNLIMITED: Unlimited = Unlimited { batch: 1000, yield_ms: 10 };
 
-    let mut total_emitted = 0i64;
     let mut frame_index = 0usize;
-    let mut total_wait_ms = 0u64;
-    let mut wait_count = 0u64;
 
     // Chunk state - frames loaded from SQLite
     let mut chunk: Vec<(i64, FrameMessage)> = load_chunk(&buf_id, min_rowid - 1, CHUNK_SIZE, false);
@@ -541,15 +520,13 @@ async fn run_capture_stream(
     // Get stream start time from first frame
     let stream_start_secs = chunk[0].1.timestamp_us as f64 / 1_000_000.0;
 
-    let mut last_frame_time_secs: Option<f64> = None;
-    let mut batch_buffer: Vec<FrameMessage> = Vec::new();
-    let mut throttle = SignalThrottle::new();
-
-    // Track wall-clock time vs playback time for proper pacing
-    let mut wall_clock_baseline = std::time::Instant::now();
-    let mut playback_baseline_secs = stream_start_secs;
-    let mut last_speed = control.read_speed();
-    let mut last_pacing_check = std::time::Instant::now();
+    let mut pacer = Pacer::new(stream_start_secs, &control, UNLIMITED);
+    let mut out = ToSubscribers {
+        session_id: &session_id,
+        throttle: SignalThrottle::new(),
+        frame_index: 0,
+        total_frames,
+    };
     let mut last_reverse = control.is_reverse();
 
     tlog!(
@@ -573,8 +550,7 @@ async fn run_capture_stream(
             &session_id, &buf_id, total_frames,
             &seek_target_frame, &seek_target_us, &control,
             &mut chunk, &mut chunk_idx, &mut frame_index, &mut last_consumed_rowid,
-            &mut batch_buffer, &mut playback_baseline_secs, &mut wall_clock_baseline,
-            &mut last_frame_time_secs,
+            &mut pacer,
         ) {
             continue;
         }
@@ -614,11 +590,7 @@ async fn run_capture_stream(
             );
             chunk_idx = 0;
 
-            // Reset timing baseline
-            if let Some(last_time) = last_frame_time_secs {
-                playback_baseline_secs = last_time;
-                wall_clock_baseline = std::time::Instant::now();
-            }
+            pacer.rebaseline_at_last();
             crate::ws::dispatch::reset_decode_state(&session_id);
             last_reverse = is_reverse;
         }
@@ -651,176 +623,36 @@ async fn run_capture_stream(
         if is_reverse {
             frame_index = frame_index.saturating_sub(1);
         }
-        let actual_index = frame_index;
+        out.frame_index = frame_index;
         if !is_reverse {
             frame_index += 1;
         }
 
-        let is_pacing = control.is_pacing_enabled();
-        let current_speed = control.read_speed();
-
-        // Check for speed change and reset timing baseline
-        if is_pacing && (current_speed - last_speed).abs() > 0.001 {
-            if let Some(last_time) = last_frame_time_secs {
-                playback_baseline_secs = last_time;
-                wall_clock_baseline = std::time::Instant::now();
-            }
-            last_speed = current_speed;
-        }
-
-        // Proactive pacing check (use absolute elapsed time for reverse support)
-        if is_pacing {
-            if let Some(last_time) = last_frame_time_secs {
-                let playback_elapsed_secs = (last_time - playback_baseline_secs).abs();
-                let expected_wall_time_ms = (playback_elapsed_secs * 1000.0 / current_speed) as u64;
-                let actual_wall_time_ms = wall_clock_baseline.elapsed().as_millis() as u64;
-
-                if expected_wall_time_ms > actual_wall_time_ms + 100 {
-                    let wait_ms = expected_wall_time_ms - actual_wall_time_ms;
-                    let capped_wait = wait_ms.min(500);
-                    total_wait_ms += capped_wait;
-                    wait_count += 1;
-                    tokio::time::sleep(Duration::from_millis(capped_wait)).await;
-                }
-            }
-        }
-
-        let frame_time_secs = frame.timestamp_us as f64 / 1_000_000.0;
-        let playback_time_us = (frame_time_secs * 1_000_000.0) as i64;
-
-        // When pacing is disabled, use maximum batch size
-        if !is_pacing {
-            batch_buffer.push(frame);
-            total_emitted += 1;
-            last_frame_time_secs = Some(frame_time_secs);
-
-            if batch_buffer.len() >= NO_LIMIT_BATCH_SIZE {
-                crate::ws::dispatch::send_frames(&session_id, &batch_buffer);
-                batch_buffer.clear();
-
-                crate::io::store_playback_position(&session_id, PlaybackPosition {
-                    timestamp_us: playback_time_us,
-                    frame_index: actual_index,
-                    frame_count: Some(total_frames),
-                });
-                if throttle.should_signal("playback-position") {
-                    signal_playback_position(&session_id);
-                }
-
-                tokio::time::sleep(Duration::from_millis(NO_LIMIT_YIELD_MS)).await;
-            }
-            continue;
-        }
-
-        // Calculate delay based on inter-frame timing (pacing enabled)
-        // Use absolute delta for reverse playback support
-        let delay_ms = if let Some(last_time) = last_frame_time_secs {
-            let delta_secs = (frame_time_secs - last_time).abs();
-            (delta_secs * 1000.0 / current_speed).max(0.0)
-        } else {
-            0.0
-        };
-
-        last_frame_time_secs = Some(frame_time_secs);
-
-        if delay_ms < MIN_DELAY_MS {
-            // High-speed mode: batch frames
-            batch_buffer.push(frame);
-            total_emitted += 1;
-
-            let time_since_pacing = last_pacing_check.elapsed().as_millis() as u64;
-            let should_emit = batch_buffer.len() >= HIGH_SPEED_BATCH_SIZE
-                || time_since_pacing >= PACING_INTERVAL_MS;
-
-            if should_emit && !batch_buffer.is_empty() {
-                let playback_elapsed_secs = (frame_time_secs - playback_baseline_secs).abs();
-                let expected_wall_time_ms = (playback_elapsed_secs * 1000.0 / current_speed) as u64;
-                let actual_wall_time_ms = wall_clock_baseline.elapsed().as_millis() as u64;
-
-                if expected_wall_time_ms > actual_wall_time_ms {
-                    let wait_ms = expected_wall_time_ms - actual_wall_time_ms;
-                    if wait_ms > 0 {
-                        let capped_wait = wait_ms.min(1000);
-                        total_wait_ms += capped_wait;
-                        wait_count += 1;
-                        tokio::time::sleep(Duration::from_millis(capped_wait)).await;
-                    }
-                }
-
-                last_pacing_check = std::time::Instant::now();
-
-                crate::ws::dispatch::send_frames(&session_id, &batch_buffer);
-                batch_buffer.clear();
-
-                crate::io::store_playback_position(&session_id, PlaybackPosition {
-                    timestamp_us: playback_time_us,
-                    frame_index: actual_index,
-                    frame_count: Some(total_frames),
-                });
-                if throttle.should_signal("playback-position") {
-                    signal_playback_position(&session_id);
-                }
-
-                tokio::task::yield_now().await;
-            }
-        } else {
-            // Normal speed: flush any pending batch first
-            if !batch_buffer.is_empty() {
-                crate::ws::dispatch::send_frames(&session_id, &batch_buffer);
-                batch_buffer.clear();
-            }
-
-            // Sleep for inter-frame delay (cap at 10 seconds)
-            let capped_delay_ms = delay_ms.min(10000.0);
-            if capped_delay_ms >= 1.0 {
-                total_wait_ms += capped_delay_ms as u64;
-                wait_count += 1;
-                tokio::time::sleep(Duration::from_millis(capped_delay_ms as u64)).await;
-            }
-
-            // Re-check pause after sleeping
-            if control.is_paused() {
-                chunk_idx -= 1; // Re-process this frame after resume
-                // Undo the frame_index update so re-processing gets the correct index
-                if is_reverse { frame_index += 1; } else { frame_index -= 1; }
-                continue;
-            }
-
-            // Send this single frame to all WS subscribers
-            total_emitted += 1;
-            crate::ws::dispatch::send_frames(&session_id, std::slice::from_ref(&frame));
-
-            crate::io::store_playback_position(&session_id, PlaybackPosition {
-                timestamp_us: playback_time_us,
-                frame_index: actual_index,
-                frame_count: Some(total_frames),
-            });
-            if throttle.should_signal("playback-position") {
-                signal_playback_position(&session_id);
-            }
+        pacer.keep_time(&control).await;
+        if pacer.play(frame, &control, &mut out).await.is_some() {
+            chunk_idx -= 1; // Re-process this frame after resume
+            // Undo the frame_index update so re-processing gets the correct index
+            if is_reverse { frame_index += 1; } else { frame_index -= 1; }
         }
     }
 
     // Flush any remaining batch
-    if !batch_buffer.is_empty() {
-        crate::ws::dispatch::send_frames(&session_id, &batch_buffer);
-        batch_buffer.clear();
-        throttle.flush();
+    if !pacer.batch.is_empty() {
+        out.frames(std::mem::take(&mut pacer.batch));
+        out.throttle.flush();
 
         // Emit final position so frontend highlights the last frame.
         // Forward: frame_index is one-past-end (post-increment), subtract 1.
         // Reverse: frame_index IS the last consumed position (pre-decrement), use directly.
-        if let Some(last_time) = last_frame_time_secs {
+        if let Some(last_time) = pacer.last_frame_time_secs {
             let is_reverse = control.is_reverse();
             let final_index = if is_reverse { frame_index } else { frame_index.saturating_sub(1) };
-            let playback_time_us = (last_time * 1_000_000.0) as i64;
             // throttle already flushed above; always signal final position
-            crate::io::store_playback_position(&session_id, PlaybackPosition {
-                timestamp_us: playback_time_us,
+            publish_position_now(&session_id, PlaybackPosition {
+                timestamp_us: (last_time * 1_000_000.0) as i64,
                 frame_index: final_index,
                 frame_count: Some(total_frames),
             });
-            signal_playback_position(&session_id);
         }
     }
 
@@ -831,18 +663,7 @@ async fn run_capture_stream(
 
     // Natural completion — pause at end position instead of stopping.
     // This keeps the stream task alive so step/seek/resume work after playback ends.
-    completed_flag.store(true, Ordering::Relaxed);
-    control.pause();
-    let frame_count = capture_store::get_capture_count(&buf_id);
-    let stream_ended_info = post_session::StreamEndedInfo {
-        reason: StreamEndReason::Paused,
-        capture_available: true,
-        capture_id: Some(buf_id.clone()),
-        capture_kind: Some(capture_store::CaptureKind::Frames),
-        count: frame_count,
-        time_range: None,
-    };
-    crate::io::publish_stream_ended(&session_id, stream_ended_info);
+    pause_at_end(&session_id, &buf_id, &control, &completed_flag);
     let final_pos = if control.is_reverse() { frame_index } else { frame_index.saturating_sub(1) };
     tlog!(
         "[Capture:{}] Stream reached end of data, pausing at final position (frame_index: {})",
@@ -861,8 +682,7 @@ async fn run_capture_stream(
             &session_id, &buf_id, total_frames,
             &seek_target_frame, &seek_target_us, &control,
             &mut chunk, &mut chunk_idx, &mut frame_index, &mut last_consumed_rowid,
-            &mut batch_buffer, &mut playback_baseline_secs, &mut wall_clock_baseline,
-            &mut last_frame_time_secs,
+            &mut pacer,
         ) {
             seeked_during_pause = true;
             continue;
@@ -893,39 +713,21 @@ async fn run_capture_stream(
 
         if chunk.is_empty() {
             // Still at boundary in this direction, re-pause and notify frontend
-            control.pause();
-            completed_flag.store(true, Ordering::Relaxed);
-            let frame_count = capture_store::get_capture_count(&buf_id);
-            let stream_ended_info = post_session::StreamEndedInfo {
-                reason: StreamEndReason::Paused,
-                capture_available: true,
-                capture_id: Some(buf_id.clone()),
-                capture_kind: Some(capture_store::CaptureKind::Frames),
-                count: frame_count,
-                time_range: None,
-            };
-            crate::io::publish_stream_ended(&session_id, stream_ended_info);
+            pause_at_end(&session_id, &buf_id, &control, &completed_flag);
             continue;
         }
 
-        // Reset timing baselines for resumed playback
-        wall_clock_baseline = std::time::Instant::now();
-        if let Some(last_time) = last_frame_time_secs {
-            playback_baseline_secs = last_time;
-        }
+        pacer.resume(&control);
         last_reverse = is_reverse;
-        last_speed = control.read_speed();
         tlog!("[Capture:{}] Resuming playback from post-completion pause", session_id);
         break; // Break post-completion loop → re-enter main streaming via 'outer
     }
     } // end 'outer
 
-    // Calculate stats
-    let total_wall_time_ms = wall_clock_baseline.elapsed().as_millis();
-    let data_duration_secs = last_frame_time_secs.unwrap_or(stream_start_secs) - stream_start_secs;
+    let data_duration_secs = pacer.last_frame_time_secs.unwrap_or(stream_start_secs) - stream_start_secs;
     tlog!(
         "[Capture:{}] Stream ended (reason: stopped, count: {}, wall_time: {}ms, data_duration: {:.1}s, waits: {} totaling {}ms)",
-        session_id, total_emitted, total_wall_time_ms, data_duration_secs, wait_count, total_wait_ms
+        session_id, pacer.emitted, pacer.wall_elapsed().as_millis(), data_duration_secs, pacer.waits, pacer.waited_ms
     );
 }
 
@@ -1050,5 +852,74 @@ mod tests {
         let mut source = CaptureSource::new("f_play_paced".into(), id, 1.0);
         let elapsed = play_to_end(&mut source, Duration::from_secs(5)).await.expect("reached the end");
         assert!(elapsed >= Duration::from_millis(350), "finished in {elapsed:?}");
+    }
+
+    async fn open_playback(session_id: &str, frames: &[(u64, u32)], speed: f64) {
+        let id = capture_of(session_id, frames);
+        let source = CaptureSource::new(session_id.into(), id, speed);
+        crate::io::create_session(session_id.into(), Box::new(source), None, None, None, vec![]).await;
+        crate::io::start_session(session_id).await.unwrap();
+    }
+
+    /// The published position once it is `(frame_index, timestamp_us)` with the
+    /// session in `state`, or what it was when that never came.
+    async fn settles_at(session_id: &str, state: IOState, at: (usize, i64)) -> Result<(), String> {
+        let position = || {
+            crate::io::get_playback_position(session_id).map(|p| (p.frame_index, p.timestamp_us))
+        };
+        tokio::time::timeout(Duration::from_secs(5), async {
+            while position() != Some(at) || crate::io::get_session_state(session_id).await != Some(state.clone()) {
+                tokio::time::sleep(Duration::from_millis(5)).await;
+            }
+        })
+        .await
+        .map_err(|_| format!("settled at {:?}", position()))
+    }
+
+    fn ten_frames() -> Vec<(u64, u32)> {
+        (1..=10).map(|i| (i * 10, 0x100)).collect()
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn paused_at_the_end_a_seek_lands_on_its_frame() {
+        const SESSION: &str = "f_play_seek_at_end";
+        open_playback(SESSION, &ten_frames(), 0.0).await;
+        let ended = settles_at(SESSION, IOState::Paused, (9, 100)).await;
+        crate::io::seek_session_by_frame(SESSION, 4).await.unwrap();
+        let by_frame = settles_at(SESSION, IOState::Paused, (4, 50)).await;
+        crate::io::seek_session(SESSION, 65).await.unwrap();
+        let by_time = settles_at(SESSION, IOState::Paused, (6, 70)).await;
+        crate::io::destroy_session(SESSION, false).await.ok();
+
+        assert_eq!((ended, by_frame, by_time), (Ok(()), Ok(()), Ok(())));
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn reversed_at_the_end_a_capture_plays_back_to_its_first_frame() {
+        const SESSION: &str = "f_play_reverse";
+        open_playback(SESSION, &ten_frames(), 0.0).await;
+        let ended = settles_at(SESSION, IOState::Paused, (9, 100)).await;
+        crate::io::update_session_direction(SESSION, true).await.unwrap();
+        crate::io::resume_session(SESSION).await.unwrap();
+        let back = settles_at(SESSION, IOState::Paused, (0, 10)).await;
+        crate::io::destroy_session(SESSION, false).await.ok();
+
+        assert_eq!((ended, back), (Ok(()), Ok(())));
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn a_seek_while_paused_mid_play_resumes_from_its_frame() {
+        const SESSION: &str = "f_play_seek_mid";
+        let frames: Vec<(u64, u32)> = (0..200).map(|i| (1_000 + i * 10_000, 0x100)).collect();
+        open_playback(SESSION, &frames, 1.0).await;
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        crate::io::pause_session(SESSION).await.unwrap();
+        crate::io::seek_session_by_frame(SESSION, 150).await.unwrap();
+        let sought = settles_at(SESSION, IOState::Paused, (150, 1_501_000)).await;
+        crate::io::resume_session(SESSION).await.unwrap();
+        let ended = settles_at(SESSION, IOState::Paused, (199, 1_991_000)).await;
+        crate::io::destroy_session(SESSION, false).await.ok();
+
+        assert_eq!((sought, ended), (Ok(()), Ok(())));
     }
 }

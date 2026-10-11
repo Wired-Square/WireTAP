@@ -2,8 +2,8 @@
 //
 // Backend API Source — streams one protocol's archive from the WireTAP backend
 // gateway over HTTP (the GET /v1/db/{db}/frames keyset cursor). This is the only
-// database-backed source; the pacing / batching / emit loop is its own, tuned for
-// frames arriving a page at a time over HTTP rather than from local storage.
+// database-backed source; it paces with capture playback's `Pacer`, batching
+// less at unlimited speed since its frames arrive a page at a time over HTTP.
 //
 // A CAN row is a CAN frame. A Modbus row is one whole RTU message, CRC and all,
 // with `id` = unit << 8 | function — delivered as `modbus_rtu`, never `modbus`,
@@ -14,13 +14,13 @@ use std::collections::VecDeque;
 use std::time::Duration;
 use wiretap_gateway::{FrameBatch, FrameBatchRow, Protocol as ArchiveProtocol};
 
-use super::base::{PlaybackControl, RecordedSourceState};
+use super::base::{publish_position, Pacer, PlaybackControl, Playout, RecordedSourceState, Unlimited};
 use crate::apiclient::{frame_tag, protocol_query};
 use crate::capture_store::{self, CaptureKind};
 use crate::io::{
     emit_capture_changed, emit_session_error, emit_stream_ended, signal_frames_ready,
-    signal_playback_position, FrameMessage, IOCapabilities, IOSource, IOState, PlaybackPosition,
-    Protocol, SignalThrottle, StreamEndReason,
+    FrameMessage, IOCapabilities, IOSource, IOState, PlaybackPosition, Protocol, SignalThrottle,
+    StreamEndReason,
 };
 
 /// Connection details for a backend-API source.
@@ -264,24 +264,27 @@ fn frame_from_row(protocol: ArchiveProtocol, row: FrameBatchRow) -> Result<Frame
     })
 }
 
-/// Store the latest playback position and signal it (throttled). Shared by the
-/// three emit points in the stream loop below.
-fn emit_playback_position(
-    session_id: &str,
-    playback_time_us: i64,
-    total_emitted: i64,
-    throttle: &mut SignalThrottle,
-) {
-    crate::io::store_playback_position(
-        session_id,
-        PlaybackPosition {
-            timestamp_us: playback_time_us,
-            frame_index: (total_emitted - 1) as usize,
-            frame_count: Some(total_emitted as usize),
-        },
-    );
-    if throttle.should_signal("playback-position") {
-        signal_playback_position(session_id);
+/// Played frames land in the session's capture, the position counting them.
+struct IntoCapture<'a> {
+    session_id: &'a str,
+    throttle: SignalThrottle,
+}
+
+impl Playout for IntoCapture<'_> {
+    fn frames(&mut self, frames: Vec<FrameMessage>) {
+        capture_store::append_frames_to_session(self.session_id, frames);
+        if self.throttle.should_signal("frames-ready") {
+            signal_frames_ready(self.session_id);
+        }
+    }
+
+    fn position(&mut self, timestamp_us: i64, emitted: i64) {
+        let position = PlaybackPosition {
+            timestamp_us,
+            frame_index: (emitted - 1) as usize,
+            frame_count: Some(emitted as usize),
+        };
+        publish_position(self.session_id, position, &mut self.throttle);
     }
 }
 
@@ -297,11 +300,7 @@ async fn run_api_stream(
 ) -> Result<(), Box<dyn std::error::Error>> {
     const BUFFER_SIZE: usize = 2000;
     const REFILL_THRESHOLD: usize = 200;
-    const HIGH_SPEED_BATCH_SIZE: usize = 50;
-    const MIN_DELAY_MS: f64 = 1.0;
-    const PACING_INTERVAL_MS: u64 = 50;
-    const NO_LIMIT_BATCH_SIZE: usize = 50;
-    const NO_LIMIT_YIELD_MS: u64 = 2;
+    const UNLIMITED: Unlimited = Unlimited { batch: 50, yield_ms: 2 };
 
     let mut fetcher = CursorFetcher {
         // The same client the query path uses — one pool for one gateway, and it
@@ -322,7 +321,6 @@ async fn run_api_stream(
     };
 
     let mut frame_queue: VecDeque<FrameMessage> = VecDeque::new();
-    let mut total_emitted = 0i64;
 
     // Refill helper: pull pages until the buffer reaches target or exhausted
     async fn refill(
@@ -353,13 +351,8 @@ async fn run_api_stream(
 
     let stream_start_secs =
         frame_queue.front().map(|f| f.timestamp_us as f64 / 1_000_000.0).unwrap_or(0.0);
-    let mut last_frame_time_secs: Option<f64> = None;
-    let mut batch_buffer: Vec<FrameMessage> = Vec::new();
-    let mut throttle = SignalThrottle::new();
-    let mut wall_clock_baseline = std::time::Instant::now();
-    let mut playback_baseline_secs = stream_start_secs;
-    let mut last_speed = control.read_speed();
-    let mut last_pacing_check = std::time::Instant::now();
+    let mut pacer = Pacer::new(stream_start_secs, &control, UNLIMITED);
+    let mut out = IntoCapture { session_id: &session_id, throttle: SignalThrottle::new() };
 
     tlog!("[BackendAPI:{}] Streaming (speed: {}x)", session_id, options.speed);
 
@@ -372,28 +365,7 @@ async fn run_api_stream(
             continue;
         }
 
-        let is_pacing = control.is_pacing_enabled();
-        let current_speed = control.read_speed();
-
-        if is_pacing && (current_speed - last_speed).abs() > 0.001 {
-            if let Some(last_time) = last_frame_time_secs {
-                playback_baseline_secs = last_time;
-                wall_clock_baseline = std::time::Instant::now();
-            }
-            last_speed = current_speed;
-        }
-
-        if is_pacing {
-            if let Some(last_time) = last_frame_time_secs {
-                let playback_elapsed_secs = last_time - playback_baseline_secs;
-                let expected_wall_time_ms = (playback_elapsed_secs * 1000.0 / current_speed) as u64;
-                let actual_wall_time_ms = wall_clock_baseline.elapsed().as_millis() as u64;
-                if expected_wall_time_ms > actual_wall_time_ms + 100 {
-                    let wait_ms = expected_wall_time_ms - actual_wall_time_ms;
-                    tokio::time::sleep(Duration::from_millis(wait_ms.min(500))).await;
-                }
-            }
-        }
+        pacer.keep_time(&control).await;
 
         if frame_queue.len() < REFILL_THRESHOLD && !fetcher.exhausted {
             refill(&mut fetcher, &mut frame_queue, BUFFER_SIZE).await?;
@@ -410,96 +382,21 @@ async fn run_api_stream(
             }
         };
 
-        let frame_time_secs = frame.timestamp_us as f64 / 1_000_000.0;
-        let playback_time_us = (frame_time_secs * 1_000_000.0) as i64;
-
-        if !is_pacing {
-            batch_buffer.push(frame);
-            total_emitted += 1;
-            last_frame_time_secs = Some(frame_time_secs);
-
-            if batch_buffer.len() >= NO_LIMIT_BATCH_SIZE {
-                capture_store::append_frames_to_session(&session_id, std::mem::take(&mut batch_buffer));
-                if throttle.should_signal("frames-ready") {
-                    signal_frames_ready(&session_id);
-                }
-                emit_playback_position(&session_id, playback_time_us, total_emitted, &mut throttle);
-                tokio::time::sleep(Duration::from_millis(NO_LIMIT_YIELD_MS)).await;
-            }
-            continue;
-        }
-
-        let delay_ms = if let Some(last_time) = last_frame_time_secs {
-            let delta_secs = frame_time_secs - last_time;
-            (delta_secs * 1000.0 / current_speed).max(0.0)
-        } else {
-            0.0
-        };
-        last_frame_time_secs = Some(frame_time_secs);
-
-        if delay_ms < MIN_DELAY_MS {
-            batch_buffer.push(frame);
-            total_emitted += 1;
-
-            let time_since_pacing = last_pacing_check.elapsed().as_millis() as u64;
-            let should_emit = batch_buffer.len() >= HIGH_SPEED_BATCH_SIZE
-                || time_since_pacing >= PACING_INTERVAL_MS;
-
-            if should_emit && !batch_buffer.is_empty() {
-                let playback_elapsed_secs = frame_time_secs - playback_baseline_secs;
-                let expected_wall_time_ms = (playback_elapsed_secs * 1000.0 / current_speed) as u64;
-                let actual_wall_time_ms = wall_clock_baseline.elapsed().as_millis() as u64;
-                if expected_wall_time_ms > actual_wall_time_ms {
-                    let wait_ms = expected_wall_time_ms - actual_wall_time_ms;
-                    if wait_ms > 0 {
-                        tokio::time::sleep(Duration::from_millis(wait_ms.min(1000))).await;
-                    }
-                }
-                last_pacing_check = std::time::Instant::now();
-                capture_store::append_frames_to_session(&session_id, std::mem::take(&mut batch_buffer));
-                if throttle.should_signal("frames-ready") {
-                    signal_frames_ready(&session_id);
-                }
-                emit_playback_position(&session_id, playback_time_us, total_emitted, &mut throttle);
-                tokio::task::yield_now().await;
-                if control.is_paused() {
-                    continue;
-                }
-            }
-        } else {
-            if !batch_buffer.is_empty() {
-                capture_store::append_frames_to_session(&session_id, std::mem::take(&mut batch_buffer));
-                if throttle.should_signal("frames-ready") {
-                    signal_frames_ready(&session_id);
-                }
-            }
-            let capped_delay_ms = delay_ms.min(10000.0);
-            if capped_delay_ms >= 1.0 {
-                tokio::time::sleep(Duration::from_millis(capped_delay_ms as u64)).await;
-            }
-            if control.is_paused() {
-                frame_queue.push_front(frame);
-                continue;
-            }
-            capture_store::append_frames_to_session(&session_id, vec![frame]);
-            total_emitted += 1;
-            if throttle.should_signal("frames-ready") {
-                signal_frames_ready(&session_id);
-            }
-            emit_playback_position(&session_id, playback_time_us, total_emitted, &mut throttle);
+        if let Some(paused) = pacer.play(frame, &control, &mut out).await {
+            frame_queue.push_front(paused);
         }
     }
 
-    if !batch_buffer.is_empty() {
-        capture_store::append_frames_to_session(&session_id, batch_buffer);
-        throttle.flush();
+    if !pacer.batch.is_empty() {
+        capture_store::append_frames_to_session(&session_id, std::mem::take(&mut pacer.batch));
+        out.throttle.flush();
         signal_frames_ready(&session_id);
     }
 
     if control.is_cancelled() {
-        tlog!("[BackendAPI:{}] Stream cancelled by user (emitted: {})", session_id, total_emitted);
+        tlog!("[BackendAPI:{}] Stream cancelled by user (emitted: {})", session_id, pacer.emitted);
     } else {
-        tlog!("[BackendAPI:{}] Stream ended (emitted: {})", session_id, total_emitted);
+        tlog!("[BackendAPI:{}] Stream ended (emitted: {})", session_id, pacer.emitted);
         emit_stream_ended(&session_id, StreamEndReason::Complete, "BackendAPI");
     }
     Ok(())
@@ -558,6 +455,128 @@ mod tests {
         let frame = can_row(serde_json::json!({ "dlc": 2, "data_hex": "abcd" }));
         assert!(!frame.is_rtr && !frame.is_brs && !frame.is_esi);
         assert_eq!(frame.dlc, 2);
+    }
+
+    /// A gateway serving `pages` in turn, each `(rows, next_cursor)`, that
+    /// records the path of every request.
+    async fn fake_gateway(
+        pages: Vec<(Vec<serde_json::Value>, Option<&'static str>)>,
+    ) -> (String, std::sync::Arc<std::sync::Mutex<Vec<String>>>) {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let base_url = format!("http://{}", listener.local_addr().unwrap());
+        let requests = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let seen = requests.clone();
+        tokio::spawn(async move {
+            let mut pages = pages.into_iter();
+            while let Ok((mut sock, _)) = listener.accept().await {
+                let mut head = Vec::new();
+                while !head.ends_with(b"\r\n\r\n") {
+                    let mut byte = [0u8; 1];
+                    if sock.read(&mut byte).await.unwrap() == 0 {
+                        break;
+                    }
+                    head.push(byte[0]);
+                }
+                let head = String::from_utf8_lossy(&head).to_string();
+                let path = head.split(' ').nth(1).unwrap_or_default().to_string();
+                seen.lock().unwrap().push(path);
+                let (frames, next_cursor) = pages.next().unwrap_or_default();
+                let body = serde_json::json!({ "frames": frames, "next_cursor": next_cursor }).to_string();
+                let reply = format!(
+                    "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}",
+                    body.len()
+                );
+                sock.write_all(reply.as_bytes()).await.unwrap();
+            }
+        });
+        (base_url, requests)
+    }
+
+    fn rows(ids: std::ops::Range<u32>, spacing_us: i64) -> Vec<serde_json::Value> {
+        ids.map(|id| {
+            serde_json::json!({
+                "ts_us": 1_000 + id as i64 * spacing_us, "id": id, "extended": false, "dlc": 1,
+                "is_fd": false, "bus": 0, "dir": "rx", "data_hex": "ab",
+            })
+        })
+        .collect()
+    }
+
+    struct Streamed {
+        frames: Vec<FrameMessage>,
+        requests: Vec<String>,
+        position: Option<PlaybackPosition>,
+        elapsed: Duration,
+    }
+
+    async fn stream(
+        session_id: &str,
+        pages: Vec<(Vec<serde_json::Value>, Option<&'static str>)>,
+        speed: f64,
+    ) -> Streamed {
+        crate::capture_db::use_in_memory_database();
+        let (base_url, requests) = fake_gateway(pages).await;
+        let config = BackendApiConfig {
+            base_url,
+            api_key: "key".into(),
+            database: "site".into(),
+            protocol: ArchiveProtocol::Can,
+        };
+        let options = BackendApiSourceOptions { speed, batch_size: 40, ..Default::default() };
+        let source = BackendApiSource::new(session_id.into(), config, options);
+        crate::io::create_session(session_id.into(), Box::new(source), None, None, None, vec![]).await;
+        let started = std::time::Instant::now();
+        crate::io::start_session(session_id).await.unwrap();
+        let ended = tokio::time::timeout(Duration::from_secs(5), async {
+            while crate::io::post_session::get_stream_ended(session_id).is_none() {
+                tokio::time::sleep(Duration::from_millis(5)).await;
+            }
+        })
+        .await;
+        let elapsed = started.elapsed();
+        let position = crate::io::get_playback_position(session_id);
+        let capture = capture_store::get_session_frame_capture_id(session_id).unwrap();
+        let frames = capture_store::get_capture_frames(&capture).unwrap_or_default();
+        crate::io::destroy_session(session_id, false).await.ok();
+        ended.expect("the stream ended");
+        let requests = requests.lock().unwrap().clone();
+        Streamed { frames, requests, position, elapsed }
+    }
+
+    fn two_pages() -> Vec<(Vec<serde_json::Value>, Option<&'static str>)> {
+        vec![(rows(0..40, 10), Some("p2")), (rows(40..60, 10), None)]
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn a_gateway_stream_follows_the_cursor_and_lands_every_row_in_order() {
+        let streamed = stream("f_backend_cursor", two_pages(), 0.0).await;
+
+        let ids: Vec<u32> = streamed.frames.iter().map(|f| f.frame_id).collect();
+        assert_eq!(ids, (0..60).collect::<Vec<_>>());
+        assert_eq!(
+            streamed.requests,
+            ["/v1/db/site/frames?limit=40", "/v1/db/site/frames?limit=40&after=p2"]
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn at_unlimited_speed_the_position_is_published_per_full_batch_only() {
+        let streamed = stream("f_backend_position", two_pages(), 0.0).await;
+
+        let position = streamed.position.expect("a position was published");
+        assert_eq!(
+            (position.timestamp_us, position.frame_index, position.frame_count),
+            (1_000 + 49 * 10, 49, Some(50))
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn at_1x_a_gateway_stream_takes_as_long_as_its_rows_span() {
+        let streamed = stream("f_backend_paced", vec![(rows(0..30, 13_000), None)], 1.0).await;
+
+        assert_eq!(streamed.frames.len(), 30);
+        assert!(streamed.elapsed >= Duration::from_millis(350), "finished in {:?}", streamed.elapsed);
     }
 
     #[test]
