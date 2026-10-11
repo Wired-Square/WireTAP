@@ -634,10 +634,11 @@ export function useIOSessionManager(
       sessionIdOverride,
     } = opts;
 
-    const sessionId = sessionIdOverride ?? await sourcesSessionId(profileIds, emitRawBytes);
+    const requestedId =
+      sessionIdOverride ?? (profileIds.length === 1 ? null : await sourcesSessionId(profileIds, emitRawBytes));
 
     const createOptions: CreateMultiSourceOptions = {
-      sessionId,
+      sessionId: requestedId,
       subscriberId: session.subscriberId,
       appName,
       profileIds,
@@ -664,7 +665,7 @@ export function useIOSessionManager(
       modbusPollsJson: opts.modbusPollsJson,
     };
 
-    const { busMappings } = await createAndStartMultiSourceSession(createOptions);
+    const { sessionId, busMappings } = await createAndStartMultiSourceSession(createOptions);
 
     // Build output bus → source mapping. Names come from `findProfile`, not the
     // prop array: a device registered moments ago in the picker is not in that

@@ -268,13 +268,10 @@ pub fn step_frame(
                 }
             }
         }
+    } else if backward {
+        i64::MAX
     } else {
-        // No position info - start from beginning or end depending on direction
-        let idx = if backward { total_frames.saturating_sub(1) } else { 0 };
-        match capture_db::get_frame_at_index(&buf_id, idx)? {
-            Some((rowid, _)) => rowid,
-            None => return Err("Capture empty".to_string()),
-        }
+        i64::MIN
     };
 
     // Find next/prev frame using targeted SQLite query
@@ -790,10 +787,10 @@ mod tests {
     }
 
     #[test]
-    fn with_no_position_a_step_starts_at_the_end_it_leaves_and_skips_that_frame() {
+    fn with_no_position_a_step_lands_on_the_end_it_starts_from() {
         let id = capture_of("step-no-position", THREE);
-        assert_eq!(step(&id, None, None, false), Some((1, 20)));
-        assert_eq!(step(&id, None, None, true), Some((1, 20)));
+        assert_eq!(step(&id, None, None, false), Some((0, 10)));
+        assert_eq!(step(&id, None, None, true), Some((2, 30)));
     }
 
     #[test]

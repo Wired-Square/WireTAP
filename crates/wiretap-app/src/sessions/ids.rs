@@ -61,7 +61,7 @@ fn random_suffix() -> u64 {
 
 /// The session open on `source_id` alone, else a fresh id to open it under. The one
 /// place a saved profile or capture is turned into a session id.
-pub(crate) async fn session_for_source(source_id: &str, settings: &AppSettings) -> String {
+pub(crate) async fn session_for_source(source_id: &str, settings: &AppSettings, emit_raw_bytes: Option<bool>) -> String {
     let live = io::session_ids().await;
     let mut open: Vec<String> = super::get_sessions_for_profile(source_id)
         .into_iter()
@@ -70,7 +70,7 @@ pub(crate) async fn session_for_source(source_id: &str, settings: &AppSettings) 
     open.sort();
     match open.into_iter().next() {
         Some(id) => id,
-        None => mint_session_id(sources_prefix(&[source_id.to_string()], settings, None)).await,
+        None => mint_session_id(sources_prefix(&[source_id.to_string()], settings, emit_raw_bytes)).await,
     }
 }
 
@@ -185,8 +185,8 @@ mod tests {
         super::super::register_session_profile(alone, "p-source-alone");
         super::super::register_session_profiles(merged, &["p-source-merged".into(), "p-other".into()]);
 
-        assert_eq!(session_for_source("p-source-alone", &settings).await, alone);
-        let fresh = session_for_source("p-source-merged", &settings).await;
+        assert_eq!(session_for_source("p-source-alone", &settings, None).await, alone);
+        let fresh = session_for_source("p-source-merged", &settings, None).await;
         assert!(fresh.starts_with("s_") && fresh != merged, "{fresh}");
         for id in [alone, merged] {
             destroy_session(id, false).await.unwrap();

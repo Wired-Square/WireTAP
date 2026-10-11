@@ -47,7 +47,7 @@ export default function ByteExtractionDialog({
   const [selectionStart, setSelectionStart] = useState<number | null>(null);
   const [useNegativeIndex, setUseNegativeIndex] = useState(initialConfig.startByte < 0);
 
-  // Reset state when dialog opens
+  // Seeded on open only: a parent may pass a new initialConfig on every render.
   useEffect(() => {
     if (isOpen) {
       setStartByte(initialConfig.startByte);
@@ -56,7 +56,7 @@ export default function ByteExtractionDialog({
       setSelectionStart(null);
       setUseNegativeIndex(initialConfig.startByte < 0);
     }
-  }, [isOpen, initialConfig]);
+  }, [isOpen]);
 
   // Get a representative frame length for negative index resolution
   const representativeLength = sampleFrames.length > 0 ? sampleFrames[0].length : 8;
