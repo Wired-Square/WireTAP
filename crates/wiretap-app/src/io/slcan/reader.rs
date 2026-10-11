@@ -11,9 +11,9 @@
 //   RTR:      r<ID:3hex><DLC:1hex>\r / R<ID:8hex><DLC:1hex>\r
 
 use serde::{Deserialize, Serialize};
-use std::sync::{atomic::AtomicBool, Arc};
 
 use tokio::sync::mpsc;
+use tokio_util::sync::CancellationToken;
 use wiretap_io::can::slcan::{open as open_slcan, probe, SlcanOptions};
 use wiretap_io::can::{CanError, CanEvent, DeviceInfo};
 use wiretap_io::serial::LineSettings;
@@ -201,7 +201,7 @@ pub async fn run_source(
     silent_mode: bool,
     data_bitrate: Option<u32>,
     bus_mappings: Vec<BusMapping>,
-    stop_flag: Arc<AtomicBool>,
+    stop: CancellationToken,
     tx: mpsc::Sender<SourceMessage>,
 ) {
     let device = format!("slcan({})", port);
@@ -222,7 +222,7 @@ pub async fn run_source(
         task,
         source_idx,
         silent_mode,
-        &stop_flag,
+        &stop,
         &tx,
         |event| {
             outage.on_event(event, probe_serial_presence, |e| {
@@ -358,7 +358,7 @@ mod tests {
             false,
             None,
             vec![],
-            Arc::new(AtomicBool::new(false)),
+            CancellationToken::new(),
             tx,
         )
         .await;

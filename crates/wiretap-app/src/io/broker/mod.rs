@@ -12,6 +12,7 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{mpsc as std_mpsc, Arc, Mutex};
 use tokio::sync::{mpsc, oneshot};
+use tokio_util::sync::CancellationToken;
 
 /// Capacity for the async frame/bytes channel between source readers and the merge task.
 const SOURCE_CHANNEL_CAPACITY: usize = 1024;
@@ -26,7 +27,10 @@ use super::bus_status::{BusStatus, BusStatusBoard};
 use super::can_task::can_frame;
 use super::lifecycle::SourceLifecycle;
 use super::traits::validate_session_traits;
-use super::types::{FramingMode, PendingTransmit, SetFramingRequest, SourceMessage, TransmitRequest};
+use super::types::{
+    channel_refusal, FramingMode, PendingTransmit, SetFramingRequest, SourceMessage,
+    TransmitRequest,
+};
 use super::{
     CanTransmitFrame, IOCapabilities, IOSource, IOState, InterfaceTraits, SessionDataStreams,
     TransmitPayload, TransmitResult, VirtualBusState, emit_capture_changed,
@@ -100,7 +104,8 @@ pub struct IOBroker {
     session_id: String,
     sources: Vec<SourceConfig>,
     state: IOState,
-    stop_flag: Arc<AtomicBool>,
+    /// This run's stop, a fresh token per start.
+    stop: CancellationToken,
     pause_flag: Arc<AtomicBool>,
     /// Handles to sub-reader tasks
     task_handles: Vec<tokio::task::JoinHandle<()>>,
@@ -158,6 +163,12 @@ pub struct IOBroker {
     /// at registration is the only thing left to tell it — and
     /// `endpoint_in_use_by_poller` reads it to decide whether a sweep may run.
     lifecycle: SourceLifecycle,
+}
+
+impl Drop for IOBroker {
+    fn drop(&mut self) {
+        self.stop.cancel();
+    }
 }
 
 /// What `sources` emit: a virtual device with serial traffic streams bytes, any
@@ -323,7 +334,7 @@ impl IOBroker {
             session_id,
             sources,
             state: IOState::Stopped,
-            stop_flag: Arc::new(AtomicBool::new(false)),
+            stop: CancellationToken::new(),
             pause_flag: Arc::new(AtomicBool::new(false)),
             task_handles: Vec::new(),
             rx: Some(rx),
@@ -606,7 +617,7 @@ impl IOBroker {
             result_tx,
             wait_for_room: false,
         })
-        .map_err(|e| format!("Serial transmit buffer full ({})", e))?;
+        .map_err(|e| format!("Serial transmit buffer full ({})", channel_refusal(&e)))?;
         Ok(TransmitResult::queued())
     }
 }
@@ -638,7 +649,7 @@ impl IOSource for IOBroker {
         }
 
         self.state = IOState::Starting;
-        self.stop_flag.store(false, Ordering::SeqCst);
+        self.stop = CancellationToken::new();
         if let Ok(mut slot) = self.fatal_error.lock() {
             *slot = None;
         }
@@ -696,7 +707,7 @@ impl IOSource for IOBroker {
         let profiles = self.profiles.clone();
         let session_id = self.session_id.clone();
         let sources = self.sources.clone();
-        let stop_flag = self.stop_flag.clone();
+        let stop = self.stop.clone();
         let pause_flag = self.pause_flag.clone();
         let tx = self.tx.clone();
         let transmit_channels = self.transmit_channels.clone();
@@ -752,7 +763,7 @@ impl IOSource for IOBroker {
                 session_id,
                 sources,
                 bytes_capture_id,
-                stop_flag,
+                stop,
                 pause_flag,
                 rx,
                 tx,
@@ -796,7 +807,7 @@ impl IOSource for IOBroker {
             self.session_id
         );
 
-        self.stop_flag.store(true, Ordering::SeqCst);
+        self.stop.cancel();
 
         // Drop the merge command channel so the merge task sees it as closed
         if let Ok(mut tx_slot) = self.merge_cmd_tx.lock() {

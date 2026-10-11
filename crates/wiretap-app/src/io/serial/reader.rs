@@ -6,12 +6,10 @@
 
 use serde::Serialize;
 use std::sync::mpsc as std_mpsc;
-use std::sync::{
-    atomic::{AtomicBool, Ordering},
-    Arc, Weak,
-};
+use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::sync::mpsc;
+use tokio_util::sync::CancellationToken;
 use wiretap_catalog::{Catalog, RtuTap, TappedMessage};
 use wiretap_io::serial::{
     self, ports, Access, LineSettings, PortInfo, PortKind, SerialError, SerialEvent,
@@ -21,7 +19,8 @@ use wiretap_io::serial::{
 use crate::io::bus_mapping::{apply_bus_mapping, BusMapping};
 use crate::io::error::DevicePresence;
 use crate::io::types::{
-    ByteEntry, EndReason, ModbusRtuOptions, SetFramingRequest, SourceMessage, TransmitRequest,
+    next_request, transmit_channel, ByteEntry, EndReason, ModbusRtuOptions, SetFramingRequest,
+    SourceMessage, TransmitReceiver,
 };
 use crate::io::FrameMessage;
 
@@ -30,7 +29,7 @@ use super::framer::{
 };
 use super::utils::{framing_from_mode, outage_message, probe_serial_presence, SerialSourceConfig};
 
-/// How often the read loop looks at the stop flag and for a framing change.
+/// How often the read loop looks for a framing or catalogue change.
 const POLL: Duration = Duration::from_millis(50);
 
 /// FTDI-type USB-serial adapters hold a short read for their 16 ms latency
@@ -382,26 +381,24 @@ fn transmit_result(written: Result<std::io::Result<()>, WriteRefused>) -> Result
     }
 }
 
-/// `TransmitSender` is a std channel, so its requests reach the async writer
-/// from a blocking thread, which ends once the reader has.
+/// On a blocking thread, since a transmit blocks its caller until it is
+/// answered; it ends once the reader has, answering what was queued first.
 fn forward_transmits(
-    requests: std_mpsc::Receiver<TransmitRequest>,
+    mut requests: TransmitReceiver,
     writer: SerialWriter,
-    reader: Weak<()>,
+    reader_ended: CancellationToken,
 ) {
     let runtime = tokio::runtime::Handle::current();
-    tokio::task::spawn_blocking(move || loop {
-        match requests.recv_timeout(POLL) {
-            Ok(req) => {
-                let result = transmit_result(runtime.block_on(writer.write(req.data)));
+    tokio::task::spawn_blocking(move || {
+        runtime.block_on(async move {
+            while let Some(req) = next_request(&mut requests, &reader_ended).await {
+                let result = transmit_result(writer.write(req.data).await);
                 if let Err(e) = &result {
                     tlog!("[serial] Transmit failed: {}", e);
                 }
                 let _ = req.result_tx.send(result);
             }
-            Err(std_mpsc::RecvTimeoutError::Timeout) if reader.strong_count() > 0 => {}
-            Err(_) => return,
-        }
+        })
     });
 }
 
@@ -412,7 +409,7 @@ pub async fn run_source(
     config: SerialSourceConfig,
     bus_mappings: Vec<BusMapping>,
     attached_catalog: impl Fn() -> Option<Arc<Catalog>>,
-    stop_flag: Arc<AtomicBool>,
+    stop: CancellationToken,
     tx: mpsc::Sender<SourceMessage>,
 ) {
     let port = config.port.clone();
@@ -438,9 +435,10 @@ pub async fn run_source(
         }
     };
 
-    let reader_running = Arc::new(());
-    let (transmit_tx, transmit_rx) = std_mpsc::sync_channel::<TransmitRequest>(32);
-    forward_transmits(transmit_rx, task.writer(), Arc::downgrade(&reader_running));
+    let reader_ended = CancellationToken::new();
+    let _on_return = reader_ended.clone().drop_guard();
+    let (transmit_tx, transmit_rx) = transmit_channel();
+    forward_transmits(transmit_rx, task.writer(), reader_ended);
     let _ = tx
         .send(SourceMessage::TransmitReady(source_idx, transmit_tx))
         .await;
@@ -474,10 +472,8 @@ pub async fn run_source(
                     return;
                 }
             },
+            () = stop.cancelled() => break,
             _ = poll.tick() => {
-                if stop_flag.load(Ordering::SeqCst) {
-                    break;
-                }
                 live.follow_catalog(attached_catalog());
                 while let Ok(req) = control_rx.try_recv() {
                     live.set_framing(req);

@@ -6,9 +6,8 @@
 // Requires the interface to be configured first:
 //   sudo ip link set can0 up type can bitrate 500000
 
-use std::sync::{atomic::AtomicBool, Arc};
-
 use tokio::sync::mpsc;
+use tokio_util::sync::CancellationToken;
 use wiretap_io::can::socketcan::{open as open_socketcan, SocketCanOptions};
 use wiretap_io::can::{CanError, CanEvent};
 
@@ -141,7 +140,7 @@ pub async fn run_source(
     enable_fd: bool,
     data_bitrate: Option<u32>,
     bus_mappings: Vec<BusMapping>,
-    stop_flag: Arc<AtomicBool>,
+    stop: CancellationToken,
     tx: mpsc::Sender<SourceMessage>,
 ) {
     let device = format!("socketcan({})", interface);
@@ -169,7 +168,7 @@ pub async fn run_source(
         task,
         source_idx,
         false,
-        &stop_flag,
+        &stop,
         &tx,
         |event| on_event(source_idx, &interface, &bus_mappings, event),
         |error| link_lost(source_idx, &device, error),

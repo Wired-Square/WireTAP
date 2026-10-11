@@ -3,9 +3,9 @@
 // Per-protocol source spawning for broker sessions.
 
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::mpsc as std_mpsc;
 use std::sync::Arc;
 use tokio::sync::{mpsc, watch};
+use tokio_util::sync::CancellationToken;
 use tokio::time::{Duration, interval};
 
 use super::types::{SerialOverrides, SourceConfig};
@@ -29,7 +29,7 @@ use crate::io::serial::utils::line_settings;
 #[cfg(not(target_os = "ios"))]
 use crate::io::slcan::{reader::slcan_rates, run_slcan_source};
 use crate::io::framelink::reader::run_source as run_framelink_source;
-use crate::io::types::{ByteEntry, EndReason, SourceMessage, TransmitRequest};
+use crate::io::types::{next_request, transmit_channel, ByteEntry, EndReason, SourceMessage};
 use crate::settings::IOProfile;
 use super::{VirtualBusCommand, VirtualBusControl, VirtualBusControls};
 
@@ -51,7 +51,7 @@ pub(super) async fn run_source_reader(
     source_idx: usize,
     profile: IOProfile,
     config: SourceConfig,
-    stop_flag: Arc<AtomicBool>,
+    stop: CancellationToken,
     pause_flag: Arc<AtomicBool>,
     tx: mpsc::Sender<SourceMessage>,
     virtual_bus_controls: VirtualBusControls,
@@ -68,19 +68,19 @@ pub(super) async fn run_source_reader(
     let error_tx = tx.clone();
     let outcome = match profile.kind.as_str() {
         "gvret_tcp" => {
-            run_gvret_tcp_reader(source_idx, &profile, bus_mappings, stop_flag, tx).await
+            run_gvret_tcp_reader(source_idx, &profile, bus_mappings, stop, tx).await
         }
         #[cfg(not(target_os = "ios"))]
         "gvret_usb" => {
-            run_gvret_usb_reader(source_idx, &profile, bus_mappings, stop_flag, tx).await
+            run_gvret_usb_reader(source_idx, &profile, bus_mappings, stop, tx).await
         }
         #[cfg(not(target_os = "ios"))]
-        "slcan" => run_slcan_reader(source_idx, &profile, bus_mappings, stop_flag, tx).await,
+        "slcan" => run_slcan_reader(source_idx, &profile, bus_mappings, stop, tx).await,
         #[cfg(any(target_os = "windows", target_os = "macos"))]
-        "gs_usb" => run_gs_usb_reader(source_idx, &profile, bus_mappings, stop_flag, tx).await,
+        "gs_usb" => run_gs_usb_reader(source_idx, &profile, bus_mappings, stop, tx).await,
         #[cfg(target_os = "linux")]
         "socketcan" => {
-            run_socketcan_reader(source_idx, &profile, bus_mappings, stop_flag, tx).await
+            run_socketcan_reader(source_idx, &profile, bus_mappings, stop, tx).await
         }
         #[cfg(not(target_os = "ios"))]
         "serial" => {
@@ -90,16 +90,16 @@ pub(super) async fn run_source_reader(
                 &profile,
                 bus_mappings,
                 &serial,
-                stop_flag,
+                stop,
                 tx,
             )
             .await
         }
         "framelink" => {
-            run_framelink_reader(source_idx, &profile, bus_mappings, stop_flag, tx).await
+            run_framelink_reader(source_idx, &profile, bus_mappings, stop, tx).await
         }
         "virtual" => {
-            run_virtual_reader(source_idx, &profile, bus_mappings, stop_flag, tx, virtual_bus_controls, virtual_cmd_rx).await
+            run_virtual_reader(source_idx, &profile, bus_mappings, stop, tx, virtual_bus_controls, virtual_cmd_rx).await
         }
         "modbus_tcp" => {
             run_modbus_tcp_client(
@@ -109,7 +109,7 @@ pub(super) async fn run_source_reader(
                 bus_mappings,
                 modbus_polls.unwrap_or_default(),
                 max_register_errors.unwrap_or(0),
-                stop_flag,
+                stop,
                 pause_flag,
                 tx,
             )
@@ -133,14 +133,14 @@ async fn run_gvret_tcp_reader(
     source_idx: usize,
     profile: &IOProfile,
     bus_mappings: Vec<BusMapping>,
-    stop_flag: Arc<AtomicBool>,
+    stop: CancellationToken,
     tx: mpsc::Sender<SourceMessage>,
 ) -> Result<(), String> {
     let host = req_str(profile, "host")?;
     let port = req_i64(profile, "port")? as u16;
     let timeout_sec = req_f64(profile, "timeout")?;
 
-    run_gvret_tcp_source(source_idx, host, port, timeout_sec, bus_mappings, stop_flag, tx).await;
+    run_gvret_tcp_source(source_idx, host, port, timeout_sec, bus_mappings, stop, tx).await;
     Ok(())
 }
 
@@ -149,12 +149,12 @@ async fn run_gvret_usb_reader(
     source_idx: usize,
     profile: &IOProfile,
     bus_mappings: Vec<BusMapping>,
-    stop_flag: Arc<AtomicBool>,
+    stop: CancellationToken,
     tx: mpsc::Sender<SourceMessage>,
 ) -> Result<(), String> {
     let port = req_str(profile, "port")?;
 
-    run_gvret_usb_source(source_idx, port, line_settings(profile)?, bus_mappings, stop_flag, tx)
+    run_gvret_usb_source(source_idx, port, line_settings(profile)?, bus_mappings, stop, tx)
         .await;
     Ok(())
 }
@@ -164,7 +164,7 @@ async fn run_slcan_reader(
     source_idx: usize,
     profile: &IOProfile,
     bus_mappings: Vec<BusMapping>,
-    stop_flag: Arc<AtomicBool>,
+    stop: CancellationToken,
     tx: mpsc::Sender<SourceMessage>,
 ) -> Result<(), String> {
     let port = req_str(profile, "port")?;
@@ -179,7 +179,7 @@ async fn run_slcan_reader(
         silent_mode,
         data_bitrate,
         bus_mappings,
-        stop_flag,
+        stop,
         tx,
     )
     .await;
@@ -191,7 +191,7 @@ async fn run_gs_usb_reader(
     source_idx: usize,
     profile: &IOProfile,
     bus_mappings: Vec<BusMapping>,
-    stop_flag: Arc<AtomicBool>,
+    stop: CancellationToken,
     tx: mpsc::Sender<SourceMessage>,
 ) -> Result<(), String> {
     let bus = req_i64(profile, "bus")? as u8;
@@ -220,7 +220,7 @@ async fn run_gs_usb_reader(
         data_bitrate,
         data_sample_point,
         bus_mappings,
-        stop_flag,
+        stop,
         tx,
     )
     .await;
@@ -232,7 +232,7 @@ async fn run_socketcan_reader(
     source_idx: usize,
     profile: &IOProfile,
     bus_mappings: Vec<BusMapping>,
-    stop_flag: Arc<AtomicBool>,
+    stop: CancellationToken,
     tx: mpsc::Sender<SourceMessage>,
 ) -> Result<(), String> {
     let interface = req_str(profile, "interface")?;
@@ -250,7 +250,7 @@ async fn run_socketcan_reader(
         enable_fd,
         data_bitrate,
         bus_mappings,
-        stop_flag,
+        stop,
         tx,
     )
     .await;
@@ -264,7 +264,7 @@ async fn run_serial_reader(
     profile: &IOProfile,
     bus_mappings: Vec<BusMapping>,
     overrides: &SerialOverrides,
-    stop_flag: Arc<AtomicBool>,
+    stop: CancellationToken,
     tx: mpsc::Sender<SourceMessage>,
 ) -> Result<(), String> {
     // Fully resolved — the overrides go in, so nothing is left to re-apply here.
@@ -288,7 +288,7 @@ async fn run_serial_reader(
         config,
         bus_mappings,
         attached_catalog,
-        stop_flag,
+        stop,
         tx,
     )
     .await;
@@ -303,14 +303,14 @@ async fn run_framelink_reader(
     source_idx: usize,
     profile: &IOProfile,
     bus_mappings: Vec<BusMapping>,
-    stop_flag: Arc<AtomicBool>,
+    stop: CancellationToken,
     tx: mpsc::Sender<SourceMessage>,
 ) -> Result<(), String> {
     let host = req_str(profile, "host")?;
     let port = req_i64(profile, "port")? as u16;
     let timeout = req_f64(profile, "timeout")?;
 
-    run_framelink_source(source_idx, host, port, timeout, bus_mappings, stop_flag, tx).await;
+    run_framelink_source(source_idx, host, port, timeout, bus_mappings, stop, tx).await;
     Ok(())
 }
 
@@ -327,7 +327,7 @@ async fn run_virtual_reader(
     source_idx: usize,
     profile: &IOProfile,
     bus_mappings: Vec<BusMapping>,
-    stop_flag: Arc<AtomicBool>,
+    stop: CancellationToken,
     tx: mpsc::Sender<SourceMessage>,
     virtual_bus_controls: VirtualBusControls,
     virtual_cmd_rx: Option<mpsc::UnboundedReceiver<VirtualBusCommand>>,
@@ -391,7 +391,7 @@ async fn run_virtual_reader(
 
     // Loopback: transmitted frames are echoed back as received. Offered before
     // `Connected`, since `start` returns on the first and a transmit may follow at once.
-    let (transmit_tx, transmit_rx) = std_mpsc::sync_channel::<TransmitRequest>(32);
+    let (transmit_tx, mut transmit_rx) = transmit_channel();
     let _ = tx
         .send(SourceMessage::TransmitReady(source_idx, transmit_tx))
         .await;
@@ -405,56 +405,52 @@ async fn run_virtual_reader(
         .await;
 
     // Spawn loopback task: receives encoded frames and echoes them back via the merge channel
-    // A blocking thread, not a tokio task: `recv_timeout` never yields, and on a worker it wedged the runtime.
     let tx_loopback = tx.clone();
-    let stop_flag_for_transmit = stop_flag.clone();
+    let loopback_stop = stop.clone();
     let serial_echo_bus = (traffic == VirtualTrafficType::Serial).then(|| {
         bus_mappings.iter().find(|m| m.enabled).map_or(0, |m| m.output_bus)
     });
     let echo_mappings = bus_mappings.clone();
-    tokio::task::spawn_blocking(move || {
-        while !stop_flag_for_transmit.load(Ordering::Relaxed) {
-            match transmit_rx.recv_timeout(std::time::Duration::from_millis(10)) {
-                Ok(req) => {
-                    let data = &req.data;
-                    if let Some(bus) = serial_echo_bus {
-                        let timestamp_us = now_us();
-                        let entries = data.iter().map(|&byte| ByteEntry { byte, timestamp_us, bus }).collect();
-                        let _ = tx_loopback.blocking_send(SourceMessage::Bytes(source_idx, entries));
-                    } else if data.len() >= 8 {
-                        // Decode virtual frame format: frame_id(4 LE) + bus(1) + is_extended(1) + is_fd(1) + dlc(1) + data
-                        let frame_id = u32::from_le_bytes([data[0], data[1], data[2], data[3]]);
-                        let bus = data[4];
-                        let is_extended = data[5] != 0;
-                        let is_fd = data[6] != 0;
-                        let dlc = data[7];
-                        let frame_data = data.get(8..).unwrap_or(&[]).to_vec();
-                        let ts = now_us();
-                        let mut frame = FrameMessage {
-                            protocol: "can".to_string(),
-                            timestamp_us: ts,
-                            frame_id,
-                            bus,
-                            dlc: dlc.into(),
-                            bytes: frame_data,
-                            is_extended,
-                            is_fd,
-                            source_address: None,
-                            incomplete: None,
-                            direction: Some("rx".to_string()),
-                            ..Default::default()
-                        };
-                        if apply_bus_mapping(&mut frame, &echo_mappings) {
-                            let _ = tx_loopback.blocking_send(SourceMessage::Frames(source_idx, vec![frame]));
-                        }
-                    }
-                    let _ = req.result_tx.send(Ok(()));
+    // A blocking thread, since a transmit blocks its caller, a runtime worker,
+    // until it is answered.
+    let runtime = tokio::runtime::Handle::current();
+    tokio::task::spawn_blocking(move || runtime.block_on(async move {
+        while let Some(req) = next_request(&mut transmit_rx, &loopback_stop).await {
+            let data = &req.data;
+            if let Some(bus) = serial_echo_bus {
+                let timestamp_us = now_us();
+                let entries = data.iter().map(|&byte| ByteEntry { byte, timestamp_us, bus }).collect();
+                let _ = tx_loopback.send(SourceMessage::Bytes(source_idx, entries)).await;
+            } else if data.len() >= 8 {
+                // Decode virtual frame format: frame_id(4 LE) + bus(1) + is_extended(1) + is_fd(1) + dlc(1) + data
+                let frame_id = u32::from_le_bytes([data[0], data[1], data[2], data[3]]);
+                let bus = data[4];
+                let is_extended = data[5] != 0;
+                let is_fd = data[6] != 0;
+                let dlc = data[7];
+                let frame_data = data.get(8..).unwrap_or(&[]).to_vec();
+                let ts = now_us();
+                let mut frame = FrameMessage {
+                    protocol: "can".to_string(),
+                    timestamp_us: ts,
+                    frame_id,
+                    bus,
+                    dlc: dlc.into(),
+                    bytes: frame_data,
+                    is_extended,
+                    is_fd,
+                    source_address: None,
+                    incomplete: None,
+                    direction: Some("rx".to_string()),
+                    ..Default::default()
+                };
+                if apply_bus_mapping(&mut frame, &echo_mappings) {
+                    let _ = tx_loopback.send(SourceMessage::Frames(source_idx, vec![frame])).await;
                 }
-                Err(std_mpsc::RecvTimeoutError::Timeout) => {}
-                Err(std_mpsc::RecvTimeoutError::Disconnected) => break,
             }
+            let _ = req.result_tx.send(Ok(()));
         }
-    });
+    }));
 
     // Register per-bus controls in the shared map and spawn generator tasks for buses
     // that have an enabled mapping (or all buses when no mappings are configured)
@@ -471,7 +467,7 @@ async fn run_virtual_reader(
             traffic.clone(),
             source_idx,
             &bus_mappings,
-            &stop_flag,
+            &stop,
             &tx,
             &virtual_bus_controls,
         );
@@ -481,12 +477,12 @@ async fn run_virtual_reader(
     // Command-driven loop: listen for add/remove bus commands until session stops
     if let Some(mut cmd_rx) = virtual_cmd_rx {
         loop {
-            if stop_flag.load(Ordering::Relaxed) {
-                break;
-            }
-            // Use a short timeout so we can check stop_flag periodically
-            match tokio::time::timeout(Duration::from_millis(100), cmd_rx.recv()).await {
-                Ok(Some(VirtualBusCommand::AddBus { bus, traffic_type: tt, frame_rate_hz })) => {
+            let cmd = tokio::select! {
+                cmd = cmd_rx.recv() => cmd,
+                () = stop.cancelled() => break,
+            };
+            match cmd {
+                Some(VirtualBusCommand::AddBus { bus, traffic_type: tt, frame_rate_hz }) => {
                     // Don't add if already exists
                     if gen_handles.contains_key(&bus) {
                         tlog!("[virtual_reader] Bus {} already exists, skipping add", bus);
@@ -504,14 +500,14 @@ async fn run_virtual_reader(
                         VirtualTrafficType::from_setting(Some(&tt)),
                         source_idx,
                         &bus_mappings,
-                        &stop_flag,
+                        &stop,
                         &tx,
                         &virtual_bus_controls,
                     );
                     gen_handles.insert(bus, handle);
                     tlog!("[virtual_reader] Added bus {} at {:.0} Hz", bus, frame_rate_hz);
                 }
-                Ok(Some(VirtualBusCommand::RemoveBus { bus })) => {
+                Some(VirtualBusCommand::RemoveBus { bus }) => {
                     // Set bus_stop flag so the generator exits on next tick
                     if let Ok(mut controls) = virtual_bus_controls.lock() {
                         if let Some(ctrl) = controls.get(&bus) {
@@ -525,20 +521,15 @@ async fn run_virtual_reader(
                     }
                     tlog!("[virtual_reader] Removed bus {}", bus);
                 }
-                Ok(None) => {
+                None => {
                     // Channel closed — session ending
                     break;
-                }
-                Err(_) => {
-                    // Timeout — loop back to check stop_flag
                 }
             }
         }
     } else {
         // No command channel — just wait for stop (legacy path, shouldn't happen)
-        while !stop_flag.load(Ordering::Relaxed) {
-            tokio::time::sleep(Duration::from_millis(100)).await;
-        }
+        stop.cancelled().await;
     }
 
     // Wait for all remaining generator tasks to finish
@@ -560,7 +551,7 @@ fn spawn_bus_generator(
     traffic: VirtualTrafficType,
     source_idx: usize,
     bus_mappings: &[BusMapping],
-    stop_flag: &Arc<AtomicBool>,
+    stop: &CancellationToken,
     tx: &mpsc::Sender<SourceMessage>,
     virtual_bus_controls: &VirtualBusControls,
 ) -> tokio::task::JoinHandle<()> {
@@ -580,7 +571,7 @@ fn spawn_bus_generator(
     }
 
     let tx_clone = tx.clone();
-    let stop_clone = stop_flag.clone();
+    let stop_clone = stop.clone();
     let bus_mappings_clone = bus_mappings.to_vec();
 
     tokio::spawn(async move {
@@ -598,9 +589,12 @@ fn spawn_bus_generator(
         let mut counter: u64 = 0;
 
         loop {
-            ticker.tick().await;
+            tokio::select! {
+                _ = ticker.tick() => {}
+                () = stop_clone.cancelled() => break,
+            }
 
-            if stop_clone.load(Ordering::Relaxed) || bus_stop.load(Ordering::Relaxed) {
+            if bus_stop.load(Ordering::Relaxed) {
                 break;
             }
 
@@ -650,7 +644,7 @@ async fn run_modbus_tcp_client(
     bus_mappings: Vec<BusMapping>,
     polls: Vec<PollGroup>,
     max_register_errors: u32,
-    stop_flag: Arc<AtomicBool>,
+    stop: CancellationToken,
     pause_flag: Arc<AtomicBool>,
     tx: mpsc::Sender<SourceMessage>,
 ) -> Result<(), String> {
@@ -698,7 +692,7 @@ async fn run_modbus_tcp_client(
     };
     tokio::select! {
         () = run_poll_task(task, control_rx, sink, max_register_errors) => {}
-        () = relay_source_flags(&stop_flag, &pause_flag, &control) => {}
+        () = relay_source_flags(&stop, &pause_flag, &control) => {}
     }
 
     let _ = tx
@@ -707,30 +701,36 @@ async fn run_modbus_tcp_client(
     Ok(())
 }
 
-/// The broker signals its sources through shared flags and a poll task takes
-/// commands, so this relays one to the other until it is dropped.
+/// The broker signals a source's pause through a shared flag and its stop
+/// through a token, and a poll task takes commands, so this relays both until it
+/// is dropped.
 async fn relay_source_flags(
-    stop: &AtomicBool,
+    stop: &CancellationToken,
     pause: &AtomicBool,
     control: &watch::Sender<PollControl>,
 ) {
     loop {
-        let wanted = if stop.load(Ordering::Relaxed) {
-            PollControl::Stop
-        } else if pause.load(Ordering::Relaxed) {
+        let wanted = if pause.load(Ordering::Relaxed) {
             PollControl::Pause
         } else {
             PollControl::Run
         };
         control.send_if_modified(|current| std::mem::replace(current, wanted) != wanted);
-        tokio::time::sleep(Duration::from_millis(50)).await;
+        tokio::select! {
+            () = stop.cancelled() => break,
+            () = tokio::time::sleep(Duration::from_millis(50)) => {}
+        }
     }
+    control.send_replace(PollControl::Stop);
+    std::future::pending().await
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::io::types::TransmitRequest;
     use crate::io::Protocol;
+    use std::sync::mpsc as std_mpsc;
     use std::sync::atomic::AtomicUsize;
     use std::sync::Mutex;
 
@@ -786,7 +786,7 @@ mod tests {
         TransmitRequest { data, frame: None, result_tx, wait_for_room: false }
     }
 
-    async fn burst_and_stop(stop: Arc<AtomicBool>, progress: Arc<Progress>) {
+    async fn burst_and_stop(stop: CancellationToken, progress: Arc<Progress>) {
         let (tx, mut rx) = mpsc::channel(1024);
         let (_cmd_tx, cmd_rx) = mpsc::unbounded_channel();
         let reader = tokio::spawn({
@@ -810,7 +810,7 @@ mod tests {
             loop {
                 match transmit.try_send(request) {
                     Ok(()) => break,
-                    Err(std_mpsc::TrySendError::Full(back)) => {
+                    Err(mpsc::error::TrySendError::Full(back)) => {
                         request = back;
                         while let Ok(msg) = rx.try_recv() {
                             progress.count(msg);
@@ -834,14 +834,14 @@ mod tests {
         }
 
         progress.enter("stop");
-        stop.store(true, Ordering::Relaxed);
+        stop.cancel();
         reader.await.expect("the reader task").expect("the reader ends cleanly");
         progress.enter("done");
     }
 
     #[test]
     fn a_loopback_virtual_device_keeps_its_runtime_free_under_a_transmit_burst() {
-        let stop = Arc::new(AtomicBool::new(false));
+        let stop = CancellationToken::new();
         let progress = Arc::new(Progress::default());
         let (done_tx, done_rx) = std_mpsc::channel();
         std::thread::spawn({
@@ -859,7 +859,7 @@ mod tests {
 
         // A starved runtime cannot fire its own timers, so the deadline is kept off it.
         let finished = done_rx.recv_timeout(std::time::Duration::from_secs(10));
-        stop.store(true, Ordering::Relaxed);
+        stop.cancel();
         assert!(
             finished.is_ok(),
             "the runtime wedged in phase '{}': echoed {}/{}, generator frames {}",
@@ -874,7 +874,7 @@ mod tests {
     async fn a_serial_virtual_device_generates_bytes_not_frames() {
         let mut profile = loopback_profile();
         profile.connection.insert("traffic_type".into(), "serial".into());
-        let stop = Arc::new(AtomicBool::new(false));
+        let stop = CancellationToken::new();
         let (tx, mut rx) = mpsc::channel(64);
         let reader = tokio::spawn({
             let stop = stop.clone();
@@ -887,7 +887,7 @@ mod tests {
                 msg => break msg,
             }
         };
-        stop.store(true, Ordering::Relaxed);
+        stop.cancel();
         reader.await.expect("the reader task").expect("the reader ends cleanly");
 
         match generated {
@@ -909,7 +909,7 @@ mod tests {
             serde_json::json!([{ "bus": 0, "signal_generator": false, "frame_rate_hz": 1.0 }]),
         );
         let mappings = vec![BusMapping { output_bus: 3, ..Default::default() }.with_protocol(Protocol::Serial)];
-        let stop = Arc::new(AtomicBool::new(false));
+        let stop = CancellationToken::new();
         let (tx, mut rx) = mpsc::channel(64);
         let reader = tokio::spawn({
             let stop = stop.clone();
@@ -927,7 +927,7 @@ mod tests {
                 msg => break msg,
             }
         };
-        stop.store(true, Ordering::Relaxed);
+        stop.cancel();
         reader.await.expect("the reader task").expect("the reader ends cleanly");
 
         match echoed {
@@ -949,7 +949,7 @@ mod tests {
             serde_json::json!([{ "bus": 0, "signal_generator": false, "frame_rate_hz": 1.0 }]),
         );
         let mappings = vec![BusMapping { output_bus: 3, ..Default::default() }];
-        let stop = Arc::new(AtomicBool::new(false));
+        let stop = CancellationToken::new();
         let (tx, mut rx) = mpsc::channel(64);
         let reader = tokio::spawn({
             let stop = stop.clone();
@@ -963,7 +963,7 @@ mod tests {
                 _ => continue,
             }
         };
-        stop.store(true, Ordering::Relaxed);
+        stop.cancel();
         reader.await.expect("the reader task").expect("the reader ends cleanly");
 
         let [frame] = echoed.as_slice() else { panic!("echoed {echoed:?}") };
@@ -976,7 +976,7 @@ mod tests {
         let (done_tx, done_rx) = std_mpsc::channel();
         let echoed = Arc::new(AtomicUsize::new(0));
         let accepted = Arc::new(AtomicUsize::new(0));
-        let stop = Arc::new(AtomicBool::new(false));
+        let stop = CancellationToken::new();
         std::thread::spawn({
             let (echoed, accepted, stop) = (echoed.clone(), accepted.clone(), stop.clone());
             move || {
@@ -1025,7 +1025,7 @@ mod tests {
                         tokio::time::sleep(Duration::from_millis(20)).await;
                     }
                     merge.await.unwrap();
-                    stop.store(true, Ordering::Relaxed);
+                    stop.cancel();
                     let _ = reader.await;
                 });
                 let _ = done_tx.send(());
@@ -1033,7 +1033,7 @@ mod tests {
         });
 
         let finished = done_rx.recv_timeout(std::time::Duration::from_secs(10));
-        stop.store(true, Ordering::Relaxed);
+        stop.cancel();
         assert!(
             finished.is_ok(),
             "the merge task saw {}/{} echoes of {} accepted transmits",

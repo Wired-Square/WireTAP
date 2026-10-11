@@ -3,12 +3,10 @@
 // FrameLink source reader — subscribes to the shared connection for a device
 // and forwards frames matching this source's bus mappings to the merge task.
 
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::mpsc as std_mpsc;
-use std::sync::Arc;
 use std::time::Duration;
 
 use tokio::sync::mpsc;
+use tokio_util::sync::CancellationToken;
 
 use super::convert_stream_frame;
 use super::shared;
@@ -16,7 +14,7 @@ use framelink::protocol::types::{IFACE_CAN, IFACE_CANFD, IFACE_RS232, IFACE_RS48
 
 use crate::io::error::IoError;
 use crate::io::bus_mapping::BusMapping;
-use crate::io::types::{EndReason, SourceMessage, TransmitRequest};
+use crate::io::types::{transmit_channel, EndReason, SourceMessage};
 use crate::io::Protocol;
 
 /// Frames buffered before a flush, independent of the 1 ms tick.
@@ -36,7 +34,7 @@ pub async fn run_source(
     port: u16,
     timeout_sec: f64,
     bus_mappings: Vec<BusMapping>,
-    stop_flag: Arc<AtomicBool>,
+    stop: CancellationToken,
     tx: mpsc::Sender<SourceMessage>,
 ) {
     // Bootstrap: connect by address to get device_id
@@ -80,7 +78,7 @@ pub async fn run_source(
         }
     }
 
-    let (transmit_tx, transmit_rx) = std_mpsc::sync_channel::<TransmitRequest>(32);
+    let (transmit_tx, mut transmit_rx) = transmit_channel();
     let _ = tx
         .send(SourceMessage::TransmitReady(source_idx, transmit_tx))
         .await;
@@ -158,7 +156,7 @@ pub async fn run_source(
                         .send(SourceMessage::Frames(source_idx, std::mem::take(&mut pending)))
                         .await;
                 }
-                if stop_flag.load(Ordering::SeqCst) {
+                if stop.is_cancelled() {
                     break;
                 }
                 while let Ok(req) = transmit_rx.try_recv() {

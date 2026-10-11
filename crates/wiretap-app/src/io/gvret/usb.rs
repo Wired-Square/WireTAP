@@ -6,9 +6,8 @@
 // Protocol reference: https://github.com/collin80/GVRET
 
 use serde::{Deserialize, Serialize};
-use std::sync::atomic::AtomicBool;
-use std::sync::Arc;
 use tokio::sync::mpsc;
+use tokio_util::sync::CancellationToken;
 use wiretap_io::can::gvret::{open as open_gvret, probe, GvretOptions, Link};
 use wiretap_io::serial::LineSettings;
 
@@ -71,7 +70,7 @@ pub async fn run_source(
     port: String,
     line: LineSettings,
     bus_mappings: Vec<BusMapping>,
-    stop_flag: Arc<AtomicBool>,
+    stop: CancellationToken,
     tx: mpsc::Sender<SourceMessage>,
 ) {
     let device = gvret_usb_device(&port);
@@ -102,7 +101,7 @@ pub async fn run_source(
         task,
         source_idx,
         false,
-        &stop_flag,
+        &stop,
         &tx,
         |event| outage.on_event(event, probe_serial_presence, |e| stream.on_event(e)),
         |error| link_lost(source_idx, &device, error),
@@ -180,8 +179,7 @@ mod tests {
             stop_bits: 1,
         };
         let path = "/nonexistent/wiretap-gvret".to_string();
-        let stop = Arc::new(AtomicBool::new(false));
-        run_source(3, path, line, vec![], stop, tx).await;
+        run_source(3, path, line, vec![], CancellationToken::new(), tx).await;
         let Some(SourceMessage::Error(3, error)) = rx.recv().await else {
             panic!("expected an error");
         };

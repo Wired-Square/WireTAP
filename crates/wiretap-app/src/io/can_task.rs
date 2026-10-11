@@ -5,11 +5,10 @@
 
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{mpsc as std_mpsc, Arc, Weak};
 use std::time::{Duration, UNIX_EPOCH};
 
 use tokio::sync::mpsc;
+use tokio_util::sync::CancellationToken;
 use wiretap_io::can::{
     BusState, CanError, CanEvent, CanFrame, CanOptions, CanRead, CanTask, CanWriter, DeviceInfo,
     Direction, SendRefused,
@@ -23,10 +22,10 @@ use crate::io::error::DevicePresence;
 use crate::io::error::IoError;
 #[cfg(not(target_os = "ios"))]
 use crate::io::serial::utils::{outage_message, PortLoss};
-use crate::io::types::{EndReason, SourceMessage, TransmitRequest};
+use crate::io::types::{
+    next_request, transmit_channel, EndReason, SourceMessage, TransmitReceiver,
+};
 use crate::io::{CanTransmitFrame, FrameMessage};
-
-const STOP_POLL: Duration = Duration::from_millis(50);
 
 /// How often a serial-port adapter lost mid-session is looked for again.
 #[cfg(not(target_os = "ios"))]
@@ -258,26 +257,26 @@ impl<'a> PortOutage<'a> {
     }
 }
 
-/// Serve `task` to the session until `lost` words its loss, or `stop_flag`
-/// stops it. A listen-only source is offered no transmit.
+/// Serve `task` to the session until `lost` words its loss, or `stop` stops
+/// it. A listen-only source is offered no transmit.
 pub(crate) async fn serve(
     mut task: CanTask,
     source_idx: usize,
     listen_only: bool,
-    stop_flag: &AtomicBool,
+    stop: &CancellationToken,
     tx: &mpsc::Sender<SourceMessage>,
     mut on_event: impl FnMut(CanEvent) -> Result<Vec<SourceMessage>, CanError>,
     lost: impl FnOnce(CanError) -> SourceMessage,
 ) {
-    let reader_running = Arc::new(());
+    let reader_ended = CancellationToken::new();
+    let _on_return = reader_ended.clone().drop_guard();
     if !listen_only {
-        let (transmit_tx, transmit_rx) = std_mpsc::sync_channel::<TransmitRequest>(32);
-        forward_transmits(transmit_rx, task.writer(), Arc::downgrade(&reader_running));
+        let (transmit_tx, transmit_rx) = transmit_channel();
+        forward_transmits(transmit_rx, task.writer(), reader_ended);
         let _ = tx
             .send(SourceMessage::TransmitReady(source_idx, transmit_tx))
             .await;
     }
-    let mut poll = tokio::time::interval(STOP_POLL);
     let ended = loop {
         tokio::select! {
             event = task.next_event() => {
@@ -291,11 +290,9 @@ pub(crate) async fn serve(
                     Err(error) => break lost(error),
                 }
             }
-            _ = poll.tick() => {
-                if stop_flag.load(Ordering::SeqCst) {
-                    task.stop().await;
-                    break SourceMessage::Ended(source_idx, EndReason::Stopped);
-                }
+            () = stop.cancelled() => {
+                task.stop().await;
+                break SourceMessage::Ended(source_idx, EndReason::Stopped);
             }
         }
     };
@@ -322,28 +319,29 @@ impl FrameWriter for CanWriter {
     }
 }
 
-/// `TransmitSender` is a std channel, so its requests reach the async writer
-/// from a blocking thread, which ends once the reader has. A request is
-/// answered once the writer accepts or refuses it, not once the device has it.
+/// On a blocking thread, since `send_now` blocks its caller, a runtime worker,
+/// until the request is answered; it ends once the reader has, answering what
+/// was queued first. A request is answered once the writer accepts or refuses
+/// it, not once the device has it.
 fn forward_transmits(
-    requests: std_mpsc::Receiver<TransmitRequest>,
+    mut requests: TransmitReceiver,
     writer: impl FrameWriter,
-    reader: Weak<()>,
+    reader_ended: CancellationToken,
 ) {
     let runtime = tokio::runtime::Handle::current();
-    tokio::task::spawn_blocking(move || loop {
-        match requests.recv_timeout(Duration::from_millis(50)) {
-            Ok(req) => {
+    tokio::task::spawn_blocking(move || {
+        runtime.block_on(async move {
+            while let Some(req) = next_request(&mut requests, &reader_ended).await {
                 let answer = match req.frame {
                     Some(frame) => {
                         let admitted = if req.wait_for_room {
-                            runtime.block_on(writer.send_when_ready(frame))
+                            writer.send_when_ready(frame).await
                         } else {
                             writer.submit(frame)
                         };
                         admitted
                             .map(|sent| {
-                                runtime.spawn(async move {
+                                tokio::spawn(async move {
                                     if let Err(e) = transmit_result(sent.await) {
                                         tlog!("[can] Transmit failed: {}", e);
                                     }
@@ -358,9 +356,7 @@ fn forward_transmits(
                 }
                 let _ = req.result_tx.send(answer);
             }
-            Err(std_mpsc::RecvTimeoutError::Timeout) if reader.strong_count() > 0 => {}
-            Err(_) => return,
-        }
+        })
     });
 }
 
@@ -473,10 +469,14 @@ mod tests {
     }
 
     /// A source whose device queue holds one frame, behind the session's channel.
-    fn narrow_source(reader: &Arc<()>) -> (TransmitSender, mpsc::Receiver<CanFrame>) {
+    fn narrow_source() -> (TransmitSender, mpsc::Receiver<CanFrame>) {
         let (device_tx, device_rx) = mpsc::channel(1);
-        let (transmit_tx, transmit_rx) = std_mpsc::sync_channel(32);
-        forward_transmits(transmit_rx, NarrowQueue(device_tx), Arc::downgrade(reader));
+        let (transmit_tx, transmit_rx) = transmit_channel();
+        forward_transmits(
+            transmit_rx,
+            NarrowQueue(device_tx),
+            CancellationToken::new(),
+        );
         (transmit_tx, device_rx)
     }
 
@@ -490,8 +490,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn a_replay_waits_for_room_instead_of_dropping_frames() {
-        let reader = Arc::new(());
-        let (transmit, mut device) = narrow_source(&reader);
+        let (transmit, mut device) = narrow_source();
         let bus = tokio::spawn(async move {
             let mut ids = Vec::new();
             while let Some(frame) = device.recv().await {
@@ -505,14 +504,13 @@ mod tests {
             let result = pending(&transmit, n).send_when_ready().await.unwrap();
             assert!(result.success, "frame {n}: {:?}", result.error);
         }
-        drop((transmit, reader));
+        drop(transmit);
         assert_eq!(bus.await.unwrap(), (0..50).collect::<Vec<_>>());
     }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn an_ordinary_transmit_is_refused_at_once_by_a_full_queue() {
-        let reader = Arc::new(());
-        let (transmit, _device) = narrow_source(&reader);
+        let (transmit, _device) = narrow_source();
         let send_now = |n| {
             let pending = pending(&transmit, n);
             tokio::task::spawn_blocking(move || pending.send_now())

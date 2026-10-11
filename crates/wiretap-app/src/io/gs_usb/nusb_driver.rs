@@ -4,10 +4,9 @@
 // session's reader on wiretap-io's CAN task.
 
 use std::io;
-use std::sync::atomic::AtomicBool;
-use std::sync::Arc;
 
 use tokio::sync::mpsc;
+use tokio_util::sync::CancellationToken;
 use wiretap_io::can::gsusb::{self, GsUsbDevice, GsUsbOptions};
 use wiretap_io::can::{CanError, CanEvent, CanOptions, DeviceInfo};
 
@@ -136,7 +135,7 @@ pub async fn run_source(
     data_bitrate: u32,
     data_sample_point: f32,
     bus_mappings: Vec<BusMapping>,
-    stop_flag: Arc<AtomicBool>,
+    stop: CancellationToken,
     tx: mpsc::Sender<SourceMessage>,
 ) {
     let device = format!("gs_usb({}:{})", bus, address);
@@ -169,7 +168,7 @@ pub async fn run_source(
         task,
         source_idx,
         listen_only,
-        &stop_flag,
+        &stop,
         &tx,
         |event| on_event(source_idx, &address, channel, &mappings, event),
         |error| link_lost(source_idx, &device, error),

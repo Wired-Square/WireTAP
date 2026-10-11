@@ -3,10 +3,9 @@
 // GVRET over TCP: the desktop's probe, and the session's source on
 // `wiretap_io::can::gvret`.
 
-use std::sync::atomic::AtomicBool;
-use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc;
+use tokio_util::sync::CancellationToken;
 use wiretap_io::can::gvret::{open as open_gvret, probe, GvretOptions, Link};
 use wiretap_io::can::{tcp_endpoint, CanError, ResolveError, TransportError};
 
@@ -75,7 +74,7 @@ pub async fn run_source(
     port: u16,
     timeout_sec: f64,
     bus_mappings: Vec<BusMapping>,
-    stop_flag: Arc<AtomicBool>,
+    stop: CancellationToken,
     tx: mpsc::Sender<SourceMessage>,
 ) {
     let device = gvret_tcp_device(&host, port);
@@ -99,7 +98,7 @@ pub async fn run_source(
         task,
         source_idx,
         false,
-        &stop_flag,
+        &stop,
         &tx,
         |event| stream.on_event(event),
         |error| link_lost(source_idx, &device, error),
@@ -112,7 +111,6 @@ pub(crate) mod tests {
     use super::*;
     use crate::io::can_task::PortOutage;
     use crate::io::types::{EndReason, TransmitRequest};
-    use std::sync::atomic::Ordering;
     use std::sync::mpsc as std_mpsc;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::net::TcpListener;
@@ -226,8 +224,8 @@ pub(crate) mod tests {
         (port, commands)
     }
 
-    fn start(port: u16) -> (Arc<AtomicBool>, mpsc::Receiver<SourceMessage>) {
-        let stop = Arc::new(AtomicBool::new(false));
+    fn start(port: u16) -> (CancellationToken, mpsc::Receiver<SourceMessage>) {
+        let stop = CancellationToken::new();
         let (tx, rx) = mpsc::channel(64);
         tokio::spawn(run_source(
             3,
@@ -366,7 +364,7 @@ pub(crate) mod tests {
             );
         }
 
-        stop.store(true, Ordering::SeqCst);
+        stop.cancel();
         assert!(matches!(
             next(&mut rx, Duration::from_secs(2)).await,
             SourceMessage::Ended(3, EndReason::Stopped)
@@ -425,20 +423,23 @@ pub(crate) mod tests {
         let task = open_gvret(link, GvretOptions::default(), can_options(true, None))
             .await
             .expect("open");
-        let stop = Arc::new(AtomicBool::new(false));
+        let stop = CancellationToken::new();
         let (tx, mut rx) = mpsc::channel(64);
-        let flag = stop.clone();
+        let stop_task = stop.clone();
         tokio::spawn(async move {
             let mut stream = Stream::new(3, "gvret_tcp", DEVICE.into(), "here".into(), vec![]);
             let on_event = |event| stream.on_event(event);
-            serve(task, 3, true, &flag, &tx, on_event, |_| panic!("not lost")).await
+            serve(task, 3, true, &stop_task, &tx, on_event, |_| {
+                panic!("not lost")
+            })
+            .await
         });
         let within = Duration::from_secs(3);
         assert!(matches!(
             next(&mut rx, within).await,
             SourceMessage::MappingsResolved(3, _)
         ));
-        stop.store(true, Ordering::SeqCst);
+        stop.cancel();
         loop {
             match next(&mut rx, within).await {
                 SourceMessage::Ended(3, EndReason::Stopped) => break,
@@ -452,10 +453,10 @@ pub(crate) mod tests {
     fn start_waiting_out(
         port: u16,
         reopen: Duration,
-    ) -> (Arc<AtomicBool>, mpsc::Receiver<SourceMessage>) {
-        let stop = Arc::new(AtomicBool::new(false));
+    ) -> (CancellationToken, mpsc::Receiver<SourceMessage>) {
+        let stop = CancellationToken::new();
         let (tx, rx) = mpsc::channel(64);
-        let flag = stop.clone();
+        let stop_task = stop.clone();
         tokio::spawn(async move {
             let link = Link::Tcp {
                 endpoint: format!("127.0.0.1:{port}"),
@@ -469,7 +470,7 @@ pub(crate) mod tests {
             let mut outage = PortOutage::new(3, "here");
             let on_event =
                 |event| outage.on_event(event, |_| unreachable!(), |e| stream.on_event(e));
-            serve(task, 3, false, &flag, &tx, on_event, |e| {
+            serve(task, 3, false, &stop_task, &tx, on_event, |e| {
                 link_lost(3, DEVICE, e)
             })
             .await
@@ -496,7 +497,7 @@ pub(crate) mod tests {
         }
         let interrupted = ["resolved", "connected", "interrupted"];
         assert_eq!(seen, [interrupted, interrupted].concat());
-        stop.store(true, Ordering::SeqCst);
+        stop.cancel();
     }
 
     #[tokio::test]
@@ -511,7 +512,7 @@ pub(crate) mod tests {
 
         let frame = CanFrame::data(0, 0x321, false, false, false, vec![1]);
         assert_eq!(answer(send(&transmit, frame)).await, Ok(()));
-        stop.store(true, Ordering::SeqCst);
+        stop.cancel();
         assert!(matches!(
             next(&mut rx, Duration::from_secs(2)).await,
             SourceMessage::Ended(3, EndReason::Stopped)

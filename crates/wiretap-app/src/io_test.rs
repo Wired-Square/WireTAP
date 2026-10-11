@@ -1635,6 +1635,30 @@ pub(crate) mod tests {
         assert_eq!(sweep.frame_id, tp::SWEEP_REQUEST_BASE + 9);
     }
 
+    #[test]
+    fn a_panic_with_a_virtual_loopback_open_does_not_hang_its_runtime() {
+        const SESSION: &str = "test_virtual_panic";
+        let (done_tx, done_rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let runtime = tokio::runtime::Runtime::new().unwrap();
+            let panicked = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                runtime.block_on(async {
+                    open_virtual_loopback(SESSION).await;
+                    panic!("a test failing with its session open");
+                })
+            }));
+            drop(runtime);
+            let _ = done_tx.send(panicked.is_err());
+        });
+
+        let shut_down = done_rx.recv_timeout(Duration::from_secs(10));
+        tokio::runtime::Runtime::new()
+            .unwrap()
+            .block_on(io::destroy_session(SESSION, false))
+            .ok();
+        assert_eq!(shut_down, Ok(true), "the runtime never shut down");
+    }
+
     #[tokio::test]
     async fn a_virtual_loopback_echo_keeps_the_id_bus_and_fd_but_drops_brs() {
         const SESSION: &str = "test_virtual_codec";
