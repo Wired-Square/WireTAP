@@ -104,10 +104,10 @@ pub(crate) fn session_id_prefix<'a>(
     let mut first: Option<(bool, Option<Protocol>)> = None;
     let mut emits_bytes = false;
     for p in profiles {
-        let spec = device_kinds::spec(&p.kind);
+        let spec = device_kinds::traits(&p.kind);
         let proto = spec.filter(|s| s.realtime).map(|s| s.protocol);
         if proto == Some(Protocol::Serial) {
-            emits_bytes |= device_kinds::resolve_serial_framing(p, None, emit_raw_bytes).1;
+            emits_bytes |= wiretap_io::profile::resolve_serial_framing(p, None, emit_raw_bytes).1;
         }
         if proto == Some(Protocol::Modbus) {
             return "m";

@@ -28,9 +28,9 @@ use super::can_task::can_frame;
 use super::lifecycle::SourceLifecycle;
 use super::traits::validate_session_traits;
 use super::types::{
-    channel_refusal, FramingMode, PendingTransmit, SetFramingRequest, SourceMessage,
-    TransmitRequest,
+    channel_refusal, PendingTransmit, SetFramingRequest, SourceMessage, TransmitRequest,
 };
+use super::FramingMode;
 use super::{
     CanTransmitFrame, IOCapabilities, IOSource, IOState, InterfaceTraits, SessionDataStreams,
     TransmitPayload, TransmitResult, VirtualBusState, emit_capture_changed,
@@ -482,7 +482,7 @@ impl IOBroker {
         let routes = self.current_transmit_routes();
         let has_can_transmit_routes = routes
             .values()
-            .any(|route| super::device_kinds::spec(&route.profile_kind).is_some_and(|s| s.can_tx));
+            .any(|route| super::device_kinds::traits(&route.profile_kind).is_some_and(|s| s.can_tx));
 
         // The routed output buses are exactly the enabled ones, already deduped
         let mut buses: Vec<u8> = routes.keys().copied().collect();
@@ -550,7 +550,7 @@ impl IOBroker {
         let mut frame = None;
         let data = match route.profile_kind.as_str() {
             "framelink" => encode_framelink_can_tx(&routed_frame),
-            kind if super::device_kinds::spec(kind).is_some_and(|s| s.can_tx) => {
+            kind if super::device_kinds::traits(kind).is_some_and(|s| s.can_tx) => {
                 frame = Some(can_frame(&routed_frame));
                 Vec::new()
             }
@@ -1075,7 +1075,7 @@ mod tests {
         SourceConfig {
             profile_kind: "serial".into(),
             serial: SerialOverrides {
-                framing_encoding: Some(FramingMode::named(framing)),
+                framing_encoding: Some(crate::io::types::framing_named(framing)),
                 emit_raw_bytes: Some(emit_raw_bytes),
                 ..Default::default()
             },
@@ -1085,7 +1085,7 @@ mod tests {
 
     fn set_framing(encoding: &str, emit_raw_bytes: bool) -> SetFramingRequest {
         SetFramingRequest {
-            encoding: FramingMode::named(encoding),
+            encoding: crate::io::types::framing_named(encoding),
             frame_id_start_byte: None,
             frame_id_bytes: None,
             frame_id_big_endian: true,
@@ -1167,8 +1167,8 @@ mod bus_status_tests {
             name: "Virtual".into(),
             kind: "virtual".into(),
             connection: [
-                ("traffic_type".to_string(), serde_json::json!("can")),
-                ("signal_generator".to_string(), serde_json::json!(false)),
+                ("traffic_type".to_string(), "can".into()),
+                ("signal_generator".to_string(), false.into()),
             ]
             .into(),
             preferred_catalog: None,

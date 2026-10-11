@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use tauri::AppHandle;
 
 use crate::credentials;
-use crate::io::device_kinds::{apply_defaults, validate_profile, ProfileValidationError};
+use wiretap_io::profile::{apply_defaults, validate_profile, ConnValue, ProfileValidationError};
 use crate::settings::{AppSettings, IOProfile};
 
 /// A device as the user described it. The id is minted by [`create_device`].
@@ -20,7 +20,7 @@ pub struct DeviceDraft {
     pub name: String,
     pub kind: String,
     #[serde(default)]
-    pub connection: HashMap<String, serde_json::Value>,
+    pub connection: HashMap<String, ConnValue>,
     #[serde(default)]
     pub preferred_catalog: Option<String>,
 }
@@ -196,7 +196,7 @@ pub async fn update_device(app: AppHandle, profile: IOProfile) -> Result<IOProfi
 pub async fn reconfigure_device(
     app: AppHandle,
     profile_id: String,
-    connection: HashMap<String, serde_json::Value>,
+    connection: HashMap<String, ConnValue>,
     session_id: Option<String>,
 ) -> Result<(), DeviceWriteError> {
     rewrite(&app, &profile_id, |p| IOProfile { connection, ..p }).await?;
@@ -286,7 +286,7 @@ mod tests {
             &[],
         );
         assert!(!profile.connection.contains_key("_password_stored"));
-        assert_eq!(profile.connection["_api_key_stored"], json!(true));
+        assert_eq!(profile.connection["_api_key_stored"], true.into());
         assert_eq!(stored, vec![(format!("{}:api_key", profile.id), "k".to_string())]);
     }
 
@@ -326,14 +326,14 @@ mod tests {
             id: "io_1".into(),
             name: "CANable".into(),
             kind: "slcan".into(),
-            connection: HashMap::from([("port".into(), json!("/dev/tty.usb"))]),
+            connection: HashMap::from([("port".into(), "/dev/tty.usb".into())]),
             ..Default::default()
         };
         let edited = IOProfile {
-            connection: HashMap::from([("port".into(), json!("/dev/tty.usb")), ("bitrate".into(), json!(""))]),
+            connection: HashMap::from([("port".into(), "/dev/tty.usb".into()), ("bitrate".into(), "".into())]),
             ..saved.clone()
         };
         let settled = settle(edited, &[saved], no_keyring).unwrap();
-        assert_eq!(settled.connection["bitrate"], json!("500000"));
+        assert_eq!(settled.connection["bitrate"], "500000".into());
     }
 }

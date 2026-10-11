@@ -67,12 +67,12 @@ static MIRROR_TRACKERS: Lazy<RwLock<HashMap<String, SharedMirrorTracker>>> =
 /// unmodelled function code outright, so without the same declaration a vendor
 /// message would be framed on the wire and then dropped before the Modbus tab.
 /// One filter is subtractive, the other additive.
-static SERIAL_RTU_OPTIONS: Lazy<RwLock<HashMap<String, crate::io::ModbusRtuOptions>>> =
+static SERIAL_RTU_OPTIONS: Lazy<RwLock<HashMap<String, wiretap_catalog::RtuSettings>>> =
     Lazy::new(|| RwLock::new(HashMap::new()));
 
 /// Publish how a serial session is framed. Called when the source resolves its
 /// framing, which may be before or after the catalogue is attached.
-pub fn set_serial_rtu_options(session_id: &str, mut options: crate::io::ModbusRtuOptions) {
+pub fn set_serial_rtu_options(session_id: &str, mut options: wiretap_catalog::RtuSettings) {
     // Dropped on the way in, so the invariant holds by construction rather than
     // being restored at every read.
     options.device_address = None;
@@ -334,20 +334,19 @@ fn feed_tunnels(
         // for was already applied by the framer that produced this frame. The
         // vendor codes are not — see `SERIAL_RTU_OPTIONS`.
         let fallback = if archive {
-            crate::io::ModbusRtuOptions::tapped()
+            wiretap_catalog::RtuSettings::tapped()
         } else {
             Default::default()
         };
         return streams
             .entry(frame.bus)
             .or_insert_with(|| {
-                SERIAL_RTU_OPTIONS
+                let settings = SERIAL_RTU_OPTIONS
                     .read()
                     .ok()
                     .and_then(|m| m.get(session_id).cloned())
-                    .unwrap_or(fallback)
-                    .with_catalog(Some(catalog))
-                    .stream()
+                    .unwrap_or(fallback);
+                wiretap_catalog::ModbusRtuOptions::from_settings(&settings, Some(catalog)).stream()
             })
             .interpret(&frame.bytes)
             .into_iter()

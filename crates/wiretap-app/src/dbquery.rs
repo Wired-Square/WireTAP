@@ -5,7 +5,7 @@
 
 use tauri::AppHandle;
 
-use crate::capture_db::InventoryRow;
+use wiretap_analysis::source::InventoryRow;
 use crate::settings::{IOProfile, SettingsSource};
 use wiretap_gateway::DatabaseActivityResult;
 

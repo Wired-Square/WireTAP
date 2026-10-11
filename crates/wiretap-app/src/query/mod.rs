@@ -22,7 +22,7 @@ use wiretap_gateway::{
     MuxStatisticsResult, PatternSearchQueryResult, PatternSearchResult, QuerySpec, QueryStats,
 };
 
-use crate::capture_db::InventoryRow;
+use wiretap_analysis::source::InventoryRow;
 use crate::payload_source::QuerySource;
 use crate::settings::SettingsSource;
 

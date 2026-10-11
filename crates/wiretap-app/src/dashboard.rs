@@ -23,9 +23,7 @@ pub fn dashboards_dir(decoder_dir: &str) -> PathBuf {
 /// Sanitise a filename and resolve it within the dashboards dir.
 /// Returns (path, exists). Rejects path separators and traversal.
 pub fn resolve_dashboard_path(decoder_dir: &str, filename: &str) -> Result<(PathBuf, bool), String> {
-    // Shared traversal guard — see catalog::reject_unsafe_filename. Only the
-    // suffix handling below is dashboard-specific.
-    let mut name = crate::catalog::reject_unsafe_filename(filename)
+    let mut name = wiretap_catalog::text::reject_unsafe_filename(filename)
         .map_err(|e| format!("invalid dashboard filename: {e}"))?
         .to_string();
     if !name.ends_with(".dashboard.json") {

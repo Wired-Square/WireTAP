@@ -11,15 +11,14 @@
 // docs/capture-db-migrations.md. Never issue ad-hoc DDL from feature code.
 
 use rusqlite::{params, Connection, OptionalExtension};
-use serde::Serialize;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use wiretap_gateway::{CaptureProtocol, FrameRowFilter, Sql, SqlValue};
-use wiretap_decode::frame_id::format_frame_id;
 
 use crate::capture_events::CaptureEvent;
-use crate::capture_store::{CaptureFrameInfo, CaptureMetadata, CaptureKind, FrameSelection, TimestampedByte};
+use crate::capture_store::{CaptureFrameInfo, CaptureMetadata, CaptureKind, TimestampedByte};
+use wiretap_analysis::source::FrameSelection;
 use crate::connection_slot::ConnectionSlot;
 use crate::io::{now_us, FrameMessage};
 
@@ -792,48 +791,6 @@ fn get_frame_info_with_conn(conn: &Connection, capture_id: &str) -> Result<Vec<C
     Ok(result)
 }
 
-/// One frame identity in a source, with its rollup.
-///
-/// Identity is (protocol, frame_id, is_extended): CAN `0x100` and Modbus
-/// register 256 are different frames that happen to share a number, and a
-/// standard id is not its extended namesake. This is the shape every source
-/// reports, and the one the MCP `frame_inventory` tool serialises.
-#[derive(Debug, Clone, Serialize)]
-#[cfg_attr(test, derive(ts_rs::TS))]
-pub struct InventoryRow {
-    pub protocol: String,
-    pub frame_id: u32,
-    pub frame_id_hex: String,
-    pub is_extended: bool,
-    pub count: i64,
-    pub first_us: i64,
-    pub last_us: i64,
-    pub max_dlc: u16,
-}
-
-impl InventoryRow {
-    pub fn new(
-        protocol: &str,
-        frame_id: u32,
-        is_extended: bool,
-        count: i64,
-        first_us: i64,
-        last_us: i64,
-        max_dlc: u16,
-    ) -> Self {
-        Self {
-            protocol: protocol.to_string(),
-            frame_id,
-            frame_id_hex: format_frame_id(frame_id, is_extended),
-            is_extended,
-            count,
-            first_us,
-            last_us,
-            max_dlc,
-        }
-    }
-}
-
 /// Pick at most `limit` items spread evenly across `items`.
 ///
 /// Ceiling division on the step, not floor: a step of 1 over 5,001 items with a
@@ -850,7 +807,7 @@ fn strided<T: Copy>(items: &[T], limit: u32) -> Vec<T> {
 /// Up to `sample_limit` payloads for one frame, spread evenly across everything
 /// the capture holds for it. `protocol` is the identity's other half; `None`
 /// matches any, which is what a caller holding only a numeric id can ask for.
-/// See [`InventoryRow`] for why the pair is the identity.
+/// See [`wiretap_analysis::source::InventoryRow`] for why the pair is the identity.
 ///
 /// A tail query (`ORDER BY rowid DESC LIMIT n`) confines the analysis to the end
 /// of the recording, which for anything that samples again afterwards is a
@@ -1902,7 +1859,7 @@ fn delete_capture_event_with_conn(conn: &Connection, capture_id: &str, id: &str)
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::capture_store::ProtocolFrames;
+    use wiretap_analysis::source::ProtocolFrames;
 
     /// The pre-rename schema as shipped before April 2026 — used to build
     /// legacy databases the baseline must normalise.

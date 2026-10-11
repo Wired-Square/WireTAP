@@ -79,7 +79,7 @@ pub async fn get_transmit_capable_profiles(app: AppHandle) -> Result<Vec<Transmi
     let mut profiles = Vec::new();
 
     for profile in &settings.io_profiles {
-        if !crate::io::device_kinds::spec(&profile.kind).is_some_and(|s| s.available) {
+        if !crate::io::device_kinds::traits(&profile.kind).is_some_and(|s| s.available) {
             continue;
         }
         let capabilities = writer_capabilities(profile);
@@ -152,7 +152,7 @@ pub async fn io_set_framing(
     source_address_bytes: Option<u8>,
     source_address_big_endian: Option<bool>,
     min_frame_length: Option<usize>,
-    modbus: Option<crate::io::ModbusRtuOptions>,
+    modbus: Option<wiretap_catalog::RtuSettings>,
 ) -> Result<IOCapabilities, String> {
     let req = crate::io::types::SetFramingRequest {
         encoding,
@@ -300,8 +300,8 @@ mod tests {
 
     #[test]
     fn every_kind_whose_bus_transmits_is_offered_to_transmit() {
-        for kind in crate::io::device_kinds::kinds() {
-            let spec = crate::io::device_kinds::spec(kind).unwrap();
+        for kind in wiretap_io::profile::kinds() {
+            let spec = crate::io::device_kinds::traits(kind).unwrap();
             let profile = crate::settings::IOProfile {
                 kind: kind.to_string(),
                 connection: serde_json::from_value(serde_json::json!({ "silent_mode": false, "listen_only": false })).unwrap(),

@@ -10,9 +10,8 @@ use std::sync::Mutex;
 use once_cell::sync::Lazy;
 
 use super::ReportFormat;
-use crate::analysis::{OrderStart, ProtocolOrder};
+use wiretap_analysis::source::{OrderStart, ProtocolFrames, ProtocolOrder};
 use crate::byte_roles::PayloadChanges;
-use crate::capture_store::ProtocolFrames;
 
 /// A capture, and the window read from it.
 pub type WindowKey = (String, String);

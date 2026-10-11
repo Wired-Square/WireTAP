@@ -5,7 +5,7 @@
 // with session-based isolation for multiple concurrent connections.
 
 // Core modules
-pub mod device_kinds; // Per-kind connection defaults and required fields — one declaration
+pub mod device_kinds; // Per-kind traits, beside the connection table in wiretap_io::profile
 pub mod ephemeral; // Ad-hoc devices, overlaid onto settings.io_profiles for this run
 pub mod profiles; // Profile lifecycle: reconfigure a device and reconnect it
 mod error;
@@ -64,7 +64,7 @@ pub use modbus_tcp::{
 #[cfg(not(target_os = "ios"))]
 pub use gvret::probe_gvret_usb;
 pub use broker::{IOBroker, ProfileLoader, SerialOverrides, SourceConfig};
-pub use types::{FramingMode, ModbusRtuOptions};
+pub use wiretap_catalog::FramingMode;
 pub use mqtt::{MqttConfig, MqttSource};
 
 pub use error::{IoError, IoErrorKind, IoFailure};

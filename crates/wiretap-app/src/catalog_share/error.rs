@@ -77,3 +77,9 @@ impl From<reqwest::Error> for ShareError {
         Self::network(format!("Network error: {e}"))
     }
 }
+
+impl From<wiretap_catalog::UnsafeFilename> for ShareError {
+    fn from(e: wiretap_catalog::UnsafeFilename) -> Self {
+        Self::invalid(e.to_string())
+    }
+}

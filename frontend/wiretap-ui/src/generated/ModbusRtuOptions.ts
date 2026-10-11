@@ -1,13 +1,8 @@
 // Generated from the Rust serde types by `npm run gen:types`. Do not edit.
 
 /**
- * Everything a `ModbusRtuStream` needs, in one place.
- *
- * Threaded whole for the reason [`crate::io::SerialOverrides`] gives: these were
- * four loose values built at five sites, three of which had quietly settled on
- * `device_address: None`. It lives here rather than beside the serial framer
- * because the CAN tunnel wants it too, and because `SetFramingRequest` below
- * must stay buildable on a platform with no serial port.
+ * A line's RTU settings as a user picks and stores them, before a catalogue
+ * adds its codes.
  */
 export type ModbusRtuOptions = { 
 /**

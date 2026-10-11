@@ -8,7 +8,7 @@ use wiretap_analysis::{order_totals, BusOrder, FrameKey};
 use super::changes::selector_text;
 use super::notes::mux_value;
 use super::{count, frame_label, grouped, ms, optional_ms, protocol_label, Block, Cell, Doc};
-use crate::analysis::ProtocolOrder;
+use wiretap_analysis::source::ProtocolOrder;
 
 const MAX_CANDIDATES: usize = 10;
 const MAX_CASES: usize = 16;

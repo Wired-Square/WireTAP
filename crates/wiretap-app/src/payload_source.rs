@@ -3,10 +3,13 @@
 // The app's `PayloadSource`s: a SQLite capture, and a WireTAP backend profile
 // reached through the settings.
 
-use crate::analysis::{FrameSource, PayloadQuery, PayloadSource, Sampling};
+use wiretap_analysis::order::TimedFrame;
+use wiretap_analysis::source::{
+    FrameSelection, FrameSource, InventoryRow, PayloadQuery, PayloadSource, Sampling, Source, SourceFrame,
+};
+use wiretap_analysis::FrameKey;
+
 use crate::blocking::off_runtime;
-use crate::capture_db::InventoryRow;
-use crate::capture_store::FrameSelection;
 use crate::io::FrameMessage;
 use crate::settings::SettingsSource;
 
@@ -52,6 +55,10 @@ pub fn parse_bound(s: &str) -> Result<i64, String> {
 
 pub struct Capture<'a>(pub &'a str);
 
+impl Source for Capture<'_> {
+    type Error = String;
+}
+
 impl PayloadSource for Capture<'_> {
     async fn inventory(&self, start_us: Option<i64>, end_us: Option<i64>) -> Result<Vec<InventoryRow>, String> {
         let id = self.0.to_owned();
@@ -77,9 +84,22 @@ impl FrameSource for Capture<'_> {
         &self,
         selection: &FrameSelection,
         newest: Option<usize>,
-    ) -> Result<Vec<FrameMessage>, String> {
+    ) -> Result<Vec<SourceFrame>, String> {
         let (id, selection) = (self.0.to_owned(), selection.clone());
-        off_runtime(move || all_selected_frames(&id, &selection, newest)).await
+        let frames = off_runtime(move || all_selected_frames(&id, &selection, newest)).await?;
+        Ok(frames.into_iter().map(source_frame).collect())
+    }
+}
+
+fn source_frame(f: FrameMessage) -> SourceFrame {
+    SourceFrame {
+        frame: TimedFrame {
+            bus: f.bus,
+            key: FrameKey::new(f.frame_id, f.is_extended),
+            timestamp_us: f.timestamp_us,
+            payload: f.bytes,
+        },
+        protocol: f.protocol,
     }
 }
 
@@ -102,6 +122,10 @@ fn all_selected_frames(id: &str, selection: &FrameSelection, newest: Option<usiz
 pub struct Gateway<'a> {
     settings: &'a dyn SettingsSource,
     profile_id: &'a str,
+}
+
+impl Source for Gateway<'_> {
+    type Error = String;
 }
 
 impl PayloadSource for Gateway<'_> {
@@ -128,6 +152,10 @@ impl PayloadSource for Gateway<'_> {
 pub enum AppSource<'a> {
     Capture(Capture<'a>),
     Gateway(Gateway<'a>),
+}
+
+impl Source for AppSource<'_> {
+    type Error = String;
 }
 
 impl PayloadSource for AppSource<'_> {

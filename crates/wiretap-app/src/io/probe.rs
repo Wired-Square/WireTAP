@@ -4,11 +4,10 @@ use std::future::Future;
 use std::sync::Mutex;
 
 use crate::capture_store;
-use crate::io::device_kinds::{conn_f64, conn_i64, conn_str, req_str};
 use crate::io::session_log::{self, SessionLogEvent, Subject};
 use crate::io::{probe_gvret_tcp, GvretDeviceInfo};
 #[cfg(not(target_os = "ios"))]
-use crate::io::{probe_gvret_usb, serial::utils::line_settings};
+use crate::io::probe_gvret_usb;
 use crate::settings::{AppSettings, IOProfile};
 
 /// Result of probing any real-time device.
@@ -162,7 +161,7 @@ pub async fn probe_profile(profile: &IOProfile) -> Result<DeviceProbeResult, Str
         // slcan devices - single-bus (desktop only)
         #[cfg(not(target_os = "ios"))]
         "slcan" => {
-            let result = probe_slcan(&req_str(profile, "port")?, line_settings(profile)?).await;
+            let result = probe_slcan(&profile.req_str("port")?, profile.line_settings()?).await;
 
             Ok(DeviceProbeResult {
                 success: result.success,
@@ -183,10 +182,10 @@ pub async fn probe_profile(profile: &IOProfile) -> Result<DeviceProbeResult, Str
         "gs_usb" => {
             use crate::io::gs_usb::probe_gs_usb_device;
 
-            let bus = conn_i64(profile, "bus").unwrap_or_default() as u8;
-            let address = conn_i64(profile, "address").unwrap_or_default() as u8;
+            let bus = profile.conn_i64("bus").unwrap_or_default() as u8;
+            let address = profile.conn_i64("address").unwrap_or_default() as u8;
             // Serial number for stable device matching across USB re-enumeration
-            let serial = conn_str(profile, "serial");
+            let serial = profile.conn_str("serial");
 
             match probe_gs_usb_device(bus, address, serial).await {
                 Ok(info) => Ok(DeviceProbeResult {
@@ -210,7 +209,7 @@ pub async fn probe_profile(profile: &IOProfile) -> Result<DeviceProbeResult, Str
         // SocketCAN - Linux only, check if interface exists
         #[cfg(target_os = "linux")]
         "socketcan" => {
-            let interface = conn_str(profile, "interface").unwrap_or_default();
+            let interface = profile.conn_str("interface").unwrap_or_default();
 
             // Check if the interface exists by reading from /sys/class/net
             let path = format!("/sys/class/net/{}", interface);
@@ -237,7 +236,7 @@ pub async fn probe_profile(profile: &IOProfile) -> Result<DeviceProbeResult, Str
         // Serial port - check if port exists (desktop only)
         #[cfg(not(target_os = "ios"))]
         "serial" => {
-            let port = req_str(profile, "port")?;
+            let port = profile.req_str("port")?;
 
             let port_exists = wiretap_io::serial::ports()
                 .unwrap_or_default()
@@ -264,9 +263,9 @@ pub async fn probe_profile(profile: &IOProfile) -> Result<DeviceProbeResult, Str
 
         // Modbus TCP - probe by attempting a TCP connection
         "modbus_tcp" => {
-            let host = conn_str(profile, "host").unwrap_or_default();
-            let port = conn_i64(profile, "port").unwrap_or_default() as u16;
-            let timeout_sec = conn_f64(profile, "timeout").unwrap_or_default();
+            let host = profile.conn_str("host").unwrap_or_default();
+            let port = profile.conn_i64("port").unwrap_or_default() as u16;
+            let timeout_sec = profile.conn_f64("timeout").unwrap_or_default();
 
             let addr = format!("{}:{}", host, port);
             let failure = |error: String| DeviceProbeResult {
@@ -303,14 +302,14 @@ pub async fn probe_profile(profile: &IOProfile) -> Result<DeviceProbeResult, Str
 
         // FrameLink device — grouped profile with interfaces[], TCP probe to verify reachability
         "framelink" => {
-            let host = req_str(profile, "host")?;
-            let port = conn_i64(profile, "port").unwrap_or_default() as u16;
+            let host = profile.req_str("host")?;
+            let port = profile.conn_i64("port").unwrap_or_default() as u16;
             // `as_f64()` only, before — and the form writes strings, so a
             // configured timeout was silently ignored.
-            let timeout_sec = conn_f64(profile, "timeout").unwrap_or_default();
-            let device_id = conn_str(profile, "device_id");
+            let timeout_sec = profile.conn_f64("timeout").unwrap_or_default();
+            let device_id = profile.conn_str("device_id");
             let iface_count = profile.connection.get("interfaces")
-                .and_then(|v| v.as_array())
+                .and_then(|v| v.as_list())
                 .map(|a| a.len() as u8)
                 .unwrap_or(1);
 
@@ -342,10 +341,10 @@ pub async fn probe_profile(profile: &IOProfile) -> Result<DeviceProbeResult, Str
             let bus_count = profile
                 .connection
                 .get("interfaces")
-                .and_then(|v| v.as_array())
+                .and_then(|v| v.as_list())
                 .map(|a| a.len() as u8)
-                .unwrap_or_else(|| conn_i64(profile, "bus_count").unwrap_or_default().clamp(1, 8) as u8);
-            let traffic_type = conn_str(profile, "traffic_type").unwrap_or_default();
+                .unwrap_or_else(|| profile.conn_i64("bus_count").unwrap_or_default().clamp(1, 8) as u8);
+            let traffic_type = profile.conn_str("traffic_type").unwrap_or_default();
             let traffic_label = match traffic_type.as_str() {
                 "canfd" => "CAN-FD",
                 "modbus" => "Modbus",
@@ -400,16 +399,16 @@ struct GvretProbe {
 async fn probe_gvret(profile: &IOProfile) -> Result<GvretProbe, String> {
     match profile.kind.as_str() {
         "gvret_tcp" => {
-            let host = conn_str(profile, "host").unwrap_or_default();
-            let port = conn_i64(profile, "port").unwrap_or_default() as u16;
-            let timeout_sec = conn_f64(profile, "timeout").unwrap_or_default();
+            let host = profile.conn_str("host").unwrap_or_default();
+            let port = profile.conn_i64("port").unwrap_or_default() as u16;
+            let timeout_sec = profile.conn_f64("timeout").unwrap_or_default();
             let info = probe_gvret_tcp(&host, port, timeout_sec).await;
             Ok(GvretProbe { address: format!("{}:{}", host, port), info })
         }
         #[cfg(not(target_os = "ios"))]
         "gvret_usb" => {
-            let port = req_str(profile, "port")?;
-            let info = probe_gvret_usb(&port, line_settings(profile)?).await;
+            let port = profile.req_str("port")?;
+            let info = probe_gvret_usb(&port, profile.line_settings()?).await;
             Ok(GvretProbe { address: port, info })
         }
         #[cfg(target_os = "ios")]
@@ -434,7 +433,7 @@ mod tests {
         IOProfile {
             id: id.into(),
             kind: kind.into(),
-            connection: connection.as_object().expect("an object").clone().into_iter().collect(),
+            connection: serde_json::from_value(connection).expect("an object"),
             ..Default::default()
         }
     }

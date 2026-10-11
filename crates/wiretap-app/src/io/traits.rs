@@ -7,7 +7,8 @@ use std::collections::HashMap;
 use serde::Serialize;
 
 use super::bus_mapping::BusMapping;
-use super::device_kinds::{self, canonical_kind, conn_bool};
+use super::device_kinds;
+use wiretap_io::profile::canonical_kind;
 use super::{InterfaceTraits, Protocol, TemporalMode};
 use crate::settings::IOProfile;
 
@@ -137,10 +138,10 @@ pub fn traits_for_protocol(protocol: Protocol) -> InterfaceTraits {
 }
 
 /// Every profile kind, plus the capture pseudo-kind the kind table has no entry
-/// for. Derived from `device_kinds::KINDS` rather than restated, so a kind added
+/// for. Derived from `wiretap_io::profile::kinds` rather than restated, so a kind added
 /// there cannot quietly go missing from the picker's protocol options.
 pub fn profile_kinds() -> impl Iterator<Item = &'static str> {
-    super::device_kinds::kinds().chain(std::iter::once("capture"))
+    wiretap_io::profile::kinds().chain(std::iter::once("capture"))
 }
 
 /// What a bus of this kind may be set to, for the source picker to offer.
@@ -155,7 +156,7 @@ pub fn profile_kinds() -> impl Iterator<Item = &'static str> {
 /// it here would be a third way to say the same thing, free to disagree with the
 /// other two.
 pub fn supported_protocols_for_kind(kind: &str) -> &'static [Protocol] {
-    match super::device_kinds::canonical_kind(kind) {
+    match wiretap_io::profile::canonical_kind(kind) {
         "framelink" | "slcan" | "gs_usb" | "socketcan" => &[Protocol::Can, Protocol::CanFd],
         "modbus_tcp" => &[Protocol::Modbus],
         "serial" => &[Protocol::Serial],
@@ -188,7 +189,7 @@ pub fn supported_protocols_for_kind(kind: &str) -> &'static [Protocol] {
 /// talked into CAN) keeps it.
 pub fn normalise_bus_traits(mappings: &mut [BusMapping], profile_kind: &str) {
     let supported = supported_protocols_for_kind(profile_kind);
-    let gvret = matches!(super::device_kinds::canonical_kind(profile_kind), "gvret_tcp" | "gvret_usb");
+    let gvret = matches!(wiretap_io::profile::canonical_kind(profile_kind), "gvret_tcp" | "gvret_usb");
     for m in mappings.iter_mut() {
         if gvret && m.protocol == Protocol::CanFd {
             m.protocol = Protocol::Can;
@@ -241,7 +242,7 @@ pub struct ProfileTraitsTable {
 
 /// A profile's traits, derived from the buses its reader would open.
 pub fn profile_traits(profile: &IOProfile) -> ProfileTraits {
-    let spec = device_kinds::spec(&profile.kind);
+    let spec = device_kinds::traits(&profile.kind);
     let mut buses = crate::sessions::profile_bus_mappings(profile);
     normalise_bus_traits(&mut buses, &profile.kind);
     let bus_traits: Vec<InterfaceTraits> = buses.iter().map(BusMapping::effective_traits).collect();
@@ -251,8 +252,8 @@ pub fn profile_traits(profile: &IOProfile) -> ProfileTraits {
 
     let kind = canonical_kind(&profile.kind);
     let tx_blocked = match kind {
-        "slcan" if conn_bool(profile, "silent_mode") == Some(true) => Some(TxBlock::SilentMode),
-        "gs_usb" if conn_bool(profile, "listen_only") == Some(true) => Some(TxBlock::ListenOnly),
+        "slcan" if profile.conn_bool("silent_mode") == Some(true) => Some(TxBlock::SilentMode),
+        "gs_usb" if profile.conn_bool("listen_only") == Some(true) => Some(TxBlock::ListenOnly),
         _ => None,
     };
     ProfileTraits {
@@ -275,10 +276,10 @@ pub fn profile_traits(profile: &IOProfile) -> ProfileTraits {
 }
 
 fn kind_traits() -> Vec<KindTraits> {
-    device_kinds::kinds()
+    wiretap_io::profile::kinds()
         .map(|kind| KindTraits {
             kind: kind.to_string(),
-            available: device_kinds::spec(kind).is_some_and(|s| s.available),
+            available: device_kinds::traits(kind).is_some_and(|s| s.available),
             traits: profile_traits(&IOProfile { kind: kind.to_string(), ..Default::default() }),
         })
         .collect()
@@ -492,7 +493,7 @@ mod tests {
     }
 
     fn family(kind: &str) -> Protocol {
-        device_kinds::spec(kind).unwrap().protocol
+        device_kinds::traits(kind).unwrap().protocol
     }
 
     /// The TypeScript registry, taken before it was deleted: every kind and
@@ -571,7 +572,7 @@ mod tests {
         for pair in golden["selections"].as_array().unwrap() {
             let (a, b) = (pair["a"].as_str().unwrap(), pair["b"].as_str().unwrap());
             let ours = selection_error(&[blank(a), profile("io_b", b, serde_json::json!({}))]).is_none();
-            let both_live = [a, b].iter().all(|k| device_kinds::spec(k).unwrap().realtime);
+            let both_live = [a, b].iter().all(|k| device_kinds::traits(k).unwrap().realtime);
             let theirs = pair["valid"].as_bool().unwrap();
             let want = if !both_live {
                 theirs

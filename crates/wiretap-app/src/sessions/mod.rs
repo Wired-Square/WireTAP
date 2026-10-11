@@ -27,12 +27,7 @@ fn profile(kind: &str, connection: serde_json::Value) -> IOProfile {
         id: format!("p-{}", kind),
         name: kind.to_string(),
         kind: kind.to_string(),
-        connection: connection
-            .as_object()
-            .expect("connection must be an object")
-            .iter()
-            .map(|(k, v)| (k.clone(), v.clone()))
-            .collect(),
+        connection: serde_json::from_value(connection).expect("connection must be an object"),
         preferred_catalog: None,
         ephemeral: false,
     }

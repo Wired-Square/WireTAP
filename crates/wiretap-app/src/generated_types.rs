@@ -145,7 +145,7 @@ fn render() -> BTreeMap<PathBuf, String> {
     r.visit::<crate::catalog_share::publish::PublishRequest>();
     r.visit::<crate::catalog_share::publish::PublishResult>();
     r.visit::<crate::catalog_share::registry::GitIdentity>();
-    r.visit::<crate::capture_db::InventoryRow>();
+    r.visit::<wiretap_analysis::source::InventoryRow>();
     r.visit::<crate::query::QueryQueue>();
     r.visit::<crate::query::QueryOutcome>();
     r.visit::<crate::query::QueryRequest>();
@@ -175,8 +175,8 @@ fn render() -> BTreeMap<PathBuf, String> {
     r.visit::<crate::flashers::EspFlashOptions>();
     r.visit::<crate::flashers::FlasherProgress>();
     r.visit::<crate::flashers::Stm32FlashOptions>();
-    r.visit::<crate::analysis::ProtocolOrder>();
-    r.visit::<crate::analysis::OrderStart>();
+    r.visit::<crate::analysis_ts::ProtocolOrder>();
+    r.visit::<wiretap_analysis::source::OrderStart>();
     r.visit::<crate::byte_roles::ProtocolMirrors>();
     r.visit::<crate::analysis_ts::ByteNotes>();
     r.visit::<crate::analysis_ts::CandidateSignal>();
@@ -537,7 +537,7 @@ fn inputs_accept_the_declared_minimum() {
     use serde_json::json;
     assert_accepts_declared_minimum::<crate::sessions::MultiSourceInput>(json!({ "profile_id": "p" }));
     assert_accepts_declared_minimum::<crate::io::ModbusRangeSpec>(json!({ "ranges": [] }));
-    assert_accepts_declared_minimum::<crate::analysis::OrderStart>(json!({ "frameId": 1, "isExtended": false }));
+    assert_accepts_declared_minimum::<wiretap_analysis::source::OrderStart>(json!({ "frameId": 1, "isExtended": false }));
     assert_accepts_declared_minimum::<crate::io::ModbusRange>(json!({ "end": 2, "register_type": "holding", "start": 1 }));
     assert_accepts_declared_minimum::<FcProbeConfig>(json!({}));
     assert_accepts_declared_minimum::<ModbusScanConfig>(json!({
@@ -657,7 +657,7 @@ fn analysis_results_serialise_as_declared() {
 
 #[tokio::test]
 async fn drafts_serialise_as_declared() {
-    use crate::analysis::memory::MemorySource;
+    use wiretap_analysis::source::MemorySource;
     use crate::analysis_ts as ts;
 
     let mut source = MemorySource::default();
@@ -671,7 +671,7 @@ async fn drafts_serialise_as_declared() {
     let changes = crate::byte_roles::payload_changes(&source, vec![], None, usize::MAX).await.unwrap();
     let mut draft = wiretap_analysis::draft::Draft::default();
     crate::drafting::apply_changes(&mut draft, &changes);
-    let orders = crate::analysis::message_order(&source, &crate::capture_store::FrameSelection::default(), None, None)
+    let orders = wiretap_analysis::source::message_order(&source, &wiretap_analysis::source::FrameSelection::default(), None, None)
         .await
         .unwrap();
     draft.apply_orders(orders.iter().map(|o| (wiretap_catalog::model::Protocol::Can, &o.order)));
@@ -873,7 +873,7 @@ fn query_shapes_serialise_as_declared() {
                 "distribution" => assert_declared::<DistributionResult>(row),
                 "gap_analysis" => assert_declared::<GapResult>(row),
                 "pattern_search" => assert_declared::<PatternSearchResult>(row),
-                _ => assert_declared::<crate::capture_db::InventoryRow>(row),
+                _ => assert_declared::<wiretap_analysis::source::InventoryRow>(row),
             }
         }
         assert_serialises_as_declared(&[QueryOutcome { results, stats: Some(stats.clone()), sql: vec!["SELECT 1".into()], truncated: true }]);

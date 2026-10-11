@@ -8,14 +8,7 @@
 // - Framed message extraction (SLIP, Modbus RTU, delimiter-based)
 // - Bidirectional communication (read + transmit)
 
-pub mod framer;
 pub mod reader; // pub for Tauri command access (list_serial_ports)
 pub(crate) mod utils;
 
-// Re-export framer types used by other modules
-pub use framer::{DelimiterOptions, FrameIdConfig, FramingEncoding, SerialFramer};
-
 pub use reader::run_source;
-
-// Re-export profile parsing for multi-source
-pub use utils::parse_profile_for_source;

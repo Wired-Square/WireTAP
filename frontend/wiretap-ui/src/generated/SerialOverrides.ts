@@ -5,12 +5,8 @@ import type { FramingMode } from "./FramingMode";
  * The serial settings a session may override on one source, as the picker sends
  * them. Every field is optional: absent means "whatever the device profile says".
  *
- * **One declaration, threaded whole.** These were previously spelled out in
- * three structs and exploded into loose parameters twice on the way to
- * the reader, and the settings that got dropped were the ones somebody forgot to
- * add to one of those lists — the picker's framing choice, and then its
- * "capture raw bytes" tick. Add a serial setting here and it reaches the reader
- * on its own.
+ * One declaration, threaded whole, so a setting added here reaches the reader
+ * without a list to forget it from.
  */
 export type SerialOverrides = { 
 /**

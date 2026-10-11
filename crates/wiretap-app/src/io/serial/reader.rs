@@ -10,7 +10,8 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
-use wiretap_catalog::{Catalog, RtuTap, TappedMessage};
+use wiretap_catalog::serial_framing::{FrameIdConfig, FramingEncoding, SerialFrame, SerialFramer};
+use wiretap_catalog::{Catalog, ModbusRtuOptions, RtuSettings, RtuTap, TappedMessage};
 use wiretap_io::serial::{
     self, ports, Access, LineSettings, PortInfo, PortKind, SerialEvent,
     SerialOptions, SerialWriter, WriteRefused,
@@ -19,15 +20,13 @@ use wiretap_io::serial::{
 use crate::io::bus_mapping::{apply_bus_mapping, BusMapping};
 use crate::io::error::{outage, DevicePresence, IoFailure};
 use crate::io::types::{
-    next_request, transmit_channel, ByteEntry, EndReason, ModbusRtuOptions, SetFramingRequest,
+    next_request, transmit_channel, ByteEntry, EndReason, SetFramingRequest,
     SourceMessage, TransmitReceiver,
 };
 use crate::io::FrameMessage;
 
-use super::framer::{
-    residue, rtu_frame, FrameIdConfig, FramingEncoding, SerialFrame, SerialFramer,
-};
-use super::utils::{framing_from_mode, probe_serial_presence, SerialSourceConfig};
+use super::utils::probe_serial_presence;
+use wiretap_io::profile::SerialSourceConfig;
 
 /// How often the read loop looks for a framing or catalogue change.
 const POLL: Duration = Duration::from_millis(50);
@@ -68,7 +67,7 @@ fn stamped(frames: Vec<SerialFrame>, at: SystemTime) -> Vec<(SerialFrame, u64)> 
 }
 
 fn tapped(tapped: TappedMessage) -> (SerialFrame, u64) {
-    (rtu_frame(tapped.message), micros(tapped.at))
+    (SerialFrame::from(tapped.message), micros(tapped.at))
 }
 
 enum Framer {
@@ -80,15 +79,16 @@ enum Framer {
     },
     /// Stamps each message at its last byte, rather than at the read that
     /// released it.
-    Rtu(RtuTap, ModbusRtuOptions),
+    Rtu(RtuTap, RtuSettings),
 }
 
 impl Framer {
     fn new(encoding: FramingEncoding, line: LineSettings, catalog: Option<&Catalog>) -> Self {
         match encoding {
-            FramingEncoding::ModbusRtu(options) => {
-                Self::Rtu(RtuTap::new(&options.with_catalog(catalog), line), options)
-            }
+            FramingEncoding::ModbusRtu(options) => Self::Rtu(
+                RtuTap::new(&ModbusRtuOptions::from_settings(&options, catalog), line),
+                options,
+            ),
             encoding => SerialFramer::new(encoding)
                 .map_or(Self::Unframed, |framer| Self::Serial {
                     framer,
@@ -106,7 +106,14 @@ impl Framer {
                 line,
                 mid_message,
             } => {
+                let abandoned = framer.abandoned_frames();
                 let frames = framer.feed(bytes);
+                if framer.abandoned_frames() > abandoned {
+                    tlog!(
+                        "[serial] SLIP frame outgrew the frame cap without an END ({} abandoned)",
+                        framer.abandoned_frames()
+                    );
+                }
                 let fed = framer.bytes_fed();
                 *mid_message = match frames.last() {
                     Some(last) => fed > last.end_offset,
@@ -146,7 +153,8 @@ impl Framer {
             }
             Self::Rtu(tap, _) => {
                 let (messages, trailing) = tap.finish();
-                let leftover = stamped(residue(trailing, tap.bytes_fed()), now);
+                let leftover =
+                    SerialFrame::residue(trailing, tap.bytes_fed()).map(|f| (f, micros(now)));
                 tap.reset();
                 messages.into_iter().map(tapped).chain(leftover).collect()
             }
@@ -330,7 +338,7 @@ impl LiveLine {
     /// next boundary in the new encoding.
     fn set_framing(&mut self, req: SetFramingRequest) {
         self.framer = Framer::new(
-            framing_from_mode(req.encoding, req.modbus.as_ref()),
+            FramingEncoding::from_mode(req.encoding, req.modbus.as_ref()),
             self.line,
             self.catalog.as_deref(),
         );
@@ -536,8 +544,7 @@ mod tests {
     use super::*;
     use crate::io::IoErrorKind;
     use wiretap_io::serial::SerialError;
-    use crate::io::serial::DelimiterOptions;
-    use crate::io::types::ModbusRtuOptions;
+    use wiretap_catalog::serial_framing::DelimiterOptions;
     use wiretap_io::serial::Parity as LineParity;
 
     const LINE_9600_8N1: LineSettings = LineSettings {
@@ -660,7 +667,7 @@ mod tests {
         let request = rtu(&[0x01, 0x03, 0x00, 0x00, 0x00, 0x01]);
         let response = rtu(&[0x01, 0x03, 0x02, 0x12, 0x34]);
         let mut line = live(
-            FramingEncoding::ModbusRtu(ModbusRtuOptions::default()),
+            FramingEncoding::ModbusRtu(RtuSettings::default()),
             false,
         );
         assert!(line.read(&request[..4], at(1_000_000)).is_empty());
@@ -756,7 +763,7 @@ mod tests {
         let request = rtu(&[0x01, 0x03, 0x00, 0x00, 0x00, 0x01]);
         let response = rtu(&[0x01, 0x03, 0x02, 0x12, 0x34]);
         let mut line = live(
-            FramingEncoding::ModbusRtu(ModbusRtuOptions::default()),
+            FramingEncoding::ModbusRtu(RtuSettings::default()),
             false,
         );
 
@@ -789,7 +796,7 @@ mod tests {
     #[test]
     fn a_declared_vendor_code_is_framed_on_the_live_line() {
         let vendor = rtu(&[0x01, 0x65, 0x03, 0x00, 0x00, 0x01, 0x00, 0x01]);
-        let options = ModbusRtuOptions {
+        let options = RtuSettings {
             vendor_functions: vec![0x65],
             ..Default::default()
         };
@@ -813,7 +820,7 @@ mod tests {
             dispatch[..18],
             "the fixture is not ambiguous"
         );
-        let options = ModbusRtuOptions {
+        let options = RtuSettings {
             vendor_functions: vec![0x60],
             allow_broadcast: true,
             ..Default::default()

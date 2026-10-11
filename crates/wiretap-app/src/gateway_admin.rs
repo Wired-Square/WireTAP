@@ -282,7 +282,9 @@ async fn read_library(app: &AppHandle) -> Library {
 }
 
 fn library_file(app: &AppHandle, filename: &str) -> Result<(String, Vec<u8>), String> {
-    let filename = crate::catalog::reject_unsafe_filename(filename)?.to_string();
+    let filename = wiretap_catalog::text::reject_unsafe_filename(filename)
+        .map_err(|e| e.to_string())?
+        .to_string();
     let dir = crate::catalog::decoder_dir(app).ok_or("No decoder directory is set")?;
     let bytes = std::fs::read(dir.join(&filename))
         .map_err(|e| format!("Failed to read {filename}: {e}"))?;

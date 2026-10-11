@@ -18,6 +18,13 @@ pub struct FrameKey {
     pub is_extended: bool,
 }
 
+/// One protocol's message order.
+#[derive(Serialize, TS)]
+pub struct ProtocolOrder {
+    pub protocol: String,
+    pub order: OrderAnalysis,
+}
+
 #[derive(Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct OrderAnalysis {
