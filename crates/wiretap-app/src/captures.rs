@@ -779,7 +779,7 @@ mod tests {
 
     #[test]
     fn a_batch_lands_in_one_capture_with_its_gaps_named_by_file() {
-        crate::capture_db::use_in_memory_database();
+        let _db = crate::capture_db::use_own_database();
         let mappings = sequenced();
         let paths = csv_batch(
             "gaps",
@@ -808,7 +808,7 @@ mod tests {
 
     #[test]
     fn a_missing_header_flag_reads_the_first_row_as_data() {
-        crate::capture_db::use_in_memory_database();
+        let _db = crate::capture_db::use_own_database();
         let mappings = sequenced();
         let paths = csv_batch("flags", &[("one.csv", "100,1,123,01\n"), ("two.csv", "200,2,123,02\n")]);
         let result = import_csv_batch("f_csv_batch_flags", &paths, &[], &layout(&mappings), |_| {}).expect("imported");
@@ -817,7 +817,7 @@ mod tests {
 
     #[test]
     fn a_batch_with_no_frames_leaves_no_capture() {
-        crate::capture_db::use_in_memory_database();
+        let _db = crate::capture_db::use_own_database();
         let mappings = sequenced();
         let paths = csv_batch("empty", &[("csv-batch-empty.csv", "")]);
         assert_eq!(

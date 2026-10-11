@@ -187,7 +187,7 @@ mod tests {
     #[test]
     fn the_stored_rollup_and_latest_frames_match_the_webview_ones_they_replace() {
         let golden = golden();
-        crate::capture_db::use_in_memory_database();
+        let _db = crate::capture_db::use_own_database();
         let id = crate::capture_store::create_session_capture(
             "frame-rollup-golden",
             crate::capture_store::CaptureKind::Frames,

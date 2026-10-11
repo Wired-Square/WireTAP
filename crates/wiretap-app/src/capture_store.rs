@@ -1483,7 +1483,7 @@ mod tests {
 
     #[test]
     fn a_copy_keeps_the_frame_ids_its_source_saw() {
-        crate::capture_db::use_in_memory_database();
+        let _db = crate::capture_db::use_own_database();
         let source = create_standalone_capture(CaptureKind::Frames, "copied".to_string());
         let frame = |frame_id| FrameMessage {
             protocol: "can".into(),
@@ -1507,7 +1507,7 @@ mod tests {
 
     #[test]
     fn every_change_to_the_list_is_pushed_but_a_session_append() {
-        crate::capture_db::use_in_memory_database();
+        let _db = crate::capture_db::use_own_database();
         let pushes = |change: &mut dyn FnMut()| {
             let before = CAPTURE_LIST_CHANGES.with(std::cell::Cell::get);
             change();
@@ -1668,6 +1668,71 @@ mod tests {
 
         assert_eq!(get_session_frame_capture_id(second), None);
         assert!(is_derived_capture(&capture, second));
+    }
+
+    fn failing_database() -> crate::connection_slot::ThreadConnection {
+        crate::capture_db::use_own_connection(rusqlite::Connection::open_in_memory().unwrap())
+    }
+
+    /// Pinned as-is: a failed query answers like an empty capture, and the registry keeps
+    /// counting what the database never stored. D9 turns these into errors.
+    #[test]
+    fn a_failed_frame_query_answers_an_empty_page() {
+        let _db = failing_database();
+        let id = create_standalone_capture(CaptureKind::Frames, "failing frames".into());
+        let frame = FrameMessage { protocol: "can".into(), frame_id: 0x100, timestamp_us: 1, ..Default::default() };
+        append_frames_to_capture(&id, vec![frame.clone(), frame.clone(), frame]);
+        let everything = FrameSelection::from_groups(Vec::new());
+        let one = FrameSelection::from_groups(groups(&[("can", &[0x100])]));
+
+        assert_eq!(get_capture_count(&id), 3);
+        let (frames, indices, total) = get_capture_frames_paginated(&id, 0, 10);
+        assert!(frames.is_empty() && indices.is_empty());
+        assert_eq!(total, 3, "the page keeps the registry's total");
+        let (frames, _, total) = get_capture_frames_paginated_filtered(&id, 0, 10, &one);
+        assert!(frames.is_empty());
+        assert_eq!(total, 0);
+        let tail = get_capture_frames_tail(&id, 10, &everything);
+        assert!(tail.frames.is_empty());
+        assert_eq!((tail.total_filtered_count, tail.capture_end_time_us), (0, None));
+        assert!(get_capture_frame_info(&id).is_empty());
+        assert_eq!(find_capture_offset_for_timestamp(&id, 1, &one), 0);
+        assert!(get_capture_frames(&id).is_none());
+        assert!(get_capture_latest_frames(&id).is_none());
+    }
+
+    #[test]
+    fn a_failed_byte_query_answers_an_empty_page() {
+        let _db = failing_database();
+        let id = create_standalone_capture(CaptureKind::Bytes, "failing bytes".into());
+        append_raw_bytes_to_capture(&id, vec![TimestampedByte { byte: 0xAA, timestamp_us: 1, bus: 0 }]);
+
+        assert_eq!(get_capture_count(&id), 1);
+        let (bytes, total) = get_capture_bytes_paginated(&id, 0, 10);
+        assert!(bytes.is_empty());
+        assert_eq!(total, 0);
+        assert!(get_capture_bytes_tail(&id, 10).is_empty());
+        assert_eq!(find_capture_bytes_offset_for_timestamp_by_id(&id, 1), 0);
+        assert!(get_capture_bytes(&id).is_none());
+    }
+
+    /// Pinned as-is (registered): hydrate reads a failed count as "no data" and deletes
+    /// the capture's metadata, so a transient error at boot loses the capture.
+    #[test]
+    fn a_failed_count_at_hydrate_deletes_the_capture_metadata() {
+        let conn = crate::capture_db::in_memory();
+        conn.execute_batch(
+            "INSERT INTO capture_metadata (capture_id, capture_kind, name, count, created_at)
+             VALUES ('hydrate_count_fails', 'frames', 'kept', 3, 0);
+             DROP TABLE frames;",
+        )
+        .unwrap();
+        let _db = crate::capture_db::use_own_connection(conn);
+
+        hydrate_from_db();
+
+        assert!(get_capture_metadata("hydrate_count_fails").is_none());
+        assert!(crate::capture_db::load_all_capture_metadata().unwrap().is_empty());
     }
 
     /// Framed serial streams both kinds; frames is the session's identity, and the

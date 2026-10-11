@@ -13,6 +13,7 @@ mod capture_db;
 mod capture_events;
 mod capture_inventory;
 mod capture_store;
+mod connection_slot;
 mod captures;
 mod catalog;
 mod catalog_share;

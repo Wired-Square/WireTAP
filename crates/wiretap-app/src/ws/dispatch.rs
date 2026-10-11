@@ -1686,7 +1686,7 @@ bit_length = 8
         const JOINING: usize = 7_001;
         const CHANNEL: u8 = 201;
         let session = "joining-window-backlog";
-        crate::capture_db::use_in_memory_database();
+        let _db = crate::capture_db::use_own_database();
         crate::capture_store::create_session_capture(
             session,
             crate::capture_store::CaptureKind::Frames,
@@ -1726,7 +1726,7 @@ bit_length = 8
         const CHANNEL: u8 = 203;
         const WINDOW: usize = 7_002;
         let session = "dashboard-history-recording";
-        crate::capture_db::use_in_memory_database();
+        let _db = crate::capture_db::use_own_database();
         crate::capture_store::create_session_capture(session, CaptureKind::Frames, session.to_string());
         attach_catalog(session, None, wiretap_catalog::Catalog::parse(ROUTED).expect("catalogue parses"));
         let watch = json!({ "session_id": session, "signals": [{ "frameId": 0x100, "name": "byte[1]" }], "heatmaps": [0x100] });
@@ -1761,7 +1761,7 @@ bit_length = 8
         use crate::ws::server::outbox;
         const CHANNEL: u8 = 202;
         let session = "frame-inventory-push";
-        crate::capture_db::use_in_memory_database();
+        let _db = crate::capture_db::use_own_database();
         let capture = crate::capture_store::create_session_capture(
             session,
             crate::capture_store::CaptureKind::Frames,

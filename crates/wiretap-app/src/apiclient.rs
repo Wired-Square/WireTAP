@@ -1010,7 +1010,7 @@ mod tests {
     #[test]
     fn only_a_capture_of_can_frames_can_be_uploaded() {
         use crate::capture_store::{append_frames_to_capture, create_standalone_capture, CaptureKind};
-        crate::capture_db::use_in_memory_database();
+        let _db = crate::capture_db::use_own_database();
         let frame = |protocol: &str| crate::io::FrameMessage { protocol: protocol.into(), timestamp_us: 1, ..Default::default() };
         let capture_of = |protocols: &[&str]| {
             let id = create_standalone_capture(CaptureKind::Frames, "upload".into());
