@@ -240,7 +240,7 @@ pub fn step_frame(
     current_frame_index: Option<usize>,
     current_timestamp_us: Option<i64>,
     backward: bool,
-    selection: &crate::capture_store::FrameSelection,
+    selection: &wiretap_analysis::source::FrameSelection,
 ) -> Result<Option<StepResult>, String> {
     let buf_id = capture_id;
 
@@ -735,7 +735,8 @@ async fn run_capture_stream(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::capture_store::{create_standalone_capture, CaptureKind, FrameSelection, ProtocolFrames};
+    use crate::capture_store::{create_standalone_capture, CaptureKind};
+    use wiretap_analysis::source::{FrameSelection, ProtocolFrames};
 
     fn capture_of(name: &str, frames: &[(u64, u32)]) -> String {
         crate::capture_db::use_in_memory_database();

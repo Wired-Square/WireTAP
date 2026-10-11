@@ -12,7 +12,8 @@ use wiretap_analysis::query::{self as kernel, QueryRow};
 use wiretap_gateway::{FrameRowFilter, QuerySpec, Sql, SqlValue};
 
 use super::{QueryOutcome, QueryResults};
-use crate::capture_db::{self, InventoryRow, STORED_LENGTH};
+use crate::capture_db::{self, STORED_LENGTH};
+use wiretap_analysis::source::InventoryRow;
 
 const ROW: &str = "timestamp_us, frame_id, is_extended, payload";
 const PAGED_ROW: &str = "timestamp_us, frame_id, is_extended, payload, rowid";

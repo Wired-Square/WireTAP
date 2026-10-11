@@ -382,9 +382,9 @@ pub async fn step_capture_frame(
     current_frame_index: Option<usize>,
     current_timestamp_us: Option<i64>,
     backward: bool,
-    filter_selection: Option<Vec<crate::capture_store::ProtocolFrames>>,
+    filter_selection: Option<Vec<wiretap_analysis::source::ProtocolFrames>>,
 ) -> Result<Option<StepResult>, String> {
-    let selection = crate::capture_store::FrameSelection::from_groups(filter_selection.unwrap_or_default());
+    let selection = wiretap_analysis::source::FrameSelection::from_groups(filter_selection.unwrap_or_default());
     step_frame(&session_id, &capture_id, current_frame_index, current_timestamp_us, backward, &selection)
 }
 

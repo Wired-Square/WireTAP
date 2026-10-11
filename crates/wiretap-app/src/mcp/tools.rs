@@ -3,7 +3,7 @@
 //! MCP tool definitions. Read tools are always available; control (mutation)
 //! tools are only merged into the router when `mcp_allow_control` is on.
 
-use crate::capture_store::{FrameSelection, ProtocolFrames};
+use wiretap_analysis::source::{FrameSelection, ProtocolFrames};
 use crate::io::FrameMessage;
 use std::collections::{BTreeMap, HashSet};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -743,7 +743,7 @@ impl WireTapTools {
         let newest = Some(analysis_window(p.newest));
         let source = Capture(&capture_id);
         let changes = crate::byte_roles::payload_changes(&source, groups, newest, max_frames).await.map_err(err)?;
-        let orders = crate::analysis::message_order(&source, &selection, newest, None).await.map_err(err)?;
+        let orders = wiretap_analysis::source::message_order(&source, &selection, newest, None).await.map_err(err)?;
         Ok(ok_text(format!(
             "{}\n{}",
             crate::report::changes::report(&changes).render(Markdown),
@@ -758,12 +758,12 @@ impl WireTapTools {
     ) -> Result<CallToolResult, McpError> {
         let capture_id = session_frame_capture(&p.session_id)?;
         let selection = FrameSelection::from_groups(frame_key_groups(p.frame_ids).map_err(err)?);
-        let start = p.start_frame_id.map(|frame_id| crate::analysis::OrderStart {
+        let start = p.start_frame_id.map(|frame_id| wiretap_analysis::source::OrderStart {
             protocol: p.start_protocol,
             frame_id,
             is_extended: p.start_is_extended,
         });
-        let orders = crate::analysis::message_order(&Capture(&capture_id), &selection, Some(analysis_window(p.newest)), start.as_ref())
+        let orders = wiretap_analysis::source::message_order(&Capture(&capture_id), &selection, Some(analysis_window(p.newest)), start.as_ref())
             .await
             .map_err(err)?;
         ok_json(json!({ "captureId": capture_id, "protocols": orders }))
@@ -846,7 +846,7 @@ impl WireTapTools {
         Parameters(p): Parameters<ByteProfileParams>,
     ) -> Result<CallToolResult, McpError> {
         let src = resolve(p.capture_id, p.profile_id).map_err(err)?;
-        let profile = crate::analysis::byte_profile(
+        let profile = wiretap_analysis::source::byte_profile(
             &src.reader(&self.ctx),
             p.protocol.as_deref(),
             p.frame_id,
@@ -876,9 +876,9 @@ impl WireTapTools {
             search_custom_polynomials: p.search_custom_polynomials,
             min_likeness: p.min_likeness,
         };
-        let filter = crate::analysis::ScanFilter::Ids(p.frame_ids.unwrap_or_default());
+        let filter = wiretap_analysis::source::ScanFilter::Ids(p.frame_ids.unwrap_or_default());
         let result =
-            crate::analysis::checksum_scan(&src.reader(&self.ctx), &filter, p.sample_limit, options)
+            wiretap_analysis::source::checksum_scan(&src.reader(&self.ctx), &filter, p.sample_limit, options)
                 .await
                 .map_err(err)?;
         ok_json(result)
@@ -893,7 +893,7 @@ impl WireTapTools {
         let entry = self.ctx.find_catalog(&p.catalog).map_err(err)?;
         let toml = crate::catalog::open_catalog(entry.path).await.map_err(err)?;
         let catalog = wiretap_catalog::Catalog::parse(&toml).map_err(|e| err(e.to_string()))?;
-        let report = crate::analysis::catalog_coverage(
+        let report = wiretap_analysis::source::catalog_coverage(
             &src.reader(&self.ctx),
             &entry.name,
             &catalog,

@@ -17,6 +17,7 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tokio::sync::Mutex;
+use wiretap_analysis::source::InventoryRow;
 use wiretap_gateway::{
     DatabaseActivityResult, Event, EventPatch, EventsResponse, FrameFilter, ImportResult,
     InventoryEntry, InventoryResponse, NewEvent, PayloadsParams, PayloadsResponse, Protocol,
@@ -339,7 +340,7 @@ pub(crate) async fn read_inventory(
     api: &ApiProfile,
     path: &str,
     limit: Option<u32>,
-) -> Result<(Vec<crate::capture_db::InventoryRow>, bool), String> {
+) -> Result<(Vec<InventoryRow>, bool), String> {
     Ok(inventory_rows(api.protocol, get(api, path).await?, limit))
 }
 
@@ -349,12 +350,12 @@ fn inventory_rows(
     protocol: Protocol,
     resp: InventoryResponse,
     limit: Option<u32>,
-) -> (Vec<crate::capture_db::InventoryRow>, bool) {
+) -> (Vec<InventoryRow>, bool) {
     let mut rows: Vec<_> = resp
         .entries
         .into_iter()
         .map(|e| {
-            crate::capture_db::InventoryRow::new(
+            InventoryRow::new(
                 frame_tag(protocol),
                 e.frame_id,
                 e.is_extended,
@@ -374,7 +375,7 @@ pub async fn frame_inventory(
     profile: &IOProfile,
     start_us: Option<i64>,
     end_us: Option<i64>,
-) -> Result<Vec<crate::capture_db::InventoryRow>, String> {
+) -> Result<Vec<InventoryRow>, String> {
     let api = resolve(profile)?;
     let query = TimeRangeQuery {
         start: start_us.map(rfc3339).transpose()?,

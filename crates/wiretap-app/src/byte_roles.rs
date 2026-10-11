@@ -12,13 +12,12 @@ use wiretap_analysis::{
     SerialStructure, TimedPayload, DEFAULT_MIRROR_WINDOW_US,
 };
 
-use crate::analysis::{
-    byte_profiles, orders_of, timed_by_protocol, FrameByteProfile, FrameSource,
-    OrderStart, PayloadSource, ProtocolOrder, ScanFilter,
+use wiretap_analysis::source::{
+    byte_profiles, orders_of, timed_by_protocol, FrameByteProfile, FrameSelection, FrameSource,
+    OrderStart, PayloadSource, ProtocolFrames, ProtocolOrder, ScanFilter,
 };
 use crate::drafting;
 use wiretap_analysis::draft::Draft;
-use crate::capture_store::{FrameSelection, ProtocolFrames};
 use crate::checksum_discovery::DEFAULT_SAMPLE_LIMIT;
 use crate::payload_source::Capture;
 use crate::report::{held, ReportFormat};
@@ -79,14 +78,21 @@ pub async fn payload_changes_cmd(
 }
 
 /// The Changes view's answer, shared with MCP `get_discovery_analysis`.
-pub async fn payload_changes<S: PayloadSource + FrameSource>(
+pub async fn payload_changes<S>(
     source: &S,
     selection: Vec<ProtocolFrames>,
     newest: Option<usize>,
     max_frames: usize,
-) -> Result<PayloadChanges, String> {
+) -> Result<PayloadChanges, String>
+where
+    S: PayloadSource + FrameSource,
+    S::Error: ToString,
+{
     let selection = FrameSelection::from_groups(selection);
-    let frames = source.frames(&selection, newest).await?;
+    let frames = source
+        .frames(&selection, newest)
+        .await
+        .map_err(|e| e.to_string())?;
     let frame_count = frames.len();
     let timed = timed_by_protocol(frames);
 
@@ -118,9 +124,14 @@ pub async fn payload_changes<S: PayloadSource + FrameSource>(
         .filter(|m| !m.groups.is_empty())
         .collect();
 
-    let profiles =
-        byte_profiles(source, &ScanFilter::Selection(selection), DEFAULT_SAMPLE_LIMIT, max_frames)
-            .await?;
+    let profiles = byte_profiles(
+        source,
+        &ScanFilter::Selection(selection),
+        DEFAULT_SAMPLE_LIMIT,
+        max_frames,
+    )
+    .await
+    .map_err(|e| e.to_string())?;
     let frames = profiles
         .frames
         .into_iter()
@@ -149,7 +160,9 @@ pub async fn frame_order_cmd(
     let mut draft = draft.unwrap_or_default();
     drafting::seed(
         &mut draft,
-        frames.iter().map(|f| (f.protocol.as_str(), FrameKey::new(f.frame_id, f.is_extended), f.bytes.len())),
+        frames
+            .iter()
+            .map(|f| (f.protocol.as_str(), f.frame.key, f.frame.payload.len())),
     );
     let result = orders_of(timed_by_protocol(frames), start.as_ref());
     held::hold_orders(key, result.clone());
@@ -191,8 +204,7 @@ pub fn serial_structure_cmd(payloads: Vec<Vec<u8>>) -> SerialStructure {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::analysis::memory::MemorySource;
-    use crate::analysis::message_order;
+    use wiretap_analysis::source::{message_order, MemorySource};
     use wiretap_analysis::{profile_bytes, ByteNote};
 
     #[tokio::test]
@@ -212,7 +224,7 @@ mod tests {
         let profile = &changes.frames[0].profile.profile;
         assert_eq!(profile.sample_count, DEFAULT_SAMPLE_LIMIT as usize);
         assert_eq!(profile.columns[2].stats.min, 0x03, "starts at frame 1000 = 0x03E8");
-        assert_eq!(source.asked.lock().unwrap()[0].2, crate::analysis::Sampling::Recent);
+        assert_eq!(source.asked()[0].2, wiretap_analysis::source::Sampling::Recent);
     }
 
     /// Two ids carrying one counter together, and a third sent in bursts of two.

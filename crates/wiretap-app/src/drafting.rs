@@ -243,10 +243,8 @@ pub fn candidate_signals_cmd(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::analysis::memory::MemorySource;
-    use crate::analysis::FrameSource;
     use crate::byte_roles::payload_changes;
-    use crate::capture_store::FrameSelection;
+    use wiretap_analysis::source::{FrameSelection, FrameSource, MemorySource};
 
     fn frame(protocol: &str, frame_id: u32, is_extended: bool, length: usize) -> DraftFrame {
         DraftFrame { protocol: protocol.into(), frame_id, is_extended, length }
@@ -321,7 +319,7 @@ mod tests {
         let source = capture();
         let frames = source.frames(&FrameSelection::default(), None).await.unwrap();
         let mut draft = Draft::default();
-        seed(&mut draft, frames.iter().map(|f| (f.protocol.as_str(), FrameKey::new(f.frame_id, f.is_extended), f.bytes.len())));
+        seed(&mut draft, frames.iter().map(|f| (f.protocol.as_str(), f.frame.key, f.frame.payload.len())));
         let lengths: Vec<usize> = draft.frames().iter().map(|f| f.length).collect();
         assert_eq!(lengths, [4, 2]);
     }

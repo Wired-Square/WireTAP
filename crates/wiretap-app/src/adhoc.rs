@@ -315,7 +315,7 @@ pub async fn rank_hypotheses(
     session_id: String,
     request: RankRequest,
 ) -> Result<RankedHypotheses, String> {
-    use crate::analysis::{byte_profile, PayloadSource};
+    use wiretap_analysis::source::{byte_profile, PayloadSource};
     use crate::payload_source::Capture;
 
     let capture_id = crate::capture_store::get_session_frame_capture_id(&session_id)

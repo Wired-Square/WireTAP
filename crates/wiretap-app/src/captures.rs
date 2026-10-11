@@ -14,9 +14,10 @@ use tauri::{AppHandle, Emitter};
 
 use crate::{
     blocking::off_runtime,
-    capture_store::{self, CaptureMetadata, CaptureFrameInfo, FrameSelection, ProtocolFrames, TimestampedByte, TailResponse},
+    capture_store::{self, CaptureMetadata, CaptureFrameInfo, TimestampedByte, TailResponse},
     io::{self, FrameMessage},
 };
+use wiretap_analysis::source::{FrameSelection, ProtocolFrames};
 
 /// Result of a CSV import, including capture metadata and any sequence gap diagnostics.
 #[derive(Clone, serde::Serialize)]

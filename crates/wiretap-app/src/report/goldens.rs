@@ -4,10 +4,8 @@
 // `WRITE_REPORT_GOLDENS=1` rewrites them.
 
 use super::ReportFormat;
-use crate::analysis::memory::MemorySource;
-use crate::analysis::message_order;
+use wiretap_analysis::source::{message_order, FrameSelection, MemorySource};
 use crate::byte_roles::payload_changes;
-use crate::capture_store::FrameSelection;
 
 const FIXTURES: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../frontend/wiretap-ui/src/tests/fixtures");
 

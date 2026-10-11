@@ -10,8 +10,7 @@ use serde::Deserialize;
 
 use wiretap_analysis::{scan_frames, ChecksumScanOptions, ChecksumScanResult, FrameKey};
 
-use crate::analysis::ScanFilter;
-use crate::capture_store::{FrameSelection, ProtocolFrames};
+use wiretap_analysis::source::{FrameSelection, ProtocolFrames, ScanFilter};
 
 /// Payloads to read per frame id, for every door onto the scan — the MCP tool's
 /// `sample_limit` defaults to this too, so the panel and an agent sample
@@ -34,7 +33,7 @@ pub async fn discover_checksums_in_capture_cmd(
     // Empty reads as "every frame", the same as everywhere else a selection is
     // accepted; Discovery guards its own "nothing selected" case before calling.
     let filter = ScanFilter::Selection(FrameSelection::from_groups(selection));
-    crate::analysis::checksum_scan(
+    wiretap_analysis::source::checksum_scan(
         &crate::payload_source::Capture(&capture_id),
         &filter,
         DEFAULT_SAMPLE_LIMIT,
