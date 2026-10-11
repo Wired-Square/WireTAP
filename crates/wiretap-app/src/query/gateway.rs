@@ -7,130 +7,40 @@
 use std::collections::BTreeSet;
 
 use serde::de::DeserializeOwned;
-use serde::Serialize;
 use serde_json::Value;
 use crate::settings::SettingsSource;
 use wiretap_gateway::{
-    ByteChangeQueryResult, ByteChangesParams, DistributionParams, DistributionQueryResult,
-    FirstLastParams, FirstLastQueryResult, FrameChangeQueryResult, FrameChangesParams,
-    FrequencyParams, FrequencyQueryResult, GapAnalysisParams, GapAnalysisQueryResult,
-    MirrorValidationParams, MirrorValidationQueryResult, MuxStatisticsParams,
-    MuxStatisticsQueryResult, PatternSearchParams, PatternSearchQueryResult, QuerySpec, TimeRangeQuery,
+    ByteChangeQueryResult, DistributionQueryResult, FirstLastQueryResult, FrameChangeQueryResult,
+    FrequencyQueryResult, GapAnalysisQueryResult, GatewayRequest, MirrorValidationQueryResult,
+    MuxStatisticsQueryResult, PatternSearchQueryResult, Protocol, QuerySpec,
 };
 
 use super::{QueryOutcome, QueryResults};
 use crate::apiclient::{self, ApiProfile};
 
-pub(super) enum Request {
-    Get(String),
-    Post(&'static str, Value),
-}
-
-impl Request {
-    fn post(path: &'static str, body: impl Serialize) -> Self {
-        Self::Post(path, serde_json::to_value(body).expect("gateway params serialise"))
-    }
-
-    pub(super) fn text(&self) -> String {
-        match self {
-            Self::Get(path) => format!("GET {path}"),
-            Self::Post(path, body) => {
-                format!("POST {path}\n{}", serde_json::to_string_pretty(body).unwrap_or_default())
-            }
+/// The request as it is sent, which is what a backend query can show for its SQL.
+pub(super) fn text(request: &GatewayRequest) -> String {
+    match request {
+        GatewayRequest::Inventory(_) => format!("GET {}", request.path()),
+        GatewayRequest::Post(path, body) => {
+            let body = serde_json::to_value(body).expect("gateway params serialise");
+            format!(
+                "POST {path}\n{}",
+                serde_json::to_string_pretty(&body).unwrap_or_default()
+            )
         }
     }
 }
 
 /// `narrowed`: a mirror validation the catalogue narrows asks for every mismatch.
-pub(super) fn request(api: &ApiProfile, spec: &QuerySpec, query_id: Option<&str>, narrowed: bool) -> Result<Request, String> {
-    let window = spec.window();
-    if window.protocol.is_some_and(|p| p != api.protocol) {
-        return Err("a WireTAP backend profile reads only its own protocol".into());
-    }
-    let start = window.start_us.map(apiclient::rfc3339).transpose()?;
-    let end = window.end_us.map(apiclient::rfc3339).transpose()?;
-    let query_id = query_id.map(str::to_string);
-    let filter = |frame_id: &u32, is_extended: &Option<bool>| {
-        api.filter(*frame_id, *is_extended, start.clone(), end.clone())
-    };
-    Ok(match spec {
-        QuerySpec::ByteChanges { frame_id, is_extended, byte_index, limit, .. } => Request::post(
-            "/query/byte-changes",
-            ByteChangesParams { filter: filter(frame_id, is_extended), byte_index: *byte_index, limit: *limit, query_id },
-        ),
-        QuerySpec::FrameChanges { frame_id, is_extended, limit, .. } => Request::post(
-            "/query/frame-changes",
-            FrameChangesParams { filter: filter(frame_id, is_extended), limit: *limit, query_id },
-        ),
-        QuerySpec::MirrorValidation { mirror_frame_id, source_frame_id, is_extended, tolerance_ms, limit, .. } => {
-            Request::post(
-                "/query/mirror-validation",
-                MirrorValidationParams {
-                    protocol: api.wire_protocol(),
-                    mirror_frame_id: *mirror_frame_id,
-                    source_frame_id: *source_frame_id,
-                    is_extended: *is_extended,
-                    tolerance_ms: *tolerance_ms,
-                    start_time: start,
-                    end_time: end,
-                    limit: if narrowed { None } else { *limit },
-                    query_id,
-                },
-            )
-        }
-        QuerySpec::MuxStatistics { frame_id, is_extended, mux_selector_byte, include_16bit, payload_length, limit, .. } => {
-            Request::post(
-                "/query/mux-statistics",
-                MuxStatisticsParams {
-                    filter: filter(frame_id, is_extended),
-                    mux_selector_byte: *mux_selector_byte,
-                    include_16bit: *include_16bit,
-                    payload_length: *payload_length,
-                    limit: *limit,
-                    query_id,
-                },
-            )
-        }
-        QuerySpec::FirstLast { frame_id, is_extended, .. } => Request::post(
-            "/query/first-last",
-            FirstLastParams { filter: filter(frame_id, is_extended), query_id },
-        ),
-        QuerySpec::Frequency { frame_id, is_extended, bucket_size_ms, limit, .. } => Request::post(
-            "/query/frequency",
-            FrequencyParams { filter: filter(frame_id, is_extended), bucket_size_ms: *bucket_size_ms, limit: *limit, query_id },
-        ),
-        QuerySpec::Distribution { frame_id, is_extended, byte_index, .. } => Request::post(
-            "/query/distribution",
-            DistributionParams { filter: filter(frame_id, is_extended), byte_index: *byte_index, query_id },
-        ),
-        QuerySpec::GapAnalysis { frame_id, is_extended, gap_threshold_ms, limit, .. } => Request::post(
-            "/query/gap-analysis",
-            GapAnalysisParams {
-                filter: filter(frame_id, is_extended),
-                gap_threshold_ms: *gap_threshold_ms,
-                limit: *limit,
-                query_id,
-            },
-        ),
-        QuerySpec::PatternSearch { pattern, pattern_mask, limit, .. } => Request::post(
-            "/query/pattern-search",
-            PatternSearchParams {
-                protocol: api.wire_protocol(),
-                pattern: pattern.clone(),
-                pattern_mask: pattern_mask.clone(),
-                start_time: start,
-                end_time: end,
-                limit: *limit,
-                query_id,
-            },
-        ),
-        QuerySpec::FrameInventory { limit, .. } => Request::Get(apiclient::inventory_path(&TimeRangeQuery {
-            start,
-            end,
-            protocol: api.wire_protocol(),
-            limit: *limit,
-        })),
-    })
+pub(super) fn request(
+    protocol: Protocol,
+    spec: &QuerySpec,
+    query_id: Option<&str>,
+    narrowed: bool,
+) -> Result<GatewayRequest, String> {
+    spec.request(protocol, query_id, narrowed)
+        .map_err(|e| e.to_string())
 }
 
 fn parse<T: DeserializeOwned>(body: Value) -> Result<T, String> {
@@ -182,27 +92,43 @@ pub async fn run(
     compare: Option<&BTreeSet<usize>>,
 ) -> Result<QueryOutcome, String> {
     let api = api(settings, profile_id).await?;
-    let request = request(&api, spec, Some(query_id), compare.is_some())?;
+    let request = request(api.protocol, spec, Some(query_id), compare.is_some())?;
     let mut outcome = match &request {
-        Request::Get(path) => {
-            let QuerySpec::FrameInventory { limit, .. } = spec else { unreachable!("only an inventory is a GET") };
-            let (rows, truncated) = apiclient::read_inventory(&api, path, *limit).await?;
+        GatewayRequest::Inventory(query) => {
+            let (rows, truncated) = apiclient::read_inventory(&api, query.clone()).await?;
             QueryOutcome { results: QueryResults::FrameInventory(rows), stats: None, sql: Vec::new(), truncated }
         }
-        Request::Post(path, body) => decode(spec, apiclient::post_query(&api, path, body, query_id).await?, compare)?,
+        GatewayRequest::Post(path, body) => {
+            let answer = api
+                .db()
+                .query::<Value>(path, body, query_id)
+                .await
+                .map_err(apiclient::text)?;
+            decode(spec, answer, compare)?
+        }
     };
-    outcome.sql = vec![request.text()];
+    outcome.sql = vec![text(&request)];
     Ok(outcome)
 }
 
-pub async fn preview(settings: &dyn SettingsSource, profile_id: &str, spec: &QuerySpec, narrowed: bool) -> Result<Vec<String>, String> {
-    Ok(vec![request(&api(settings, profile_id).await?, spec, None, narrowed)?.text()])
+pub async fn preview(
+    settings: &dyn SettingsSource,
+    profile_id: &str,
+    spec: &QuerySpec,
+    narrowed: bool,
+) -> Result<Vec<String>, String> {
+    Ok(vec![text(&request(
+        api(settings, profile_id).await?.protocol,
+        spec,
+        None,
+        narrowed,
+    )?)])
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use wiretap_gateway::{MirrorValidationResult, Protocol, QueryStats};
+    use wiretap_gateway::{MirrorValidationResult, QueryStats};
 
     #[test]
     fn a_backend_profile_refuses_another_protocols_window() {
@@ -210,10 +136,12 @@ mod tests {
             window: wiretap_gateway::RowWindow { protocol, start_us: None, end_us: None },
             limit: Some(5),
         };
-        let api = apiclient::test_api(Protocol::Modbus);
-        assert!(request(&api, &spec(Some(Protocol::Can)), None, false).is_err());
+        assert!(request(Protocol::Modbus, &spec(Some(Protocol::Can)), None, false).is_err());
         for protocol in [None, Some(Protocol::Modbus)] {
-            assert_eq!(request(&api, &spec(protocol), None, false).unwrap().text(), "GET /inventory?protocol=modbus&limit=5");
+            assert_eq!(
+                text(&request(Protocol::Modbus, &spec(protocol), None, false).unwrap()),
+                "GET /inventory?protocol=modbus&limit=5"
+            );
         }
     }
 

@@ -9,11 +9,11 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use wiretap_analysis::query::{self as kernel, QueryRow};
+use wiretap_capture::{inventory_row, inventory_statement};
 use wiretap_gateway::{FrameRowFilter, QuerySpec, Sql, SqlValue};
 
 use super::{QueryOutcome, QueryResults};
-use crate::capture_db::{self, STORED_LENGTH};
-use wiretap_analysis::source::InventoryRow;
+use crate::capture_db;
 
 const ROW: &str = "timestamp_us, frame_id, is_extended, payload";
 const PAGED_ROW: &str = "timestamp_us, frame_id, is_extended, payload, rowid";
@@ -25,22 +25,6 @@ const TIMES: &str = "timestamp_us, frame_id, is_extended, x''";
 fn select(capture_id: &str, columns: &str, filter: &FrameRowFilter, tail: &str) -> Sql {
     let filter = filter.sql_where(capture_id);
     Sql { sql: format!("SELECT {columns} FROM frames WHERE {}{tail}", filter.sql), values: filter.values }
-}
-
-fn inventory_statement(capture_id: &str, filter: &FrameRowFilter, limit: Option<u32>) -> Sql {
-    let mut statement = select(
-        capture_id,
-        &format!(
-            "protocol, frame_id, is_extended, COUNT(*), MIN(timestamp_us), MAX(timestamp_us), MAX({STORED_LENGTH})"
-        ),
-        filter,
-        &format!(
-            " GROUP BY protocol, frame_id, is_extended ORDER BY frame_id, protocol, is_extended{}",
-            if limit.is_some() { " LIMIT ?" } else { "" }
-        ),
-    );
-    statement.values.extend(limit.map(|n| SqlValue::Integer(n.into())));
-    statement
 }
 
 /// One page of rows after `after_rowid`.
@@ -85,18 +69,6 @@ fn query_row(row: &rusqlite::Row) -> rusqlite::Result<QueryRow> {
         is_extended: row.get(2)?,
         payload: row.get(3)?,
     })
-}
-
-fn inventory_row(row: &rusqlite::Row) -> rusqlite::Result<InventoryRow> {
-    Ok(InventoryRow::new(
-        &row.get::<_, String>(0)?,
-        row.get::<_, i64>(1)? as u32,
-        row.get(2)?,
-        row.get(3)?,
-        row.get(4)?,
-        row.get(5)?,
-        row.get::<_, i64>(6)? as u16,
-    ))
 }
 
 /// Page through `filter`'s rows until `kernel` has found `limit` results.
@@ -210,19 +182,7 @@ fn run_paged(
     Ok(outcome)
 }
 
-/// Every identity in capture `capture_id` within the window, with its rollup.
-pub fn frame_inventory(capture_id: &str, start_us: Option<i64>, end_us: Option<i64>) -> Result<Vec<InventoryRow>, String> {
-    let filter = FrameRowFilter { start_us, end_us, ..Default::default() };
-    capture_db::read_rows(&inventory_statement(capture_id, &filter, None), &Arc::default(), inventory_row)
-}
-
 #[cfg(test)]
 pub(crate) fn run_in_pages(capture_id: &str, spec: &QuerySpec, page: usize) -> Result<QueryOutcome, String> {
     run_paged(capture_id, spec, None, &Arc::default(), page)
-}
-
-#[cfg(test)]
-pub(crate) fn inventory_with_conn(conn: &rusqlite::Connection, capture_id: &str) -> Vec<InventoryRow> {
-    capture_db::read_rows_with_conn(conn, &inventory_statement(capture_id, &FrameRowFilter::default(), None), inventory_row)
-        .unwrap()
 }

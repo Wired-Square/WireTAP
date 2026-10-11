@@ -3,14 +3,9 @@
 // The app's `PayloadSource`s: a SQLite capture, and a WireTAP backend profile
 // reached through the settings.
 
-use wiretap_analysis::order::TimedFrame;
-use wiretap_analysis::source::{
-    FrameSelection, FrameSource, InventoryRow, PayloadQuery, PayloadSource, Sampling, Source, SourceFrame,
-};
-use wiretap_analysis::FrameKey;
+use wiretap_analysis::source::{InventoryRow, PayloadQuery, PayloadSource, Source};
 
-use crate::blocking::off_runtime;
-use crate::io::FrameMessage;
+use crate::capture_db::{self, source_error};
 use crate::settings::SettingsSource;
 
 /// Where a query runs: a SQLite capture or a WireTAP backend profile.
@@ -38,7 +33,7 @@ pub fn resolve(
 impl QuerySource {
     pub fn reader<'a>(&'a self, settings: &'a dyn SettingsSource) -> AppSource<'a> {
         match self {
-            QuerySource::Capture(id) => AppSource::Capture(Capture(id)),
+            QuerySource::Capture(id) => AppSource::Capture(id),
             QuerySource::Backend(profile_id) => AppSource::Gateway(Gateway { settings, profile_id }),
         }
     }
@@ -51,72 +46,6 @@ pub fn parse_bound(s: &str) -> Result<i64, String> {
         .map(|dt| dt.timestamp_micros())
         .or_else(|_| s.trim().parse::<i64>())
         .map_err(|_| format!("time bound {s:?} is neither RFC3339 with an offset nor integer microseconds"))
-}
-
-pub struct Capture<'a>(pub &'a str);
-
-impl Source for Capture<'_> {
-    type Error = String;
-}
-
-impl PayloadSource for Capture<'_> {
-    async fn inventory(&self, start_us: Option<i64>, end_us: Option<i64>) -> Result<Vec<InventoryRow>, String> {
-        let id = self.0.to_owned();
-        off_runtime(move || crate::query::capture::frame_inventory(&id, start_us, end_us)).await
-    }
-
-    async fn payloads(&self, q: PayloadQuery<'_>) -> Result<Vec<Vec<u8>>, String> {
-        let read = match q.sampling {
-            Sampling::Spread => crate::capture_db::sample_frame_payloads,
-            Sampling::Recent => crate::capture_db::tail_frame_payloads,
-        };
-        let (id, protocol) = (self.0.to_owned(), q.protocol.map(str::to_owned));
-        let (frame_id, is_extended, limit) = (q.frame_id, q.is_extended, q.limit);
-        off_runtime(move || read(&id, protocol.as_deref(), frame_id, is_extended, limit)).await
-    }
-}
-
-/// Frames read a page at a time, so a whole capture is never one query.
-const FRAME_PAGE: usize = 50_000;
-
-impl FrameSource for Capture<'_> {
-    async fn frames(
-        &self,
-        selection: &FrameSelection,
-        newest: Option<usize>,
-    ) -> Result<Vec<SourceFrame>, String> {
-        let (id, selection) = (self.0.to_owned(), selection.clone());
-        let frames = off_runtime(move || all_selected_frames(&id, &selection, newest)).await?;
-        Ok(frames.into_iter().map(source_frame).collect())
-    }
-}
-
-fn source_frame(f: FrameMessage) -> SourceFrame {
-    SourceFrame {
-        frame: TimedFrame {
-            bus: f.bus,
-            key: FrameKey::new(f.frame_id, f.is_extended),
-            timestamp_us: f.timestamp_us,
-            payload: f.bytes,
-        },
-        protocol: f.protocol,
-    }
-}
-
-fn all_selected_frames(id: &str, selection: &FrameSelection, newest: Option<usize>) -> Result<Vec<FrameMessage>, String> {
-    if let Some(n) = newest {
-        return Ok(crate::capture_store::get_capture_frames_tail(id, n, selection)?.frames);
-    }
-    let mut frames = Vec::new();
-    loop {
-        let (page, _, total) =
-            crate::capture_store::get_capture_frames_paginated_filtered(id, frames.len(), FRAME_PAGE, selection)?;
-        let done = page.is_empty() || frames.len() + page.len() >= total;
-        frames.extend(page);
-        if done {
-            return Ok(frames);
-        }
-    }
 }
 
 pub struct Gateway<'a> {
@@ -150,7 +79,7 @@ impl PayloadSource for Gateway<'_> {
 }
 
 pub enum AppSource<'a> {
-    Capture(Capture<'a>),
+    Capture(&'a str),
     Gateway(Gateway<'a>),
 }
 
@@ -161,14 +90,35 @@ impl Source for AppSource<'_> {
 impl PayloadSource for AppSource<'_> {
     async fn inventory(&self, start_us: Option<i64>, end_us: Option<i64>) -> Result<Vec<InventoryRow>, String> {
         match self {
-            AppSource::Capture(s) => s.inventory(start_us, end_us).await,
+            AppSource::Capture(id) => {
+                capture_db::analyse(id, async move |c| c.inventory(start_us, end_us).await)
+                    .await?
+                    .map_err(source_error)
+            }
             AppSource::Gateway(s) => s.inventory(start_us, end_us).await,
         }
     }
 
     async fn payloads(&self, q: PayloadQuery<'_>) -> Result<Vec<Vec<u8>>, String> {
         match self {
-            AppSource::Capture(s) => s.payloads(q).await,
+            AppSource::Capture(id) => {
+                let (protocol, q) = (
+                    q.protocol.map(str::to_owned),
+                    PayloadQuery {
+                        protocol: None,
+                        ..q
+                    },
+                );
+                capture_db::analyse(id, async move |c| {
+                    c.payloads(PayloadQuery {
+                        protocol: protocol.as_deref(),
+                        ..q
+                    })
+                    .await
+                })
+                .await?
+                .map_err(source_error)
+            }
             AppSource::Gateway(s) => s.payloads(q).await,
         }
     }

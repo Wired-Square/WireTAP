@@ -526,7 +526,7 @@ cannot go infinite even where a size is legitimately unresolved.
 | File | Role |
 |------|------|
 | [crates/wiretap-app/src/capture_store.rs](../crates/wiretap-app/src/capture_store.rs) | Registry, session-scoped API, streaming/active sets |
-| [crates/wiretap-app/src/capture_db.rs](../crates/wiretap-app/src/capture_db.rs) | SQLite persistence |
+| [crates/wiretap-app/src/capture_db.rs](../crates/wiretap-app/src/capture_db.rs) | The SQLite connection; the store itself is `wiretap-capture` |
 | [crates/wiretap-app/src/captures.rs](../crates/wiretap-app/src/captures.rs) | Tauri commands (list/read/import/delete) |
 | [crates/wiretap-app/src/capture_events.rs](../crates/wiretap-app/src/capture_events.rs) | Events — owner dispatch between `capture_db` and the gateway |
 | [crates/wiretap-app/src/framing.rs](../crates/wiretap-app/src/framing.rs) | `apply_framing_to_capture` — byte capture → frame capture |

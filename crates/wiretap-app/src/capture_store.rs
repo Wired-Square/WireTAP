@@ -4,11 +4,11 @@
 // Metadata lives in RAM; bulk frame/byte data lives in SQLite (capture_db).
 // Supports multiple named captures, each typed as either Frames or Bytes.
 //
-// Schema changes to buffers.db MUST be recorded migrations — see
-// docs/capture-db-migrations.md. Never issue ad-hoc DDL from this file.
+// Schema changes to buffers.db MUST be recorded migrations in wiretap-capture —
+// see that crate's README. Never issue ad-hoc DDL from this file.
 
 use once_cell::sync::Lazy;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 use std::collections::hash_map::RandomState;
 use std::hash::{BuildHasher, Hasher};
@@ -19,88 +19,7 @@ use crate::capture_inventory::FrameInventory;
 use crate::io::FrameMessage;
 use wiretap_analysis::source::FrameSelection;
 
-// ============================================================================
-// Types
-// ============================================================================
-
-/// Capture kind - determines what kind of data the capture contains
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "snake_case")]
-#[cfg_attr(test, derive(ts_rs::TS))]
-pub enum CaptureKind {
-    /// CAN frames, framed serial messages
-    Frames,
-    /// Raw serial bytes (unframed)
-    Bytes,
-}
-
-impl CaptureKind {
-    /// The wire spelling, as persisted and as reported to the frontend. Must match the
-    /// `rename_all` derive above, which is what serialised `CaptureMetadata` carries.
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            CaptureKind::Frames => "frames",
-            CaptureKind::Bytes => "bytes",
-        }
-    }
-
-    /// Inverse of `as_str`. Anything unrecognised reads as `Frames`, which is what the
-    /// persisted column has always defaulted to.
-    pub fn from_str(s: &str) -> Self {
-        match s {
-            "bytes" => CaptureKind::Bytes,
-            _ => CaptureKind::Frames,
-        }
-    }
-}
-
-/// Timestamped byte for raw serial data
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[cfg_attr(test, derive(ts_rs::TS))]
-pub struct TimestampedByte {
-    /// The byte value
-    pub byte: u8,
-    /// Timestamp in microseconds since epoch
-    pub timestamp_us: u64,
-    /// Bus/interface number (for multi-source sessions)
-    #[serde(default)]
-    pub bus: u8,
-}
-
-/// Metadata about a capture
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[cfg_attr(test, derive(ts_rs::TS))]
-pub struct CaptureMetadata {
-    /// Unique capture ID (e.g., "xk9m2p", "r7f3kw")
-    pub id: String,
-    /// Capture kind (frames or bytes)
-    pub kind: CaptureKind,
-    /// Display name (e.g., "GVRET 10:30am", "Serial dump")
-    pub name: String,
-    /// Number of items (frames or bytes depending on type)
-    pub count: usize,
-    /// Timestamp of first item (microseconds)
-    pub start_time_us: Option<u64>,
-    /// Timestamp of last item (microseconds)
-    pub end_time_us: Option<u64>,
-    /// When the capture was created (Unix timestamp in seconds)
-    pub created_at: u64,
-    /// Whether this capture is actively receiving data (is the streaming target)
-    #[serde(default)]
-    pub is_streaming: bool,
-    /// Session ID that owns this capture (None = orphaned, available for standalone use)
-    /// Captures with an owning session are only accessible through that session.
-    /// When a session is destroyed, the capture is orphaned (owning_session_id = None).
-    #[serde(default)]
-    pub owning_session_id: Option<String>,
-    /// Whether this capture survives app restart when 'clear captures on start' is enabled.
-    #[serde(default)]
-    pub persistent: bool,
-    /// Distinct bus numbers seen in this capture's data (sorted).
-    /// Enables bus mapping/wiring when a capture is used as a source.
-    #[serde(default)]
-    pub buses: Vec<u8>,
-}
+pub use wiretap_capture::{CaptureFrameInfo, CaptureKind, CaptureMetadata, TimestampedByte};
 
 // ============================================================================
 // Internal Types
@@ -276,7 +195,7 @@ fn create_capture_internal(
 
     let metadata = CaptureMetadata {
         id: id.clone(),
-        kind: kind.clone(),
+        kind,
         name: name.clone(),
         count: 0,
         start_time_us: None,
@@ -522,11 +441,7 @@ pub fn hydrate_from_db() {
         // Backfill buses from DB if not already populated
         let mut buses = meta.buses.clone();
         if buses.is_empty() {
-            let table = match meta.kind {
-                CaptureKind::Frames => "frames",
-                CaptureKind::Bytes => "bytes",
-            };
-            if let Ok(db_buses) = capture_db::get_distinct_buses(&meta.id, table) {
+            if let Ok(db_buses) = capture_db::get_distinct_buses(&meta.id, meta.kind) {
                 buses = db_buses;
             }
         }
@@ -633,7 +548,7 @@ pub fn orphan_captures_for_session(session_id: &str) -> Vec<OrphanedCaptureInfo>
                 orphaned.push(OrphanedCaptureInfo {
                     capture_id: cap.metadata.id.clone(),
                     name: cap.metadata.name.clone(),
-                    kind: cap.metadata.kind.clone(),
+                    kind: cap.metadata.kind,
                     count: cap.metadata.count,
                 });
                 metas.push(cap.metadata.clone());
@@ -862,7 +777,7 @@ pub fn copy_capture(source_capture_id: &str, new_name: String) -> Result<String,
 
         let metadata = CaptureMetadata {
             id: id.clone(),
-            kind: source_metadata.kind.clone(),
+            kind: source_metadata.kind,
             name: new_name.clone(),
             count: source_metadata.count,
             start_time_us: source_metadata.start_time_us,
@@ -1116,20 +1031,6 @@ pub fn get_capture_frames_tail(id: &str, limit: usize, selection: &FrameSelectio
     })
 }
 
-/// Frame info extracted from a capture
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(test, derive(ts_rs::TS))]
-pub struct CaptureFrameInfo {
-    /// Frame identity is (protocol, frame_id) — CAN 0x100 and Modbus register 256
-    /// are different frames that share a numeric id.
-    pub protocol: String,
-    pub frame_id: u32,
-    pub max_dlc: u16,
-    pub bus: u8,
-    pub is_extended: bool,
-    pub has_dlc_mismatch: bool,
-}
-
 /// Get unique frame IDs and their metadata from a capture.
 pub fn get_capture_frame_info(id: &str) -> Result<Vec<CaptureFrameInfo>, String> {
     if !is_frame_capture(id) {
@@ -1281,7 +1182,7 @@ pub fn take_frame_inventory(id: &str, everything: bool) -> Vec<CaptureFrameInfo>
 /// Get the kind of a specific capture.
 pub fn get_capture_kind(id: &str) -> Option<CaptureKind> {
     let registry = registry();
-    registry.captures.get(id).map(|b| b.metadata.kind.clone())
+    registry.captures.get(id).map(|b| b.metadata.kind)
 }
 
 

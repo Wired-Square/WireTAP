@@ -240,7 +240,13 @@ pub(crate) mod tests {
 
     static EXECUTED: Mutex<Vec<String>> = Mutex::new(Vec::new());
 
-    fn record(sql: &str) {
+    fn record(event: rusqlite::trace::TraceEvent<'_>) {
+        let rusqlite::trace::TraceEvent::Stmt(stmt, _) = event else {
+            return;
+        };
+        let Some(sql) = stmt.expanded_sql() else {
+            return;
+        };
         if sql.contains(SQL_CAPTURE) {
             EXECUTED.lock().unwrap().push(sql.split_whitespace().collect::<Vec<_>>().join(" "));
         }
@@ -264,8 +270,9 @@ pub(crate) mod tests {
                 capture::statements(SQL_CAPTURE, &with_default_limit(spec.clone())).iter().map(|s| s.inlined()).collect();
             assert_eq!(executed, outcome.sql, "{name}");
             assert_eq!(previewed, outcome.sql, "{name}");
-            let api = crate::apiclient::test_api(Protocol::Can);
-            let request = gateway::request(&api, &with_default_limit(spec), None, false).unwrap().text();
+            let request = gateway::text(
+                &gateway::request(Protocol::Can, &with_default_limit(spec), None, false).unwrap(),
+            );
             cases.push(json!({ "name": name, "capture": outcome.sql, "gateway": request.lines().collect::<Vec<_>>() }));
         }
         crate::capture_db::trace_statements(None);
@@ -378,7 +385,6 @@ pub(crate) mod tests {
             panic!()
         };
         assert_eq!(rows.iter().map(|r| (r.frame_id, r.count, r.first_us, r.last_us)).collect::<Vec<_>>(), [(0x300, 3, 1000, 3000)]);
-        assert_eq!(capture::frame_inventory("d5-first-last", None, Some(2000)).unwrap()[0].count, 2);
         let truncated = |limit| run_capture("d5-first-last", QuerySpec::FrameInventory { window: RowWindow::default(), limit }).unwrap().truncated;
         assert!(truncated(Some(1)), "an inventory that reaches its limit may have been cut");
         assert!(!truncated(Some(2)));

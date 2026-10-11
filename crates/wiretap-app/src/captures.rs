@@ -7,8 +7,8 @@
 // `list_captures`, `capture_id`) are preserved in Stage 1 of the Buffer →
 // Capture rename — they are the IPC contract and change atomically in Stage 2.
 //
-// Schema changes to buffers.db MUST be recorded migrations — see
-// docs/capture-db-migrations.md. Never issue ad-hoc DDL from this file.
+// Schema changes to buffers.db MUST be recorded migrations in wiretap-capture —
+// see that crate's README. Never issue ad-hoc DDL from this file.
 
 use tauri::{AppHandle, Emitter};
 

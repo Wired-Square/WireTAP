@@ -316,13 +316,12 @@ pub async fn rank_hypotheses(
     request: RankRequest,
 ) -> Result<RankedHypotheses, String> {
     use wiretap_analysis::source::{byte_profile, PayloadSource};
-    use crate::payload_source::Capture;
 
     let capture_id = crate::capture_store::get_session_frame_capture_id(&session_id)
         .ok_or_else(|| format!("session '{session_id}' has no frame capture"))?;
     let mask = crate::ws::dispatch::attached_catalog(&session_id)
         .and_then(|c| wiretap_catalog::decode::frame_id_mask(&c));
-    let src = Capture(&capture_id);
+    let src = crate::payload_source::AppSource::Capture(&capture_id);
     let inventory = src.inventory(None, None).await?;
     let mut per_frame = Vec::new();
     for &id in &request.frame_ids {

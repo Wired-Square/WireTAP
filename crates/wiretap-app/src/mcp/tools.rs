@@ -26,7 +26,8 @@ use wslib_ai_mcp::server::{ServerIdentity, ToolListCache};
 
 use super::types::*;
 use super::McpRunningConfig;
-use crate::payload_source::{resolve, Capture};
+use crate::capture_db::{self, source_error};
+use crate::payload_source::resolve;
 use crate::settings::SettingsSource;
 use wiretap_gateway::{QuerySpec, RowWindow};
 
@@ -717,9 +718,13 @@ impl WireTapTools {
         let capture_id = session_frame_capture(&p.session_id)?;
         let groups = frame_key_groups(p.frame_ids).map_err(err)?;
         let max_frames = if groups.is_empty() { DISCOVERY_ANALYSIS_MAX_FRAMES } else { usize::MAX };
-        let changes = crate::byte_roles::payload_changes(&Capture(&capture_id), groups, Some(analysis_window(p.newest)), max_frames)
-            .await
-            .map_err(err)?;
+        let newest = Some(analysis_window(p.newest));
+        let changes = capture_db::analyse(&capture_id, async move |c| {
+            crate::byte_roles::payload_changes(c, groups, newest, max_frames).await
+        })
+        .await
+        .and_then(|r| r)
+        .map_err(err)?;
         ok_json(json!({
             "captureId": capture_id,
             "frameCount": changes.frames.len(),
@@ -741,9 +746,16 @@ impl WireTapTools {
         let max_frames = if groups.is_empty() { DISCOVERY_ANALYSIS_MAX_FRAMES } else { usize::MAX };
         let selection = FrameSelection::from_groups(groups.clone());
         let newest = Some(analysis_window(p.newest));
-        let source = Capture(&capture_id);
-        let changes = crate::byte_roles::payload_changes(&source, groups, newest, max_frames).await.map_err(err)?;
-        let orders = wiretap_analysis::source::message_order(&source, &selection, newest, None).await.map_err(err)?;
+        let (changes, orders) = capture_db::analyse(&capture_id, async move |c| {
+            let changes = crate::byte_roles::payload_changes(c, groups, newest, max_frames).await?;
+            let orders = wiretap_analysis::source::message_order(c, &selection, newest, None)
+                .await
+                .map_err(source_error)?;
+            Ok::<_, String>((changes, orders))
+        })
+        .await
+        .and_then(|r| r)
+        .map_err(err)?;
         Ok(ok_text(format!(
             "{}\n{}",
             crate::report::changes::report(&changes).render(Markdown),
@@ -763,9 +775,13 @@ impl WireTapTools {
             frame_id,
             is_extended: p.start_is_extended,
         });
-        let orders = wiretap_analysis::source::message_order(&Capture(&capture_id), &selection, Some(analysis_window(p.newest)), start.as_ref())
-            .await
-            .map_err(err)?;
+        let newest = Some(analysis_window(p.newest));
+        let orders = capture_db::analyse(&capture_id, async move |c| {
+            wiretap_analysis::source::message_order(c, &selection, newest, start.as_ref()).await
+        })
+        .await
+        .map_err(err)?
+        .map_err(|e| err(source_error(e)))?;
         ok_json(json!({ "captureId": capture_id, "protocols": orders }))
     }
 

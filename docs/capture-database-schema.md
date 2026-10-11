@@ -13,12 +13,12 @@ renamed in a future cleanup.
 launch (setting: *Clear captures on start*). Pinned (persistent) captures
 always survive restart. See [capture-flow.md § Persistence](capture-flow.md#7-persistence).
 
-**Schema migrations:** All schema changes are recorded, run-once migrations
+**Schema migrations:** The store is the `wiretap-capture` crate in
+`wslib-wiretap-rs`. All schema changes are recorded, run-once migrations
 gated by `PRAGMA user_version` and audited in the `schema_migrations` table —
-see [capture-db-migrations.md](capture-db-migrations.md) for the rules and
-how to add one. The v1 baseline (`baseline_capture_schema` in
-[crates/wiretap-app/src/capture_db.rs](../crates/wiretap-app/src/capture_db.rs)) normalises
-unstamped pre-versioning databases, including the legacy `buffer_*` rename.
+that crate's README has the rules and how to add one. Its v1 baseline
+(`baseline_capture_schema`) normalises unstamped pre-versioning databases,
+including the legacy `buffer_*` rename.
 
 **PRAGMAs:**
 
@@ -158,7 +158,8 @@ timeline. A WireTAP Backend profile's events live on the gateway instead
 
 | Module | File | Role |
 |--------|------|------|
-| `capture_db` | `crates/wiretap-app/src/capture_db.rs` | All SQLite operations. Owns the `Mutex<Connection>`. |
+| `wiretap_capture` | `wslib-wiretap-rs`: `crates/wiretap-capture` | All SQLite operations: schema, reads, writes, events. |
+| `capture_db` | `crates/wiretap-app/src/capture_db.rs` | Owns the `Mutex<Connection>` and lends it to `wiretap_capture`. |
 | `capture_store` | `crates/wiretap-app/src/capture_store.rs` | Public API. Metadata in RAM (`RwLock<CaptureRegistry>`), delegates data ops to `capture_db`. |
 | `CaptureSource` | `crates/wiretap-app/src/io/recorded/capture.rs` | Playback engine. Reads chunks from `capture_db` for streaming. |
 
