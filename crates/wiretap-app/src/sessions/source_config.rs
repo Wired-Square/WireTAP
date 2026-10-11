@@ -12,7 +12,7 @@ use crate::{
 use crate::io::device_kinds::{self, conn_i64, conn_str};
 use crate::io::traits::supported_protocols_for_kind;
 
-use super::tracking::get_cached_probe;
+use crate::io::probe::get_cached_probe;
 
 /// Session-level serial settings, as the picker sends them for one source.
 /// Adopt a session's serial overrides, then settle the two fields the broker

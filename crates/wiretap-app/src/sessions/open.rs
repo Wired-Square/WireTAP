@@ -10,7 +10,8 @@ use crate::io::device_kinds::{self, conn_f64, conn_i64, conn_str, req_str};
 use crate::io::{
     create_session, current_session_of_app, destroy_session_by, get_session_state, register_subscriber_from,
     session_exists, settle_session, start_session, BackendApiConfig, BackendApiSource, BackendApiSourceOptions, BusMapping,
-    CaptureSource, IOBroker, IOSource, MqttConfig, MqttSource, RegisterSubscriberResult, SerialOverrides,
+    CaptureSource, IOBroker, IOSource, IoErrorKind, IoFailure, MqttConfig, MqttSource, RegisterSubscriberResult,
+    SerialOverrides,
 };
 use crate::settings::{self, AppSettings, IOProfile};
 use crate::{capture_store, credentials, profile_tracker};
@@ -63,36 +64,17 @@ pub struct OpenedSession {
     pub bus_mappings: Option<HashMap<String, Vec<BusMapping>>>,
 }
 
-/// Why a session command was refused.
-#[derive(Debug, PartialEq, Serialize)]
-#[cfg_attr(test, derive(ts_rs::TS))]
-#[serde(tag = "kind", rename_all = "snake_case")]
-pub enum SessionRefusal {
-    /// No session under the id, and nothing to open one from.
-    NotFound { message: String },
-    Failed { message: String },
-}
-
 /// An operation's refusal on `session_id`, as not-found once the session is gone.
-pub(super) async fn refused_on<T>(session_id: &str, result: Result<T, String>) -> Result<T, SessionRefusal> {
+pub(super) async fn refused_on<T>(session_id: &str, result: Result<T, String>) -> Result<T, IoFailure> {
     match result {
         Ok(value) => Ok(value),
-        Err(message) if session_exists(session_id).await => Err(SessionRefusal::Failed { message }),
-        Err(message) => Err(SessionRefusal::NotFound { message }),
+        Err(message) if session_exists(session_id).await => Err(message.into()),
+        Err(message) => Err(not_found(message)),
     }
 }
 
-impl From<String> for SessionRefusal {
-    fn from(message: String) -> Self {
-        Self::Failed { message }
-    }
-}
-
-impl std::fmt::Display for SessionRefusal {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let (Self::NotFound { message } | Self::Failed { message }) = self;
-        f.write_str(message)
-    }
+fn not_found(message: impl Into<String>) -> IoFailure {
+    IoFailure::new(IoErrorKind::SessionNotFound, message)
 }
 
 /// Join the session under `session_id`, or create it from `opts` and start it,
@@ -106,31 +88,31 @@ pub async fn open_session(
     subscriber_id: String,
     app_name: Option<String>,
     opts: OpenSessionOptions,
-) -> Result<OpenedSession, SessionRefusal> {
+) -> Result<OpenedSession, IoFailure> {
     open_from(&app, session_id.as_deref(), &subscriber_id, app_name.as_deref(), opts).await
 }
 
 /// `open_session` without a webview. A subscriber is on one session at a time, so
 /// the one it leaves is torn down if this empties it.
 pub async fn open_from(
-    app: &tauri::AppHandle,
+    source: &dyn settings::SettingsSource,
     session_id: Option<&str>,
     subscriber_id: &str,
     app_name: Option<&str>,
     mut opts: OpenSessionOptions,
-) -> Result<OpenedSession, SessionRefusal> {
+) -> Result<OpenedSession, IoFailure> {
     let connect_only = opts.connect_only.unwrap_or(false);
     let replaces = opts.sources.is_some();
     let source_id = opts.source_id.clone();
     let named = (subscriber_id.to_string(), app_name.map(str::to_string));
     let create = |session_id: String| async move {
         match opts.sources.take() {
-            Some(sources) => create_from_sources(app, &session_id, sources, opts.modbus_polls.take(), named).await,
+            Some(sources) => create_from_sources(source, &session_id, sources, opts.modbus_polls.take(), named).await,
             None => {
-                let settings = settings::load_settings(app.clone()).await?;
+                let settings = source.load()?;
                 match source_of(&settings, &session_id, opts.source_id.take())? {
                     Source::Capture(capture_id) => create_from_capture(&session_id, capture_id, opts.speed, named).await,
-                    Source::Profile(profile) => create_from_profile(app, &settings, &session_id, profile, opts, named).await,
+                    Source::Profile(profile) => create_from_profile(source, &settings, &session_id, profile, opts, named).await,
                 }
             }
         }
@@ -138,10 +120,9 @@ pub async fn open_from(
     match (session_id, source_id) {
         (Some(id), _) => open_or_join(id, subscriber_id, app_name, connect_only, replaces, create(id.to_string())).await,
         (None, Some(source_id)) if !replaces => {
-            let settings = settings::load_settings(app.clone()).await?;
-            open_source(&source_id, &settings, subscriber_id, app_name, connect_only, create).await
+            open_source(&source_id, &source.load()?, subscriber_id, app_name, connect_only, create).await
         }
-        _ => Err(SessionRefusal::NotFound { message: "No session id, and no single source to open".into() }),
+        _ => Err(not_found("No session id, and no single source to open")),
     }
 }
 
@@ -153,14 +134,14 @@ fn source_open_lock(source_id: &str) -> Arc<tokio::sync::Mutex<()>> {
 }
 
 /// Open `source_id` under the session open on it alone, else under a new one.
-async fn open_source<F: Future<Output = Result<Created, SessionRefusal>>>(
+async fn open_source<F: Future<Output = Result<Created, IoFailure>>>(
     source_id: &str,
     settings: &AppSettings,
     subscriber_id: &str,
     app_name: Option<&str>,
     connect_only: bool,
     create: impl FnOnce(String) -> F,
-) -> Result<OpenedSession, SessionRefusal> {
+) -> Result<OpenedSession, IoFailure> {
     let lock = source_open_lock(source_id);
     let _opening = lock.lock().await;
     let session_id = session_for_source(source_id, settings).await;
@@ -179,8 +160,8 @@ pub(super) async fn open_or_join(
     app_name: Option<&str>,
     connect_only: bool,
     replaces: bool,
-    create: impl Future<Output = Result<Created, SessionRefusal>>,
-) -> Result<OpenedSession, SessionRefusal> {
+    create: impl Future<Output = Result<Created, IoFailure>>,
+) -> Result<OpenedSession, IoFailure> {
     let leaving = current_session_of_app(subscriber_id);
     settle_session(session_id).await;
     let created = if replaces || !session_exists(session_id).await {
@@ -208,18 +189,18 @@ enum Source {
     Profile(IOProfile),
 }
 
-fn source_of(settings: &AppSettings, session_id: &str, source_id: Option<String>) -> Result<Source, SessionRefusal> {
+fn source_of(settings: &AppSettings, session_id: &str, source_id: Option<String>) -> Result<Source, IoFailure> {
     let Some(source_id) = source_id else {
-        return Err(SessionRefusal::NotFound { message: format!("No session '{session_id}'") });
+        return Err(not_found(format!("No session '{session_id}'")));
     };
     if capture_store::is_known_capture(&source_id) {
         return Ok(Source::Capture(source_id));
     }
     match settings.io_profiles.iter().find(|p| p.id == source_id) {
         Some(profile) => Ok(Source::Profile(profile.clone())),
-        None => Err(SessionRefusal::NotFound {
-            message: format!("No session '{session_id}', and no profile or capture '{source_id}' to open it from"),
-        }),
+        None => Err(not_found(format!(
+            "No session '{session_id}', and no profile or capture '{source_id}' to open it from"
+        ))),
     }
 }
 
@@ -228,7 +209,7 @@ async fn create_from_capture(
     capture_id: String,
     speed: Option<f64>,
     (subscriber_id, app_name): (String, Option<String>),
-) -> Result<Created, SessionRefusal> {
+) -> Result<Created, IoFailure> {
     claim_session_profile(session_id, &capture_id).await;
     let reader = CaptureSource::new(session_id.to_string(), capture_id, speed.unwrap_or(1.0));
     crate::telemetry::emit_feature_usage("io_source_start", "capture");
@@ -237,26 +218,26 @@ async fn create_from_capture(
 }
 
 async fn create_from_profile(
-    app: &tauri::AppHandle,
+    source: &dyn settings::SettingsSource,
     settings: &AppSettings,
     session_id: &str,
     profile: IOProfile,
     opts: OpenSessionOptions,
     (subscriber_id, app_name): (String, Option<String>),
-) -> Result<Created, SessionRefusal> {
+) -> Result<Created, IoFailure> {
     // A same-id open racing this one is about to join, not contend.
     profile_tracker::can_use_profile(&profile.id, &profile.kind, Some(session_id))?;
     profile_tracker::can_use_adapter(&profile.id, &settings.io_profiles, &[], Some(session_id))?;
     crate::telemetry::emit_feature_usage("io_source_start", &profile.kind);
 
-    let reader = profile_reader(app, settings, session_id, &profile, opts)?;
+    let reader = profile_reader(source, settings, session_id, &profile, opts)?;
     claim_session_profile(session_id, &profile.id).await;
     let result = create_session(session_id.to_string(), reader, Some(subscriber_id), app_name, None, vec![]).await;
     Ok(Created { starts: result.is_new, bus_mappings: None })
 }
 
 fn profile_reader(
-    app: &tauri::AppHandle,
+    source: &dyn settings::SettingsSource,
     settings: &AppSettings,
     session_id: &str,
     profile: &IOProfile,
@@ -271,7 +252,7 @@ fn profile_reader(
             settings.modbus_max_register_errors,
         )?;
         return Ok(Box::new(IOBroker::single_source(
-            settings::saved_profiles(app),
+            source.saved_profiles(),
             session_id.to_string(),
             source_config,
         )?));
@@ -319,16 +300,16 @@ fn profile_reader(
 /// Merge `sources` into one session under `session_id`, replacing any session
 /// already there so the buses are the ones asked for now.
 async fn create_from_sources(
-    app: &tauri::AppHandle,
+    source: &dyn settings::SettingsSource,
     session_id: &str,
     sources: Vec<MultiSourceInput>,
     modbus_polls: Option<String>,
     (subscriber_id, app_name): (String, Option<String>),
-) -> Result<Created, SessionRefusal> {
+) -> Result<Created, IoFailure> {
     if sources.is_empty() {
         return Err("At least one source is required".to_string().into());
     }
-    let settings = settings::load_settings(app.clone()).await?;
+    let settings = source.load()?;
     let parsed_polls = parse_modbus_polls(modbus_polls.as_deref())?;
     let mut source_configs = resolve_source_configs(sources, &settings, 0)?;
     for config in &mut source_configs {
@@ -366,7 +347,7 @@ async fn create_from_sources(
     let display_names = source_configs.iter().map(|c| c.display_name.clone()).collect();
     let bus_mappings = source_configs.iter().map(|c| (c.profile_id.clone(), c.bus_mappings.clone())).collect();
     let stored_configs = source_configs.clone();
-    let reader = IOBroker::new(settings::saved_profiles(app), session_id.to_string(), source_configs)?;
+    let reader = IOBroker::new(source.saved_profiles(), session_id.to_string(), source_configs)?;
 
     register_session_profiles(session_id, &profile_ids);
     let mut seen = std::collections::HashSet::new();
@@ -395,7 +376,7 @@ mod tests {
     use crate::io::{destroy_session, IOState, SessionMode, SessionSourceKind, SourceConfig};
     use std::time::Duration;
 
-    fn create_test_source(session_id: &str) -> impl Future<Output = Result<Created, SessionRefusal>> + '_ {
+    fn create_test_source(session_id: &str) -> impl Future<Output = Result<Created, IoFailure>> + '_ {
         async move {
             let result =
                 create_session(session_id.into(), Box::new(TestSource::new(session_id)), None, None, None, vec![]).await;
@@ -403,11 +384,11 @@ mod tests {
         }
     }
 
-    async fn not_created() -> Result<Created, SessionRefusal> {
+    async fn not_created() -> Result<Created, IoFailure> {
         panic!("a join created a session")
     }
 
-    async fn open(session_id: &str, subscriber: &str) -> Result<OpenedSession, SessionRefusal> {
+    async fn open(session_id: &str, subscriber: &str) -> Result<OpenedSession, IoFailure> {
         open_or_join(session_id, subscriber, None, false, false, create_test_source(session_id)).await
     }
 
@@ -559,19 +540,19 @@ mod tests {
     #[test]
     fn an_id_that_names_neither_a_profile_nor_a_capture_is_not_found() {
         let refused = source_of(&AppSettings::default(), "f_nothing", Some("p-nothing".into())).err();
-        assert!(matches!(refused, Some(SessionRefusal::NotFound { .. })));
+        assert_eq!(refused.map(|r| r.kind), Some(IoErrorKind::SessionNotFound));
     }
 
     #[test]
     fn a_session_id_is_never_read_as_the_profile_to_open() {
         let settings = AppSettings { io_profiles: vec![slcan_at(500_000)], ..AppSettings::default() };
         let refused = source_of(&settings, "p-open-slcan", None).err();
-        assert!(matches!(refused, Some(SessionRefusal::NotFound { .. })));
+        assert_eq!(refused.map(|r| r.kind), Some(IoErrorKind::SessionNotFound));
     }
 
     #[test]
     fn a_refusal_reaches_typescript_tagged_by_kind() {
-        let refused = serde_json::to_value(SessionRefusal::NotFound { message: "gone".into() }).unwrap();
-        assert_eq!(refused, serde_json::json!({ "kind": "not_found", "message": "gone" }));
+        let refused = serde_json::to_value(not_found("gone")).unwrap();
+        assert_eq!(refused, serde_json::json!({ "kind": "sessionNotFound", "message": "gone" }));
     }
 }

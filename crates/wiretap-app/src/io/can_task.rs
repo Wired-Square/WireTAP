@@ -5,28 +5,25 @@
 
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{mpsc as std_mpsc, Arc, Weak};
 use std::time::{Duration, UNIX_EPOCH};
 
 use tokio::sync::mpsc;
+use tokio_util::sync::CancellationToken;
 use wiretap_io::can::{
-    BusState, CanError, CanEvent, CanFrame, CanOptions, CanRead, CanTask, CanWriter, Direction,
-    SendRefused,
+    BusState, CanError, CanEvent, CanFrame, CanOptions, CanRead, CanTask, CanWriter, DeviceInfo,
+    Direction, SendRefused,
 };
 use wiretap_protocol::dlc_to_len;
 
 use crate::io::bus_mapping::{apply_bus_mappings_batch, output_bus, BusMapping};
 use crate::io::bus_status::BusStatus;
 #[cfg(not(target_os = "ios"))]
-use crate::io::error::DevicePresence;
-use crate::io::error::IoError;
-#[cfg(not(target_os = "ios"))]
-use crate::io::serial::utils::{outage_message, PortLoss};
-use crate::io::types::{EndReason, SourceMessage, TransmitRequest};
+use crate::io::error::{outage, DevicePresence};
+use crate::io::error::IoFailure;
+use crate::io::types::{
+    next_request, transmit_channel, EndReason, SourceMessage, TransmitReceiver,
+};
 use crate::io::{CanTransmitFrame, FrameMessage};
-
-const STOP_POLL: Duration = Duration::from_millis(50);
 
 /// How often a serial-port adapter lost mid-session is looked for again.
 #[cfg(not(target_os = "ios"))]
@@ -145,12 +142,37 @@ pub(crate) fn mapped_bus_state(
     Some(SourceMessage::BusState(source_idx, status, state.tx_dropped))
 }
 
-pub(crate) fn open_failed(device: &str, error: CanError) -> String {
-    match error {
-        CanError::Open { source, .. } => {
-            IoError::connection(device, source.to_string()).to_string()
+/// The opened task, or `None` once the session has been told why it would not open.
+pub(crate) async fn open_or_report(
+    opening: impl Future<Output = Result<CanTask, CanError>>,
+    source_idx: usize,
+    tx: &mpsc::Sender<SourceMessage>,
+    failed: impl FnOnce(CanError) -> IoFailure,
+) -> Option<CanTask> {
+    match opening.await {
+        Ok(task) => Some(task),
+        Err(e) => {
+            let _ = tx.send(SourceMessage::Error(source_idx, failed(e))).await;
+            None
         }
-        other => format!("{device}: {other}"),
+    }
+}
+
+/// What the broker is told of `event`, or the loss that ends the source: reads
+/// on the session's buses, and a connect as `on_connect` announces it.
+pub(crate) fn announce_on_event(
+    source_idx: usize,
+    mappings: &[BusMapping],
+    event: CanEvent,
+    on_connect: impl FnOnce(DeviceInfo) -> Vec<SourceMessage>,
+) -> Result<Vec<SourceMessage>, CanError> {
+    match event {
+        CanEvent::Connected(info) => Ok(on_connect(info)),
+        CanEvent::Read(reads) => Ok(mapped_frames(source_idx, reads, mappings)
+            .into_iter()
+            .collect()),
+        CanEvent::Disconnected { error, .. } => Err(error),
+        _ => Ok(Vec::new()),
     }
 }
 
@@ -159,18 +181,7 @@ pub(crate) fn open_failed(device: &str, error: CanError) -> String {
 pub(crate) fn link_lost(source_idx: usize, device: &str, error: CanError) -> SourceMessage {
     match error {
         CanError::Closed => SourceMessage::Ended(source_idx, EndReason::Disconnected),
-        other => SourceMessage::Error(source_idx, format!("{device}: {other}")),
-    }
-}
-
-#[cfg(not(target_os = "ios"))]
-impl From<CanError> for PortLoss {
-    fn from(error: CanError) -> Self {
-        match error {
-            CanError::Closed => Self::Closed,
-            CanError::Read(e) => Self::Read(e),
-            other => Self::Other(other.to_string()),
-        }
+        other => SourceMessage::Error(source_idx, IoFailure::from_can(device, other)),
     }
 }
 
@@ -204,9 +215,9 @@ impl<'a> PortOutage<'a> {
             CanEvent::Disconnected { .. } if self.waiting => Ok(Vec::new()),
             CanEvent::Disconnected { error, .. } => {
                 self.waiting = true;
-                let message = outage_message(self.port, error.into(), presence);
-                tlog!("[can] Source {} {}", self.source_idx, message);
-                Ok(vec![SourceMessage::Interrupted(self.source_idx, message)])
+                let failure = outage(self.port, error.into(), presence);
+                tlog!("[can] Source {} {}", self.source_idx, failure);
+                Ok(vec![SourceMessage::Interrupted(self.source_idx, failure)])
             }
             CanEvent::Connected(_) => {
                 if std::mem::take(&mut self.waiting) {
@@ -224,26 +235,26 @@ impl<'a> PortOutage<'a> {
     }
 }
 
-/// Serve `task` to the session until `lost` words its loss, or `stop_flag`
-/// stops it. A listen-only source is offered no transmit.
+/// Serve `task` to the session until `lost` words its loss, or `stop` stops
+/// it. A listen-only source is offered no transmit.
 pub(crate) async fn serve(
     mut task: CanTask,
     source_idx: usize,
     listen_only: bool,
-    stop_flag: &AtomicBool,
+    stop: &CancellationToken,
     tx: &mpsc::Sender<SourceMessage>,
     mut on_event: impl FnMut(CanEvent) -> Result<Vec<SourceMessage>, CanError>,
     lost: impl FnOnce(CanError) -> SourceMessage,
 ) {
-    let reader_running = Arc::new(());
+    let reader_ended = CancellationToken::new();
+    let _on_return = reader_ended.clone().drop_guard();
     if !listen_only {
-        let (transmit_tx, transmit_rx) = std_mpsc::sync_channel::<TransmitRequest>(32);
-        forward_transmits(transmit_rx, task.writer(), Arc::downgrade(&reader_running));
+        let (transmit_tx, transmit_rx) = transmit_channel();
+        forward_transmits(transmit_rx, task.writer(), reader_ended);
         let _ = tx
             .send(SourceMessage::TransmitReady(source_idx, transmit_tx))
             .await;
     }
-    let mut poll = tokio::time::interval(STOP_POLL);
     let ended = loop {
         tokio::select! {
             event = task.next_event() => {
@@ -257,11 +268,9 @@ pub(crate) async fn serve(
                     Err(error) => break lost(error),
                 }
             }
-            _ = poll.tick() => {
-                if stop_flag.load(Ordering::SeqCst) {
-                    task.stop().await;
-                    break SourceMessage::Ended(source_idx, EndReason::Stopped);
-                }
+            () = stop.cancelled() => {
+                task.stop().await;
+                break SourceMessage::Ended(source_idx, EndReason::Stopped);
             }
         }
     };
@@ -288,28 +297,29 @@ impl FrameWriter for CanWriter {
     }
 }
 
-/// `TransmitSender` is a std channel, so its requests reach the async writer
-/// from a blocking thread, which ends once the reader has. A request is
-/// answered once the writer accepts or refuses it, not once the device has it.
+/// On a blocking thread, since `send_now` blocks its caller, a runtime worker,
+/// until the request is answered; it ends once the reader has, answering what
+/// was queued first. A request is answered once the writer accepts or refuses
+/// it, not once the device has it.
 fn forward_transmits(
-    requests: std_mpsc::Receiver<TransmitRequest>,
+    mut requests: TransmitReceiver,
     writer: impl FrameWriter,
-    reader: Weak<()>,
+    reader_ended: CancellationToken,
 ) {
     let runtime = tokio::runtime::Handle::current();
-    tokio::task::spawn_blocking(move || loop {
-        match requests.recv_timeout(Duration::from_millis(50)) {
-            Ok(req) => {
+    tokio::task::spawn_blocking(move || {
+        runtime.block_on(async move {
+            while let Some(req) = next_request(&mut requests, &reader_ended).await {
                 let answer = match req.frame {
                     Some(frame) => {
                         let admitted = if req.wait_for_room {
-                            runtime.block_on(writer.send_when_ready(frame))
+                            writer.send_when_ready(frame).await
                         } else {
                             writer.submit(frame)
                         };
                         admitted
                             .map(|sent| {
-                                runtime.spawn(async move {
+                                tokio::spawn(async move {
                                     if let Err(e) = transmit_result(sent.await) {
                                         tlog!("[can] Transmit failed: {}", e);
                                     }
@@ -324,9 +334,7 @@ fn forward_transmits(
                 }
                 let _ = req.result_tx.send(answer);
             }
-            Err(std_mpsc::RecvTimeoutError::Timeout) if reader.strong_count() > 0 => {}
-            Err(_) => return,
-        }
+        })
     });
 }
 
@@ -350,6 +358,7 @@ pub(crate) fn reopen_failed(port: &str) -> CanEvent {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::io::IoErrorKind;
     use crate::io::types::{PendingTransmit, TransmitSender};
     use wiretap_io::can::Unsupported;
 
@@ -439,10 +448,14 @@ mod tests {
     }
 
     /// A source whose device queue holds one frame, behind the session's channel.
-    fn narrow_source(reader: &Arc<()>) -> (TransmitSender, mpsc::Receiver<CanFrame>) {
+    fn narrow_source() -> (TransmitSender, mpsc::Receiver<CanFrame>) {
         let (device_tx, device_rx) = mpsc::channel(1);
-        let (transmit_tx, transmit_rx) = std_mpsc::sync_channel(32);
-        forward_transmits(transmit_rx, NarrowQueue(device_tx), Arc::downgrade(reader));
+        let (transmit_tx, transmit_rx) = transmit_channel();
+        forward_transmits(
+            transmit_rx,
+            NarrowQueue(device_tx),
+            CancellationToken::new(),
+        );
         (transmit_tx, device_rx)
     }
 
@@ -456,8 +469,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn a_replay_waits_for_room_instead_of_dropping_frames() {
-        let reader = Arc::new(());
-        let (transmit, mut device) = narrow_source(&reader);
+        let (transmit, mut device) = narrow_source();
         let bus = tokio::spawn(async move {
             let mut ids = Vec::new();
             while let Some(frame) = device.recv().await {
@@ -471,14 +483,13 @@ mod tests {
             let result = pending(&transmit, n).send_when_ready().await.unwrap();
             assert!(result.success, "frame {n}: {:?}", result.error);
         }
-        drop((transmit, reader));
+        drop(transmit);
         assert_eq!(bus.await.unwrap(), (0..50).collect::<Vec<_>>());
     }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn an_ordinary_transmit_is_refused_at_once_by_a_full_queue() {
-        let reader = Arc::new(());
-        let (transmit, _device) = narrow_source(&reader);
+        let (transmit, _device) = narrow_source();
         let send_now = |n| {
             let pending = pending(&transmit, n);
             tokio::task::spawn_blocking(move || pending.send_now())
@@ -517,7 +528,10 @@ mod tests {
         else {
             panic!("expected an error");
         };
-        assert_eq!(unresponsive, format!("{DEVICE}: device stopped answering"));
+        assert_eq!(
+            unresponsive,
+            IoFailure::new(IoErrorKind::DeviceDisconnected, format!("{DEVICE}: device stopped answering"))
+        );
         let SourceMessage::Error(3, read) = link_lost(
             3,
             DEVICE,
@@ -525,7 +539,7 @@ mod tests {
         ) else {
             panic!("expected an error");
         };
-        assert!(read.contains("connection reset"), "got: {read}");
+        assert_eq!(read, IoFailure::new(IoErrorKind::Read, format!("{DEVICE}: read failed: connection reset")));
     }
 
     #[cfg(not(target_os = "ios"))]
@@ -539,7 +553,7 @@ mod tests {
             |_| panic!("a loss is the outage's"),
         );
         match messages.unwrap().as_slice() {
-            [SourceMessage::Interrupted(3, message)] => message.clone(),
+            [SourceMessage::Interrupted(3, failure)] => failure.message.clone(),
             _ => panic!("expected one interruption"),
         }
     }
@@ -573,15 +587,16 @@ mod tests {
 
     #[test]
     fn a_port_that_will_not_open_names_the_device() {
-        let failed = open_failed(
+        let failed = IoFailure::from_can(
             DEVICE,
             CanError::Open {
                 device: PORT.into(),
                 source: std::io::Error::from(std::io::ErrorKind::NotFound),
             },
         );
+        assert_eq!(failed.kind, IoErrorKind::Connection);
         assert!(
-            failed.starts_with(&format!("[{DEVICE}] connection failed")),
+            failed.message.starts_with(&format!("[{DEVICE}] connection failed")),
             "got: {failed}"
         );
     }

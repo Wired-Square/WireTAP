@@ -5,12 +5,15 @@
 
 mod commands;
 mod ids;
+mod live;
 mod open;
+mod scan;
 mod source_config;
 mod tracking;
 pub use commands::*;
 pub use ids::*;
 pub use open::*;
+pub use scan::create_scan_session;
 pub use source_config::*;
 pub use tracking::*;
 

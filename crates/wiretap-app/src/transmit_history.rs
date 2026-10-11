@@ -4,19 +4,15 @@
 // Records every transmitted frame (CAN or serial) from repeat loops and
 // single-shot transmits so the frontend can display a scrollable, paginated
 // history without unbounded Zustand array growth.
-//
-// Pattern mirrors capture_db.rs: one global Mutex<Connection>.
 
-use once_cell::sync::Lazy;
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::sync::atomic::{AtomicI64, Ordering};
-use std::sync::Mutex;
 
-/// Global database connection, protected by a Mutex.
-/// rusqlite::Connection is !Sync, so we use Mutex (not RwLock).
-static DB: Lazy<Mutex<Option<Connection>>> = Lazy::new(|| Mutex::new(None));
+use crate::connection_slot::ConnectionSlot;
+
+static DB: ConnectionSlot = ConnectionSlot::new();
 
 const SCHEMA_SQL: &str = "
 CREATE TABLE IF NOT EXISTS transmit_history (
@@ -65,23 +61,12 @@ pub struct TransmitHistoryRow {
 
 /// Initialise the transmit history database. Must be called once at app startup.
 pub fn initialise(data_dir: &Path) -> Result<(), String> {
-    std::fs::create_dir_all(data_dir)
-        .map_err(|e| format!("Failed to create data dir: {}", e))?;
-
-    let db_path = data_dir.join("transmit_history.db");
-    let conn = Connection::open(&db_path)
-        .map_err(|e| format!("Failed to open transmit history database: {}", e))?;
-
-    conn.execute_batch(SCHEMA_SQL)
-        .map_err(|e| format!("Failed to create schema: {}", e))?;
-
-    conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;")
-        .map_err(|e| format!("Failed to set pragmas: {}", e))?;
-
-    let mut db = DB.lock().map_err(|_| "DB mutex poisoned".to_string())?;
-    *db = Some(conn);
-
-    Ok(())
+    DB.open(&data_dir.join("transmit_history.db"), "transmit history database", |conn| {
+        conn.execute_batch(SCHEMA_SQL)
+            .map_err(|e| format!("Failed to create schema: {}", e))?;
+        conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;")
+            .map_err(|e| format!("Failed to set pragmas: {}", e))
+    })
 }
 
 // ============================================================================
@@ -109,51 +94,46 @@ pub fn write_entry(
         .unwrap_or_default()
         .as_micros() as i64;
 
-    let db = match DB.lock() {
-        Ok(g) => g,
-        Err(_) => return 0,
-    };
-    let conn = match db.as_ref() {
-        Some(c) => c,
-        None => return 0,
-    };
+    with_db(0, |conn| {
+        let result = conn.execute(
+            "INSERT INTO transmit_history \
+             (session_id, timestamp_us, kind, frame_id, dlc, bytes, bus, is_extended, is_fd, success, error_msg) \
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+            params![
+                session_id,
+                timestamp_us,
+                kind,
+                frame_id,
+                dlc,
+                bytes,
+                bus,
+                is_extended as i64,
+                is_fd as i64,
+                success as i64,
+                error_msg,
+            ],
+        );
 
-    let result = conn.execute(
-        "INSERT INTO transmit_history \
-         (session_id, timestamp_us, kind, frame_id, dlc, bytes, bus, is_extended, is_fd, success, error_msg) \
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
-        params![
-            session_id,
-            timestamp_us,
-            kind,
-            frame_id,
-            dlc,
-            bytes,
-            bus,
-            is_extended as i64,
-            is_fd as i64,
-            success as i64,
-            error_msg,
-        ],
-    );
-
-    match result {
-        Ok(_) => conn.last_insert_rowid(),
-        Err(e) => {
-            tlog!("[transmit_history] INSERT failed: {}", e);
-            0
+        match result {
+            Ok(_) => conn.last_insert_rowid(),
+            Err(e) => {
+                tlog!("[transmit_history] INSERT failed: {}", e);
+                0
+            }
         }
-    }
+    })
+}
+
+#[cfg(test)]
+fn in_memory() -> Connection {
+    let conn = Connection::open_in_memory().unwrap();
+    conn.execute_batch(SCHEMA_SQL).unwrap();
+    conn
 }
 
 #[cfg(test)]
 pub(crate) fn use_in_memory_database() {
-    let mut db = DB.lock().unwrap();
-    if db.is_none() {
-        let conn = Connection::open_in_memory().unwrap();
-        conn.execute_batch(SCHEMA_SQL).unwrap();
-        *db = Some(conn);
-    }
+    DB.install_once(in_memory);
 }
 
 static REVISION: AtomicI64 = AtomicI64::new(0);
@@ -164,10 +144,7 @@ pub fn next_revision() -> i64 {
 }
 
 fn with_db<T>(fallback: T, read: impl FnOnce(&Connection) -> T) -> T {
-    match DB.lock() {
-        Ok(db) => db.as_ref().map_or(fallback, read),
-        Err(_) => fallback,
-    }
+    DB.with(|conn| Ok(read(conn))).unwrap_or(fallback)
 }
 
 fn clear_session(conn: &Connection, session_id: &str) {
@@ -253,32 +230,43 @@ fn session_offset_after(conn: &Connection, session_id: &str, timestamp_us: i64) 
 // Tauri Commands
 // ============================================================================
 
-#[tauri::command]
-pub fn transmit_history_query(session_id: String, offset: usize, limit: usize) -> Result<Vec<TransmitHistoryRow>, String> {
-    Ok(with_db(vec![], |conn| session_rows(conn, &session_id, offset, limit)))
+async fn with_db_off_runtime<T: Send + 'static>(
+    fallback: T,
+    read: impl FnOnce(&Connection) -> T + Send + 'static,
+) -> T {
+    crate::blocking::off_runtime(move || with_db(fallback, read)).await
 }
 
 #[tauri::command]
-pub fn transmit_history_count(session_id: String) -> Result<i64, String> {
-    Ok(with_db(0, |conn| session_count(conn, &session_id)))
+pub async fn transmit_history_query(session_id: String, offset: usize, limit: usize) -> Result<Vec<TransmitHistoryRow>, String> {
+    Ok(with_db_off_runtime(vec![], move |conn| session_rows(conn, &session_id, offset, limit)).await)
 }
 
 #[tauri::command]
-pub fn transmit_history_clear(session_id: String) -> Result<i64, String> {
-    with_db((), |conn| clear_session(conn, &session_id));
+pub async fn transmit_history_count(session_id: String) -> Result<i64, String> {
+    Ok(with_db_off_runtime(0, move |conn| session_count(conn, &session_id)).await)
+}
+
+#[tauri::command]
+pub async fn transmit_history_clear(session_id: String) -> Result<i64, String> {
+    Ok(crate::blocking::off_runtime(move || clear_and_announce(&session_id)).await)
+}
+
+fn clear_and_announce(session_id: &str) -> i64 {
+    with_db((), |conn| clear_session(conn, session_id));
     let revision = next_revision();
     crate::ws::dispatch::send_transmit_updated(revision);
-    Ok(revision)
+    revision
 }
 
 #[tauri::command]
-pub fn transmit_history_time_range(session_id: String) -> Result<Option<(i64, i64)>, String> {
-    Ok(with_db(None, |conn| session_time_range(conn, &session_id)))
+pub async fn transmit_history_time_range(session_id: String) -> Result<Option<(i64, i64)>, String> {
+    Ok(with_db_off_runtime(None, move |conn| session_time_range(conn, &session_id)).await)
 }
 
 #[tauri::command]
-pub fn transmit_history_find_offset(session_id: String, timestamp_us: i64) -> Result<i64, String> {
-    Ok(with_db(0, |conn| session_offset_after(conn, &session_id, timestamp_us)))
+pub async fn transmit_history_find_offset(session_id: String, timestamp_us: i64) -> Result<i64, String> {
+    Ok(with_db_off_runtime(0, move |conn| session_offset_after(conn, &session_id, timestamp_us)).await)
 }
 
 #[cfg(test)]
@@ -286,8 +274,7 @@ mod tests {
     use super::*;
 
     fn history_with(rows: &[(&str, i64)]) -> Connection {
-        let conn = Connection::open_in_memory().unwrap();
-        conn.execute_batch(SCHEMA_SQL).unwrap();
+        let conn = in_memory();
         for (session_id, timestamp_us) in rows {
             conn.execute(
                 "INSERT INTO transmit_history (session_id, timestamp_us, kind, bytes) VALUES (?1, ?2, 'can', x'00')",
@@ -312,14 +299,14 @@ mod tests {
 
     #[test]
     fn a_clear_then_a_write_never_repeats_a_history_signal() {
-        use_in_memory_database();
+        let _db = DB.lend_to_this_thread(in_memory());
         let write = |session_id| {
             write_entry(session_id, "can", Some(0x100), Some(1), &[1], 0, false, false, true, None);
             next_revision()
         };
         let signals = [
             write("signal_mine"),
-            transmit_history_clear("signal_mine".into()).unwrap(),
+            clear_and_announce("signal_mine"),
             write("signal_agent"),
         ];
         assert!(signals[0] < signals[1] && signals[1] < signals[2], "signals repeated: {signals:?}");

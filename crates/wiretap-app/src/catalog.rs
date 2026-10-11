@@ -112,8 +112,11 @@ pub async fn dispatch_catalog_command(
             crate::ws::dispatch::attach_catalog(&session_id, path, cat);
             // Decode frames already delivered before this attach (e.g. a capture replay
             // that started before the catalogue bound) so they don't show "No signals".
-            if let Some(subscriber) = params.get("subscriber").and_then(|v| v.as_str()) {
-                crate::ws::dispatch::redecode_delivered(&session_id, conn_id, subscriber);
+            if let Some(subscriber) = params.get("subscriber").and_then(|v| v.as_str()).map(str::to_string) {
+                crate::blocking::off_runtime(move || {
+                    crate::ws::dispatch::redecode_delivered(&session_id, conn_id, &subscriber)
+                })
+                .await;
             }
             Ok(serde_json::json!({ "attached": true, "frames": frame_count, "catalog": catalog }))
         }
@@ -471,11 +474,13 @@ fn resolve_decoder_dir(app: &AppHandle) -> Option<PathBuf> {
 /// Rebuild the catalogue cache from the current decoder directory, store it, and
 /// signal all WS clients (CatalogListChanged) to reconcile. Returns the fresh list.
 pub fn refresh_catalog_cache(app: &AppHandle) -> Vec<CatalogFile> {
-    let dir = match resolve_decoder_dir(app) {
-        Some(d) => d,
-        None => return Vec::new(),
+    let Some((dir, catalogs)) = crate::blocking::in_place(|| {
+        let dir = resolve_decoder_dir(app)?;
+        let catalogs = scan_catalogs(&dir, &sync_index(app));
+        Some((dir, catalogs))
+    }) else {
+        return Vec::new();
     };
-    let catalogs = scan_catalogs(&dir, &sync_index(app));
     {
         let cache = app.state::<CatalogCache>();
         let mut st = cache.state.lock().unwrap();
@@ -490,7 +495,7 @@ pub fn refresh_catalog_cache(app: &AppHandle) -> Vec<CatalogFile> {
 /// The provenance registry, snapshotted for the scan's join.
 ///
 /// `try_state` rather than `state`: this runs from `start_catalog_cache` inside the
-/// setup hook, and `lib.rs` registers some state on the builder and some inside that
+/// setup hook, and `run()` registers some state on the builder and some inside that
 /// hook. Builder state does land first today, but degrading to "nothing is tracked"
 /// costs nothing and does not make catalogue listing depend on that ordering.
 fn sync_index(app: &AppHandle) -> SyncIndex {
@@ -598,21 +603,24 @@ fn restart_watcher(_app: &AppHandle) -> Result<(), String> {
 /// one-off scan only if the cache was never built (shouldn't happen post-setup).
 #[tauri::command]
 pub async fn list_catalogs(app: AppHandle) -> Result<Vec<CatalogFile>, String> {
+    Ok(cached_catalogs(&app))
+}
+
+pub fn cached_catalogs(app: &AppHandle) -> Vec<CatalogFile> {
     {
         let cache = app.state::<CatalogCache>();
         let st = cache.state.lock().unwrap();
         if st.dir.is_some() {
-            return Ok(st.catalogs.clone());
+            return st.catalogs.clone();
         }
     }
-    Ok(refresh_catalog_cache(&app))
+    refresh_catalog_cache(app)
 }
 
 /// The catalogue a caller named, by filename, display name or bare filename
 /// without its `.toml`.
-pub async fn find_catalog(app: &AppHandle, name: &str) -> Result<CatalogFile, String> {
-    let catalogs = list_catalogs(app.clone()).await?;
-    catalog_named(&catalogs, name)
+pub fn find_catalog(catalogs: &[CatalogFile], name: &str) -> Result<CatalogFile, String> {
+    catalog_named(catalogs, name)
         .cloned()
         .ok_or_else(|| format!("Catalog '{name}' not found — use list_catalogs"))
 }

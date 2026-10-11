@@ -1,14 +1,18 @@
 // ui/crates/wiretap-app/src/io/recorded/base.rs
 //
-// Shared control state for recorded sources (Capture, the WireTAP backend).
-// These sources share identical pause/resume and speed control patterns.
+// Shared control state for recorded sources (Capture, the WireTAP backend):
+// pause/resume and speed control, and the pacing that plays their frames.
 
 use std::sync::{
     atomic::{AtomicBool, AtomicU64, Ordering},
     Arc,
 };
+use std::time::{Duration, Instant};
 
-use crate::io::IOState;
+use crate::io::{
+    signal_playback_position, store_playback_position, FrameMessage, IOState, PlaybackPosition,
+    SignalThrottle,
+};
 
 /// Shared control state for recorded source playback.
 /// Used by CaptureSource and BackendApiSource.
@@ -215,6 +219,203 @@ impl RecordedSourceState {
     #[allow(dead_code)] // Used by IOSource trait implementations
     pub fn session_id(&self) -> &str {
         &self.session_id
+    }
+}
+
+/// Stores `position` and signals it, as often as `throttle` allows.
+pub fn publish_position(
+    session_id: &str,
+    position: PlaybackPosition,
+    throttle: &mut SignalThrottle,
+) {
+    store_playback_position(session_id, position);
+    if throttle.should_signal("playback-position") {
+        signal_playback_position(session_id);
+    }
+}
+
+/// Stores `position` and signals it at once, as a seek does.
+pub fn publish_position_now(session_id: &str, position: PlaybackPosition) {
+    store_playback_position(session_id, position);
+    signal_playback_position(session_id);
+}
+
+/// Where a recorded source's paced frames go.
+pub trait Playout {
+    fn frames(&mut self, frames: Vec<FrameMessage>);
+    /// The playback reached `timestamp_us`, `emitted` frames in.
+    fn position(&mut self, timestamp_us: i64, emitted: i64);
+}
+
+/// Frames held per batch at unlimited speed, and the pause after each batch.
+pub struct Unlimited {
+    pub batch: usize,
+    pub yield_ms: u64,
+}
+
+/// Frames per batch while paced faster than one frame a millisecond.
+const HIGH_SPEED_BATCH_SIZE: usize = 50;
+/// A paced frame due sooner than this joins a batch rather than waiting.
+const MIN_DELAY_MS: f64 = 1.0;
+/// Most time (ms) a paced batch is held before it goes out.
+const PACING_INTERVAL_MS: u64 = 50;
+
+/// Plays frames at the session's speed against the wall clock, in either
+/// direction of the capture.
+pub struct Pacer {
+    unlimited: Unlimited,
+    pacing: bool,
+    speed: f64,
+    last_speed: f64,
+    playback_baseline_secs: f64,
+    wall_clock_baseline: Instant,
+    last_pacing_check: Instant,
+    pub last_frame_time_secs: Option<f64>,
+    pub batch: Vec<FrameMessage>,
+    pub emitted: i64,
+    pub waits: u64,
+    pub waited_ms: u64,
+}
+
+impl Pacer {
+    pub fn new(start_secs: f64, control: &PlaybackControl, unlimited: Unlimited) -> Self {
+        Self {
+            unlimited,
+            pacing: control.is_pacing_enabled(),
+            speed: control.read_speed(),
+            last_speed: control.read_speed(),
+            playback_baseline_secs: start_secs,
+            wall_clock_baseline: Instant::now(),
+            last_pacing_check: Instant::now(),
+            last_frame_time_secs: None,
+            batch: Vec::new(),
+            emitted: 0,
+            waits: 0,
+            waited_ms: 0,
+        }
+    }
+
+    /// Reads the speed, measuring from the last frame when it changed, and waits
+    /// out any lead the playback has built over the wall clock.
+    pub async fn keep_time(&mut self, control: &PlaybackControl) {
+        self.pacing = control.is_pacing_enabled();
+        self.speed = control.read_speed();
+        if !self.pacing {
+            return;
+        }
+        if (self.speed - self.last_speed).abs() > 0.001 {
+            self.rebaseline_at_last();
+            self.last_speed = self.speed;
+        }
+        if let Some(last_time) = self.last_frame_time_secs {
+            let (expected_ms, actual_ms) = self.schedule(last_time);
+            if expected_ms > actual_ms + 100 {
+                self.wait((expected_ms - actual_ms).min(500)).await;
+            }
+        }
+    }
+
+    /// Plays `frame`, handing it back when a pause came during its wait.
+    pub async fn play(
+        &mut self,
+        frame: FrameMessage,
+        control: &PlaybackControl,
+        out: &mut impl Playout,
+    ) -> Option<FrameMessage> {
+        let frame_time_secs = frame.timestamp_us as f64 / 1_000_000.0;
+        let playback_time_us = (frame_time_secs * 1_000_000.0) as i64;
+
+        if !self.pacing {
+            self.batch.push(frame);
+            self.emitted += 1;
+            self.last_frame_time_secs = Some(frame_time_secs);
+            if self.batch.len() >= self.unlimited.batch {
+                out.frames(std::mem::take(&mut self.batch));
+                out.position(playback_time_us, self.emitted);
+                tokio::time::sleep(Duration::from_millis(self.unlimited.yield_ms)).await;
+            }
+            return None;
+        }
+
+        let delay_ms = self.last_frame_time_secs.map_or(0.0, |last_time| {
+            (frame_time_secs - last_time).abs() * 1000.0 / self.speed
+        });
+        self.last_frame_time_secs = Some(frame_time_secs);
+
+        if delay_ms < MIN_DELAY_MS {
+            self.batch.push(frame);
+            self.emitted += 1;
+            let since_check_ms = self.last_pacing_check.elapsed().as_millis() as u64;
+            if self.batch.len() >= HIGH_SPEED_BATCH_SIZE || since_check_ms >= PACING_INTERVAL_MS {
+                let (expected_ms, actual_ms) = self.schedule(frame_time_secs);
+                if expected_ms > actual_ms {
+                    self.wait((expected_ms - actual_ms).min(1000)).await;
+                }
+                self.last_pacing_check = Instant::now();
+                out.frames(std::mem::take(&mut self.batch));
+                out.position(playback_time_us, self.emitted);
+                tokio::task::yield_now().await;
+            }
+            return None;
+        }
+
+        if !self.batch.is_empty() {
+            out.frames(std::mem::take(&mut self.batch));
+        }
+        let capped_delay_ms = delay_ms.min(10_000.0);
+        if capped_delay_ms >= 1.0 {
+            self.wait(capped_delay_ms as u64).await;
+        }
+        if control.is_paused() {
+            return Some(frame);
+        }
+        self.emitted += 1;
+        out.frames(vec![frame]);
+        out.position(playback_time_us, self.emitted);
+        None
+    }
+
+    /// Measures from `secs` with no frame played yet, as a seek lands.
+    pub fn restart_at(&mut self, secs: f64) {
+        self.playback_baseline_secs = secs;
+        self.wall_clock_baseline = Instant::now();
+        self.last_frame_time_secs = None;
+    }
+
+    /// Measures from the last frame played, as a change of direction does.
+    pub fn rebaseline_at_last(&mut self) {
+        if let Some(last_time) = self.last_frame_time_secs {
+            self.playback_baseline_secs = last_time;
+            self.wall_clock_baseline = Instant::now();
+        }
+    }
+
+    /// Measures from now, and from the last frame played, at today's speed.
+    pub fn resume(&mut self, control: &PlaybackControl) {
+        self.wall_clock_baseline = Instant::now();
+        if let Some(last_time) = self.last_frame_time_secs {
+            self.playback_baseline_secs = last_time;
+        }
+        self.last_speed = control.read_speed();
+    }
+
+    pub fn wall_elapsed(&self) -> Duration {
+        self.wall_clock_baseline.elapsed()
+    }
+
+    /// The wall time (ms) playback at `secs` is due at, and the wall time gone,
+    /// both since the baseline.
+    fn schedule(&self, secs: f64) -> (u64, u64) {
+        let playback_elapsed_secs = (secs - self.playback_baseline_secs).abs();
+        let expected_ms = (playback_elapsed_secs * 1000.0 / self.speed) as u64;
+        let actual_ms = self.wall_clock_baseline.elapsed().as_millis() as u64;
+        (expected_ms, actual_ms)
+    }
+
+    async fn wait(&mut self, ms: u64) {
+        self.waits += 1;
+        self.waited_ms += ms;
+        tokio::time::sleep(Duration::from_millis(ms)).await;
     }
 }
 

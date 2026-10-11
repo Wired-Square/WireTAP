@@ -22,7 +22,8 @@
 
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Mutex, MutexGuard};
 
 use serde::{Deserialize, Serialize};
 use sha1::{Digest, Sha1};
@@ -822,14 +823,17 @@ impl Registry {
     /// differ — push to one, edit, push to the other — so a per-entry loop would
     /// relink only the one that happens to match the disk and orphan its sibling.
     /// The group relinks as a unit, on any of its shas.
+    #[cfg(test)]
     pub fn reconcile(&mut self, decoder_dir: &Path) -> bool {
         let present = list_toml_filenames(decoder_dir);
-        let is_present = |name: &str| present.iter().any(|n| filename_eq(n, name));
+        let shas = blob_shas(decoder_dir, &self.unclaimed_when_missing(&present));
+        self.relink(&present, &shas)
+    }
 
-        // One grouping answers all three questions below: which filenames are missing,
-        // which are claimed (so not rename candidates), and what shas a group will
-        // accept. Keyed through `filename_key`, which owns the case fold — a second
-        // spelling of it here would drift the moment it learns anything.
+    /// One grouping answers which filenames are missing, which are claimed (so not
+    /// rename candidates), and what shas a group will accept. Keyed through `filename_key`, which owns the case fold — a second
+    /// spelling of it here would drift the moment it learns anything.
+    fn shas_by_filename_key(&self) -> HashMap<String, HashSet<&str>> {
         let mut by_key: HashMap<String, HashSet<&str>> = HashMap::new();
         for c in &self.catalogs {
             by_key
@@ -837,6 +841,28 @@ impl Registry {
                 .or_default()
                 .insert(c.synced_sha.as_str());
         }
+        by_key
+    }
+
+    /// The present files `relink` would match by content: none while every tracked
+    /// file is present, so hashing is lazy.
+    pub fn unclaimed_when_missing(&self, present: &[String]) -> Vec<String> {
+        let by_key = self.shas_by_filename_key();
+        if by_key.keys().all(|key| present.iter().any(|n| filename_eq(n, key))) {
+            return Vec::new();
+        }
+        present
+            .iter()
+            .filter(|name| !by_key.contains_key(&filename_key(name)))
+            .cloned()
+            .collect()
+    }
+
+    /// The second half of a reconcile: `present` lists the decoder directory and
+    /// `shas` hashes what `unclaimed_when_missing` named.
+    pub fn relink(&mut self, present: &[String], shas: &HashMap<String, String>) -> bool {
+        let is_present = |name: &str| present.iter().any(|n| filename_eq(n, name));
+        let by_key = self.shas_by_filename_key();
         let missing: Vec<(&String, &HashSet<&str>)> = by_key
             .iter()
             .filter(|(key, _)| !is_present(key))
@@ -845,13 +871,10 @@ impl Registry {
             return false;
         }
 
-        // Only now is hashing worth it.
         let unclaimed: Vec<(String, String)> = present
             .iter()
             .filter(|name| !by_key.contains_key(&filename_key(name)))
-            .filter_map(|name| {
-                git_blob_sha_of_file(&decoder_dir.join(name)).map(|sha| (name.clone(), sha))
-            })
+            .filter_map(|name| shas.get(name).map(|sha| (name.clone(), sha.clone())))
             .collect();
 
         // Resolve every group first, then apply — because the second ambiguity guard
@@ -967,20 +990,32 @@ fn list_toml_filenames(decoder_dir: &Path) -> Vec<String> {
         .collect()
 }
 
+fn blob_shas(decoder_dir: &Path, filenames: &[String]) -> HashMap<String, String> {
+    filenames
+        .iter()
+        .filter_map(|name| git_blob_sha_of_file(&decoder_dir.join(name)).map(|sha| (name.clone(), sha)))
+        .collect()
+}
+
 // ── Managed state ────────────────────────────────────────────────────────────
 
 /// Tauri-managed registry, mirroring the shape of `CatalogCache` in `catalog.rs`.
+/// The file is read and written outside `inner`, so a slow disk never holds up a reader.
 #[derive(Default)]
 pub struct CatalogSourceRegistry {
     inner: Mutex<Option<Registry>>,
+    edits: AtomicU64,
+    /// The newest edit on disk, held across the write so an older snapshot never
+    /// lands after a newer one.
+    written: Mutex<u64>,
 }
+
+type RegistryPath<'a> = &'a dyn Fn() -> Result<PathBuf, String>;
 
 impl CatalogSourceRegistry {
     /// Read the registry, loading from disk on first use.
     pub fn read<T>(&self, app: &AppHandle, f: impl FnOnce(&Registry) -> T) -> T {
-        let mut guard = self.inner.lock().unwrap_or_else(|e| e.into_inner());
-        let registry = guard.get_or_insert_with(|| load(app));
-        f(registry)
+        self.with_loaded(&|| registry_path(app), |r| f(r))
     }
 
     /// Mutate the registry and persist it unconditionally.
@@ -1013,26 +1048,61 @@ impl CatalogSourceRegistry {
         app: &AppHandle,
         f: impl FnOnce(&mut Registry) -> (T, bool),
     ) -> Result<T, String> {
-        let mut guard = self.inner.lock().unwrap_or_else(|e| e.into_inner());
-        let registry = guard.get_or_insert_with(|| load(app));
-        let (result, changed) = f(registry);
-        if changed {
-            save(app, registry)?;
-        }
-        Ok(result)
+        let (result, saved) = self.update(&|| registry_path(app), f);
+        saved.unwrap_or(Ok(())).map(|()| result)
+    }
+
+    /// A reconcile with the directory listed and hashed outside the lock.
+    pub fn reconcile(&self, app: &AppHandle, decoder_dir: &Path) -> bool {
+        let present = list_toml_filenames(decoder_dir);
+        let shas = blob_shas(decoder_dir, &self.read(app, |r| r.unclaimed_when_missing(&present)));
+        self.write_if(app, |r| r.relink(&present, &shas))
     }
 
     fn mutate<T>(&self, app: &AppHandle, f: impl FnOnce(&mut Registry) -> (T, bool)) -> (T, bool) {
-        let mut guard = self.inner.lock().unwrap_or_else(|e| e.into_inner());
-        let registry = guard.get_or_insert_with(|| load(app));
-        let (result, should_save) = f(registry);
-        if should_save {
-            if let Err(e) = save(app, registry) {
-                // Provenance is advisory; a failed write must not fail the command.
-                tlog!("[catalog_share] failed to persist registry: {}", e);
-            }
+        let (result, saved) = self.update(&|| registry_path(app), f);
+        if let Some(Err(e)) = &saved {
+            // Provenance is advisory; a failed write must not fail the command.
+            tlog!("[catalog_share] failed to persist registry: {}", e);
         }
-        (result, should_save)
+        (result, saved.is_some())
+    }
+
+    fn with_loaded<T>(&self, path: RegistryPath, f: impl FnOnce(&mut Registry) -> T) -> T {
+        if self.lock().is_none() {
+            let loaded = load(path);
+            self.lock().get_or_insert(loaded);
+        }
+        f(self.lock().get_or_insert_with(Registry::default))
+    }
+
+    /// Apply `f`, then write the registry if it reports a change. `None` when nothing was written.
+    fn update<T>(
+        &self,
+        path: RegistryPath,
+        f: impl FnOnce(&mut Registry) -> (T, bool),
+    ) -> (T, Option<Result<(), String>>) {
+        let (result, snapshot) = self.with_loaded(path, |r| {
+            let (result, changed) = f(r);
+            let edit = || self.edits.fetch_add(1, Ordering::Relaxed) + 1;
+            (result, changed.then(|| (edit(), serde_json::to_string_pretty(r))))
+        });
+        (result, snapshot.map(|(edit, json)| self.persist(path, edit, json)))
+    }
+
+    fn persist(&self, path: RegistryPath, edit: u64, json: serde_json::Result<String>) -> Result<(), String> {
+        let mut written = self.written.lock().unwrap_or_else(|e| e.into_inner());
+        if *written > edit {
+            return Ok(());
+        }
+        let json = json.map_err(|e| format!("Failed to serialise registry: {e}"))?;
+        crate::catalog::write_file_atomically(&path()?, json.as_bytes())?;
+        *written = edit;
+        Ok(())
+    }
+
+    fn lock(&self) -> MutexGuard<'_, Option<Registry>> {
+        self.inner.lock().unwrap_or_else(|e| e.into_inner())
     }
 }
 
@@ -1045,8 +1115,8 @@ fn registry_path(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(dir.join(REGISTRY_FILE))
 }
 
-fn load(app: &AppHandle) -> Registry {
-    let Ok(path) = registry_path(app) else {
+fn load(path: RegistryPath) -> Registry {
+    let Ok(path) = path() else {
         return Registry::default();
     };
     if !path.exists() {
@@ -1068,13 +1138,6 @@ fn load(app: &AppHandle) -> Registry {
             Registry::default()
         }
     }
-}
-
-fn save(app: &AppHandle, registry: &Registry) -> Result<(), String> {
-    let path = registry_path(app)?;
-    let json = serde_json::to_string_pretty(registry)
-        .map_err(|e| format!("Failed to serialise registry: {e}"))?;
-    crate::catalog::write_file_atomically(&path, json.as_bytes())
 }
 
 // ── Lifecycle hooks, called from catalog.rs ──────────────────────────────────
@@ -1932,6 +1995,34 @@ mod tests {
         );
 
         std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn a_change_is_written_for_the_next_load_and_no_change_writes_nothing() {
+        let file = temp_dir("registry-update").join(REGISTRY_FILE);
+        let path = || Ok(file.clone());
+        let state = CatalogSourceRegistry::default();
+
+        let (_, saved) = state.update(&path, |r| (r.upsert_catalog(entry("a.toml", "sha")), true));
+        assert_eq!(saved, Some(Ok(())));
+        assert_eq!(CatalogSourceRegistry::default().with_loaded(&path, |r| r.catalogs.len()), 1);
+
+        std::fs::remove_file(&file).unwrap();
+        assert_eq!(state.update(&path, |_| ((), false)).1, None);
+        assert!(!file.exists());
+        std::fs::remove_dir_all(file.parent().unwrap()).ok();
+    }
+
+    #[test]
+    fn an_older_snapshot_never_overwrites_a_newer_one() {
+        let file = temp_dir("registry-order").join(REGISTRY_FILE);
+        let path = || Ok(file.clone());
+        let state = CatalogSourceRegistry::default();
+
+        state.persist(&path, 2, Ok("newer".into())).unwrap();
+        state.persist(&path, 1, Ok("older".into())).unwrap();
+        assert_eq!(std::fs::read_to_string(&file).unwrap(), "newer");
+        std::fs::remove_dir_all(file.parent().unwrap()).ok();
     }
 
     #[test]

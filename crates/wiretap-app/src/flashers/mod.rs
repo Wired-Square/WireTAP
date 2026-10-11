@@ -192,10 +192,11 @@ pub(crate) fn clear_flash(flash_id: &str) {
     CANCEL_FLAGS.lock().unwrap().remove(flash_id);
 }
 
-fn request_cancel(flash_id: &str) {
+fn request_cancel(flash_id: &str) -> Result<(), String> {
     if let Some(flag) = CANCEL_FLAGS.lock().unwrap().get_mut(flash_id) {
         *flag = true;
     }
+    Ok(())
 }
 
 pub(crate) fn emit_progress(app: &AppHandle, progress: FlasherProgress) {
@@ -354,8 +355,7 @@ pub async fn flasher_esp_erase(
 
 #[tauri::command(rename_all = "snake_case")]
 pub fn flasher_esp_cancel(flash_id: String) -> Result<(), String> {
-    request_cancel(&flash_id);
-    Ok(())
+    request_cancel(&flash_id)
 }
 
 /// Final-status emitter used by every async ESP/DFU runner. The `flash` /
@@ -421,8 +421,7 @@ pub async fn flasher_dfu_flash(
 
 #[tauri::command(rename_all = "snake_case")]
 pub fn flasher_dfu_cancel(flash_id: String) -> Result<(), String> {
-    request_cancel(&flash_id);
-    Ok(())
+    request_cancel(&flash_id)
 }
 
 // ============================================================================
@@ -481,8 +480,7 @@ pub async fn flasher_stm32_erase(
 
 #[tauri::command(rename_all = "snake_case")]
 pub fn flasher_stm32_cancel(flash_id: String) -> Result<(), String> {
-    request_cancel(&flash_id);
-    Ok(())
+    request_cancel(&flash_id)
 }
 
 // ============================================================================
@@ -592,5 +590,21 @@ mod tests {
             ..Default::default()
         };
         assert!(opts.parse().unwrap_err().to_string().contains("spi"));
+    }
+
+    #[test]
+    fn every_driver_cancels_only_a_registered_flash() {
+        let cancels: [fn(String) -> Result<(), String>; 3] =
+            [flasher_esp_cancel, flasher_dfu_cancel, flasher_stm32_cancel];
+        for (i, cancel) in cancels.into_iter().enumerate() {
+            let id = format!("cancel_test_{i}");
+            register_flash(&id);
+            cancel(id.clone()).unwrap();
+            assert!(is_cancelled(&id));
+            clear_flash(&id);
+
+            cancel(id.clone()).unwrap();
+            assert!(!is_cancelled(&id), "an unknown id stays unknown");
+        }
     }
 }

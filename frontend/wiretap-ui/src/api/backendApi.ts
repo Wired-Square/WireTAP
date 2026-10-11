@@ -10,6 +10,9 @@ import type { ArchiveProtocol } from "../settings/appSettings";
 import type { AssignmentOutcome } from "../generated/AssignmentOutcome";
 import type { GatewayDaemon } from "../generated/GatewayDaemon";
 import type { CatalogueRef } from "../generated/CatalogueRef";
+import type { CaptureUploadProgress } from "../generated/CaptureUploadProgress";
+
+export type { CaptureUploadProgress };
 
 export interface ApiDatabase {
   name: string;
@@ -119,9 +122,3 @@ export async function gatewayCopyCatalogue(profileId: string, catalogue: Catalog
   return invoke<string>("gateway_copy_catalogue", { profileId, blobSha: catalogue.blobSha, name: catalogue.name });
 }
 
-export interface CaptureUploadProgress {
-  capture_id: string;
-  sent: number;
-  total: number;
-  done: boolean;
-}

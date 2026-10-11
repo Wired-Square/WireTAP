@@ -13,7 +13,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::io::error::IoError;
+use crate::io::error::{IoError, IoFailure};
 use framelink::protocol::capabilities::decode_capabilities;
 use framelink::protocol::types::{FLAG_ACK_REQ, MSG_CAPABILITIES_REQ};
 use framelink::session::FrameLinkSession;
@@ -246,10 +246,10 @@ pub(crate) async fn connect_by_address(
     host: &str,
     port: u16,
     timeout_sec: f64,
-) -> Result<String, String> {
+) -> Result<String, IoFailure> {
     let addr = crate::io::net::resolve_host_port(host, port)
         .await
-        .map_err(|e| e.user_message())?;
+        .map_err(IoError::for_user)?;
     connect_to_addr(addr, &format!("{host}:{port}"), timeout_sec).await
 }
 
@@ -259,7 +259,7 @@ pub(crate) async fn connect_to_addr(
     addr: SocketAddr,
     display_key: &str,
     timeout_sec: f64,
-) -> Result<String, String> {
+) -> Result<String, IoFailure> {
     // Per-key lock: only one connection attempt per address at a time
     let connecting = ConnectingGuard::acquire(format!("addr:{display_key}"));
     let _guard = connecting.lock.clone().lock_owned().await;
@@ -279,8 +279,8 @@ pub(crate) async fn connect_to_addr(
         FrameLinkSession::connect(addr),
     )
     .await
-    .map_err(|_| IoError::timeout(display_key, "connect").user_message())?
-    .map_err(|e| IoError::connection(display_key, e.to_string()).user_message())?;
+    .map_err(|_| IoError::timeout(display_key, "connect").for_user())?
+    .map_err(|e| IoError::connection(display_key, e.to_string()).for_user())?;
 
     let (iface_types, probe_cache, editable_board_def) =
         match fetch_capabilities(&session, display_key, timeout_sec).await {
@@ -297,7 +297,7 @@ pub(crate) async fn connect_to_addr(
                 drop(session);
                 return Err(diagnose_failed_connect(addr, display_key, e)
                     .await
-                    .user_message());
+                    .for_user());
             }
         };
 
@@ -544,7 +544,7 @@ async fn fetch_capabilities(
 pub(crate) async fn get_connection(
     device_id: &str,
     timeout_sec: f64,
-) -> Result<ConnectionLease, String> {
+) -> Result<ConnectionLease, IoFailure> {
     let pooled = {
         let pool = POOL.lock().await;
         match pool.get(device_id) {
@@ -573,11 +573,11 @@ pub(crate) async fn get_connection(
         .await
         .get(device_id)
         .map(|conn| ConnectionLease::take(conn.clone()))
-        .ok_or_else(|| format!("Connection to '{}' ({}) failed", device_id, addr))
+        .ok_or_else(|| format!("Connection to '{}' ({}) failed", device_id, addr).into())
 }
 
 /// Poll the shared Discovery until the device resolves, or the timeout passes.
-async fn discover_address(device_id: &str, timeout_sec: f64) -> Result<SocketAddr, String> {
+async fn discover_address(device_id: &str, timeout_sec: f64) -> Result<SocketAddr, IoFailure> {
     let discovery = crate::device_scan::discovery_handle().await?;
     let deadline = tokio::time::Instant::now() + Duration::from_secs_f64(timeout_sec);
     loop {
@@ -594,7 +594,7 @@ async fn discover_address(device_id: &str, timeout_sec: f64) -> Result<SocketAdd
             return Err(IoError::DeviceNotFound {
                 device: device_id.to_string(),
             }
-            .user_message());
+            .for_user());
         }
         tokio::time::sleep(Duration::from_millis(200)).await;
     }

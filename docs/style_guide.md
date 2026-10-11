@@ -1102,7 +1102,7 @@ A single `apps.json` + `registry.ts` entry feeds:
 | Watermark dashboard | [MainLayout.tsx](../frontend/wiretap-ui/src/components/MainLayout.tsx) iterates `menuApps` grouped by `menuGroupOrder` |
 | Logo menu (with dividers) | [LogoMenu.tsx](../frontend/wiretap-ui/src/components/LogoMenu.tsx) iterates `menuApps` grouped by `menuGroupOrder` |
 | Tab icon in the app's hue | [AppTab.tsx](../frontend/wiretap-ui/src/components/AppTab.tsx) draws `<AppIcon>` |
-| Native Tauri **Apps** menu | [lib.rs](../crates/wiretap-app/src/lib.rs) `build_apps_menu` reads `apps.json` via `include_str!`, inserts separators between groups |
+| Native Tauri **Apps** menu | [menu.rs](../crates/wiretap-app/src/menu.rs) `build_apps_menu` reads `apps.json` via `include_str!`, inserts separators between groups |
 | `cmdOrCtrl+<accel>` shortcut | Built from the JSON `accelerator` field |
 
 If a surface is missing your app, the cause is one of: missing `visualConfig`
@@ -1138,7 +1138,7 @@ adjacency so related tooling is visible at a glance.
 | [../frontend/wiretap-ui/src/i18n.ts](../frontend/wiretap-ui/src/i18n.ts) | i18next bootstrap |
 | [../frontend/wiretap-ui/src/components/MainLayout.tsx](../frontend/wiretap-ui/src/components/MainLayout.tsx) | Panel registry, dashboard watermark |
 | [../frontend/wiretap-ui/src/components/LogoMenu.tsx](../frontend/wiretap-ui/src/components/LogoMenu.tsx) | App launcher menu |
-| [../crates/wiretap-app/src/lib.rs](../crates/wiretap-app/src/lib.rs) | Native Tauri menu, panel-open events |
+| [../crates/wiretap-app/src/menu.rs](../crates/wiretap-app/src/menu.rs) | Native Tauri menu, panel-open events |
 
 ## What is not a primitive yet
 

@@ -122,6 +122,29 @@ pub fn default_bus_mappings(bus_count: u8) -> Vec<BusMapping> {
         .collect()
 }
 
+/// One mapping per bus the device has, in its order. The profile decides whether
+/// each streams and where it lands (a bus it never named streams, in its slot);
+/// `describe` gives the rest from what the device said of the bus.
+pub fn reconcile_with_device(
+    profile_mappings: &[BusMapping],
+    device_buses: impl IntoIterator<Item = u8>,
+    describe: impl Fn(u8, Option<&BusMapping>) -> BusMapping,
+) -> Vec<BusMapping> {
+    device_buses
+        .into_iter()
+        .enumerate()
+        .map(|(slot, device_bus)| {
+            let override_for = profile_mappings.iter().find(|m| m.device_bus == device_bus);
+            BusMapping {
+                device_bus,
+                enabled: override_for.is_none_or(|m| m.enabled),
+                output_bus: override_for.map_or(slot as u8, |m| m.output_bus),
+                ..describe(device_bus, override_for)
+            }
+        })
+        .collect()
+}
+
 /// What a GVRET bus may be set to, from the one per-kind table.
 pub(crate) fn gvret_protocols() -> Vec<Protocol> {
     crate::io::traits::supported_protocols_for_kind("gvret_tcp").to_vec()
@@ -155,4 +178,49 @@ pub fn apply_bus_mappings_batch(
         .into_iter()
         .filter_map(|mut frame| apply_bus_mapping(&mut frame, mappings).then_some(frame))
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn mapping(device_bus: u8, enabled: bool, output_bus: u8) -> BusMapping {
+        BusMapping {
+            device_bus,
+            enabled,
+            output_bus,
+            ..BusMapping::default()
+        }
+    }
+
+    fn reconcile(profile: &[BusMapping], device_buses: &[u8]) -> Vec<BusMapping> {
+        reconcile_with_device(profile, device_buses.iter().copied(), |_, _| {
+            BusMapping::default()
+        })
+    }
+
+    /// The case this exists for: the profile was never probed and carries one
+    /// bus 0, while the device in front of us has two.
+    #[test]
+    fn a_device_bus_the_profile_never_saw_still_streams_in_its_slot() {
+        let mappings = reconcile(&[mapping(0, true, 0)], &[0, 4]);
+        assert_eq!(mappings.len(), 2);
+        assert!(mappings.iter().all(|m| m.enabled));
+        assert_eq!((mappings[1].device_bus, mappings[1].output_bus), (4, 1));
+    }
+
+    #[test]
+    fn the_profile_still_decides_enabled_and_output_bus() {
+        let mappings = reconcile(&[mapping(0, false, 7), mapping(1, true, 9)], &[0, 1]);
+        assert!(!mappings[0].enabled, "a muted bus stays muted");
+        assert_eq!(mappings[0].output_bus, 7);
+        assert_eq!(mappings[1].output_bus, 9);
+    }
+
+    #[test]
+    fn a_bus_the_device_does_not_have_is_dropped() {
+        let mappings = reconcile(&[mapping(0, true, 0), mapping(3, true, 3)], &[0]);
+        assert_eq!(mappings.len(), 1);
+        assert_eq!(mappings[0].device_bus, 0);
+    }
 }

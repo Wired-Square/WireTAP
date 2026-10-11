@@ -1,4 +1,4 @@
-// The Rust halves are `session_error_leads_with_its_severity` and
+// The Rust halves are `session_error_leads_with_its_severity_and_kind` and
 // `subscribe_nack_names_its_session` in ws/protocol.rs; these are their bytes.
 
 import { describe, it, expect } from "vitest";
@@ -9,12 +9,12 @@ const utf8 = (s: string) => [...new TextEncoder().encode(s)];
 
 describe("SessionError wire format", () => {
   it("decodes Rust's golden payloads", () => {
-    expect(decodeSessionError(new Uint8Array([1, ...utf8("boom")]))).toEqual({ severity: "routine", message: "boom" });
-    expect(decodeSessionError(new Uint8Array([0]))).toEqual({ severity: "fault", message: "" });
+    expect(decodeSessionError(new Uint8Array([1, 11, ...utf8("boom")]))).toEqual({ severity: "routine", kind: "other", message: "boom" });
+    expect(decodeSessionError(new Uint8Array([0, 8]))).toEqual({ severity: "fault", kind: "deviceDisconnected", message: "" });
   });
 
-  it("reads an unknown severity as a fault", () => {
-    expect(decodeSessionError(new Uint8Array([9, ...utf8("x")])).severity).toBe("fault");
+  it("reads an unknown severity as a fault and an unknown kind as other", () => {
+    expect(decodeSessionError(new Uint8Array([9, 99, ...utf8("x")]))).toEqual({ severity: "fault", kind: "other", message: "x" });
   });
 
   // The regexes sessionStore matched before the severity byte, and the messages
@@ -28,7 +28,7 @@ describe("SessionError wire format", () => {
     ];
     for (const message of routine) {
       expect(retired.some((r) => r.test(message))).toBe(true);
-      expect(decodeSessionError(new Uint8Array([1, ...utf8(message)]))).toEqual({ severity: "routine", message });
+      expect(decodeSessionError(new Uint8Array([1, 11, ...utf8(message)]))).toEqual({ severity: "routine", kind: "other", message });
     }
     for (const fault of ["Modbus connection lost: refused", "Stopped polling holding @ 100 after 5 consecutive errors"]) {
       expect(retired.some((r) => r.test(fault))).toBe(false);

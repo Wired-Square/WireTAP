@@ -6,15 +6,17 @@
 // Requires the interface to be configured first:
 //   sudo ip link set can0 up type can bitrate 500000
 
-use std::sync::{atomic::AtomicBool, Arc};
-
 use tokio::sync::mpsc;
+use tokio_util::sync::CancellationToken;
 use wiretap_io::can::socketcan::{open as open_socketcan, SocketCanOptions};
 use wiretap_io::can::{CanError, CanEvent};
 
 use crate::io::bus_mapping::BusMapping;
-use crate::io::can_task::{can_options, link_lost, mapped_frames, open_failed, serve};
+use crate::io::can_task::{
+    announce_on_event, can_options, link_lost, open_or_report, serve,
+};
 use crate::io::types::SourceMessage;
+use crate::io::IoFailure;
 
 // ============================================================================
 // Interface Configuration
@@ -112,27 +114,20 @@ fn on_event(
     mappings: &[BusMapping],
     event: CanEvent,
 ) -> Result<Vec<SourceMessage>, CanError> {
-    match event {
-        CanEvent::Connected(info) => {
-            tlog!(
-                "[socketcan] Source {} connected to {} (fd: {})",
-                source_idx,
-                interface,
-                info.fd
-            );
-            Ok(vec![SourceMessage::Connected(
-                source_idx,
-                "socketcan".to_string(),
-                interface.to_string(),
-                None,
-            )])
-        }
-        CanEvent::Read(reads) => Ok(mapped_frames(source_idx, reads, mappings)
-            .into_iter()
-            .collect()),
-        CanEvent::Disconnected { error, .. } => Err(error),
-        _ => Ok(Vec::new()),
-    }
+    announce_on_event(source_idx, mappings, event, |info| {
+        tlog!(
+            "[socketcan] Source {} connected to {} (fd: {})",
+            source_idx,
+            interface,
+            info.fd
+        );
+        vec![SourceMessage::Connected(
+            source_idx,
+            "socketcan".to_string(),
+            interface.to_string(),
+            None,
+        )]
+    })
 }
 
 /// Run a SocketCAN source on the library's CAN task.
@@ -146,14 +141,14 @@ pub async fn run_source(
     enable_fd: bool,
     data_bitrate: Option<u32>,
     bus_mappings: Vec<BusMapping>,
-    stop_flag: Arc<AtomicBool>,
+    stop: CancellationToken,
     tx: mpsc::Sender<SourceMessage>,
 ) {
     let device = format!("socketcan({})", interface);
 
     if let Some(br) = bitrate {
         if let Err(e) = configure_interface(&interface, br, enable_fd, data_bitrate) {
-            let _ = tx.send(SourceMessage::Error(source_idx, e)).await;
+            let _ = tx.send(SourceMessage::Error(source_idx, e.into())).await;
             return;
         }
     }
@@ -164,21 +159,17 @@ pub async fn run_source(
         interface: interface.clone(),
         fd: true,
     };
-    let task = match open_socketcan(options, can_options(false, None)).await {
-        Ok(task) => task,
-        Err(e) => {
-            let _ = tx
-                .send(SourceMessage::Error(source_idx, open_failed(&device, e)))
-                .await;
-            return;
-        }
+    let opening = open_socketcan(options, can_options(false, None));
+    let Some(task) = open_or_report(opening, source_idx, &tx, |e| IoFailure::from_can(&device, e)).await
+    else {
+        return;
     };
 
     serve(
         task,
         source_idx,
         false,
-        &stop_flag,
+        &stop,
         &tx,
         |event| on_event(source_idx, &interface, &bus_mappings, event),
         |error| link_lost(source_idx, &device, error),
@@ -271,7 +262,7 @@ mod tests {
             link_lost(3, "socketcan(can0)", error)
         };
         let down = std::io::Error::from(std::io::ErrorKind::NetworkDown);
-        let SourceMessage::Error(3, message) = lost(CanError::Read(down)) else {
+        let SourceMessage::Error(3, IoFailure { message, .. }) = lost(CanError::Read(down)) else {
             panic!("expected an error");
         };
         assert!(message.starts_with("socketcan(can0): "), "got: {message}");

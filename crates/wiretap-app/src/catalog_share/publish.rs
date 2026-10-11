@@ -19,6 +19,7 @@
 //! again. There is deliberately **no rollback**: deleting a branch or fork on failure
 //! risks destroying someone's work.
 
+use std::future::Future;
 use std::path::PathBuf;
 use std::time::Duration;
 
@@ -28,7 +29,7 @@ use tauri::{AppHandle, Emitter, Manager};
 use super::error::{ShareError, ShareErrorKind};
 use super::github::{self, GitHubClient, NewRepo, RepoInfo};
 use crate::catalog::DiffKind;
-use super::registry::{CatalogEntry, CatalogSourceRegistry, ForkRef, PublishState};
+use super::registry::{CatalogEntry, CatalogSourceRegistry, ForkRef, GitIdentity, PublishState};
 use super::secrets::{self, SecretFinding};
 use super::{auth, git, url::CatalogSource};
 
@@ -290,15 +291,38 @@ pub(crate) struct ProgressEvent {
     detail: Option<String>,
 }
 
-fn emit(app: &AppHandle, request_id: &str, step: &'static str, detail: Option<String>) {
-    let _ = app.emit(
-        PROGRESS_EVENT,
-        ProgressEvent {
-            request_id: request_id.to_string(),
-            step,
-            detail,
-        },
-    );
+/// What a publish reads and writes outside the repository and GitHub.
+trait PublishHost {
+    fn identity(&self) -> Option<GitIdentity>;
+    fn remember_identity(&self, identity: GitIdentity);
+    fn known_fork(&self, repo_id: &str) -> Option<ForkRef>;
+    fn write_bumped_file(&self, filename: &str, expected_sha: &str, bumped: &str) -> bool;
+    fn persist_publish_state(&self, spec: Published<'_>);
+}
+
+impl PublishHost for AppHandle {
+    fn identity(&self) -> Option<GitIdentity> {
+        self.state::<CatalogSourceRegistry>()
+            .read(self, |r| r.identity.clone())
+    }
+
+    fn remember_identity(&self, identity: GitIdentity) {
+        self.state::<CatalogSourceRegistry>()
+            .write(self, |r| r.identity = Some(identity));
+    }
+
+    fn known_fork(&self, repo_id: &str) -> Option<ForkRef> {
+        self.state::<CatalogSourceRegistry>()
+            .read(self, |r| r.repo(repo_id).and_then(|e| e.fork.clone()))
+    }
+
+    fn write_bumped_file(&self, filename: &str, expected_sha: &str, bumped: &str) -> bool {
+        write_bumped_file(self, filename, expected_sha, bumped)
+    }
+
+    fn persist_publish_state(&self, spec: Published<'_>) {
+        persist_publish_state(self, spec)
+    }
 }
 
 // ── Backend ──────────────────────────────────────────────────────────────────
@@ -510,7 +534,34 @@ pub async fn publish_catalog(
     app: AppHandle,
     req: PublishRequest,
 ) -> Result<PublishResult, ShareError> {
-    emit(&app, &req.request_id, "validate", None);
+    publish(
+        &app,
+        &req,
+        resolve(&app, &req),
+        |event| {
+            let _ = app.emit(PROGRESS_EVENT, event);
+        },
+        git::progress_emitter(&app),
+    )
+    .await
+}
+
+/// `resolved` is awaited after the `validate` step is reported.
+async fn publish(
+    host: &impl PublishHost,
+    req: &PublishRequest,
+    resolved: impl Future<Output = Result<Resolved, ShareError>>,
+    progress: impl Fn(ProgressEvent),
+    git_progress: impl Fn(git::Progress) + Send + 'static,
+) -> Result<PublishResult, ShareError> {
+    let emit = |step, detail| {
+        progress(ProgressEvent {
+            request_id: req.request_id.clone(),
+            step,
+            detail,
+        })
+    };
+    emit("validate", None);
     // Resolved once, so the repository lookup, disk read and parse are not repeated.
     // The re-read is deliberate even though the dialog just ran a preflight: the file
     // could have changed since, and re-scanning is what stops an edited-in secret
@@ -523,7 +574,7 @@ pub async fn publish_catalog(
         source,
         client,
         upstream,
-    } = resolve(&app, &req).await?;
+    } = resolved.await?;
 
     if !plan.validation_errors.is_empty() {
         return Err(ShareError::invalid(format!(
@@ -538,25 +589,17 @@ pub async fn publish_catalog(
         )));
     }
 
-    emit(&app, &req.request_id, "auth", None);
-    let login = auth_login(&app, &client, &source.host).await?;
+    emit("auth", None);
+    let login = auth_login(host, &client, &source.host).await?;
     let repo_id = source.repo_id();
 
     // Without push access the commit has to land on the user's own fork. That is true
     // whether or not they want a pull request — pushing to a fork and stopping is a
     // legitimate "park this somewhere I control".
     let head = if plan.fork_needed {
-        emit(&app, &req.request_id, "fork", None);
-        let known_fork = app
-            .state::<CatalogSourceRegistry>()
-            .read(&app, |r| r.repo(&repo_id).and_then(|e| e.fork.clone()));
-        let head = ensure_fork(&client, &upstream, &login, known_fork).await?;
-        emit(
-            &app,
-            &req.request_id,
-            "fork",
-            Some(format!("{}/{}", head.owner, head.repo)),
-        );
+        emit("fork", None);
+        let head = ensure_fork(&client, &upstream, &login, host.known_fork(&repo_id)).await?;
+        emit("fork", Some(format!("{}/{}", head.owner, head.repo)));
         head
     } else {
         HeadRepo {
@@ -570,7 +613,7 @@ pub async fn publish_catalog(
     // reports work that did not happen. The default push has no branch step at all.
     let creating_branch = plan.branch != plan.base_branch;
     if creating_branch {
-        emit(&app, &req.request_id, "branch", Some(plan.branch.clone()));
+        emit("branch", Some(plan.branch.clone()));
     }
 
     let saved_sha = super::registry::git_blob_sha(content.as_bytes());
@@ -607,9 +650,9 @@ pub async fn publish_catalog(
         .flatten();
     let content = bump.as_ref().map_or(content, |b| b.text.clone());
 
-    emit(&app, &req.request_id, "commit", None);
+    emit("commit", None);
     let pushed = git::commit_and_push(
-        &app,
+        git_progress,
         &repo_id,
         &clone_dir,
         &git::PushSpec {
@@ -631,7 +674,7 @@ pub async fn publish_catalog(
     .await?;
 
     let (action, pull) = if req.open_pr {
-        emit(&app, &req.request_id, "pr", None);
+        emit("pr", None);
         let spec = github::PullSpec {
             head_owner: head.owner.clone(),
             branch: plan.branch.clone(),
@@ -683,32 +726,29 @@ pub async fn publish_catalog(
     let version_bump = bump.map(|bump| VersionBump {
         from: bump.from,
         to: bump.to,
-        written_locally: write_bumped_file(&app, &req.filename, &saved_sha, &bump.text),
+        written_locally: host.write_bumped_file(&req.filename, &saved_sha, &bump.text),
     });
 
     // The committed blob sha becomes synced_sha, which is what immediately makes the
     // local file read as in sync rather than locally ahead — and, when this push is
     // the first thing to link the file to this repository, records the subscription
     // that makes it read as anything but `localOnly` at all.
-    persist_publish_state(
-        &app,
-        Published {
-            filename: &req.filename,
-            source: &source,
-            upstream: &upstream,
-            target_path: &plan.target_path,
-            base_branch: &plan.base_branch,
-            branch: &plan.branch,
-            blob_sha: &pushed.blob_sha,
-            pull: pull.as_ref(),
-            fork: head.is_fork.then(|| ForkRef {
-                owner: head.owner.clone(),
-                repo: head.repo.clone(),
-            }),
-        },
-    );
+    host.persist_publish_state(Published {
+        filename: &req.filename,
+        source: &source,
+        upstream: &upstream,
+        target_path: &plan.target_path,
+        base_branch: &plan.base_branch,
+        branch: &plan.branch,
+        blob_sha: &pushed.blob_sha,
+        pull: pull.as_ref(),
+        fork: head.is_fork.then(|| ForkRef {
+            owner: head.owner.clone(),
+            repo: head.repo.clone(),
+        }),
+    });
 
-    emit(&app, &req.request_id, "done", None);
+    emit("done", None);
     Ok(PublishResult {
         action,
         pr_url: pull.as_ref().map(|p| p.url.clone()),
@@ -931,23 +971,17 @@ fn write_bumped_file(app: &AppHandle, filename: &str, expected_sha: &str, bumped
 }
 
 async fn auth_login(
-    app: &AppHandle,
+    state: &impl PublishHost,
     client: &GitHubClient,
     host: &str,
 ) -> Result<String, ShareError> {
     // Prefer the cached login; fall back to a round trip when it is absent or stale.
-    if let Some(login) = app
-        .state::<CatalogSourceRegistry>()
-        .read(app, |r| r.identity.clone())
-        .filter(|i| i.host == host)
-        .map(|i| i.login)
-    {
+    if let Some(login) = state.identity().filter(|i| i.host == host).map(|i| i.login) {
         return Ok(login);
     }
     let identity = client.get_authenticated_identity(host).await?;
     let login = identity.login.clone();
-    app.state::<CatalogSourceRegistry>()
-        .write(app, |r| r.identity = Some(identity));
+    state.remember_identity(identity);
     Ok(login)
 }
 
@@ -1230,5 +1264,146 @@ mod tests {
         let publish = entry.publish.expect("still recorded");
         assert_eq!(publish.branch.as_deref(), Some("catalog/sbrxxx"));
         assert!(publish.pr_number.is_none());
+    }
+
+    struct FakeHost {
+        persisted: std::cell::RefCell<Vec<String>>,
+    }
+
+    impl PublishHost for FakeHost {
+        fn identity(&self) -> Option<GitIdentity> {
+            Some(GitIdentity {
+                host: "github.com".to_string(),
+                login: "tester".to_string(),
+                scopes: Vec::new(),
+                validated_at: String::new(),
+            })
+        }
+        fn remember_identity(&self, _: GitIdentity) {
+            panic!("a cached login needs no lookup");
+        }
+        fn known_fork(&self, _: &str) -> Option<ForkRef> {
+            None
+        }
+        fn write_bumped_file(&self, _: &str, _: &str, _: &str) -> bool {
+            false
+        }
+        fn persist_publish_state(&self, spec: Published<'_>) {
+            self.persisted.borrow_mut().push(spec.blob_sha.to_string());
+        }
+    }
+
+    type Steps = Vec<(&'static str, Option<String>)>;
+
+    /// A direct-push publish into a seeded `file://` remote: no fork, no pull request,
+    /// so nothing reaches GitHub.
+    async fn publish_to_seeded_remote(
+        root_name: &str,
+        branch: &str,
+        validation_errors: Vec<String>,
+    ) -> (Result<PublishResult, ShareError>, Steps, Vec<String>) {
+        let root = std::env::temp_dir().join(root_name);
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).expect("root");
+        let clone_dir = root.join("clone");
+        git2::Repository::clone(&git::tests::seed_remote(&root), &clone_dir).expect("clone");
+
+        let req: PublishRequest = serde_json::from_str(
+            r#"{"filename":"x.toml","repoUrl":"https://github.com/owner/repo","commitMessage":"m","requestId":"r1"}"#,
+        )
+        .expect("request");
+        let content = "[meta]\nname = \"x\"\n".to_string();
+        let resolved = Resolved {
+            plan: PublishPlan {
+                upstream: "owner/repo".to_string(),
+                target_path: "catalogs/x.toml".to_string(),
+                branch: branch.to_string(),
+                base_branch: "main".to_string(),
+                suggested_branch: default_branch_name("x.toml"),
+                branches: Vec::new(),
+                base_blob_sha: None,
+                identical_to_base: false,
+                fork_needed: false,
+                target_is_public: true,
+                content_bytes: content.len(),
+                meta_version: 1,
+                validation_errors,
+                secret_findings: Vec::new(),
+                transmit_frame_count: 0,
+                existing_pr_url: None,
+            },
+            clone_dir,
+            token: None,
+            content,
+            source: source(),
+            client: GitHubClient::new(None),
+            upstream: upstream(),
+        };
+
+        let host = FakeHost {
+            persisted: Default::default(),
+        };
+        let steps = std::cell::RefCell::new(Vec::new());
+        let result = publish(
+            &host,
+            &req,
+            async { Ok(resolved) },
+            |e: ProgressEvent| {
+                assert_eq!(e.request_id, "r1");
+                steps.borrow_mut().push((e.step, e.detail));
+            },
+            |_| {},
+        )
+        .await;
+        let _ = std::fs::remove_dir_all(&root);
+        (result, steps.into_inner(), host.persisted.into_inner())
+    }
+
+    #[tokio::test]
+    async fn a_direct_push_reports_each_step_and_records_the_blob() {
+        let (result, steps, persisted) =
+            publish_to_seeded_remote("wiretap-publish-direct", "main", Vec::new()).await;
+        let result = result.expect("publish");
+
+        assert_eq!(
+            steps,
+            [
+                ("validate", None),
+                ("auth", None),
+                ("commit", None),
+                ("done", None)
+            ]
+        );
+        assert_eq!(result.action, PublishAction::Committed);
+        assert_eq!(persisted.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn a_named_branch_adds_the_branch_step() {
+        let (result, steps, _) =
+            publish_to_seeded_remote("wiretap-publish-branch", "catalog/x", Vec::new()).await;
+        result.expect("publish");
+
+        assert_eq!(
+            steps,
+            [
+                ("validate", None),
+                ("auth", None),
+                ("branch", Some("catalog/x".to_string())),
+                ("commit", None),
+                ("done", None),
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn an_invalid_catalogue_stops_after_validate() {
+        let (result, steps, persisted) =
+            publish_to_seeded_remote("wiretap-publish-invalid", "main", vec!["bad".to_string()])
+                .await;
+
+        assert_eq!(result.unwrap_err().kind, ShareErrorKind::Invalid);
+        assert_eq!(steps, [("validate", None)]);
+        assert!(persisted.is_empty());
     }
 }

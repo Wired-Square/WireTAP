@@ -42,6 +42,7 @@ export const MsgType = {
   CommandResponse: 0x21,
   FrameInventory: 0x22,
   QueryQueue: 0x23,
+  DecodedBacklogMore: 0x24,
   BridgeRequest: 0x30,
   BridgeResponse: 0x31,
   Heartbeat: 0xfe,
@@ -83,6 +84,8 @@ export const SESSION_STATES = ["stopped", "starting", "running", "paused", "erro
 export const STREAM_END_REASONS = ["complete", "disconnected", "error", "stopped", "paused"] as const;
 
 export const SESSION_ERROR_SEVERITIES = ["fault", "routine"] as const;
+
+export const SESSION_ERROR_KINDS = ["connection", "dnsResolution", "timeout", "protocol", "transmission", "configuration", "deviceNotFound", "deviceBusy", "deviceDisconnected", "read", "sessionNotFound", "other"] as const;
 
 export const SESSION_TRANSITIONS = ["suspended", "switched_to_capture", "resuming", "returned_to_live", "capabilities_changed"] as const;
 

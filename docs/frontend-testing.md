@@ -116,7 +116,7 @@ Two things do listen on loopback, and neither helps.
 | WS binary transport ([ws/server.rs](../crates/wiretap-app/src/ws/server.rs)) | `127.0.0.1:0` — ephemeral, new each run | 32-hex token, new each run | Socket opens; cannot authenticate |
 | MCP server ([mcp/mod.rs](../crates/wiretap-app/src/mcp/mod.rs)) | `127.0.0.1:8787` default, opt-in | Bearer token in Settings | Rejected — see below |
 
-The WS port is logged; the token deliberately is not (`lib.rs` discards it as
+The WS port is logged; the token deliberately is not (`boot.rs` discards it as
 `_token`). The frontend gets both from `invoke("get_ws_config")`, so the only
 route to the token is from inside the app — and the protocol is custom binary
 framing, so there would be nothing to browse with it.

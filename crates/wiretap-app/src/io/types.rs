@@ -5,6 +5,9 @@
 
 use std::sync::mpsc as std_mpsc;
 
+use tokio::sync::mpsc::{self, error::TrySendError};
+use tokio_util::sync::CancellationToken;
+
 use super::{FrameMessage, TransmitResult};
 
 // ============================================================================
@@ -63,11 +66,11 @@ pub enum SourceMessage {
     /// Source ended (source_index, reason)
     Ended(usize, EndReason),
     /// Source error (source_index, error)
-    Error(usize, String),
+    Error(usize, crate::io::IoFailure),
     /// The source lost its device and is waiting for it to return: reported
     /// like an error, but the source lives on and its next `Connected` resumes.
     #[cfg_attr(target_os = "ios", allow(dead_code))]
-    Interrupted(usize, String),
+    Interrupted(usize, crate::io::IoFailure),
     /// Transmit channel is ready (source_index, transmit_sender)
     TransmitReady(usize, TransmitSender),
     /// Control channel is ready (source_index, control_sender) — serial only,
@@ -108,11 +111,34 @@ pub struct TransmitRequest {
     pub wait_for_room: bool,
 }
 
-/// Sender type for transmit requests (sync-safe)
-pub type TransmitSender = std_mpsc::SyncSender<TransmitRequest>;
+pub type TransmitSender = mpsc::Sender<TransmitRequest>;
+pub type TransmitReceiver = mpsc::Receiver<TransmitRequest>;
 
-/// A full channel holds 32 frames, which take longer than this to drain at any bit rate.
-const ROOM_POLL: std::time::Duration = std::time::Duration::from_millis(1);
+/// A source's transmit channel, which holds 32 requests.
+pub fn transmit_channel() -> (TransmitSender, TransmitReceiver) {
+    mpsc::channel(32)
+}
+
+/// The next request, queued ones first, or `None` once the channel closes or
+/// `until` is cancelled.
+pub async fn next_request(
+    requests: &mut TransmitReceiver,
+    until: &CancellationToken,
+) -> Option<TransmitRequest> {
+    tokio::select! {
+        biased;
+        req = requests.recv() => req,
+        () = until.cancelled() => None,
+    }
+}
+
+/// Worded as the std channel this replaced, whose words the transmit history holds.
+pub(crate) fn channel_refusal<T>(e: &TrySendError<T>) -> &'static str {
+    match e {
+        TrySendError::Full(_) => "sending on a full channel",
+        TrySendError::Closed(_) => "sending on a closed channel",
+    }
+}
 
 /// A transmit routed and encoded for its source, not yet queued.
 pub struct PendingTransmit {
@@ -140,20 +166,16 @@ impl PendingTransmit {
     pub fn send_now(self) -> Result<TransmitResult, String> {
         let (tx, request, answer) = self.request(false);
         tx.try_send(request)
-            .map_err(|e| format!("Transmit buffer full ({})", e))?;
+            .map_err(|e| format!("Transmit buffer full ({})", channel_refusal(&e)))?;
         Ok(refused_or_queued(answer.and_then(|answer| answer.recv().ok())))
     }
 
     /// Waits for room in the channel and the device queue; dropped before it is
     /// queued, nothing is sent.
     pub async fn send_when_ready(self) -> Result<TransmitResult, String> {
-        let (tx, mut request, answer) = self.request(true);
-        while let Err(e) = tx.try_send(request) {
-            let std_mpsc::TrySendError::Full(unsent) = e else {
-                return Err(format!("Transmit buffer full ({})", e));
-            };
-            request = unsent;
-            tokio::time::sleep(ROOM_POLL).await;
+        let (tx, request, answer) = self.request(true);
+        if tx.send(request).await.is_err() {
+            return Err("Transmit buffer full (sending on a closed channel)".to_string());
         }
         let answer = match answer {
             Some(answer) => tokio::task::spawn_blocking(move || answer.recv().ok())
@@ -308,7 +330,7 @@ pub struct SetFramingRequest {
     pub modbus: Option<ModbusRtuOptions>,
 }
 
-/// Sender type for control requests (sync-safe), mirroring `TransmitSender`.
+/// Sender type for control requests (sync-safe).
 pub type ControlSender = std_mpsc::SyncSender<SetFramingRequest>;
 
 #[cfg(test)]

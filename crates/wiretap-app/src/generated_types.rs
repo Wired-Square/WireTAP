@@ -89,12 +89,12 @@ fn render() -> BTreeMap<PathBuf, String> {
     r.visit::<crate::io::modbus_tcp::scanner::ScanProgressPayload>();
     r.visit::<crate::io::post_session::SourceInfo>();
     r.visit::<crate::io::post_session::StreamEndedInfo>();
+    r.visit::<crate::io::probe::DeviceProbeResult>();
     r.visit::<crate::captures::BytesTailResponse>();
-    r.visit::<crate::sessions::DeviceProbeResult>();
     r.visit::<crate::sessions::MultiSourceInput>();
     r.visit::<crate::sessions::OpenSessionOptions>();
     r.visit::<crate::sessions::OpenedSession>();
-    r.visit::<crate::sessions::SessionRefusal>();
+    r.visit::<crate::io::IoFailure>();
     r.visit::<crate::sessions::ProfileUsageInfo>();
     r.visit::<crate::sessions::SessionPurpose>();
     r.visit::<crate::ws::decoded::DecodedSignalsEntry<'static>>();
@@ -109,6 +109,7 @@ fn render() -> BTreeMap<PathBuf, String> {
     r.visit::<crate::io::profiles::DeviceWriteError>();
     r.visit::<crate::io::traits::ProfileTraitsTable>();
     r.visit::<crate::captures::CandumpImportResult>();
+    r.visit::<crate::captures::CsvImportProgress>();
     r.visit::<crate::captures::CsvImportResult>();
     r.visit::<crate::captures::PaginatedBytesResponse>();
     r.visit::<crate::captures::PaginatedFramesResponse>();
@@ -148,6 +149,7 @@ fn render() -> BTreeMap<PathBuf, String> {
     r.visit::<crate::query::QueryQueue>();
     r.visit::<crate::query::QueryOutcome>();
     r.visit::<crate::query::QueryRequest>();
+    r.visit::<crate::apiclient::ImportProgress>();
     r.visit::<crate::gateway_admin::GatewayDaemon>();
     r.visit::<crate::gateway_admin::AssignmentOutcome>();
     r.visit::<crate::replay::ReplayEstimate>();
@@ -190,7 +192,7 @@ fn wire_constants() -> String {
         let rows: String = entries.into_iter().map(|(key, value)| format!("  {key}: 0x{value:0width$x},\n")).collect();
         format!("export const {name} = {{\n{rows}}} as const;\n")
     }
-    fn names(name: &str, table: &[&str]) -> String {
+    fn names(name: &str, table: &[impl std::fmt::Debug]) -> String {
         format!("export const {name} = {table:?} as const;\n")
     }
     [
@@ -206,6 +208,10 @@ fn wire_constants() -> String {
         names("SESSION_STATES", &SESSION_STATES),
         names("STREAM_END_REASONS", &STREAM_END_REASONS),
         names("SESSION_ERROR_SEVERITIES", &SESSION_ERROR_SEVERITIES),
+        names(
+            "SESSION_ERROR_KINDS",
+            &crate::io::IoErrorKind::ALL.map(|kind| serde_json::to_value(kind).unwrap().as_str().unwrap().to_owned()),
+        ),
         names("SESSION_TRANSITIONS", &SESSION_TRANSITIONS),
         names("SESSION_MODES", &SESSION_MODES),
         format!("export const SESSION_LOG_CAPACITY = {};\n", crate::io::session_log::SESSION_LOG_CAPACITY),

@@ -11,9 +11,9 @@
 //   RTR:      r<ID:3hex><DLC:1hex>\r / R<ID:8hex><DLC:1hex>\r
 
 use serde::{Deserialize, Serialize};
-use std::sync::{atomic::AtomicBool, Arc};
 
 use tokio::sync::mpsc;
+use tokio_util::sync::CancellationToken;
 use wiretap_io::can::slcan::{open as open_slcan, probe, SlcanOptions};
 use wiretap_io::can::{CanError, CanEvent, DeviceInfo};
 use wiretap_io::serial::LineSettings;
@@ -22,11 +22,12 @@ use wiretap_protocol::slcan::{bitrate_command, data_bitrate_command, DATA_BITRAT
 use crate::io::bus_mapping::BusMapping;
 use crate::io::device_kinds::{req_bool, req_i64};
 use crate::io::can_task::{
-    can_options, link_lost, mapped_frames, open_failed, serve, PortOutage, PORT_REOPEN,
-    PROBE_TIMEOUT,
+    announce_on_event, can_options, link_lost, open_or_report, serve, PortOutage,
+    PORT_REOPEN, PROBE_TIMEOUT,
 };
 use crate::io::serial::utils::probe_serial_presence;
 use crate::io::types::SourceMessage;
+use crate::io::IoFailure;
 use crate::settings::IOProfile;
 
 // ============================================================================
@@ -136,7 +137,7 @@ fn probe_result(device: &str, probed: Result<DeviceInfo, CanError>) -> SlcanProb
             supports_fd: None,
             error: Some(match e {
                 CanError::Handshake(_) => "No response from device".to_string(),
-                other => open_failed(device, other),
+                other => IoFailure::from_can(device, other).message,
             }),
         },
     }
@@ -153,28 +154,21 @@ fn on_event(
     mappings: &[BusMapping],
     event: CanEvent,
 ) -> Result<Vec<SourceMessage>, CanError> {
-    match event {
-        CanEvent::Connected(info) => {
-            tlog!(
-                "[slcan] Source {} connected to {} (firmware: {:?}, fd: {})",
-                source_idx,
-                port,
-                info.firmware,
-                info.fd
-            );
-            Ok(vec![SourceMessage::Connected(
-                source_idx,
-                "slcan".to_string(),
-                port.to_string(),
-                None,
-            )])
-        }
-        CanEvent::Read(reads) => Ok(mapped_frames(source_idx, reads, mappings)
-            .into_iter()
-            .collect()),
-        CanEvent::Disconnected { error, .. } => Err(error),
-        _ => Ok(Vec::new()),
-    }
+    announce_on_event(source_idx, mappings, event, |info| {
+        tlog!(
+            "[slcan] Source {} connected to {} (firmware: {:?}, fd: {})",
+            source_idx,
+            port,
+            info.firmware,
+            info.fd
+        );
+        vec![SourceMessage::Connected(
+            source_idx,
+            "slcan".to_string(),
+            port.to_string(),
+            None,
+        )]
+    })
 }
 
 /// The nominal and CAN FD data rates a profile asks for, refused when SLCAN has
@@ -208,7 +202,7 @@ pub async fn run_source(
     silent_mode: bool,
     data_bitrate: Option<u32>,
     bus_mappings: Vec<BusMapping>,
-    stop_flag: Arc<AtomicBool>,
+    stop: CancellationToken,
     tx: mpsc::Sender<SourceMessage>,
 ) {
     let device = format!("slcan({})", port);
@@ -218,14 +212,10 @@ pub async fn run_source(
         bitrate,
         data_bitrate,
     };
-    let task = match open_slcan(options, can_options(silent_mode, PORT_REOPEN)).await {
-        Ok(task) => task,
-        Err(e) => {
-            let _ = tx
-                .send(SourceMessage::Error(source_idx, open_failed(&device, e)))
-                .await;
-            return;
-        }
+    let opening = open_slcan(options, can_options(silent_mode, PORT_REOPEN));
+    let Some(task) = open_or_report(opening, source_idx, &tx, |e| IoFailure::from_can(&device, e)).await
+    else {
+        return;
     };
 
     let mut outage = PortOutage::new(source_idx, &port);
@@ -233,7 +223,7 @@ pub async fn run_source(
         task,
         source_idx,
         silent_mode,
-        &stop_flag,
+        &stop,
         &tx,
         |event| {
             outage.on_event(event, probe_serial_presence, |e| {
@@ -335,7 +325,7 @@ mod tests {
                 .expect("an outage never ends the source")
         };
         let unplugged = source(lost(CanError::Closed));
-        let [SourceMessage::Interrupted(3, message)] = unplugged.as_slice() else {
+        let [SourceMessage::Interrupted(3, IoFailure { message, .. })] = unplugged.as_slice() else {
             panic!("expected one interruption and no ending");
         };
         assert_eq!(
@@ -369,7 +359,7 @@ mod tests {
             false,
             None,
             vec![],
-            Arc::new(AtomicBool::new(false)),
+            CancellationToken::new(),
             tx,
         )
         .await;
@@ -378,7 +368,7 @@ mod tests {
 
     #[tokio::test]
     async fn a_port_that_will_not_open_is_named() {
-        let SourceMessage::Error(3, error) = first_message(500_000).await else {
+        let SourceMessage::Error(3, IoFailure { message: error, .. }) = first_message(500_000).await else {
             panic!("expected an error");
         };
         assert!(error.contains("/nonexistent/wiretap-slcan"), "got: {error}");
@@ -386,7 +376,7 @@ mod tests {
 
     #[tokio::test]
     async fn a_bitrate_slcan_cannot_name_says_which_ones_it_can() {
-        let SourceMessage::Error(3, error) = first_message(300_000).await else {
+        let SourceMessage::Error(3, IoFailure { message: error, .. }) = first_message(300_000).await else {
             panic!("expected an error");
         };
         assert!(

@@ -46,7 +46,7 @@ pub fn register(mut profile: IOProfile) -> Vec<IOProfile> {
     profile.ephemeral = true;
     // A replaced device may have different connection parameters under the same
     // id, which would otherwise be probed from cache and reported as the old one.
-    crate::sessions::clear_probe_cache(&profile.id);
+    crate::io::probe::clear_probe_cache(&profile.id);
     if let Ok(mut map) = EPHEMERAL.lock() {
         tlog!(
             "[ephemeral] Registered ad-hoc {} device '{}' ({})",
@@ -59,7 +59,7 @@ pub fn register(mut profile: IOProfile) -> Vec<IOProfile> {
 
 /// Discard an ad-hoc device. Returns the remaining list.
 pub fn unregister(profile_id: &str) -> Vec<IOProfile> {
-    crate::sessions::clear_probe_cache(profile_id);
+    crate::io::probe::clear_probe_cache(profile_id);
     if let Ok(mut map) = EPHEMERAL.lock() {
         if map.remove(profile_id).is_some() {
             tlog!("[ephemeral] Discarded ad-hoc device {}", profile_id);

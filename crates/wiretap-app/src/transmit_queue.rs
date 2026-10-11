@@ -4,11 +4,11 @@
 //! one queue, its repeats run here, and each change is pushed whole over WS.
 
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
+use tokio_util::sync::CancellationToken;
 
 use crate::io::periodic::Cadence;
 use crate::io::{CanTransmitFrame, SignalThrottle};
@@ -114,7 +114,7 @@ enum RepeatKey {
 
 /// A repeat that is sending, and the rows it sends as they were at its start.
 struct Running {
-    cancel: Arc<AtomicBool>,
+    cancel: Arc<CancellationToken>,
     rows: Vec<String>,
 }
 
@@ -232,13 +232,13 @@ impl Queue {
 
     fn stop(&mut self, key: &RepeatKey) {
         if let Some(running) = self.running.remove(key) {
-            running.cancel.store(true, Ordering::Relaxed);
+            running.cancel.cancel();
         }
     }
 
     fn stop_all(&mut self) {
         for (_, running) in self.running.drain() {
-            running.cancel.store(true, Ordering::Relaxed);
+            running.cancel.cancel();
         }
     }
 
@@ -262,7 +262,7 @@ impl Queue {
         let interval_ms = members.first().ok_or("Nothing to send")?.interval_ms;
         let sends = members.iter().map(|r| (r.session.session_id.clone(), r.payload.outgoing())).collect();
         self.stop(&key);
-        let cancel = Arc::new(AtomicBool::new(false));
+        let cancel = Arc::new(CancellationToken::new());
         tauri::async_runtime::spawn(repeat(key.clone(), sends, interval_ms, cancel.clone()));
         for row in self.rows.iter_mut().filter(|r| ids.contains(&r.id)) {
             row.last_error = None;
@@ -272,7 +272,7 @@ impl Queue {
     }
 
     /// A repeat that stopped by itself: its rows say why, unless a newer run has its key.
-    fn ended(&mut self, key: &RepeatKey, cancel: &Arc<AtomicBool>, reason: &str) -> Result<(), String> {
+    fn ended(&mut self, key: &RepeatKey, cancel: &Arc<CancellationToken>, reason: &str) -> Result<(), String> {
         if !self.running.get(key).is_some_and(|r| Arc::ptr_eq(&r.cancel, cancel)) {
             return Err("superseded".to_string());
         }
@@ -346,9 +346,9 @@ pub fn stop_group(group: &str) {
 }
 
 /// The queue's record of `session_id`: its first profile, by name.
-pub fn session_row(app: &tauri::AppHandle, session_id: &str) -> QueueRowSession {
+pub fn session_row(settings: &dyn crate::settings::SettingsSource, session_id: &str) -> QueueRowSession {
     let profile_id = crate::sessions::get_session_profile_ids(session_id).into_iter().next().unwrap_or_default();
-    let profile_name = crate::settings::profile_by_id(app, &profile_id).map_or_else(|_| profile_id.clone(), |p| p.name);
+    let profile_name = crate::settings::profile_by_id(settings, &profile_id).map_or_else(|_| profile_id.clone(), |p| p.name);
     QueueRowSession { session_id: session_id.to_string(), profile_id, profile_name }
 }
 
@@ -402,9 +402,9 @@ pub async fn add_and_start(row: NewQueueRow, origin: QueueOrigin) -> Result<Stri
 
 /// Sends every one of `sends` in order with no gap between them, then waits the
 /// interval, until cancelled or a send fails for good.
-async fn repeat(key: RepeatKey, sends: Vec<(String, Outgoing)>, interval_ms: u64, cancel: Arc<AtomicBool>) {
+async fn repeat(key: RepeatKey, sends: Vec<(String, Outgoing)>, interval_ms: u64, cancel: Arc<CancellationToken>) {
     let mut throttle = SignalThrottle::new();
-    let mut cadence = Cadence::new(interval_ms, cancel.clone());
+    let mut cadence = Cadence::new(interval_ms, CancellationToken::clone(&cancel));
     while cadence.next().await.is_some() {
         for (session_id, out) in &sends {
             let result = crate::transmit::send_and_record(session_id, out).await;
@@ -508,8 +508,8 @@ mod tests {
         }
     }
 
-    fn running(q: &mut Queue, key: RepeatKey, ids: &[&String]) -> Arc<AtomicBool> {
-        let cancel = Arc::new(AtomicBool::new(false));
+    fn running(q: &mut Queue, key: RepeatKey, ids: &[&String]) -> Arc<CancellationToken> {
+        let cancel = Arc::new(CancellationToken::new());
         q.running.insert(key, Running { cancel: cancel.clone(), rows: ids.iter().map(|id| id.to_string()).collect() });
         cancel
     }
@@ -584,9 +584,9 @@ mod tests {
         let group = running(&mut q, RepeatKey::Group("g".into()), &[&ids[0]]);
         let alone = running(&mut q, RepeatKey::Row(ids[1].clone()), &[&ids[1]]);
         q.remove(|r| r.id == ids[0]);
-        assert!(group.load(Ordering::Relaxed) && !alone.load(Ordering::Relaxed));
+        assert!(group.is_cancelled() && !alone.is_cancelled());
         q.stop_all();
-        assert!(alone.load(Ordering::Relaxed) && q.running.is_empty());
+        assert!(alone.is_cancelled() && q.running.is_empty());
     }
 
     // The tests below drive the process queue, so each uses rows and groups of its own.

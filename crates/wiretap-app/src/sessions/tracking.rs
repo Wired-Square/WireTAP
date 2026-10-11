@@ -2,35 +2,6 @@ use once_cell::sync::Lazy;
 use std::collections::{HashMap, HashSet};
 use std::sync::{Mutex, MutexGuard, PoisonError};
 
-use super::commands::DeviceProbeResult;
-
-/// Cache of successful probe results by profile_id.
-/// When a device is probed successfully, the result is cached so subsequent probes
-/// (e.g., when the device is already running) return instantly without reconnecting.
-static PROBE_CACHE: Lazy<Mutex<HashMap<String, DeviceProbeResult>>> =
-    Lazy::new(|| Mutex::new(HashMap::new()));
-
-/// Cache a successful probe result for a profile
-pub(super) fn cache_probe_result(profile_id: &str, result: &DeviceProbeResult) {
-    if result.success {
-        if let Ok(mut cache) = PROBE_CACHE.lock() {
-            cache.insert(profile_id.to_string(), result.clone());
-        }
-    }
-}
-
-/// Get a cached probe result for a profile
-pub(super) fn get_cached_probe(profile_id: &str) -> Option<DeviceProbeResult> {
-    PROBE_CACHE.lock().ok()?.get(profile_id).cloned()
-}
-
-/// Clear the cached probe result for a profile (called when device errors or disconnects)
-pub fn clear_probe_cache(profile_id: &str) {
-    if let Ok(mut cache) = PROBE_CACHE.lock() {
-        cache.remove(profile_id);
-    }
-}
-
 /// Which profiles each session holds, and the reverse. A single-handle device
 /// (slcan, serial, gs_usb) admits a second session only once its holder is released.
 #[derive(Default)]

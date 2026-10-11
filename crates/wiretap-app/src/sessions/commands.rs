@@ -3,42 +3,39 @@ use crate::{
     io::{
         self,
         create_session, destroy_session, get_session_capabilities, get_session_joiner_count, get_session_state,
-        get_session_subscribers, get_session_source_configs, list_sessions, pause_session,
+        get_session_subscribers, list_sessions, pause_session,
         reconfigure_session, reinitialize_session_if_safe, resume_session,
         resume_session_fresh, seek_session, seek_session_by_frame, set_subscriber_active, start_session, stop_session,
-        stop_and_switch_to_capture, suspend_session, switch_to_capture_replay, resume_to_live_session, transmit_frame, unregister_subscriber,
+        stop_and_switch_to_capture, suspend_session, switch_to_capture_replay, transmit_frame, unregister_subscriber,
         evict_session_subscriber, leave_session_to_capture, add_source_to_session, remove_source_from_session, update_source_bus_mappings, set_source_polling, get_session_next_output_bus,
-        update_session_direction, update_session_speed, update_session_time_range, ActiveSessionInfo, IOCapabilities, IOSource, IOState,
+        update_session_direction, update_session_speed, update_session_time_range, ActiveSessionInfo, IOCapabilities, IOState,
         SubscriberInfo, ReinitializeResult, CaptureSource, step_frame, StepResult,
         BusMapping, Protocol, TemporalMode,
-        GvretDeviceInfo, probe_gvret_tcp,
+        GvretDeviceInfo,
+        probe::DeviceProbeResult,
         ModbusRangeSpec, PollGroup,
-        IOBroker, SerialOverrides, SourceConfig,
-        CanTransmitFrame, TransmitResult,
-        session_log::{self, SessionLogEntry, SessionLogEvent, Subject},
+        CanTransmitFrame, IoFailure, TransmitResult,
+        session_log::{self, SessionLogEntry},
         set_wake_settings as io_set_wake_settings,
     },
     profile_tracker,
     settings,
 };
 #[cfg(not(target_os = "ios"))]
-use crate::io::device_kinds::{self, conn_f64, conn_i64, conn_str, req_str};
+use crate::io::device_kinds;
 use crate::io::traits::supported_protocols_for_kind;
-use crate::io::probe_gvret_usb;
-#[cfg(not(target_os = "ios"))]
-use crate::io::serial::utils::line_settings;
 use std::collections::HashMap;
 use std::sync::{atomic::AtomicBool, Arc};
 
-use super::open::{refused_on, SessionRefusal};
+use super::open::refused_on;
 use super::ids::{mint_session_id, sources_prefix, SessionPurpose, MODBUS_SCAN_SESSION_PREFIX};
 use super::source_config::{
-    allocate_inputs, create_source_config_from_profile, declared_bus_mappings, resolve_source_configs,
+    allocate_inputs, declared_bus_mappings, resolve_source_configs,
     MultiSourceInput,
 };
 use super::tracking::{
-    cache_probe_result, claim_session_profile, clear_probe_cache, get_cached_probe, get_session_profile_ids,
-    hold_profile_while, profiles_in_use, restore_session_profiles,
+    claim_session_profile,
+    hold_profile_while, profiles_in_use,
     unregister_session_profile,
 };
 
@@ -47,7 +44,7 @@ use super::tracking::{
 /// report the device it used to point at.
 #[tauri::command(rename_all = "snake_case")]
 pub fn clear_profile_probe_cache(profile_id: String) {
-    clear_probe_cache(&profile_id);
+    io::probe::clear_probe_cache(&profile_id);
 }
 
 /// Mint a session id. The prefix is cosmetic: nothing classifies a session by
@@ -127,20 +124,6 @@ pub fn clear_session_log() {
     session_log::clear();
 }
 
-fn log_probe(profile_id: &str, result: &DeviceProbeResult, cached: bool) {
-    session_log::append(
-        Subject { profile_ids: Some(vec![profile_id.to_string()]), ..Subject::default() },
-        SessionLogEvent::DeviceProbe {
-            source_type: result.source_type.clone(),
-            address: result.secondary_info.clone().unwrap_or_default(),
-            success: result.success,
-            cached,
-            bus_count: result.bus_count,
-            error: result.error.clone(),
-        },
-    );
-}
-
 /// List all active sessions (for discovering shareable sessions like multi-source)
 #[tauri::command(rename_all = "snake_case")]
 pub async fn list_active_sessions() -> Vec<ActiveSessionInfo> {
@@ -171,7 +154,7 @@ pub async fn start_reader_session(session_id: String) -> Result<IOState, String>
 /// Stop a reader session
 /// Returns the confirmed state after the operation.
 #[tauri::command(rename_all = "snake_case")]
-pub async fn stop_reader_session(session_id: String) -> Result<IOState, SessionRefusal> {
+pub async fn stop_reader_session(session_id: String) -> Result<IOState, IoFailure> {
     refused_on(&session_id, stop_session(&session_id).await).await
 }
 
@@ -317,13 +300,13 @@ pub async fn reconfigure_reader_session(
 
 /// Seek to a specific timestamp in microseconds
 #[tauri::command(rename_all = "snake_case")]
-pub async fn seek_reader_session(session_id: String, timestamp_us: i64) -> Result<(), SessionRefusal> {
+pub async fn seek_reader_session(session_id: String, timestamp_us: i64) -> Result<(), IoFailure> {
     refused_on(&session_id, seek_session(&session_id, timestamp_us).await).await
 }
 
 /// Seek to a specific frame index (preferred for capture playback - avoids floating-point issues)
 #[tauri::command(rename_all = "snake_case")]
-pub async fn seek_reader_session_by_frame(session_id: String, frame_index: i64) -> Result<(), SessionRefusal> {
+pub async fn seek_reader_session_by_frame(session_id: String, frame_index: i64) -> Result<(), IoFailure> {
     refused_on(&session_id, seek_session_by_frame(&session_id, frame_index).await).await
 }
 
@@ -379,84 +362,12 @@ pub async fn switch_session_to_capture_replay(
 }
 
 /// Resume a session from capture playback back to live streaming.
-/// Uses stored source configs to rebuild the reader (supports multi-source).
-/// Falls back to loading from settings for single-source sessions without stored configs.
-/// Re-registers device profiles with the tracker before reconnecting.
 #[tauri::command(rename_all = "snake_case")]
 pub async fn resume_session_to_live(
     app: tauri::AppHandle,
     session_id: String,
 ) -> Result<IOCapabilities, String> {
-    // Prefer stored source configs (set during session creation)
-    let stored_configs: Vec<SourceConfig> = get_session_source_configs(&session_id).await;
-
-    let configs = if !stored_configs.is_empty() {
-        stored_configs
-    } else {
-        // Fallback: load from settings (legacy single-source path)
-        let profile_ids = get_session_profile_ids(&session_id);
-        if profile_ids.is_empty() {
-            return Err(format!(
-                "No profile IDs or source configs found for session '{}'. Cannot resume to live.",
-                session_id
-            ));
-        }
-
-        let settings = settings::load_settings(app.clone())
-            .await
-            .map_err(|e| format!("Failed to load settings: {}", e))?;
-
-        let profile_id = &profile_ids[0];
-        let profile = settings
-            .io_profiles
-            .iter()
-            .find(|p| p.id == *profile_id)
-            .ok_or_else(|| format!("Profile '{}' not found in settings", profile_id))?;
-
-        if !device_kinds::is_multi_source(&profile.kind) {
-            return Err(format!(
-                "Cannot resume to live for '{}' device type.",
-                profile.kind
-            ));
-        }
-
-        // No session overrides on this path — the original ones went with the
-        // stored configs this branch is the fallback for, so the profile decides.
-        let source_config = create_source_config_from_profile(profile, None, SerialOverrides::default())
-            .ok_or_else(|| format!("Failed to create source config for profile '{}'", profile_id))?;
-
-        vec![source_config]
-    };
-
-    // Check profile availability before committing
-    let profiles = settings::load_settings(app.clone())
-        .await
-        .map_err(|e| format!("Failed to load settings: {}", e))?
-        .io_profiles;
-    for config in &configs {
-        crate::profile_tracker::can_use_profile(&config.profile_id, &config.profile_kind, None)?;
-        crate::profile_tracker::can_use_adapter(&config.profile_id, &profiles, &[], None)?;
-    }
-
-    let profile_ids: Vec<String> = configs.iter().map(|c| c.profile_id.clone()).collect();
-    restore_session_profiles(&session_id, &profile_ids);
-
-    // Build the new live reader
-    let new_reader: Box<dyn IOSource> = if configs.len() == 1 {
-        Box::new(IOBroker::single_source(
-            settings::saved_profiles(&app),
-            session_id.clone(),
-            configs.into_iter().next().unwrap(),
-        )?)
-    } else {
-        Box::new(IOBroker::new(
-            settings::saved_profiles(&app),
-            session_id.clone(),
-            configs,
-        )?)
-    };
-
-    resume_to_live_session(&session_id, new_reader).await
+    super::live::rebuild_live_reader(&session_id, settings::saved_profiles(&app)).await
 }
 
 /// Step one frame forward or backward in the capture.
@@ -698,64 +609,7 @@ pub async fn probe_gvret_device(
     app: tauri::AppHandle,
     profile_id: String,
 ) -> Result<GvretDeviceInfo, String> {
-    let settings = settings::load_settings(app.clone())
-        .await
-        .map_err(|e| format!("Failed to load settings: {}", e))?;
-
-    let profile = settings
-        .io_profiles
-        .iter()
-        .find(|p| p.id == profile_id)
-        .ok_or_else(|| format!("Profile '{}' not found", profile_id))?;
-
-    match profile.kind.as_str() {
-        "gvret_tcp" => {
-            let host = &conn_str(profile, "host").unwrap_or_default();
-            let port = conn_i64(profile, "port").unwrap_or_default() as u16;
-            let timeout_sec = conn_f64(profile, "timeout").unwrap_or_default();
-
-            probe_gvret_tcp(host, port, timeout_sec).await
-        }
-        #[cfg(not(target_os = "ios"))]
-        "gvret_usb" => {
-            probe_gvret_usb(&req_str(profile, "port")?, line_settings(profile)?).await
-        }
-        #[cfg(target_os = "ios")]
-        "gvret_usb" => {
-            Err("GVRET USB is not available on iOS".to_string())
-        }
-        _ => Err(format!(
-            "Profile '{}' is not a GVRET device (kind: {})",
-            profile_id, profile.kind
-        )),
-    }
-}
-
-// ============================================================================
-// Unified Device Probe API
-// ============================================================================
-
-/// Result of probing any real-time device.
-/// Provides a unified structure for all device types.
-#[derive(Clone, Debug, serde::Serialize)]
-#[cfg_attr(test, derive(ts_rs::TS))]
-pub struct DeviceProbeResult {
-    /// Whether the probe was successful (device is online and responding)
-    pub success: bool,
-    /// Device type (e.g., "gvret", "slcan", "gs_usb", "socketcan")
-    pub source_type: String,
-    /// Whether this is a multi-bus device (GVRET can have multiple CAN buses)
-    pub is_multi_bus: bool,
-    /// Number of buses available (1 for single-bus devices, 1-5 for GVRET)
-    pub bus_count: u8,
-    /// Primary info line (firmware version, device name, etc.)
-    pub primary_info: Option<String>,
-    /// Secondary info line (hardware version, channel count, etc.)
-    pub secondary_info: Option<String>,
-    /// Whether device supports CAN FD (gs_usb devices only, None for others)
-    pub supports_fd: Option<bool>,
-    /// Error message if probe failed
-    pub error: Option<String>,
+    io::probe::probe_gvret_device(&profile_id, load_settings(app)).await
 }
 
 /// Probe any real-time device to check if it's online and healthy.
@@ -766,427 +620,18 @@ pub struct DeviceProbeResult {
 /// If a successful probe result is cached for this profile, returns the cached
 /// result immediately without reconnecting. This is useful when the device is
 /// already running in an active session.
-///
-/// Supported device types:
-/// - gvret_tcp, gvret_usb: Multi-bus GVRET devices
-/// - slcan: Single-bus slcan/CANable devices
-/// - gs_usb: Single-bus gs_usb/candleLight devices (Windows/macOS)
-/// - socketcan: Single-bus SocketCAN interfaces (Linux)
-/// - serial: Raw serial ports (always "online" if port exists)
 #[tauri::command(rename_all = "snake_case")]
 pub async fn probe_device(
     app: tauri::AppHandle,
     profile_id: String,
 ) -> Result<DeviceProbeResult, String> {
-    #[cfg(not(target_os = "ios"))]
-    use crate::io::slcan::reader::probe_slcan;
+    io::probe::probe_device(&profile_id, load_settings(app)).await
+}
 
-    // Capture IDs — metadata already in memory, no profile lookup needed
-    if capture_store::is_known_capture(&profile_id) {
-        if let Some(meta) = capture_store::get_capture_metadata(&profile_id) {
-            let bus_count = if meta.buses.is_empty() { 1 } else { meta.buses.len() as u8 };
-            let is_multi_bus = meta.buses.len() > 1;
-            let result = DeviceProbeResult {
-                success: true,
-                source_type: "capture".to_string(),
-                is_multi_bus,
-                bus_count,
-                primary_info: Some(format!("{} buses", bus_count)),
-                secondary_info: Some(meta.id.clone()),
-                supports_fd: None,
-                error: None,
-            };
-            log_probe(&profile_id, &result, false);
-            // Don't cache capture probes — metadata may change as data streams in
-            return Ok(result);
-        } else {
-            return Err(format!("Capture '{}' not found", profile_id));
-        }
-    }
-
-    // Check cache first - if we have a successful probe result, return it immediately
-    if let Some(cached) = get_cached_probe(&profile_id) {
-        tlog!("[probe_device] Returning cached probe result for profile '{}'", profile_id);
-        log_probe(&profile_id, &cached, true);
-        return Ok(cached);
-    }
-
-    let settings = settings::load_settings(app.clone())
+async fn load_settings(app: tauri::AppHandle) -> Result<settings::AppSettings, String> {
+    settings::load_settings(app)
         .await
-        .map_err(|e| format!("Failed to load settings: {}", e))?;
-
-    let profile = settings
-        .io_profiles
-        .iter()
-        .find(|p| p.id == profile_id)
-        .ok_or_else(|| format!("Profile '{}' not found", profile_id))?;
-
-    let result = match profile.kind.as_str() {
-        // GVRET devices - multi-bus
-        "gvret_tcp" => {
-            let host = conn_str(profile, "host").unwrap_or_default();
-            let port = conn_i64(profile, "port").unwrap_or_default() as u16;
-            let timeout_sec = conn_f64(profile, "timeout").unwrap_or_default();
-
-            match probe_gvret_tcp(&host, port, timeout_sec).await {
-                Ok(info) => Ok(DeviceProbeResult {
-                    success: true,
-                    source_type: "gvret".to_string(),
-                    is_multi_bus: true,
-                    bus_count: info.bus_count,
-                    primary_info: Some(format!("{} buses available", info.bus_count)),
-                    secondary_info: Some(format!("{}:{}", host, port)),
-                    supports_fd: None,
-                    error: None,
-                }),
-                Err(e) => Ok(DeviceProbeResult {
-                    success: false,
-                    source_type: "gvret".to_string(),
-                    is_multi_bus: true,
-                    bus_count: 0,
-                    primary_info: None,
-                    secondary_info: None,
-                    supports_fd: None,
-                    error: Some(e),
-                }),
-            }
-        }
-
-        #[cfg(not(target_os = "ios"))]
-        "gvret_usb" => {
-            let port = req_str(profile, "port")?;
-            match probe_gvret_usb(&port, line_settings(profile)?).await {
-                Ok(info) => Ok(DeviceProbeResult {
-                    success: true,
-                    source_type: "gvret".to_string(),
-                    is_multi_bus: true,
-                    bus_count: info.bus_count,
-                    primary_info: Some(format!("{} buses available", info.bus_count)),
-                    secondary_info: Some(port),
-                    supports_fd: None,
-                    error: None,
-                }),
-                Err(e) => Ok(DeviceProbeResult {
-                    success: false,
-                    source_type: "gvret".to_string(),
-                    is_multi_bus: true,
-                    bus_count: 0,
-                    primary_info: None,
-                    secondary_info: None,
-                    supports_fd: None,
-                    error: Some(e),
-                }),
-            }
-        }
-        #[cfg(target_os = "ios")]
-        "gvret_usb" => {
-            Ok(DeviceProbeResult {
-                success: false,
-                source_type: "gvret".to_string(),
-                is_multi_bus: true,
-                bus_count: 0,
-                primary_info: None,
-                secondary_info: None,
-                supports_fd: None,
-                error: Some("GVRET USB is not available on iOS".to_string()),
-            })
-        }
-
-        // slcan devices - single-bus (desktop only)
-        #[cfg(not(target_os = "ios"))]
-        "slcan" => {
-            let result = probe_slcan(&req_str(profile, "port")?, line_settings(profile)?).await;
-
-            Ok(DeviceProbeResult {
-                success: result.success,
-                source_type: "slcan".to_string(),
-                is_multi_bus: false,
-                bus_count: if result.success { 1 } else { 0 },
-                primary_info: result.version,
-                secondary_info: result.hardware_version,
-                supports_fd: result.supports_fd,
-                error: result.error,
-            })
-        }
-        #[cfg(target_os = "ios")]
-        "slcan" => {
-            Ok(DeviceProbeResult {
-                success: false,
-                source_type: "slcan".to_string(),
-                is_multi_bus: false,
-                bus_count: 0,
-                primary_info: None,
-                secondary_info: None,
-                supports_fd: None,
-                error: Some("slcan is not available on iOS".to_string()),
-            })
-        }
-
-        // gs_usb devices - single-bus (Windows/macOS via nusb)
-        #[cfg(any(target_os = "windows", target_os = "macos"))]
-        "gs_usb" => {
-            use crate::io::gs_usb::probe_gs_usb_device;
-
-            let bus = conn_i64(profile, "bus").unwrap_or_default() as u8;
-            let address = conn_i64(profile, "address").unwrap_or_default() as u8;
-            // Serial number for stable device matching across USB re-enumeration
-            let serial = conn_str(profile, "serial");
-
-            match probe_gs_usb_device(bus, address, serial).await {
-                Ok(info) => Ok(DeviceProbeResult {
-                    success: true,
-                    source_type: "gs_usb".to_string(),
-                    is_multi_bus: false,
-                    bus_count: info.channel_count.unwrap_or(1) as u8,
-                    primary_info: info.channel_count.map(|c| format!("{} channel(s)", c)),
-                    secondary_info: if info.supports_fd.unwrap_or(false) {
-                        Some("CAN FD supported".to_string())
-                    } else {
-                        None
-                    },
-                    supports_fd: info.supports_fd,
-                    error: None,
-                }),
-                Err(e) => Ok(DeviceProbeResult {
-                    success: false,
-                    source_type: "gs_usb".to_string(),
-                    is_multi_bus: false,
-                    bus_count: 0,
-                    primary_info: None,
-                    secondary_info: None,
-                    supports_fd: None,
-                    error: Some(e),
-                }),
-            }
-        }
-
-        // SocketCAN - Linux only, check if interface exists
-        #[cfg(target_os = "linux")]
-        "socketcan" => {
-            let interface = conn_str(profile, "interface").unwrap_or_default();
-
-            // Check if the interface exists by reading from /sys/class/net
-            let path = format!("/sys/class/net/{}", interface);
-            if std::path::Path::new(&path).exists() {
-                Ok(DeviceProbeResult {
-                    success: true,
-                    source_type: "socketcan".to_string(),
-                    is_multi_bus: false,
-                    bus_count: 1,
-                    primary_info: Some(format!("Interface: {}", interface)),
-                    secondary_info: None,
-                    supports_fd: None,
-                    error: None,
-                })
-            } else {
-                Ok(DeviceProbeResult {
-                    success: false,
-                    source_type: "socketcan".to_string(),
-                    is_multi_bus: false,
-                    bus_count: 0,
-                    primary_info: None,
-                    secondary_info: None,
-                    supports_fd: None,
-                    error: Some(format!("Interface '{}' not found", interface)),
-                })
-            }
-        }
-
-        // Serial port - check if port exists (desktop only)
-        #[cfg(not(target_os = "ios"))]
-        "serial" => {
-            let port = req_str(profile, "port")?;
-
-            let port_exists = wiretap_io::serial::ports()
-                .unwrap_or_default()
-                .iter()
-                .any(|p| p.path == port);
-
-            if port_exists {
-                Ok(DeviceProbeResult {
-                    success: true,
-                    source_type: "serial".to_string(),
-                    is_multi_bus: false,
-                    bus_count: 1,
-                    primary_info: Some(port.clone()),
-                    secondary_info: None,
-                    supports_fd: None,
-                    error: None,
-                })
-            } else {
-                Ok(DeviceProbeResult {
-                    success: false,
-                    source_type: "serial".to_string(),
-                    is_multi_bus: false,
-                    bus_count: 0,
-                    primary_info: None,
-                    secondary_info: None,
-                    supports_fd: None,
-                    error: Some(format!("Port '{}' not found", port)),
-                })
-            }
-        }
-        #[cfg(target_os = "ios")]
-        "serial" => {
-            Ok(DeviceProbeResult {
-                success: false,
-                source_type: "serial".to_string(),
-                is_multi_bus: false,
-                bus_count: 0,
-                primary_info: None,
-                secondary_info: None,
-                supports_fd: None,
-                error: Some("Serial ports are not available on iOS".to_string()),
-            })
-        }
-
-        // Modbus TCP - probe by attempting a TCP connection
-        "modbus_tcp" => {
-            let host = conn_str(profile, "host").unwrap_or_default();
-            let port = conn_i64(profile, "port").unwrap_or_default() as u16;
-            let timeout_sec = conn_f64(profile, "timeout").unwrap_or_default();
-
-            let addr = format!("{}:{}", host, port);
-
-            // Resolve before connecting, like every other Modbus TCP path — passing
-            // the "host:port" string to connect() resolves inside the timeout, which
-            // reports a DNS failure as a connection one.
-            let sock_addr = match crate::io::net::resolve_host_port(&host, port).await {
-                Ok(a) => a,
-                Err(e) => {
-                    return Ok(DeviceProbeResult {
-                        success: false,
-                        source_type: "modbus_tcp".to_string(),
-                        is_multi_bus: false,
-                        bus_count: 0,
-                        primary_info: None,
-                        secondary_info: Some(addr),
-                        supports_fd: None,
-                        error: Some(e.user_message()),
-                    });
-                }
-            };
-
-            match tokio::time::timeout(
-                std::time::Duration::from_secs_f64(timeout_sec),
-                tokio::net::TcpStream::connect(sock_addr),
-            ).await {
-                Ok(Ok(_stream)) => Ok(DeviceProbeResult {
-                    success: true,
-                    source_type: "modbus_tcp".to_string(),
-                    is_multi_bus: false,
-                    bus_count: 1,
-                    primary_info: Some("Modbus TCP".to_string()),
-                    secondary_info: Some(addr),
-                    supports_fd: None,
-                    error: None,
-                }),
-                Ok(Err(e)) => Ok(DeviceProbeResult {
-                    success: false,
-                    source_type: "modbus_tcp".to_string(),
-                    is_multi_bus: false,
-                    bus_count: 0,
-                    primary_info: None,
-                    secondary_info: Some(addr),
-                    supports_fd: None,
-                    error: Some(format!("Connection failed: {}", e)),
-                }),
-                Err(_) => Ok(DeviceProbeResult {
-                    success: false,
-                    source_type: "modbus_tcp".to_string(),
-                    is_multi_bus: false,
-                    bus_count: 0,
-                    primary_info: None,
-                    secondary_info: Some(addr),
-                    supports_fd: None,
-                    error: Some(format!("Connection timed out after {}s", timeout_sec)),
-                }),
-            }
-        }
-
-        // FrameLink device — grouped profile with interfaces[], TCP probe to verify reachability
-        "framelink" => {
-            let host = req_str(profile, "host")?;
-            let port = conn_i64(profile, "port").unwrap_or_default() as u16;
-            // `as_f64()` only, before — and the form writes strings, so a
-            // configured timeout was silently ignored.
-            let timeout_sec = conn_f64(profile, "timeout").unwrap_or_default();
-            let device_id = conn_str(profile, "device_id");
-            let iface_count = profile.connection.get("interfaces")
-                .and_then(|v| v.as_array())
-                .map(|a| a.len() as u8)
-                .unwrap_or(1);
-
-            match crate::io::framelink::probe_framelink(&host, port, timeout_sec).await {
-                Ok(probe) => {
-                    let bus_count = probe.interfaces.len().max(iface_count as usize) as u8;
-                    Ok(DeviceProbeResult {
-                        success: true,
-                        source_type: "framelink".to_string(),
-                        is_multi_bus: bus_count > 1,
-                        bus_count,
-                        primary_info: device_id.map(|s| s.to_string()),
-                        secondary_info: Some(format!("{}:{}", host, port)),
-                        supports_fd: None,
-                        error: None,
-                    })
-                }
-                Err(e) => Ok(DeviceProbeResult {
-                    success: false,
-                    source_type: "framelink".to_string(),
-                    is_multi_bus: iface_count > 1,
-                    bus_count: iface_count,
-                    primary_info: device_id.map(|s| s.to_string()),
-                    secondary_info: None,
-                    supports_fd: None,
-                    error: Some(e.to_string()),
-                }),
-            }
-        }
-
-        // Virtual adapter — always succeeds, reports configured interface count and traffic type
-        "virtual" => {
-            let bus_count = profile
-                .connection
-                .get("interfaces")
-                .and_then(|v| v.as_array())
-                .map(|a| a.len() as u8)
-                .unwrap_or_else(|| conn_i64(profile, "bus_count").unwrap_or_default().clamp(1, 8) as u8);
-            let traffic_type = conn_str(profile, "traffic_type").unwrap_or_default();
-            let traffic_label = match traffic_type.as_str() {
-                "canfd" => "CAN-FD",
-                "modbus" => "Modbus",
-                "serial" => "Serial",
-                _ => "CAN",
-            };
-            let supports_fd = traffic_type == "canfd";
-            Ok(DeviceProbeResult {
-                success: true,
-                source_type: "virtual".to_string(),
-                is_multi_bus: bus_count > 1,
-                bus_count,
-                primary_info: Some(format!("{}", traffic_label)),
-                secondary_info: Some(format!("{} interface(s)", bus_count)),
-                supports_fd: Some(supports_fd),
-                error: None,
-            })
-        }
-
-        // Recorded sources or unsupported types
-        _ => Err(format!(
-            "Profile '{}' is not a real-time device (kind: {})",
-            profile_id, profile.kind
-        )),
-    };
-
-    // Emit probe result event (fresh probe, not cached)
-    if let Ok(ref probe_result) = result {
-        log_probe(&profile_id, probe_result, false);
-        // Cache successful probe results for future use
-        cache_probe_result(&profile_id, probe_result);
-    }
-
-    result
+        .map_err(|e| format!("Failed to load settings: {}", e))
 }
 
 // ============================================================================
@@ -1253,37 +698,6 @@ pub fn set_wake_settings(prevent_idle_sleep: bool, keep_display_awake: bool) {
 // Modbus Scanning
 // ============================================================================
 
-/// Find a live session already polling this `host:port`, so a sweep can name the
-/// conflict instead of quietly contending for the socket.
-///
-/// `scan_holding` only sees other *sweeps*; this sees pollers, which is the case
-/// that matters now that the Discovery tools only appear during a live session.
-async fn endpoint_in_use_by_poller(
-    settings: &crate::settings::AppSettings,
-    endpoint: &str,
-    exclude: &str,
-) -> Option<(String, String)> {
-    for info in crate::io::list_sessions().await {
-        // A paused poller still holds its socket — pause stops requests, not the
-        // connection — so it contends exactly as a running one does.
-        let holds_socket = matches!(
-            info.state,
-            crate::io::IOState::Running | crate::io::IOState::Paused
-        );
-        if info.session_id == exclude || !holds_socket {
-            continue;
-        }
-        let Some(profile) = crate::io::modbus_tcp::session_modbus_profile(settings, &info.session_id)
-        else {
-            continue;
-        };
-        if crate::io::modbus_tcp::modbus_endpoint_str(profile) == endpoint {
-            return Some((info.session_id.clone(), profile.name.clone()));
-        }
-    }
-    None
-}
-
 /// Probe which read function codes a device answers, before sweeping anything.
 #[tauri::command(rename_all = "snake_case")]
 pub async fn modbus_probe_function_codes(
@@ -1316,47 +730,8 @@ pub async fn create_modbus_scan_session(
     allow_contention: Option<bool>,
 ) -> Result<IOCapabilities, String> {
     let settings = crate::settings::load_settings_sync(&app)?;
-
-    // A sweep opens its own connection. Devices that serve one Modbus
-    // conversation at a time — the cheap stacks this feature exists for — break
-    // when a second one arrives, and pausing a poller doesn't help because it
-    // keeps its socket. Name the conflict rather than producing junk data.
-    let endpoint = job.endpoint();
-    if let Some(holder) = crate::io::modbus_tcp::scan_source::scan_holding(&endpoint) {
-        if holder != session_id {
-            return Err(format!(
-                "A Modbus scan of {} is already running as session '{}' — stop it first.",
-                endpoint, holder
-            ));
-        }
-    }
-
-    if !allow_contention.unwrap_or(false) {
-        if let Some((holder, name)) =
-            endpoint_in_use_by_poller(&settings, &endpoint, &session_id).await
-        {
-            return Err(format!(
-                "{name} is being polled by session '{holder}' — that device may only serve one \
-                 Modbus connection at a time. Stop that session, or re-run allowing contention."
-            ));
-        }
-    }
-
-    if let Some(pid) = &profile_id {
-        claim_session_profile(&session_id, pid).await;
-    }
-
-    let source = crate::io::ModbusScanSource::new(session_id.clone(), job);
-    let result = create_session(
-        session_id,
-        Box::new(source),
-        subscriber_id,
-        app_name,
-        None,
-        vec![],
-    )
-    .await;
-    Ok(result.capabilities)
+    let pollers = (!allow_contention.unwrap_or(false)).then_some(&settings);
+    super::scan::create_scan_session(session_id, job, profile_id, subscriber_id, app_name, pollers).await
 }
 
 /// Build Modbus poll groups from an address range instead of a catalogue, so a

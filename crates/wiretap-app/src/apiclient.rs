@@ -414,7 +414,8 @@ use wiretap_protocol::{can::CanFrame, import};
 const IMPORT_PAGE: usize = 50_000;
 
 #[derive(serde::Serialize, Clone)]
-struct ImportProgress {
+#[cfg_attr(test, derive(ts_rs::TS), ts(rename = "CaptureUploadProgress"))]
+pub(crate) struct ImportProgress {
     capture_id: String,
     sent: usize,
     total: usize,
@@ -537,23 +538,25 @@ pub async fn api_import_capture(
 ) -> Result<u64, String> {
     use tauri::Emitter;
 
-    let settings = crate::settings::load_settings(app.clone())
-        .await
-        .map_err(|e| format!("Failed to load settings: {e}"))?;
-    let profile = settings
-        .io_profiles
-        .iter()
-        .find(|p| p.id == profile_id)
-        .cloned()
-        .ok_or_else(|| format!("Profile not found: {profile_id}"))?;
-    if profile.kind != "wiretap" {
-        return Err("Target profile is not a WireTAP backend profile".into());
-    }
-    let api = resolve(&profile)?;
-    import_capture(&api, &capture_id, &database, create, |progress| {
+    let profile = saved_profile(&app, &profile_id).await?;
+    import_capture_to(&profile, &capture_id, &database, create, |progress| {
         let _ = app.emit("capture-upload-progress", progress);
     })
     .await
+}
+
+/// Upload a capture to the backend a WireTAP profile names.
+pub(crate) async fn import_capture_to(
+    profile: &IOProfile,
+    capture_id: &str,
+    database: &str,
+    create: bool,
+    progress: impl Fn(ImportProgress),
+) -> Result<u64, String> {
+    if profile.kind != "wiretap" {
+        return Err("Target profile is not a WireTAP backend profile".into());
+    }
+    import_capture(&resolve(profile)?, capture_id, database, create, progress).await
 }
 
 async fn import_capture(
@@ -579,7 +582,7 @@ async fn import_capture(
 
     while offset < total {
         let (frames, _indices, count) =
-            crate::capture_store::get_capture_frames_paginated(capture_id, offset, IMPORT_PAGE);
+            crate::capture_store::get_capture_frames_paginated(capture_id, offset, IMPORT_PAGE)?;
         total = count;
         if frames.is_empty() {
             break;
@@ -622,16 +625,19 @@ pub struct ApiDatabase {
 }
 
 pub(crate) async fn resolve_by_id(app: &tauri::AppHandle, profile_id: &str) -> Result<ApiProfile, String> {
+    resolve(&saved_profile(app, profile_id).await?)
+}
+
+async fn saved_profile(app: &tauri::AppHandle, profile_id: &str) -> Result<IOProfile, String> {
     let settings = crate::settings::load_settings(app.clone())
         .await
         .map_err(|e| format!("Failed to load settings: {e}"))?;
-    let profile = settings
+    settings
         .io_profiles
         .iter()
         .find(|p| p.id == profile_id)
         .cloned()
-        .ok_or_else(|| format!("Profile not found: {profile_id}"))?;
-    resolve(&profile)
+        .ok_or_else(|| format!("Profile not found: {profile_id}"))
 }
 
 /// List capture databases on the backend (for the profile editor's picker).
@@ -1004,7 +1010,7 @@ mod tests {
     #[test]
     fn only_a_capture_of_can_frames_can_be_uploaded() {
         use crate::capture_store::{append_frames_to_capture, create_standalone_capture, CaptureKind};
-        crate::capture_db::use_in_memory_database();
+        let _db = crate::capture_db::use_own_database();
         let frame = |protocol: &str| crate::io::FrameMessage { protocol: protocol.into(), timestamp_us: 1, ..Default::default() };
         let capture_of = |protocols: &[&str]| {
             let id = create_standalone_capture(CaptureKind::Frames, "upload".into());
@@ -1078,5 +1084,33 @@ mod tests {
 
         import_capture(&gateway, &capture_of("can"), "fresh", true, |_| {}).await.unwrap();
         assert_eq!(*requests.lock().unwrap(), ["POST /v1/databases", "POST /v1/db/fresh/import?create=true"]);
+    }
+
+    #[tokio::test]
+    async fn only_a_wiretap_profile_is_uploaded_to_with_its_inline_key() {
+        use crate::capture_store::{append_frames_to_capture, create_standalone_capture, CaptureKind};
+        crate::capture_db::use_in_memory_database();
+        let capture_id = create_standalone_capture(CaptureKind::Frames, "upload".into());
+        let frame = crate::io::FrameMessage { protocol: "can".into(), timestamp_us: 1, ..Default::default() };
+        append_frames_to_capture(&capture_id, vec![frame]);
+        let (base_url, requests) = recording_gateway().await;
+        let profile = |kind: &str| IOProfile {
+            id: "upload-target".into(),
+            kind: kind.into(),
+            connection: [("url".to_string(), json!(format!("{base_url}/"))), ("api_key".to_string(), json!("inline"))]
+                .into(),
+            ..Default::default()
+        };
+        let finished = std::sync::Mutex::new(Vec::new());
+        let progress = |p: ImportProgress| finished.lock().unwrap().push((p.sent, p.total, p.done));
+
+        let refused = import_capture_to(&profile("mqtt"), &capture_id, "archive", false, progress).await;
+        assert_eq!(refused, Err("Target profile is not a WireTAP backend profile".into()));
+        assert!(requests.lock().unwrap().is_empty());
+
+        let imported = import_capture_to(&profile("wiretap"), &capture_id, "archive", false, progress).await;
+        assert_eq!(imported, Ok(1));
+        assert_eq!(*requests.lock().unwrap(), ["POST /v1/db/archive/import"]);
+        assert_eq!(*finished.lock().unwrap(), [(1, 1, false), (1, 1, true)]);
     }
 }

@@ -52,9 +52,9 @@ pub struct ReplaySource {
 }
 
 impl ReplaySource {
-    fn frames(&self) -> Vec<ReplayFrame> {
-        let (frames, _, _) = crate::capture_store::get_capture_frames_paginated(&self.capture_id, self.offset, self.count);
-        frames
+    fn frames(&self) -> Result<Vec<ReplayFrame>, String> {
+        let (frames, _, _) = crate::capture_store::get_capture_frames_paginated(&self.capture_id, self.offset, self.count)?;
+        Ok(frames
             .iter()
             .filter(|f| f.protocol == "can" || f.protocol == "canfd")
             .map(|f| {
@@ -64,7 +64,7 @@ impl ReplaySource {
                 }
                 replay
             })
-            .collect()
+            .collect())
     }
 }
 
@@ -263,9 +263,10 @@ fn recipes() -> std::sync::MutexGuard<'static, VecDeque<(String, Recipe)>> {
 }
 
 /// How long a replay of `source` would take at `speed`, by the schedule it would keep.
+/// A capture that cannot be read estimates as empty; starting the replay says why.
 #[tauri::command]
 pub fn replay_estimate(source: ReplaySource, speed: f64) -> ReplayEstimate {
-    estimate(&source.frames(), speed)
+    estimate(&source.frames().unwrap_or_default(), speed)
 }
 
 fn estimate(frames: &[ReplayFrame], speed: f64) -> ReplayEstimate {
@@ -302,7 +303,7 @@ pub async fn io_restart_replay(replay_id: String) -> Result<usize, String> {
 
 /// Starts a replay and returns how many frames it plays.
 async fn start(replay_id: String, recipe: Recipe) -> Result<usize, String> {
-    let frames = recipe.source.frames();
+    let frames = recipe.source.frames()?;
     if frames.is_empty() {
         return Err("No frames to replay".to_string());
     }
@@ -447,7 +448,7 @@ mod tests {
             replay_estimate(source.clone(), 1.0),
             ReplayEstimate { frame_count: 3, span_us: 60_010_000, pass_duration_us: 10_000 + MAX_SLEEP_US }
         );
-        assert!(source.frames().iter().all(|f| f.frame.bus == 2));
+        assert!(source.frames().unwrap().iter().all(|f| f.frame.bus == 2));
     }
 
     #[tokio::test]

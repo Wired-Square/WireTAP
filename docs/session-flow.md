@@ -1210,7 +1210,7 @@ operation on that session, and no other session waits on it.
 ## 5. WebSocket transport
 
 Frame delivery and most session events flow over a local WebSocket, not
-Tauri events. The server is started during Tauri `setup()` in [lib.rs:945](../crates/wiretap-app/src/lib.rs#L945)
+Tauri events. The server is started during Tauri `setup()` in `boot_desktop` ([boot.rs](../crates/wiretap-app/src/boot.rs))
 and binds to `127.0.0.1:0` (ephemeral port). The frontend fetches the port
 and auth token via the Tauri command `get_ws_config` and connects once at
 startup through [src/services/wsTransport.ts](../frontend/wiretap-ui/src/services/wsTransport.ts).
@@ -1329,7 +1329,9 @@ re-decodes every frame. Two surfaces, both over this WebSocket:
   loads a catalogue. Because `send_new_frames` only decodes frames *past* a
   forward-only per-session send offset, `catalog.attach` also re-decodes the frames
   already delivered to the client (`redecode_delivered`) and pushes their signals —
-  decoded entries only, since no tab shows unmatched history —
+  decoded entries only, since no tab shows unmatched history, read and sent a page at a
+  time: a `DecodedBacklog` the subscriber replaces what it holds with, then a
+  `DecodedBacklogMore` (0x24) per further page, all before any newer batch —
   otherwise a catalogue bound *after* a capture replay had already streamed its
   frames (e.g. the per-app Leave switching the decoder to a fresh replay session)
   would leave them showing "No signals decoded". Raw `FrameData` keeps flowing for
@@ -1959,6 +1961,14 @@ The WebSocket *connection* itself times out separately, at
 deliberately longer than the subscriber timeout, so the socket outlives a
 suspended session and a display-sleep wake resumes on the same connection
 without re-subscribing.
+
+Each connection has its own writer task and a bounded queue (`QUEUE_CAPACITY`,
+512 messages), so a socket that stops reading holds up no other. A connection
+whose queue fills is closed, not dropped from: what it had queued goes with it,
+the transport reconnects and re-subscribes as above, and the frame views read the
+capture by page. A stream to one connection (an
+attach's backlog) holds one place in its queue and waits for the socket a chunk at
+a time; one that waits 10 s closes the connection the same way.
 
 ### Wake lock
 

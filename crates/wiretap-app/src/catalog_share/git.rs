@@ -285,11 +285,11 @@ pub struct Pushed {
 ///
 /// Rebuilt per call rather than shared: `RemoteCallbacks` borrows its closures, and a
 /// fetch and a push in the same function each need their own.
-/// `progress` is optional so the core is exercisable without a running Tauri app —
-/// which is what lets the round-trip test below be a real test rather than a mock.
 fn callbacks<'a>(
     token: Option<&'a str>,
-    progress: Option<(&'a AppHandle, &'a str, &'static str)>,
+    repo_id: &'a str,
+    phase: &'static str,
+    progress: &'a impl Fn(Progress),
 ) -> RemoteCallbacks<'a> {
     let mut cb = RemoteCallbacks::new();
     cb.credentials(move |_url, username, _allowed| match token {
@@ -304,24 +304,25 @@ fn callbacks<'a>(
             "This repository needs an account. Connect GitHub in Settings → Catalogs.",
         )),
     });
-    if let Some((app, repo_id, phase)) = progress {
-        let app = app.clone();
-        let repo_id = repo_id.to_string();
-        cb.transfer_progress(move |stats| {
-            let _ = app.emit(
-                PROGRESS_EVENT,
-                Progress {
-                    repo_id: repo_id.clone(),
-                    phase,
-                    received_objects: stats.received_objects(),
-                    total_objects: stats.total_objects(),
-                    received_bytes: stats.received_bytes(),
-                },
-            );
-            true
+    cb.transfer_progress(move |stats| {
+        progress(Progress {
+            repo_id: repo_id.to_string(),
+            phase,
+            received_objects: stats.received_objects(),
+            total_objects: stats.total_objects(),
+            received_bytes: stats.received_bytes(),
         });
-    }
+        true
+    });
     cb
+}
+
+/// Progress as the `catalog-git-progress` event the window listens for.
+pub(crate) fn progress_emitter(app: &AppHandle) -> impl Fn(Progress) + Send + 'static {
+    let app = app.clone();
+    move |progress| {
+        let _ = app.emit(PROGRESS_EVENT, progress);
+    }
 }
 
 // ── Sync ─────────────────────────────────────────────────────────────────────
@@ -333,13 +334,13 @@ fn callbacks<'a>(
 /// matches what it recorded last time.
 pub async fn sync(app: &AppHandle, spec: &RepoSpec) -> Result<Synced, ShareError> {
     let dir = clone_dir(app, &spec.repo_id)?;
-    let app = app.clone();
+    let progress = progress_emitter(app);
     let spec = spec.clone();
-    blocking(move || sync_blocking(Some(&app), &dir, &spec)).await
+    blocking(move || sync_blocking(progress, &dir, &spec)).await
 }
 
 fn sync_blocking(
-    app: Option<&AppHandle>,
+    progress: impl Fn(Progress),
     dir: &Path,
     spec: &RepoSpec,
 ) -> Result<Synced, ShareError> {
@@ -360,7 +361,9 @@ fn sync_blocking(
         let mut fo = FetchOptions::new();
         fo.remote_callbacks(callbacks(
             spec.token.as_deref(),
-            app.map(|app| (app, spec.repo_id.as_str(), "clone")),
+            &spec.repo_id,
+            "clone",
+            &progress,
         ));
         RepoBuilder::new()
             .fetch_options(fo)
@@ -373,7 +376,9 @@ fn sync_blocking(
             let mut fo = FetchOptions::new();
             fo.remote_callbacks(callbacks(
                 spec.token.as_deref(),
-                app.map(|app| (app, spec.repo_id.as_str(), "fetch")),
+                &spec.repo_id,
+                "fetch",
+                &progress,
             ));
             // Explicit refspec: a clone's configured one is fine, but a repository we
             // may later add a fork remote to should never depend on that.
@@ -924,27 +929,23 @@ fn describe(commit: &git2::Commit) -> FileCommit {
 /// this module does — there is no separate "create a branch" step to get out of step
 /// with the commit.
 pub async fn commit_and_push(
-    app: &AppHandle,
+    progress: impl Fn(Progress) + Send + 'static,
     repo_id: &str,
     dir: &Path,
     spec: &PushSpec,
     token: Option<&str>,
 ) -> Result<Pushed, ShareError> {
-    let (app, repo_id, dir, spec, token) = (
-        app.clone(),
+    let (repo_id, dir, spec, token) = (
         repo_id.to_string(),
         dir.to_path_buf(),
         spec.clone(),
         token.map(str::to_string),
     );
-    blocking(move || {
-        push_blocking(Some(&app), &repo_id, &dir, &spec, token.as_deref())
-    })
-    .await
+    blocking(move || push_blocking(progress, &repo_id, &dir, &spec, token.as_deref())).await
 }
 
 fn push_blocking(
-    app: Option<&AppHandle>,
+    progress: impl Fn(Progress),
     repo_id: &str,
     dir: &Path,
     spec: &PushSpec,
@@ -1036,7 +1037,7 @@ fn push_blocking(
     let mut rejection: Option<String> = None;
     // Scoped so the callback's mutable borrow of `rejection` ends before it is read.
     {
-        let mut cb = callbacks(token, app.map(|app| (app, repo_id, "push")));
+        let mut cb = callbacks(token, repo_id, "push", &progress);
         cb.push_update_reference(|reference, status| {
             if let Some(status) = status {
                 rejection = Some(format!("{reference}: {status}"));
@@ -1106,8 +1107,10 @@ fn is_candidate_catalog_path(path: &str) -> bool {
 }
 
 #[cfg(test)]
-mod tests {
+pub(super) mod tests {
     use super::*;
+
+    fn ignore(_: Progress) {}
 
     #[test]
     fn clone_key_is_one_safe_path_segment() {
@@ -1222,13 +1225,13 @@ mod tests {
         let dir = std::env::temp_dir().join("wiretap-git-roundtrip");
         let _ = std::fs::remove_dir_all(&dir);
 
-        let synced = sync_blocking(None, &dir, &spec).expect("clone");
+        let synced = sync_blocking(ignore, &dir, &spec).expect("clone");
         assert!(synced.cloned, "first sync must clone");
         assert_eq!(synced.head.len(), 40, "head should be a full commit id");
         assert!(is_usable(&dir));
 
         // A second sync fetches rather than re-cloning, and lands on the same commit.
-        let again = sync_blocking(None, &dir, &spec).expect("fetch");
+        let again = sync_blocking(ignore, &dir, &spec).expect("fetch");
         assert!(!again.cloned, "second sync must reuse the clone");
         assert_eq!(again.head, synced.head);
 
@@ -1269,8 +1272,7 @@ mod tests {
     /// A `file://` remote exercises the real clone, commit and push paths with no
     /// network and no credentials, which is what makes the push tests runnable
     /// everywhere rather than only on a machine with a token.
-    #[cfg(test)]
-    fn seed_remote(at: &Path) -> String {
+    pub(in crate::catalog_share) fn seed_remote(at: &Path) -> String {
         let work = at.join("seed");
         std::fs::create_dir_all(&work).expect("seed dir");
         let repo = Repository::init(&work).expect("init seed");
@@ -1318,10 +1320,10 @@ mod tests {
             token: None,
         };
         let dir = root.join("clone");
-        sync_blocking(None, &dir, &spec).expect("clone");
+        sync_blocking(ignore, &dir, &spec).expect("clone");
 
         let pushed = push_blocking(
-            None,
+            ignore,
             &spec.repo_id,
             &dir,
             &PushSpec {
@@ -1357,6 +1359,30 @@ mod tests {
         let _ = std::fs::remove_dir_all(&root);
     }
 
+    #[test]
+    fn transfer_progress_names_the_repository_and_the_phase() {
+        let root = std::env::temp_dir().join("wiretap-git-progress");
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).expect("root");
+        let spec = RepoSpec {
+            repo_id: "gh:test/progress".into(),
+            clone_url: seed_remote(&root),
+            git_ref: "main".into(),
+            token: None,
+        };
+        let dir = root.join("clone");
+        let seen = std::sync::Mutex::new(Vec::new());
+        let record = |p: Progress| seen.lock().unwrap().push((p.repo_id, p.phase));
+
+        sync_blocking(record, &dir, &spec).expect("clone");
+        sync_blocking(record, &dir, &spec).expect("fetch");
+
+        let seen = seen.into_inner().unwrap();
+        assert!(seen.iter().all(|(id, _)| id == "gh:test/progress"));
+        assert!(seen.iter().any(|(_, phase)| *phase == "clone"), "{seen:?}");
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
     /// Naming a branch creates it off the base rather than committing to the base —
     /// the opt-in half of "branches are optional".
     #[test]
@@ -1368,7 +1394,7 @@ mod tests {
 
         let dir = root.join("clone");
         sync_blocking(
-            None,
+            ignore,
             &dir,
             &RepoSpec {
                 repo_id: "gh:test/branch".into(),
@@ -1380,7 +1406,7 @@ mod tests {
         .expect("clone");
 
         let pushed = push_blocking(
-            None,
+            ignore,
             "gh:test/branch",
             &dir,
             &PushSpec {
@@ -1439,7 +1465,7 @@ mod tests {
 
         let dir = root.join("clone");
         sync_blocking(
-            None,
+            ignore,
             &dir,
             &RepoSpec {
                 repo_id: "gh:test/refs".into(),
@@ -1474,7 +1500,7 @@ mod tests {
 
         let dir = root.join("clone");
         sync_blocking(
-            None,
+            ignore,
             &dir,
             &RepoSpec {
                 repo_id: "gh:test/blobsha".into(),
@@ -1503,7 +1529,7 @@ mod tests {
 
         let dir = root.join("clone");
         sync_blocking(
-            None,
+            ignore,
             &dir,
             &RepoSpec {
                 repo_id: "gh:test/lastchange".into(),
@@ -1517,7 +1543,7 @@ mod tests {
         // Two more commits on the remote: one touching the file we ask about, then one
         // touching something else. The second is HEAD, so a naive answer returns it.
         let target = push_blocking(
-            None,
+            ignore,
             "gh:test/lastchange",
             &dir,
             &PushSpec {
@@ -1535,7 +1561,7 @@ mod tests {
         .expect("commit the target file");
 
         push_blocking(
-            None,
+            ignore,
             "gh:test/lastchange",
             &dir,
             &PushSpec {
@@ -1554,7 +1580,7 @@ mod tests {
 
         // Re-sync so the clone's remote-tracking ref carries both commits.
         sync_blocking(
-            None,
+            ignore,
             &dir,
             &RepoSpec {
                 repo_id: "gh:test/lastchange".into(),
@@ -1601,11 +1627,11 @@ mod tests {
             git_ref: "main".into(),
             token: None,
         };
-        sync_blocking(None, &dir, &spec).expect("clone");
+        sync_blocking(ignore, &dir, &spec).expect("clone");
 
         let push = |content: &[u8]| {
             push_blocking(
-                None,
+                ignore,
                 &spec.repo_id,
                 &dir,
                 &PushSpec {
@@ -1656,7 +1682,7 @@ mod tests {
         assert!(!is_usable(&dir));
 
         let synced = sync_blocking(
-            None,
+            ignore,
             &dir,
             &RepoSpec {
                 repo_id: "gh:rust-lang/log".into(),

@@ -6,15 +6,16 @@
 // Protocol reference: https://github.com/collin80/GVRET
 
 use serde::{Deserialize, Serialize};
-use std::sync::atomic::AtomicBool;
-use std::sync::Arc;
 use tokio::sync::mpsc;
+use tokio_util::sync::CancellationToken;
 use wiretap_io::can::gvret::{open as open_gvret, probe, GvretOptions, Link};
 use wiretap_io::serial::LineSettings;
 
 use super::common::{handshake_failed, probed_bus_count, GvretDeviceInfo, Stream};
 use crate::io::bus_mapping::BusMapping;
-use crate::io::can_task::{can_options, link_lost, serve, PortOutage, PORT_REOPEN, PROBE_TIMEOUT};
+use crate::io::can_task::{
+    can_options, link_lost, open_or_report, serve, PortOutage, PORT_REOPEN, PROBE_TIMEOUT,
+};
 use crate::io::serial::utils::probe_serial_presence;
 use crate::io::types::SourceMessage;
 
@@ -56,7 +57,7 @@ pub async fn probe_gvret_usb(port: &str, line: LineSettings) -> Result<GvretDevi
         line,
     };
     probed_bus_count(probe(link, PROBE_TIMEOUT).await)
-        .map_err(|e| handshake_failed(&gvret_usb_device(port), e))
+        .map_err(|e| handshake_failed(&gvret_usb_device(port), e).into())
 }
 
 // ============================================================================
@@ -69,7 +70,7 @@ pub async fn run_source(
     port: String,
     line: LineSettings,
     bus_mappings: Vec<BusMapping>,
-    stop_flag: Arc<AtomicBool>,
+    stop: CancellationToken,
     tx: mpsc::Sender<SourceMessage>,
 ) {
     let device = gvret_usb_device(&port);
@@ -77,23 +78,15 @@ pub async fn run_source(
         path: port.clone(),
         line,
     };
-    let task = match open_gvret(
+    let opening = open_gvret(
         link,
         GvretOptions::default(),
         can_options(false, PORT_REOPEN),
-    )
-    .await
-    {
-        Ok(task) => task,
-        Err(e) => {
-            let _ = tx
-                .send(SourceMessage::Error(
-                    source_idx,
-                    handshake_failed(&device, e),
-                ))
-                .await;
-            return;
-        }
+    );
+    let Some(task) =
+        open_or_report(opening, source_idx, &tx, |e| handshake_failed(&device, e)).await
+    else {
+        return;
     };
 
     let mut stream = Stream::new(
@@ -108,7 +101,7 @@ pub async fn run_source(
         task,
         source_idx,
         false,
-        &stop_flag,
+        &stop,
         &tx,
         |event| outage.on_event(event, probe_serial_presence, |e| stream.on_event(e)),
         |error| link_lost(source_idx, &device, error),
@@ -120,6 +113,7 @@ pub async fn run_source(
 mod tests {
     use super::super::common::MAX_BUSES;
     use super::*;
+    use crate::io::IoFailure;
     use crate::io::can_task::{lost, reopen_failed};
     use crate::io::error::DevicePresence;
     use wiretap_io::can::{CanError, CanEvent, DeviceInfo};
@@ -159,7 +153,7 @@ mod tests {
         assert_eq!(buses(&source(connected(2))), 2);
 
         let unplugged = source(lost(CanError::Closed));
-        let [SourceMessage::Interrupted(3, message)] = unplugged.as_slice() else {
+        let [SourceMessage::Interrupted(3, IoFailure { message, .. })] = unplugged.as_slice() else {
             panic!("expected one interruption and no ending");
         };
         assert_eq!(
@@ -186,9 +180,8 @@ mod tests {
             stop_bits: 1,
         };
         let path = "/nonexistent/wiretap-gvret".to_string();
-        let stop = Arc::new(AtomicBool::new(false));
-        run_source(3, path, line, vec![], stop, tx).await;
-        let Some(SourceMessage::Error(3, error)) = rx.recv().await else {
+        run_source(3, path, line, vec![], CancellationToken::new(), tx).await;
+        let Some(SourceMessage::Error(3, IoFailure { message: error, .. })) = rx.recv().await else {
             panic!("expected an error");
         };
         assert!(error.contains("/nonexistent/wiretap-gvret"), "got: {error}");

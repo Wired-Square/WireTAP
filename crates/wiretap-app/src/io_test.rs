@@ -1634,4 +1634,61 @@ pub(crate) mod tests {
         assert!(!sweep.is_extended);
         assert_eq!(sweep.frame_id, tp::SWEEP_REQUEST_BASE + 9);
     }
+
+    #[test]
+    fn a_panic_with_a_virtual_loopback_open_does_not_hang_its_runtime() {
+        const SESSION: &str = "test_virtual_panic";
+        let (done_tx, done_rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let runtime = tokio::runtime::Runtime::new().unwrap();
+            let panicked = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                runtime.block_on(async {
+                    open_virtual_loopback(SESSION).await;
+                    panic!("a test failing with its session open");
+                })
+            }));
+            drop(runtime);
+            let _ = done_tx.send(panicked.is_err());
+        });
+
+        let shut_down = done_rx.recv_timeout(Duration::from_secs(10));
+        tokio::runtime::Runtime::new()
+            .unwrap()
+            .block_on(io::destroy_session(SESSION, false))
+            .ok();
+        assert_eq!(shut_down, Ok(true), "the runtime never shut down");
+    }
+
+    #[tokio::test]
+    async fn a_virtual_loopback_echo_keeps_the_id_bus_fd_and_brs() {
+        const SESSION: &str = "test_virtual_codec";
+        open_virtual_loopback(SESSION).await;
+        let sent = io::CanTransmitFrame {
+            frame_id: 0x1ABC_DEF0,
+            data: (1..=12).collect(),
+            bus: 0,
+            is_extended: true,
+            is_fd: true,
+            is_brs: true,
+            is_rtr: false,
+        };
+        let transmitted = io::transmit_frame(SESSION, &sent).await;
+        let capture = crate::capture_store::get_session_frame_capture_id(SESSION).unwrap();
+        let echo = tokio::time::timeout(Duration::from_secs(2), async {
+            loop {
+                if let Some(frame) = crate::capture_store::get_capture_frames(&capture).unwrap().and_then(|f| f.into_iter().next()) {
+                    return frame;
+                }
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await;
+        io::destroy_session(SESSION, false).await.ok();
+
+        assert!(transmitted.unwrap().success);
+        let echo = echo.expect("the frame came back");
+        assert_eq!((echo.frame_id, echo.bus, echo.dlc, echo.bytes), (sent.frame_id, 0, 12, sent.data));
+        assert_eq!((echo.is_extended, echo.is_fd, echo.is_brs), (true, true, true));
+        assert_eq!(echo.direction.as_deref(), Some("rx"));
+    }
 }

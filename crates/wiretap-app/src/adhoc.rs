@@ -550,24 +550,28 @@ mod tests {
 
     #[test]
     fn each_window_sets_and_clears_only_its_own_watch_and_the_history_lasts_while_one_watches() {
+        // `forget_connection` reaches every session, so these ids are this test's alone.
+        const FIRST: usize = 8_001;
+        const SECOND: usize = 8_002;
+        const THIRD: usize = 8_003;
         let session = "adhoc-windows";
         let command = |op: &str, conn_id| {
             dispatch_adhoc_command(op, json!({ "session_id": session }), conn_id).unwrap()
         };
-        command("adhoc.set", 1);
-        command("adhoc.set", 2);
+        command("adhoc.set", FIRST);
+        command("adhoc.set", SECOND);
         let frames = [frame(7, 0, vec![0])];
         assert_eq!(batch_messages(session, &frames, None, None).len(), 2);
         assert!(dashboard_history::get(session).is_some());
 
-        command("adhoc.clear", 1);
+        command("adhoc.clear", FIRST);
         assert_eq!(batch_messages(session, &frames, None, None).len(), 1);
-        command("adhoc.set", 3);
-        forget_connection(3);
+        command("adhoc.set", THIRD);
+        forget_connection(THIRD);
         assert_eq!(batch_messages(session, &frames, None, None).len(), 1);
         assert!(dashboard_history::get(session).is_some());
 
-        forget_connection(2);
+        forget_connection(SECOND);
         assert!(batch_messages(session, &frames, None, None).is_empty());
         assert!(dashboard_history::get(session).is_none());
     }

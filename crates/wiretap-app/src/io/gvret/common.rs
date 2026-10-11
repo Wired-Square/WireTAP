@@ -11,8 +11,9 @@ use std::time::Duration;
 
 use wiretap_io::can::{CanError, CanEvent, DeviceInfo};
 
-use crate::io::bus_mapping::{gvret_protocols, BusMapping};
-use crate::io::can_task::{mapped_frames, open_failed};
+use crate::io::bus_mapping::{gvret_protocols, reconcile_with_device, BusMapping};
+use crate::io::can_task::announce_on_event;
+use crate::io::{IoErrorKind, IoFailure};
 use crate::io::types::SourceMessage;
 
 // ============================================================================
@@ -74,29 +75,19 @@ pub fn probed_bus_count(probed: Result<DeviceInfo, CanError>) -> Result<GvretDev
 /// nothing" is not spelled as a count here — it is [`NumBusesOutcome::Silent`],
 /// and the decision to honour the profile lives in `mappings_from_num_buses`.
 fn reconcile_to_bus_count(profile_mappings: &[BusMapping], bus_count: u8) -> Vec<BusMapping> {
-    (0..bus_count)
-        .enumerate()
-        .map(|(slot, device_bus)| {
-            let override_for = profile_mappings.iter().find(|m| m.device_bus == device_bus);
-            BusMapping {
-                device_bus,
-                // A bus the profile has never heard of streams by default; one
-                // it has been told to mute stays muted.
-                enabled: override_for.map(|m| m.enabled).unwrap_or(true),
-                output_bus: override_for.map(|m| m.output_bus).unwrap_or(slot as u8),
-                interface_id: override_for
-                    .map(|m| m.interface_id.clone())
-                    .filter(|id| !id.is_empty())
-                    .unwrap_or_else(|| format!("can{}", device_bus)),
-                supported_protocols: gvret_protocols(),
-                // The protocol is the session's to choose, not the device's —
-                // GVRET reports a bus *count* and says nothing about FD. So it
-                // survives the reconcile, and the traits follow from it.
-                ..BusMapping::default()
-                    .with_protocol(override_for.map(|m| m.protocol).unwrap_or_default())
-            }
-        })
-        .collect()
+    reconcile_with_device(profile_mappings, 0..bus_count, |device_bus, profile| {
+        BusMapping {
+            interface_id: profile
+                .map(|m| m.interface_id.clone())
+                .filter(|id| !id.is_empty())
+                .unwrap_or_else(|| format!("can{}", device_bus)),
+            supported_protocols: gvret_protocols(),
+            // The protocol is the session's to choose, not the device's — GVRET
+            // reports a bus *count* and says nothing about FD. So it survives the
+            // reconcile, and the traits follow from it.
+            ..BusMapping::default().with_protocol(profile.map(|m| m.protocol).unwrap_or_default())
+        }
+    })
 }
 
 /// How long a source waits for GET_NUMBUSES: `GvretOptions::probe_timeout`'s default.
@@ -158,15 +149,13 @@ pub fn mappings_from_num_buses(
 
 /// A link lost during the handshake reads as it did when the desktop asked
 /// GET_NUMBUSES itself.
-pub fn handshake_failed(device: &str, error: CanError) -> String {
-    let outcome = match error {
-        CanError::Closed => NumBusesOutcome::Closed,
-        CanError::Read(e) => NumBusesOutcome::Failed(e.to_string()),
-        other => return open_failed(device, other),
+pub fn handshake_failed(device: &str, error: CanError) -> IoFailure {
+    let (kind, outcome) = match error {
+        CanError::Closed => (IoErrorKind::DeviceDisconnected, NumBusesOutcome::Closed),
+        CanError::Read(e) => (IoErrorKind::Read, NumBusesOutcome::Failed(e.to_string())),
+        other => return IoFailure::from_can(device, other),
     };
-    mappings_from_num_buses(outcome, &[], device)
-        .err()
-        .unwrap_or_default()
+    IoFailure::new(kind, mappings_from_num_buses(outcome, &[], device).err().unwrap_or_default())
 }
 
 /// A GVRET source on either link, as the broker sees it.
@@ -202,37 +191,35 @@ impl Stream {
     /// Every connect re-resolves the mappings from the bus count, since
     /// `MappingsResolved` is what feeds `available_buses` and transmit routing.
     pub fn on_event(&mut self, event: CanEvent) -> Result<Vec<SourceMessage>, CanError> {
-        match event {
-            CanEvent::Connected(info) => {
-                if !info.keepalive {
-                    tlog!(
-                        "[gvret] {} does not answer keepalives, so a silent drop will not be seen",
-                        self.device
-                    );
-                }
-                let outcome = info.buses.map_or(NumBusesOutcome::Silent, |n| {
-                    NumBusesOutcome::Answered(clamp_bus_count(n))
-                });
-                if let Ok(mappings) =
-                    mappings_from_num_buses(outcome, &self.profile_mappings, &self.device)
-                {
-                    self.mappings = mappings;
-                }
-                Ok(vec![
-                    SourceMessage::MappingsResolved(self.source_idx, self.mappings.clone()),
-                    SourceMessage::Connected(
-                        self.source_idx,
-                        self.kind.to_string(),
-                        self.address.clone(),
-                        None,
-                    ),
-                ])
-            }
-            CanEvent::Read(reads) => Ok(mapped_frames(self.source_idx, reads, &self.mappings)
-                .into_iter()
-                .collect()),
-            CanEvent::Disconnected { error, .. } => Err(error),
-            _ => Ok(Vec::new()),
+        if let CanEvent::Connected(info) = &event {
+            self.resolve(info);
+        }
+        announce_on_event(self.source_idx, &self.mappings, event, |_| {
+            vec![
+                SourceMessage::MappingsResolved(self.source_idx, self.mappings.clone()),
+                SourceMessage::Connected(
+                    self.source_idx,
+                    self.kind.to_string(),
+                    self.address.clone(),
+                    None,
+                ),
+            ]
+        })
+    }
+
+    fn resolve(&mut self, info: &DeviceInfo) {
+        if !info.keepalive {
+            tlog!(
+                "[gvret] {} does not answer keepalives, so a silent drop will not be seen",
+                self.device
+            );
+        }
+        let outcome = info.buses.map_or(NumBusesOutcome::Silent, |n| {
+            NumBusesOutcome::Answered(clamp_bus_count(n))
+        });
+        if let Ok(mappings) = mappings_from_num_buses(outcome, &self.profile_mappings, &self.device)
+        {
+            self.mappings = mappings;
         }
     }
 }
@@ -258,39 +245,15 @@ mod tests {
         }
     }
 
-    /// The case this exists for: the profile was never probed and carries one
-    /// bus 0, while the device in front of us has two.
     #[test]
-    fn a_device_bus_the_profile_never_saw_still_streams() {
-        let mappings = reconcile_to_bus_count(&[reconcile_mapping(0, true, 0)], 2);
-        assert_eq!(mappings.len(), 2);
-        assert!(mappings.iter().all(|m| m.enabled));
-        assert_eq!(mappings[1].device_bus, 1);
-        assert_eq!(mappings[1].interface_id, "can1");
-    }
-
-    #[test]
-    fn the_profile_still_decides_enabled_and_output_bus() {
-        let mappings = reconcile_to_bus_count(
-            &[
-                reconcile_mapping(0, false, 7),
-                reconcile_mapping(1, true, 9),
-            ],
-            2,
-        );
-        assert!(!mappings[0].enabled, "a muted bus stays muted");
-        assert_eq!(mappings[0].output_bus, 7);
-        assert_eq!(mappings[1].output_bus, 9);
-    }
-
-    #[test]
-    fn a_bus_the_device_does_not_have_is_dropped() {
-        let mappings = reconcile_to_bus_count(
-            &[reconcile_mapping(0, true, 0), reconcile_mapping(3, true, 3)],
-            1,
-        );
-        assert_eq!(mappings.len(), 1);
-        assert_eq!(mappings[0].device_bus, 0);
+    fn a_bus_is_named_by_its_number_unless_the_profile_named_it() {
+        let named = BusMapping {
+            interface_id: "left".into(),
+            ..reconcile_mapping(0, true, 0)
+        };
+        let mappings = reconcile_to_bus_count(&[named], 2);
+        let ids: Vec<&str> = mappings.iter().map(|m| m.interface_id.as_str()).collect();
+        assert_eq!(ids, ["left", "can1"]);
     }
 
     /// A profile carrying a bus the device would never synthesise, so honouring
@@ -478,11 +441,13 @@ mod tests {
     #[test]
     fn a_link_lost_in_the_handshake_says_how() {
         let closed = handshake_failed(DEVICE, CanError::Closed);
-        assert!(closed.contains("closed the connection"), "got: {closed}");
+        assert_eq!(closed.kind, IoErrorKind::DeviceDisconnected);
+        assert!(closed.message.contains("closed the connection"), "got: {closed}");
         let reset = handshake_failed(
             DEVICE,
             CanError::Read(std::io::Error::other("connection reset")),
         );
-        assert!(reset.contains("connection reset"), "got: {reset}");
+        assert_eq!(reset.kind, IoErrorKind::Read);
+        assert!(reset.message.contains("connection reset"), "got: {reset}");
     }
 }

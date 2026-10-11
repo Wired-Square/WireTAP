@@ -5,6 +5,7 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot};
+use tokio_util::sync::CancellationToken;
 
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -12,7 +13,7 @@ use super::spawner::run_source_reader;
 use super::types::{ControlChannels, SourceConfig, SourcePauseFlags, TransmitChannels};
 use super::{MergeCommand, ProfileLoader, VirtualBusCommand, VirtualBusControls, VirtualCmdTx};
 use crate::capture_store::{self, TimestampedByte};
-use crate::io::error::IoError;
+use crate::io::error::{IoError, IoFailure};
 use crate::io::bus_mapping::BusMapping;
 use crate::io::bus_status::{BusStatusBoard, BusStatusMsg};
 use crate::io::types::SourceMessage;
@@ -83,7 +84,7 @@ pub(super) async fn run_merge_task(
     session_id: String,
     sources: Vec<SourceConfig>,
     _bytes_capture_id: Option<String>,
-    stop_flag: Arc<AtomicBool>,
+    stop: CancellationToken,
     _pause_flag: Arc<AtomicBool>,
     mut rx: mpsc::Receiver<SourceMessage>,
     tx: mpsc::Sender<SourceMessage>,
@@ -115,8 +116,11 @@ pub(super) async fn run_merge_task(
     // Spawn a sub-reader task for each source
     let mut source_handles = Vec::new();
     let mut next_source_idx = sources.len();
-    // Per-source stop flags for hot-remove
-    let mut source_stop_flags: HashMap<String, Arc<AtomicBool>> = HashMap::new();
+    // Every source stops with the session, or alone on a hot-remove, or with
+    // this task if it unwinds.
+    let sources_stop = stop.child_token();
+    let _stop_sources_on_exit = sources_stop.clone().drop_guard();
+    let mut source_stops: HashMap<String, CancellationToken> = HashMap::new();
     // A reader identifies itself by source index; everything that has to
     // survive a hot add/remove is keyed by profile id, because `next_source_idx`
     // only ever grows while the broker's `sources` vec is compacted on removal.
@@ -134,8 +138,8 @@ pub(super) async fn run_merge_task(
             }
         };
 
-        let source_stop = Arc::new(AtomicBool::new(false));
-        source_stop_flags.insert(source_config.profile_id.clone(), source_stop.clone());
+        let source_stop = sources_stop.child_token();
+        source_stops.insert(source_config.profile_id.clone(), source_stop.clone());
         let source_pause = register_pause_flag(&source_pause_flags, &source_config.profile_id);
         source_profiles.insert(index, SourceIdentity::of(source_config));
 
@@ -146,7 +150,6 @@ pub(super) async fn run_merge_task(
             source_stop,
             source_pause,
             &session_id,
-            &stop_flag,
             &tx,
             &virtual_bus_controls,
             &virtual_cmd_txs,
@@ -159,7 +162,7 @@ pub(super) async fn run_merge_task(
     let mut pending_readds = PendingReadds::default();
     // The last error a source reported, kept so the session can end as "error"
     // rather than "complete" when every source has failed.
-    let mut last_source_error: Option<String> = None;
+    let mut last_source_error: Option<IoFailure> = None;
     let mut interrupted: std::collections::HashSet<usize> = std::collections::HashSet::new();
     let mut pending_frames: Vec<FrameMessage> = Vec::new();
     let mut pending_bytes: Vec<TimestampedByte> = Vec::new();
@@ -173,7 +176,7 @@ pub(super) async fn run_merge_task(
     // Main merge loop — uses select! to handle both source messages and commands
     let emit_interval = std::time::Duration::from_millis(MERGE_EMIT_INTERVAL_MS);
     loop {
-        if stop_flag.load(Ordering::SeqCst) {
+        if stop.is_cancelled() {
             break;
         }
         if live.is_empty() {
@@ -212,10 +215,10 @@ pub(super) async fn run_merge_task(
                                 .get(&source_idx)
                                 .map(|s| s.display_name.clone())
                                 .unwrap_or_else(|| format!("source {}", source_idx));
-                            let error = IoError::DeviceDisconnected { device }.to_string();
-                            last_source_error = Some(error.clone());
+                            let error = IoFailure::from(IoError::DeviceDisconnected { device });
                             emit_session_error(&session_id, error.clone());
-                            start.failed(source_idx, error);
+                            start.failed(source_idx, error.message.clone());
+                            last_source_error = Some(error);
                         } else {
                             start.ready(source_idx);
                         }
@@ -228,9 +231,9 @@ pub(super) async fn run_merge_task(
                         if let Ok(mut channels) = transmit_channels.lock() {
                             channels.remove(&source_idx);
                         }
-                        last_source_error = Some(error.clone());
                         emit_session_error(&session_id, error.clone());
-                        start.failed(source_idx, error);
+                        start.failed(source_idx, error.message.clone());
+                        last_source_error = Some(error);
                         live.end(source_idx);
                         ready_to_add = pending_readds.source_ended(source_idx);
                         send_bus_status(&session_id, bus_statuses.forget_source(source_idx));
@@ -338,8 +341,8 @@ pub(super) async fn run_merge_task(
                         if let Some((&idx, _)) = running {
                             pending_readds.removing(idx, profile_id.clone());
                         }
-                        if let Some(flag) = source_stop_flags.remove(&profile_id) {
-                            flag.store(true, Ordering::SeqCst);
+                        if let Some(source_stop) = source_stops.remove(&profile_id) {
+                            source_stop.cancel();
                             tlog!("[IOBroker] Hot-removing source (profile '{}')", profile_id);
                         } else {
                             tlog!("[IOBroker] Hot-remove: profile '{}' not found in stop flags", profile_id);
@@ -359,6 +362,7 @@ pub(super) async fn run_merge_task(
                     }
                 }
             }
+            () = stop.cancelled() => {}
             _ = tokio::time::sleep(emit_interval) => {
                 // Periodic wakeup for batch emission
             }
@@ -387,8 +391,8 @@ pub(super) async fn run_merge_task(
                 tlog!("[IOBroker] Hot-add: profile '{}' not found", source_config.profile_id);
                 continue;
             };
-            let source_stop = Arc::new(AtomicBool::new(false));
-            source_stop_flags.insert(source_config.profile_id.clone(), source_stop.clone());
+            let source_stop = sources_stop.child_token();
+            source_stops.insert(source_config.profile_id.clone(), source_stop.clone());
             let source_pause =
                 register_pause_flag(&source_pause_flags, &source_config.profile_id);
             source_profiles.insert(idx, SourceIdentity::of(&source_config));
@@ -404,7 +408,6 @@ pub(super) async fn run_merge_task(
                 source_stop,
                 source_pause,
                 &session_id,
-                &stop_flag,
                 &tx,
                 &virtual_bus_controls,
                 &virtual_cmd_txs,
@@ -485,13 +488,13 @@ pub(super) async fn run_merge_task(
     // "complete" — that reported a clean finish for a session which may never
     // have carried a frame, and left the backend claiming Running while only
     // the frontend knew otherwise.
-    let reason = stream_ended_reason(stop_flag.load(Ordering::SeqCst), last_source_error.is_some());
+    let reason = stream_ended_reason(stop.is_cancelled(), last_source_error.is_some());
     // Only a run that *ended* in error is a failed session. A source that
     // dropped hours ago must not turn a deliberate stop into one — it was
     // reported at the time, via emit_session_error.
     if reason == StreamEndReason::Error {
         if let (Some(error), Ok(mut slot)) = (last_source_error, fatal_error.lock()) {
-            slot.get_or_insert(error);
+            slot.get_or_insert(error.message);
         }
     }
     emit_stream_ended(&session_id, reason, "IOBroker");
@@ -509,23 +512,13 @@ fn spawn_source(
     index: usize,
     source_config: &SourceConfig,
     profile: &crate::settings::IOProfile,
-    source_stop: Arc<AtomicBool>,
+    source_stop: CancellationToken,
     source_pause: Arc<AtomicBool>,
     session_id: &str,
-    stop_flag: &Arc<AtomicBool>,
     tx: &mpsc::Sender<SourceMessage>,
     virtual_bus_controls: &VirtualBusControls,
     virtual_cmd_txs: &Arc<Mutex<HashMap<usize, VirtualCmdTx>>>,
 ) -> tokio::task::JoinHandle<()> {
-    let session_id_clone = session_id.to_string();
-    let stop_flag_clone = stop_flag.clone();
-    let source_stop_clone = source_stop;
-    let source_pause_clone = source_pause;
-    let tx_clone = tx.clone();
-    let config = source_config.clone();
-    let virtual_bus_controls_clone = virtual_bus_controls.clone();
-    let profile = profile.clone();
-
     // Create virtual command channel for virtual sources
     let virtual_cmd_rx = if profile.kind == "virtual" {
         let (vtx, vrx) = mpsc::unbounded_channel::<VirtualBusCommand>();
@@ -537,38 +530,17 @@ fn spawn_source(
         None
     };
 
-    tokio::spawn(async move {
-        // Combine global stop flag with per-source stop flag
-        let combined_stop = Arc::new(AtomicBool::new(false));
-        let combined = combined_stop.clone();
-        let global = stop_flag_clone.clone();
-        let source = source_stop_clone.clone();
-        // Spawn a tiny monitor task that sets combined_stop when either flag is set
-        let monitor = tokio::spawn(async move {
-            loop {
-                if global.load(Ordering::Relaxed) || source.load(Ordering::Relaxed) {
-                    combined.store(true, Ordering::SeqCst);
-                    break;
-                }
-                tokio::time::sleep(std::time::Duration::from_millis(50)).await;
-            }
-        });
-
-        run_source_reader(
-            session_id_clone,
-            index,
-            profile,
-            config,
-            combined_stop,
-            source_pause_clone,
-            tx_clone,
-            virtual_bus_controls_clone,
-            virtual_cmd_rx,
-        )
-        .await;
-
-        monitor.abort();
-    })
+    tokio::spawn(run_source_reader(
+        session_id.to_string(),
+        index,
+        profile.clone(),
+        source_config.clone(),
+        source_stop,
+        source_pause,
+        tx.clone(),
+        virtual_bus_controls.clone(),
+        virtual_cmd_rx,
+    ))
 }
 
 /// Why a session's stream ended, from the two facts the merge loop knows when

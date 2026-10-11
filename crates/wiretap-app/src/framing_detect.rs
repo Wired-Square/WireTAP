@@ -219,7 +219,7 @@ mod desktop {
 
         // The tail spans every bus, so read a few windows' worth to leave the
         // busiest one a full window once they are separated.
-        let captured = capture_store::get_capture_bytes_tail(&capture_id, sample.saturating_mul(4));
+        let captured = capture_store::get_capture_bytes_tail(&capture_id, sample.saturating_mul(4))?;
         let mut by_bus: std::collections::BTreeMap<u8, Vec<u8>> = std::collections::BTreeMap::new();
         for b in &captured {
             by_bus.entry(b.bus).or_default().push(b.byte);

@@ -10,22 +10,20 @@
 // Schema changes MUST be recorded migrations — see
 // docs/capture-db-migrations.md. Never issue ad-hoc DDL from feature code.
 
-use once_cell::sync::Lazy;
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::Serialize;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use wiretap_gateway::{CaptureProtocol, FrameRowFilter, Sql, SqlValue};
 use wiretap_decode::frame_id::format_frame_id;
 
 use crate::capture_events::CaptureEvent;
 use crate::capture_store::{CaptureFrameInfo, CaptureMetadata, CaptureKind, FrameSelection, TimestampedByte};
+use crate::connection_slot::ConnectionSlot;
 use crate::io::{now_us, FrameMessage};
 
-/// Global database connection, protected by a Mutex.
-/// rusqlite::Connection is !Sync, so we use Mutex (not RwLock).
-static DB: Lazy<Mutex<Option<Connection>>> = Lazy::new(|| Mutex::new(None));
+static DB: ConnectionSlot = ConnectionSlot::new();
 
 /// Table creation only. Indexes are created in a separate step AFTER the
 /// buffer→capture migration, because pre-migration legacy databases have
@@ -287,57 +285,69 @@ fn baseline_capture_schema(tx: &rusqlite::Transaction) -> Result<(), String> {
 /// Initialise the capture database. Must be called once at app startup.
 /// When `clear_on_start` is true, leftover data from previous sessions is deleted.
 pub fn initialise(app_data_dir: &Path, clear_on_start: bool) -> Result<(), String> {
-    std::fs::create_dir_all(app_data_dir)
-        .map_err(|e| format!("Failed to create app data dir: {}", e))?;
-
     let db_path = app_data_dir.join("buffers.db");
-    let mut conn = Connection::open(&db_path)
-        .map_err(|e| format!("Failed to open capture database: {}", e))?;
+    DB.open(&db_path, "capture database", |conn| {
+        run_migrations(conn)?;
 
-    run_migrations(&mut conn)?;
+        // Conditionally clear leftover data and reclaim disk space
+        // Persistent (pinned) captures survive the clear.
+        if clear_on_start {
+            // The database file persists WAL mode from the previous session.
+            // VACUUM cannot shrink a WAL-mode database, so switch to DELETE mode first.
+            conn.execute_batch("PRAGMA journal_mode=DELETE;")
+                .map_err(|e| format!("Failed to switch to DELETE journal mode: {}", e))?;
+            sweep_non_persistent_with_conn(conn)?;
+            conn.execute_batch("VACUUM;")
+                .map_err(|e| format!("Failed to vacuum database: {}", e))?;
+            tlog!("[capture_db] Initialised at {:?} (cleared non-persistent and vacuumed)", db_path);
+        } else {
+            tlog!("[capture_db] Initialised at {:?} (preserving previous data)", db_path);
+        }
 
-    // Conditionally clear leftover data and reclaim disk space
-    // Persistent (pinned) captures survive the clear.
-    if clear_on_start {
-        // The database file persists WAL mode from the previous session.
-        // VACUUM cannot shrink a WAL-mode database, so switch to DELETE mode first.
-        conn.execute_batch("PRAGMA journal_mode=DELETE;")
-            .map_err(|e| format!("Failed to switch to DELETE journal mode: {}", e))?;
-        sweep_non_persistent_with_conn(&conn)?;
-        conn.execute_batch("VACUUM;")
-            .map_err(|e| format!("Failed to vacuum database: {}", e))?;
-        tlog!("[capture_db] Initialised at {:?} (cleared non-persistent and vacuumed)", db_path);
-    } else {
-        tlog!("[capture_db] Initialised at {:?} (preserving previous data)", db_path);
-    }
-
-    // Set WAL mode and performance pragmas after vacuum (VACUUM resets journal mode)
-    conn.execute_batch("PRAGMA journal_mode=WAL;")
-        .map_err(|e| format!("Failed to set WAL mode: {}", e))?;
-    conn.execute_batch("PRAGMA synchronous=NORMAL;")
-        .map_err(|e| format!("Failed to set synchronous mode: {}", e))?;
-    conn.execute_batch("PRAGMA cache_size=-65536;")
-        .map_err(|e| format!("Failed to set cache size: {}", e))?;
-    conn.execute_batch("PRAGMA temp_store=MEMORY;")
-        .map_err(|e| format!("Failed to set temp store: {}", e))?;
-
-    *DB.lock().unwrap() = Some(conn);
-    Ok(())
+        // Set WAL mode and performance pragmas after vacuum (VACUUM resets journal mode)
+        conn.execute_batch("PRAGMA journal_mode=WAL;")
+            .map_err(|e| format!("Failed to set WAL mode: {}", e))?;
+        conn.execute_batch("PRAGMA synchronous=NORMAL;")
+            .map_err(|e| format!("Failed to set synchronous mode: {}", e))?;
+        conn.execute_batch("PRAGMA cache_size=-65536;")
+            .map_err(|e| format!("Failed to set cache size: {}", e))?;
+        conn.execute_batch("PRAGMA temp_store=MEMORY;")
+            .map_err(|e| format!("Failed to set temp store: {}", e))
+    })
 }
 
 #[cfg(test)]
+pub(crate) fn in_memory() -> Connection {
+    let mut conn = Connection::open_in_memory().unwrap();
+    run_migrations(&mut conn).unwrap();
+    conn
+}
+
+/// The one database every test shares; for a test whose work leaves its thread.
+#[cfg(test)]
 pub(crate) fn use_in_memory_database() {
-    let mut db = DB.lock().unwrap();
-    if db.is_none() {
-        let mut conn = Connection::open_in_memory().unwrap();
-        run_migrations(&mut conn).unwrap();
-        *db = Some(conn);
-    }
+    DB.install_once(in_memory);
+}
+
+/// `conn` stands in for the database on this test's thread until the guard drops;
+/// any other thread still reaches the shared one.
+#[cfg(test)]
+pub(crate) fn use_own_connection(conn: Connection) -> crate::connection_slot::ThreadConnection {
+    DB.lend_to_this_thread(conn)
+}
+
+#[cfg(test)]
+pub(crate) fn use_own_database() -> crate::connection_slot::ThreadConnection {
+    use_own_connection(in_memory())
 }
 
 #[cfg(test)]
 pub(crate) fn trace_statements(trace: Option<fn(&str)>) {
-    DB.lock().unwrap().as_mut().expect("database").trace(trace);
+    DB.with(|conn| {
+        conn.trace(trace);
+        Ok(())
+    })
+    .expect("database");
 }
 
 
@@ -395,12 +405,13 @@ fn row_to_frame_with_rowid(row: &rusqlite::Row) -> rusqlite::Result<(i64, FrameM
 
 /// Insert a batch of frames for a capture. Uses a single transaction.
 pub fn insert_frames(capture_id: &str, frames: &[FrameMessage]) -> Result<(), String> {
+    DB.with(|conn| insert_frames_with_conn(conn, capture_id, frames))
+}
+
+fn insert_frames_with_conn(conn: &mut Connection, capture_id: &str, frames: &[FrameMessage]) -> Result<(), String> {
     if frames.is_empty() {
         return Ok(());
     }
-
-    let mut guard = DB.lock().unwrap();
-    let conn = guard.as_mut().ok_or("Database not initialised")?;
 
     let tx = conn
         .transaction()
@@ -447,12 +458,13 @@ fn insert_frame_rows(conn: &Connection, capture_id: &str, frames: &[FrameMessage
 
 /// Insert a batch of timestamped bytes for a capture. Uses a single transaction.
 pub fn insert_bytes(capture_id: &str, bytes: &[TimestampedByte]) -> Result<(), String> {
+    DB.with(|conn| insert_bytes_with_conn(conn, capture_id, bytes))
+}
+
+fn insert_bytes_with_conn(conn: &mut Connection, capture_id: &str, bytes: &[TimestampedByte]) -> Result<(), String> {
     if bytes.is_empty() {
         return Ok(());
     }
-
-    let mut guard = DB.lock().unwrap();
-    let conn = guard.as_mut().ok_or("Database not initialised")?;
 
     let tx = conn
         .transaction()
@@ -493,9 +505,15 @@ pub fn get_frames_paginated(
     offset: usize,
     limit: usize,
 ) -> Result<(Vec<FrameMessage>, Vec<i64>), String> {
-    let guard = DB.lock().unwrap();
-    let conn = guard.as_ref().ok_or("Database not initialised")?;
+    DB.with(|conn| get_frames_paginated_with_conn(conn, capture_id, offset, limit))
+}
 
+fn get_frames_paginated_with_conn(
+    conn: &Connection,
+    capture_id: &str,
+    offset: usize,
+    limit: usize,
+) -> Result<(Vec<FrameMessage>, Vec<i64>), String> {
     let mut stmt = conn
         .prepare_cached(
             &format!("SELECT {FRAME_COLUMNS}
@@ -526,15 +544,7 @@ pub fn get_frames_paginated_filtered(
     limit: usize,
     selection: &FrameSelection,
 ) -> Result<(Vec<FrameMessage>, Vec<i64>, usize), String> {
-    if selection.is_empty() {
-        let (frames, rowids) = get_frames_paginated(capture_id, offset, limit)?;
-        let total = get_frame_count(capture_id)?;
-        return Ok((frames, rowids, total));
-    }
-
-    let guard = DB.lock().unwrap();
-    let conn = guard.as_ref().ok_or("Database not initialised")?;
-    get_frames_paginated_filtered_with_conn(conn, capture_id, offset, limit, selection)
+    DB.with(|conn| get_frames_paginated_filtered_with_conn(conn, capture_id, offset, limit, selection))
 }
 
 fn get_frames_paginated_filtered_with_conn(
@@ -544,6 +554,12 @@ fn get_frames_paginated_filtered_with_conn(
     limit: usize,
     selection: &FrameSelection,
 ) -> Result<(Vec<FrameMessage>, Vec<i64>, usize), String> {
+    if selection.is_empty() {
+        let (frames, rowids) = get_frames_paginated_with_conn(conn, capture_id, offset, limit)?;
+        let total = get_frame_count_with_conn(conn, capture_id)?;
+        return Ok((frames, rowids, total));
+    }
+
     let pairs = selection_json(selection);
 
     // Get total filtered count
@@ -653,9 +669,14 @@ pub fn get_frames_tail_rows(
     capture_id: &str,
     limit: usize,
 ) -> Result<(Vec<FrameMessage>, Vec<i64>), String> {
-    let guard = DB.lock().unwrap();
-    let conn = guard.as_ref().ok_or("Database not initialised")?;
+    DB.with(|conn| get_frames_tail_rows_with_conn(conn, capture_id, limit))
+}
 
+fn get_frames_tail_rows_with_conn(
+    conn: &Connection,
+    capture_id: &str,
+    limit: usize,
+) -> Result<(Vec<FrameMessage>, Vec<i64>), String> {
     let mut stmt = conn
         .prepare_cached(&format!(
             "SELECT {FRAME_COLUMNS} FROM frames WHERE capture_id = ?1 ORDER BY rowid DESC LIMIT ?2"
@@ -673,9 +694,7 @@ pub fn get_frames_tail_filtered(
     limit: usize,
     selection: &FrameSelection,
 ) -> Result<(Vec<FrameMessage>, Vec<i64>, usize), String> {
-    let guard = DB.lock().unwrap();
-    let conn = guard.as_ref().ok_or("Database not initialised")?;
-    get_frames_tail_filtered_with_conn(conn, capture_id, limit, selection)
+    DB.with(|conn| get_frames_tail_filtered_with_conn(conn, capture_id, limit, selection))
 }
 
 fn get_frames_tail_filtered_with_conn(
@@ -709,9 +728,10 @@ fn get_frames_tail_filtered_with_conn(
 
 /// Get total frame count for a capture.
 pub fn get_frame_count(capture_id: &str) -> Result<usize, String> {
-    let guard = DB.lock().unwrap();
-    let conn = guard.as_ref().ok_or("Database not initialised")?;
+    DB.with(|conn| get_frame_count_with_conn(conn, capture_id))
+}
 
+fn get_frame_count_with_conn(conn: &Connection, capture_id: &str) -> Result<usize, String> {
     let count: i64 = conn
         .query_row(
             "SELECT COUNT(*) FROM frames WHERE capture_id = ?1",
@@ -725,8 +745,10 @@ pub fn get_frame_count(capture_id: &str) -> Result<usize, String> {
 
 /// The protocols other than CAN a capture holds, alphabetically.
 pub fn non_can_protocols(capture_id: &str) -> Result<Vec<String>, String> {
-    let guard = DB.lock().unwrap();
-    let conn = guard.as_ref().ok_or("Database not initialised")?;
+    DB.with(|conn| non_can_protocols_with_conn(conn, capture_id))
+}
+
+fn non_can_protocols_with_conn(conn: &Connection, capture_id: &str) -> Result<Vec<String>, String> {
     conn.prepare_cached(
         "SELECT DISTINCT protocol FROM frames WHERE capture_id = ?1 AND protocol != 'can' ORDER BY protocol",
     )
@@ -736,9 +758,7 @@ pub fn non_can_protocols(capture_id: &str) -> Result<Vec<String>, String> {
 
 /// Get unique frame info via aggregation query.
 pub fn get_frame_info(capture_id: &str) -> Result<Vec<CaptureFrameInfo>, String> {
-    let guard = DB.lock().unwrap();
-    let conn = guard.as_ref().ok_or("Database not initialised")?;
-    get_frame_info_with_conn(conn, capture_id)
+    DB.with(|conn| get_frame_info_with_conn(conn, capture_id))
 }
 
 fn get_frame_info_with_conn(conn: &Connection, capture_id: &str) -> Result<Vec<CaptureFrameInfo>, String> {
@@ -852,9 +872,7 @@ pub fn sample_frame_payloads(
     is_extended: Option<bool>,
     sample_limit: u32,
 ) -> Result<Vec<Vec<u8>>, String> {
-    let guard = DB.lock().unwrap();
-    let conn = guard.as_ref().ok_or("Database not initialised")?;
-    sample_frame_payloads_with_conn(conn, capture_id, protocol, frame_id, is_extended, sample_limit)
+    DB.with(|conn| sample_frame_payloads_with_conn(conn, capture_id, protocol, frame_id, is_extended, sample_limit))
 }
 
 /// One frame's rows in a capture; a protocol the capture cannot store is refused.
@@ -910,9 +928,7 @@ pub fn tail_frame_payloads(
     is_extended: Option<bool>,
     limit: u32,
 ) -> Result<Vec<Vec<u8>>, String> {
-    let guard = DB.lock().unwrap();
-    let conn = guard.as_ref().ok_or("Database not initialised")?;
-    tail_frame_payloads_with_conn(conn, capture_id, protocol, frame_id, is_extended, limit)
+    DB.with(|conn| tail_frame_payloads_with_conn(conn, capture_id, protocol, frame_id, is_extended, limit))
 }
 
 fn tail_frame_payloads_with_conn(
@@ -938,9 +954,15 @@ pub fn find_offset_for_timestamp(
     target_us: u64,
     selection: &FrameSelection,
 ) -> Result<usize, String> {
-    let guard = DB.lock().unwrap();
-    let conn = guard.as_ref().ok_or("Database not initialised")?;
+    DB.with(|conn| find_offset_for_timestamp_with_conn(conn, capture_id, target_us, selection))
+}
 
+fn find_offset_for_timestamp_with_conn(
+    conn: &Connection,
+    capture_id: &str,
+    target_us: u64,
+    selection: &FrameSelection,
+) -> Result<usize, String> {
     let sql = format!(
         "SELECT COUNT(*) FROM frames WHERE capture_id = ?1 AND timestamp_us < ?2 {}",
         if selection.is_empty() { String::new() } else { selection_predicate(3, selection) }
@@ -971,6 +993,17 @@ pub fn search_frames(
     search_data: bool,
     selection: &FrameSelection,
 ) -> Result<Vec<usize>, String> {
+    DB.with(|conn| search_frames_with_conn(conn, capture_id, query, search_id, search_data, selection))
+}
+
+fn search_frames_with_conn(
+    conn: &Connection,
+    capture_id: &str,
+    query: &str,
+    search_id: bool,
+    search_data: bool,
+    selection: &FrameSelection,
+) -> Result<Vec<usize>, String> {
     if query.is_empty() || (!search_id && !search_data) {
         return Ok(Vec::new());
     }
@@ -983,9 +1016,6 @@ pub fn search_frames(
     };
     let q_lower = q.to_lowercase();
     let q_upper = q.to_uppercase();
-
-    let guard = DB.lock().unwrap();
-    let conn = guard.as_ref().ok_or("Database not initialised")?;
 
     let id_filter = if selection.is_empty() {
         String::new()
@@ -1048,9 +1078,7 @@ pub fn search_frames(
 
 /// Copy all frame and byte data from one capture to another using INSERT SELECT.
 pub fn copy_capture_data(source_id: &str, dest_id: &str) -> Result<usize, String> {
-    let mut guard = DB.lock().unwrap();
-    let conn = guard.as_mut().ok_or("Database not initialised")?;
-    copy_capture_data_with_conn(conn, source_id, dest_id)
+    DB.with(|conn| copy_capture_data_with_conn(conn, source_id, dest_id))
 }
 
 fn copy_capture_data_with_conn(conn: &mut Connection, source_id: &str, dest_id: &str) -> Result<usize, String> {
@@ -1092,9 +1120,7 @@ fn copy_capture_data_with_conn(conn: &mut Connection, source_id: &str, dest_id: 
 
 /// Delete all data for a specific capture.
 pub fn delete_capture_data(capture_id: &str) -> Result<(), String> {
-    let guard = DB.lock().unwrap();
-    let conn = guard.as_ref().ok_or("Database not initialised")?;
-    delete_capture_data_with_conn(conn, capture_id)
+    DB.with(|conn| delete_capture_data_with_conn(conn, capture_id))
 }
 
 fn delete_capture_data_with_conn(conn: &Connection, capture_id: &str) -> Result<(), String> {
@@ -1110,9 +1136,10 @@ fn delete_capture_data_with_conn(conn: &Connection, capture_id: &str) -> Result<
 
 /// Clear and refill a capture with new frames (used by framing to reuse capture IDs).
 pub fn clear_and_refill(capture_id: &str, frames: &[FrameMessage]) -> Result<(), String> {
-    let mut guard = DB.lock().unwrap();
-    let conn = guard.as_mut().ok_or("Database not initialised")?;
+    DB.with(|conn| clear_and_refill_with_conn(conn, capture_id, frames))
+}
 
+fn clear_and_refill_with_conn(conn: &mut Connection, capture_id: &str, frames: &[FrameMessage]) -> Result<(), String> {
     let tx = conn
         .transaction()
         .map_err(|e| format!("Failed to begin transaction: {}", e))?;
@@ -1130,9 +1157,10 @@ pub fn clear_and_refill(capture_id: &str, frames: &[FrameMessage]) -> Result<(),
 
 /// Get all frames for a capture (loads everything — use sparingly).
 pub fn get_all_frames(capture_id: &str) -> Result<Vec<FrameMessage>, String> {
-    let guard = DB.lock().unwrap();
-    let conn = guard.as_ref().ok_or("Database not initialised")?;
+    DB.with(|conn| get_all_frames_with_conn(conn, capture_id))
+}
 
+fn get_all_frames_with_conn(conn: &Connection, capture_id: &str) -> Result<Vec<FrameMessage>, String> {
     let mut stmt = conn
         .prepare_cached(
             &format!("SELECT {FRAME_COLUMNS}
@@ -1159,9 +1187,10 @@ pub fn get_all_frames(capture_id: &str) -> Result<Vec<FrameMessage>, String> {
 /// answer for 20× the rows over IPC, so the reduction belongs here, next to
 /// `get_frame_info`, which already groups the same way.
 pub fn get_latest_frames(capture_id: &str) -> Result<Vec<FrameMessage>, String> {
-    let guard = DB.lock().unwrap();
-    let conn = guard.as_ref().ok_or("Database not initialised")?;
+    DB.with(|conn| get_latest_frames_with_conn(conn, capture_id))
+}
 
+fn get_latest_frames_with_conn(conn: &Connection, capture_id: &str) -> Result<Vec<FrameMessage>, String> {
     let mut stmt = conn
         .prepare_cached(
             &format!("SELECT {FRAME_COLUMNS}
@@ -1195,9 +1224,15 @@ pub fn read_frame_chunk(
     after_rowid: i64,
     limit: usize,
 ) -> Result<Vec<(i64, FrameMessage)>, String> {
-    let guard = DB.lock().unwrap();
-    let conn = guard.as_ref().ok_or("Database not initialised")?;
+    DB.with(|conn| read_frame_chunk_with_conn(conn, capture_id, after_rowid, limit))
+}
 
+fn read_frame_chunk_with_conn(
+    conn: &Connection,
+    capture_id: &str,
+    after_rowid: i64,
+    limit: usize,
+) -> Result<Vec<(i64, FrameMessage)>, String> {
     let mut stmt = conn
         .prepare_cached(
             &format!("SELECT {FRAME_COLUMNS}
@@ -1225,9 +1260,15 @@ pub fn read_frame_chunk_reverse(
     before_rowid: i64,
     limit: usize,
 ) -> Result<Vec<(i64, FrameMessage)>, String> {
-    let guard = DB.lock().unwrap();
-    let conn = guard.as_ref().ok_or("Database not initialised")?;
+    DB.with(|conn| read_frame_chunk_reverse_with_conn(conn, capture_id, before_rowid, limit))
+}
 
+fn read_frame_chunk_reverse_with_conn(
+    conn: &Connection,
+    capture_id: &str,
+    before_rowid: i64,
+    limit: usize,
+) -> Result<Vec<(i64, FrameMessage)>, String> {
     let mut stmt = conn
         .prepare_cached(
             &format!("SELECT {FRAME_COLUMNS}
@@ -1250,9 +1291,10 @@ pub fn read_frame_chunk_reverse(
 
 /// Get min and max rowid for a capture (for determining bounds).
 pub fn get_rowid_range(capture_id: &str) -> Result<Option<(i64, i64)>, String> {
-    let guard = DB.lock().unwrap();
-    let conn = guard.as_ref().ok_or("Database not initialised")?;
+    DB.with(|conn| get_rowid_range_with_conn(conn, capture_id))
+}
 
+fn get_rowid_range_with_conn(conn: &Connection, capture_id: &str) -> Result<Option<(i64, i64)>, String> {
     let result: Option<(i64, i64)> = conn
         .query_row(
             "SELECT MIN(rowid), MAX(rowid) FROM frames WHERE capture_id = ?1",
@@ -1273,9 +1315,14 @@ pub fn find_rowid_for_timestamp(
     capture_id: &str,
     timestamp_us: u64,
 ) -> Result<Option<i64>, String> {
-    let guard = DB.lock().unwrap();
-    let conn = guard.as_ref().ok_or("Database not initialised")?;
+    DB.with(|conn| find_rowid_for_timestamp_with_conn(conn, capture_id, timestamp_us))
+}
 
+fn find_rowid_for_timestamp_with_conn(
+    conn: &Connection,
+    capture_id: &str,
+    timestamp_us: u64,
+) -> Result<Option<i64>, String> {
     let result: Option<i64> = conn
         .query_row(
             "SELECT rowid FROM frames WHERE capture_id = ?1 AND timestamp_us >= ?2 ORDER BY timestamp_us ASC, rowid ASC LIMIT 1",
@@ -1295,9 +1342,14 @@ pub fn get_frame_at_index(
     capture_id: &str,
     index: usize,
 ) -> Result<Option<(i64, FrameMessage)>, String> {
-    let guard = DB.lock().unwrap();
-    let conn = guard.as_ref().ok_or("Database not initialised")?;
+    DB.with(|conn| get_frame_at_index_with_conn(conn, capture_id, index))
+}
 
+fn get_frame_at_index_with_conn(
+    conn: &Connection,
+    capture_id: &str,
+    index: usize,
+) -> Result<Option<(i64, FrameMessage)>, String> {
     let result = conn
         .query_row(
             &format!("SELECT {FRAME_COLUMNS}
@@ -1319,9 +1371,16 @@ pub fn get_next_filtered_frame(
     selection: &FrameSelection,
     backward: bool,
 ) -> Result<Option<(i64, usize, FrameMessage)>, String> {
-    let guard = DB.lock().unwrap();
-    let conn = guard.as_ref().ok_or("Database not initialised")?;
+    DB.with(|conn| get_next_filtered_frame_with_conn(conn, capture_id, current_rowid, selection, backward))
+}
 
+fn get_next_filtered_frame_with_conn(
+    conn: &Connection,
+    capture_id: &str,
+    current_rowid: i64,
+    selection: &FrameSelection,
+    backward: bool,
+) -> Result<Option<(i64, usize, FrameMessage)>, String> {
     let (op, order) = if backward {
         ("<", "DESC")
     } else {
@@ -1364,9 +1423,10 @@ pub fn get_next_filtered_frame(
 
 /// Count the number of frames before a given rowid in a capture (for computing 0-based frame index).
 pub fn count_frames_before_rowid(capture_id: &str, rowid: i64) -> Result<usize, String> {
-    let guard = DB.lock().unwrap();
-    let conn = guard.as_ref().ok_or("Database not initialised")?;
+    DB.with(|conn| count_frames_before_rowid_with_conn(conn, capture_id, rowid))
+}
 
+fn count_frames_before_rowid_with_conn(conn: &Connection, capture_id: &str, rowid: i64) -> Result<usize, String> {
     let count: i64 = conn
         .query_row(
             "SELECT COUNT(*) FROM frames WHERE capture_id = ?1 AND rowid < ?2",
@@ -1409,9 +1469,7 @@ pub fn get_bytes_paginated(
     offset: usize,
     limit: usize,
 ) -> Result<(Vec<TimestampedByte>, usize), String> {
-    let guard = DB.lock().unwrap();
-    let conn = guard.as_ref().ok_or("Database not initialised")?;
-    get_bytes_paginated_with_conn(conn, capture_id, offset, limit)
+    DB.with(|conn| get_bytes_paginated_with_conn(conn, capture_id, offset, limit))
 }
 
 fn get_bytes_paginated_with_conn(
@@ -1445,9 +1503,7 @@ fn get_bytes_paginated_with_conn(
 /// this must not scan the capture. `LIMIT ?2 OFFSET total - n` would walk every skipped
 /// row on each call, which is quadratic over a session.
 pub fn get_bytes_tail_rows(capture_id: &str, limit: usize) -> Result<Vec<TimestampedByte>, String> {
-    let guard = DB.lock().unwrap();
-    let conn = guard.as_ref().ok_or("Database not initialised")?;
-    get_bytes_tail_rows_with_conn(conn, capture_id, limit)
+    DB.with(|conn| get_bytes_tail_rows_with_conn(conn, capture_id, limit))
 }
 
 fn get_bytes_tail_rows_with_conn(
@@ -1469,9 +1525,10 @@ fn get_bytes_tail_rows_with_conn(
 
 /// Get all bytes for a capture (used by framing which needs the full stream).
 pub fn get_all_bytes(capture_id: &str) -> Result<Vec<TimestampedByte>, String> {
-    let guard = DB.lock().unwrap();
-    let conn = guard.as_ref().ok_or("Database not initialised")?;
+    DB.with(|conn| get_all_bytes_with_conn(conn, capture_id))
+}
 
+fn get_all_bytes_with_conn(conn: &Connection, capture_id: &str) -> Result<Vec<TimestampedByte>, String> {
     let mut stmt = conn
         .prepare_cached(&format!(
             "SELECT {BYTE_COLUMNS} FROM bytes WHERE capture_id = ?1 ORDER BY rowid"
@@ -1493,13 +1550,13 @@ pub fn read_rows<T>(
     cancel: &Arc<AtomicBool>,
     map: impl FnMut(&rusqlite::Row) -> rusqlite::Result<T>,
 ) -> Result<Vec<T>, String> {
-    let guard = DB.lock().unwrap();
-    let conn = guard.as_ref().ok_or("Database not initialised")?;
-    let cancel = Arc::clone(cancel);
-    conn.progress_handler(1000, Some(move || cancel.load(Ordering::Relaxed)));
-    let rows = read_rows_with_conn(conn, statement, map);
-    conn.progress_handler(0, None::<fn() -> bool>);
-    rows
+    DB.with(|conn| {
+        let cancel = Arc::clone(cancel);
+        conn.progress_handler(1000, Some(move || cancel.load(Ordering::Relaxed)));
+        let rows = read_rows_with_conn(conn, statement, map);
+        conn.progress_handler(0, None::<fn() -> bool>);
+        rows
+    })
 }
 
 pub(crate) fn read_rows_with_conn<T>(
@@ -1559,9 +1616,14 @@ pub fn find_bytes_offset_for_timestamp(
     capture_id: &str,
     target_us: u64,
 ) -> Result<usize, String> {
-    let guard = DB.lock().unwrap();
-    let conn = guard.as_ref().ok_or("Database not initialised")?;
+    DB.with(|conn| find_bytes_offset_for_timestamp_with_conn(conn, capture_id, target_us))
+}
 
+fn find_bytes_offset_for_timestamp_with_conn(
+    conn: &Connection,
+    capture_id: &str,
+    target_us: u64,
+) -> Result<usize, String> {
     let count: i64 = conn
         .query_row(
             "SELECT COUNT(*) FROM bytes WHERE capture_id = ?1 AND timestamp_us < ?2",
@@ -1579,9 +1641,10 @@ pub fn find_bytes_offset_for_timestamp(
 
 /// Upsert capture metadata into SQLite.
 pub fn save_capture_metadata(meta: &CaptureMetadata) -> Result<(), String> {
-    let guard = DB.lock().unwrap();
-    let conn = guard.as_ref().ok_or("Database not initialised")?;
+    DB.with(|conn| save_capture_metadata_with_conn(conn, meta))
+}
 
+fn save_capture_metadata_with_conn(conn: &Connection, meta: &CaptureMetadata) -> Result<(), String> {
     let kind_str = meta.kind.as_str();
 
     let buses_json = serde_json::to_string(&meta.buses).unwrap_or_else(|_| "[]".to_string());
@@ -1609,9 +1672,10 @@ pub fn save_capture_metadata(meta: &CaptureMetadata) -> Result<(), String> {
 
 /// Load all capture metadata from SQLite.
 pub fn load_all_capture_metadata() -> Result<Vec<CaptureMetadata>, String> {
-    let guard = DB.lock().unwrap();
-    let conn = guard.as_ref().ok_or("Database not initialised")?;
+    DB.with(|conn| load_all_capture_metadata_with_conn(conn))
+}
 
+fn load_all_capture_metadata_with_conn(conn: &Connection, ) -> Result<Vec<CaptureMetadata>, String> {
     let mut stmt = conn
         .prepare("SELECT capture_id, capture_kind, name, count, start_time_us, end_time_us, created_at, owning_session_id, persistent, buses FROM capture_metadata")
         .map_err(|e| format!("Failed to prepare: {}", e))?;
@@ -1649,9 +1713,10 @@ pub fn load_all_capture_metadata() -> Result<Vec<CaptureMetadata>, String> {
 
 /// Update the name of a capture in SQLite.
 pub fn update_capture_name(capture_id: &str, new_name: &str) -> Result<(), String> {
-    let guard = DB.lock().unwrap();
-    let conn = guard.as_ref().ok_or("Database not initialised")?;
+    DB.with(|conn| update_capture_name_with_conn(conn, capture_id, new_name))
+}
 
+fn update_capture_name_with_conn(conn: &Connection, capture_id: &str, new_name: &str) -> Result<(), String> {
     conn.execute(
         "UPDATE capture_metadata SET name = ?2 WHERE capture_id = ?1",
         params![capture_id, new_name],
@@ -1663,9 +1728,10 @@ pub fn update_capture_name(capture_id: &str, new_name: &str) -> Result<(), Strin
 
 /// Update the persistent flag of a capture in SQLite.
 pub fn update_capture_persistent(capture_id: &str, persistent: bool) -> Result<(), String> {
-    let guard = DB.lock().unwrap();
-    let conn = guard.as_ref().ok_or("Database not initialised")?;
+    DB.with(|conn| update_capture_persistent_with_conn(conn, capture_id, persistent))
+}
 
+fn update_capture_persistent_with_conn(conn: &Connection, capture_id: &str, persistent: bool) -> Result<(), String> {
     conn.execute(
         "UPDATE capture_metadata SET persistent = ?2 WHERE capture_id = ?1",
         params![capture_id, persistent as i64],
@@ -1679,9 +1745,10 @@ pub fn update_capture_persistent(capture_id: &str, persistent: bool) -> Result<(
 /// Used to backfill bus metadata for captures created before bus tracking was added.
 /// `table` should be "frames" or "bytes".
 pub fn get_distinct_buses(capture_id: &str, table: &str) -> Result<Vec<u8>, String> {
-    let guard = DB.lock().unwrap();
-    let conn = guard.as_ref().ok_or("Database not initialised")?;
+    DB.with(|conn| get_distinct_buses_with_conn(conn, capture_id, table))
+}
 
+fn get_distinct_buses_with_conn(conn: &Connection, capture_id: &str, table: &str) -> Result<Vec<u8>, String> {
     // table is an internal constant ("frames" or "bytes"), not user input
     let sql = format!(
         "SELECT DISTINCT bus FROM {} WHERE capture_id = ?1 ORDER BY bus",
@@ -1704,9 +1771,10 @@ pub fn get_distinct_buses(capture_id: &str, table: &str) -> Result<Vec<u8>, Stri
 
 /// Delete metadata for a specific capture.
 pub fn delete_capture_metadata(capture_id: &str) -> Result<(), String> {
-    let guard = DB.lock().unwrap();
-    let conn = guard.as_ref().ok_or("Database not initialised")?;
+    DB.with(|conn| delete_capture_metadata_with_conn(conn, capture_id))
+}
 
+fn delete_capture_metadata_with_conn(conn: &Connection, capture_id: &str) -> Result<(), String> {
     conn.execute(
         "DELETE FROM capture_metadata WHERE capture_id = ?1",
         params![capture_id],
@@ -1740,9 +1808,7 @@ fn parse_event_id(id: &str) -> Result<i64, String> {
 }
 
 pub fn list_capture_events(capture_id: &str) -> Result<Vec<CaptureEvent>, String> {
-    let guard = DB.lock().unwrap();
-    let conn = guard.as_ref().ok_or("Database not initialised")?;
-    list_capture_events_with_conn(conn, capture_id)
+    DB.with(|conn| list_capture_events_with_conn(conn, capture_id))
 }
 
 fn list_capture_events_with_conn(conn: &Connection, capture_id: &str) -> Result<Vec<CaptureEvent>, String> {
@@ -1764,9 +1830,7 @@ pub fn insert_capture_event(
     duration_us: i64,
     note: &str,
 ) -> Result<CaptureEvent, String> {
-    let guard = DB.lock().unwrap();
-    let conn = guard.as_ref().ok_or("Database not initialised")?;
-    insert_capture_event_with_conn(conn, capture_id, timestamp_us, duration_us, note)
+    DB.with(|conn| insert_capture_event_with_conn(conn, capture_id, timestamp_us, duration_us, note))
 }
 
 fn insert_capture_event_with_conn(
@@ -1794,9 +1858,7 @@ pub fn update_capture_event(
     duration_us: i64,
     note: &str,
 ) -> Result<CaptureEvent, String> {
-    let guard = DB.lock().unwrap();
-    let conn = guard.as_ref().ok_or("Database not initialised")?;
-    update_capture_event_with_conn(conn, capture_id, id, timestamp_us, duration_us, note)
+    DB.with(|conn| update_capture_event_with_conn(conn, capture_id, id, timestamp_us, duration_us, note))
 }
 
 fn update_capture_event_with_conn(
@@ -1821,9 +1883,7 @@ fn update_capture_event_with_conn(
 }
 
 pub fn delete_capture_event(capture_id: &str, id: &str) -> Result<(), String> {
-    let guard = DB.lock().unwrap();
-    let conn = guard.as_ref().ok_or("Database not initialised")?;
-    delete_capture_event_with_conn(conn, capture_id, id)
+    DB.with(|conn| delete_capture_event_with_conn(conn, capture_id, id))
 }
 
 fn delete_capture_event_with_conn(conn: &Connection, capture_id: &str, id: &str) -> Result<(), String> {
@@ -2640,5 +2700,73 @@ mod tests {
         for (i, m) in MIGRATIONS.iter().enumerate() {
             assert_eq!(m.version, i as i64 + 1, "MIGRATIONS must be contiguous from 1");
         }
+    }
+
+    fn own_capture(name: &str, frames: &[(u32, &[u8])]) -> (crate::connection_slot::ThreadConnection, String) {
+        let db = use_own_database();
+        let id = crate::capture_store::create_standalone_capture(crate::capture_store::CaptureKind::Frames, name.into());
+        let frames = frames
+            .iter()
+            .enumerate()
+            .map(|(i, &(frame_id, bytes))| FrameMessage {
+                protocol: "can".into(),
+                timestamp_us: i as u64,
+                frame_id,
+                dlc: bytes.len() as u16,
+                bytes: bytes.to_vec(),
+                ..Default::default()
+            })
+            .collect();
+        crate::capture_store::append_frames_to_capture(&id, frames);
+        (db, id)
+    }
+
+    fn search(id: &str, query: &str, search_id: bool, search_data: bool) -> Vec<usize> {
+        search_frames(id, query, search_id, search_data, &FrameSelection::default()).unwrap()
+    }
+
+    #[test]
+    fn a_search_matches_a_substring_of_the_unpadded_lowercase_hex_id() {
+        let (_db, id) = own_capture("search-id", &[(0x100, &[]), (0x210, &[]), (0x7AB, &[])]);
+        assert_eq!(search(&id, "10", true, false), vec![0, 1]);
+        assert_eq!(search(&id, "0x7AB", true, false), vec![2]);
+        assert_eq!(search(&id, "", true, false), Vec::<usize>::new());
+        assert_eq!(search(&id, "10", false, false), Vec::<usize>::new());
+    }
+
+    #[test]
+    fn a_data_search_matches_hex_across_byte_boundaries_in_either_case() {
+        let (_db, id) = own_capture("search-data", &[(1, &[0xDE, 0xAD]), (2, &[0xBE, 0xEF]), (3, &[0x0E, 0xAD])]);
+        assert_eq!(search(&id, "ead", false, true), vec![0, 2]);
+        assert_eq!(search(&id, "EADB", false, true), Vec::<usize>::new());
+        assert_eq!(search(&id, "2", true, true), vec![1]);
+    }
+
+    #[test]
+    fn like_wildcards_in_a_query_are_not_escaped() {
+        let (_db, id) = own_capture("search-wildcards", &[(0x100, &[0x01]), (0x200, &[0x02])]);
+        assert_eq!(search(&id, "_", true, false), vec![0, 1]);
+        assert_eq!(search(&id, "1%0", true, false), vec![0]);
+        assert_eq!(search(&id, "'", true, true), Vec::<usize>::new());
+    }
+
+    #[test]
+    fn a_search_offset_counts_only_the_selected_frames() {
+        let (_db, id) = own_capture("search-selection", &[(0x100, &[]), (0x200, &[]), (0x100, &[])]);
+        let only_0x100 = FrameSelection::from_groups(vec![ProtocolFrames {
+            protocol: "can".into(),
+            frame_ids: vec![0x100],
+            all_ids: false,
+        }]);
+        assert_eq!(search_frames(&id, "100", true, false, &only_0x100).unwrap(), vec![0, 1]);
+    }
+
+    #[test]
+    fn all_frames_come_back_in_insertion_order_with_their_bytes() {
+        let (_db, id) = own_capture("all-frames", &[(0x200, &[1, 2]), (0x100, &[3])]);
+        let frames = get_all_frames(&id).unwrap();
+        let summary: Vec<_> = frames.iter().map(|f| (f.frame_id, f.bytes.clone(), f.timestamp_us)).collect();
+        assert_eq!(summary, vec![(0x200, vec![1, 2], 0), (0x100, vec![3], 1)]);
+        assert!(get_all_frames("no-such-capture").unwrap().is_empty());
     }
 }

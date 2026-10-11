@@ -37,13 +37,13 @@ import type { ProfileUsageInfo } from "../generated/ProfileUsageInfo";
 import type { Protocol } from "../generated/Protocol";
 import type { RegisterSubscriberResult } from "../generated/RegisterSubscriberResult";
 import type { ReinitializeResult } from "../generated/ReinitializeResult";
+import type { IoFailure } from "../generated/IoFailure";
 import type { ScanCompletePayload } from "../generated/ScanCompletePayload";
 import type { ScanJob } from "../generated/ScanJob";
 import type { ScanProgressPayload } from "../generated/ScanProgressPayload";
 import type { SerialOverrides } from "../generated/SerialOverrides";
 import type { SessionLogEntry } from "../generated/SessionLogEntry";
 import type { SessionPurpose } from "../generated/SessionPurpose";
-import type { SessionRefusal } from "../generated/SessionRefusal";
 import type { SessionMode } from "../generated/SessionMode";
 import type { SessionSourceKind } from "../generated/SessionSourceKind";
 import type { SourceInfo } from "../generated/SourceInfo";
@@ -72,6 +72,7 @@ export type {
   InterfaceTraits,
   IOCapabilities,
   IOState,
+  IoFailure,
   ModbusRange,
   ModbusRangeSpec,
   ModbusRegisterType,
@@ -88,7 +89,6 @@ export type {
   ScanJob,
   ScanProgressPayload,
   SessionMode,
-  SessionRefusal,
   SessionSourceKind,
   SourceInfo,
   StepResult,
@@ -193,24 +193,24 @@ export function serialPayload(source: SerialSettings): SerialOverrides {
 
 /** A session command Rust refused, carrying why. */
 export class SessionCommandError extends Error {
-  constructor(readonly refusal: SessionRefusal) {
-    super(refusal.message);
+  constructor(readonly failure: IoFailure) {
+    super(failure.message);
   }
 }
 
 /** Whether `e` says there is no such session, and nothing to open one from. */
 export function isSessionNotFound(e: unknown): boolean {
-  return e instanceof SessionCommandError && e.refusal.kind === "not_found";
+  return e instanceof SessionCommandError && e.failure.kind === "sessionNotFound";
 }
 
 async function sessionCommand<T>(command: string, args: Record<string, unknown>): Promise<T> {
   try {
     return await invoke<T>(command, args);
   } catch (e) {
-    const refusal = typeof e === "object" && e !== null && "kind" in e
-      ? (e as SessionRefusal)
-      : { kind: "failed" as const, message: String(e) };
-    throw new SessionCommandError(refusal);
+    const failure = typeof e === "object" && e !== null && "kind" in e
+      ? (e as IoFailure)
+      : { kind: "other" as const, message: String(e) };
+    throw new SessionCommandError(failure);
   }
 }
 

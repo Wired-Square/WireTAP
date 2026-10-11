@@ -331,7 +331,7 @@ mod tests {
 
         let refused = super::transmit_can(id, &frame).await.unwrap_err();
 
-        let rows = crate::transmit_history::transmit_history_query(id.into(), 0, 10).unwrap();
+        let rows = crate::transmit_history::transmit_history_query(id.into(), 0, 10).await.unwrap();
         assert_eq!(rows.len(), 1, "the refusal never reached the history");
         assert!(!rows[0].success);
         assert_eq!(rows[0].error_msg.as_deref(), Some(refused.as_str()));
@@ -347,7 +347,7 @@ mod tests {
 
         let refused = super::io_transmit_serial(id.into(), vec![0x41], super::SerialFraming::Raw).await.unwrap_err();
 
-        let rows = crate::transmit_history::transmit_history_query(id.into(), 0, 10).unwrap();
+        let rows = crate::transmit_history::transmit_history_query(id.into(), 0, 10).await.unwrap();
         assert_eq!(rows.len(), 1, "the refusal never reached the history");
         assert!(!rows[0].success);
         assert_eq!(rows[0].error_msg.as_deref(), Some(refused.as_str()));

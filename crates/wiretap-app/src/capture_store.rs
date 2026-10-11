@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::collections::hash_map::RandomState;
 use std::hash::{BuildHasher, Hasher};
-use std::sync::RwLock;
+use std::sync::{PoisonError, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use crate::capture_db;
 use crate::capture_inventory::FrameInventory;
@@ -259,6 +259,14 @@ impl Default for CaptureRegistry {
 static CAPTURE_REGISTRY: Lazy<RwLock<CaptureRegistry>> =
     Lazy::new(|| RwLock::new(CaptureRegistry::default()));
 
+fn registry() -> RwLockReadGuard<'static, CaptureRegistry> {
+    CAPTURE_REGISTRY.read().unwrap_or_else(PoisonError::into_inner)
+}
+
+fn registry_mut() -> RwLockWriteGuard<'static, CaptureRegistry> {
+    CAPTURE_REGISTRY.write().unwrap_or_else(PoisonError::into_inner)
+}
+
 #[cfg(test)]
 thread_local! {
     static CAPTURE_LIST_CHANGES: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
@@ -278,7 +286,7 @@ fn capture_list_changed() {
 
 /// Check if a given ID corresponds to a known capture.
 pub fn is_known_capture(id: &str) -> bool {
-    let registry = CAPTURE_REGISTRY.read().unwrap();
+    let registry = registry();
     registry.captures.contains_key(id)
 }
 
@@ -286,10 +294,7 @@ pub fn is_known_capture(id: &str) -> bool {
 /// in progress. True independent of whether a UI panel is watching the session,
 /// so the wake lock can stay held while an unwatched capture keeps recording.
 pub fn has_streaming_captures() -> bool {
-    CAPTURE_REGISTRY
-        .read()
-        .map(|r| !r.streaming_ids.is_empty())
-        .unwrap_or(false)
+    !registry().streaming_ids.is_empty()
 }
 
 // ============================================================================
@@ -356,7 +361,7 @@ fn create_capture_internal(
     set_streaming: bool,
     owner: Option<(&str, CaptureRole)>,
 ) -> String {
-    let mut registry = CAPTURE_REGISTRY.write().unwrap();
+    let mut registry = registry_mut();
 
     let id = generate_capture_id(&registry);
 
@@ -411,7 +416,7 @@ fn create_capture_internal(
 /// List all buffers (returns metadata only, not data).
 /// Sets is_streaming=true for the capture currently being streamed to.
 pub fn list_captures() -> Vec<CaptureMetadata> {
-    let mut registry = CAPTURE_REGISTRY.write().unwrap();
+    let mut registry = registry_mut();
 
     let current_streaming = registry.streaming_ids.clone();
     let capture_count = registry.captures.len();
@@ -450,7 +455,7 @@ pub fn list_captures() -> Vec<CaptureMetadata> {
 /// Get metadata for a specific capture.
 /// Sets is_streaming=true if this capture is being streamed to.
 pub fn get_capture_metadata(id: &str) -> Option<CaptureMetadata> {
-    let registry = CAPTURE_REGISTRY.read().unwrap();
+    let registry = registry();
     registry.captures.get(id).map(|b| {
         let mut meta = b.metadata.clone();
         meta.is_streaming = registry.streaming_ids.contains(&meta.id);
@@ -461,7 +466,7 @@ pub fn get_capture_metadata(id: &str) -> Option<CaptureMetadata> {
 /// Delete a specific capture.
 /// If deleting the active/streaming capture, clears those IDs.
 pub fn delete_capture(id: &str) -> Result<(), String> {
-    let mut registry = CAPTURE_REGISTRY.write().unwrap();
+    let mut registry = registry_mut();
 
     registry.active_ids.remove(id);
     registry.streaming_ids.remove(id);
@@ -490,7 +495,7 @@ pub fn delete_capture(id: &str) -> Result<(), String> {
 pub fn clear_capture(id: &str) -> Result<(), String> {
     let owning_session: Option<String>;
     {
-        let mut registry = CAPTURE_REGISTRY.write().unwrap();
+        let mut registry = registry_mut();
         if let Some(cap) = registry.captures.get_mut(id) {
             owning_session = cap.metadata.owning_session_id.clone();
             cap.metadata.count = 0;
@@ -522,7 +527,7 @@ pub fn clear_capture(id: &str) -> Result<(), String> {
 /// Rename a capture.
 /// Updates both the in-memory registry and SQLite metadata.
 pub fn rename_capture(id: &str, new_name: &str) -> Result<CaptureMetadata, String> {
-    let mut registry = CAPTURE_REGISTRY.write().unwrap();
+    let mut registry = registry_mut();
     let cap = registry.captures.get_mut(id)
         .ok_or_else(|| format!("Capture '{}' not found", id))?;
 
@@ -544,7 +549,7 @@ pub fn rename_capture(id: &str, new_name: &str) -> Result<CaptureMetadata, Strin
 /// Set a capture's persistent flag.
 /// Persistent captures survive app restart when 'clear captures on start' is enabled.
 pub fn set_capture_persistent(id: &str, persistent: bool) -> Result<CaptureMetadata, String> {
-    let mut registry = CAPTURE_REGISTRY.write().unwrap();
+    let mut registry = registry_mut();
     let cap = registry.captures.get_mut(id)
         .ok_or_else(|| format!("Capture '{}' not found", id))?;
 
@@ -580,7 +585,7 @@ pub fn hydrate_from_db() {
         return;
     }
 
-    let mut registry = CAPTURE_REGISTRY.write().unwrap();
+    let mut registry = registry_mut();
     let mut hydrated = 0u32;
 
     for meta in metadata_rows {
@@ -673,7 +678,7 @@ pub fn set_capture_owner(
     role: CaptureRole,
 ) -> Result<(), String> {
     let meta = {
-        let mut registry = CAPTURE_REGISTRY.write().unwrap();
+        let mut registry = registry_mut();
         if let Some(cap) = registry.captures.get_mut(capture_id) {
             cap.metadata.owning_session_id = Some(session_id.to_string());
             cap.owner_role = Some(role);
@@ -713,7 +718,7 @@ pub struct OrphanedCaptureInfo {
 /// Returns list of orphaned capture info for event emission.
 pub fn orphan_captures_for_session(session_id: &str) -> Vec<OrphanedCaptureInfo> {
     let (orphaned, metas_to_persist) = {
-        let mut registry = CAPTURE_REGISTRY.write().unwrap();
+        let mut registry = registry_mut();
         let mut orphaned = Vec::new();
         let mut metas = Vec::new();
 
@@ -758,17 +763,12 @@ pub fn orphan_captures_for_session(session_id: &str) -> Vec<OrphanedCaptureInfo>
 /// Gives each per-app "Leave session" snapshot a distinct, sortable name.
 pub fn next_indexed_name(base: &str) -> String {
     let prefix = format!("{}_", base);
-    let max_n = CAPTURE_REGISTRY
-        .read()
-        .map(|registry| {
-            registry
-                .captures
-                .values()
-                .filter_map(|b| b.metadata.name.strip_prefix(prefix.as_str()))
-                .filter_map(|suffix| suffix.parse::<u32>().ok())
-                .max()
-                .unwrap_or(0)
-        })
+    let max_n = registry()
+        .captures
+        .values()
+        .filter_map(|b| b.metadata.name.strip_prefix(prefix.as_str()))
+        .filter_map(|suffix| suffix.parse::<u32>().ok())
+        .max()
         .unwrap_or(0);
     format!("{}_{}", base, max_n + 1)
 }
@@ -786,7 +786,7 @@ fn is_session_stream(capture: &NamedCapture, session_id: &str) -> bool {
 /// session's own. Framing may clear and refill one of these; doing that to the
 /// session's own capture would destroy what it is still recording.
 pub fn is_derived_capture(capture_id: &str, session_id: &str) -> bool {
-    CAPTURE_REGISTRY.read().unwrap().captures.get(capture_id).is_some_and(|c| {
+    registry().captures.get(capture_id).is_some_and(|c| {
         c.metadata.owning_session_id.as_deref() == Some(session_id)
             && c.owner_role == Some(CaptureRole::Derived)
     })
@@ -795,9 +795,7 @@ pub fn is_derived_capture(capture_id: &str, session_id: &str) -> bool {
 /// The capture of `kind` that `session_id` streams into, if one exists. A session has
 /// at most one of each kind, so this identifies it uniquely.
 fn session_capture_id(session_id: &str, kind: CaptureKind) -> Option<String> {
-    CAPTURE_REGISTRY
-        .read()
-        .unwrap()
+    registry()
         .captures
         .values()
         .find(|b| is_session_stream(b, session_id) && b.metadata.kind == kind)
@@ -806,7 +804,7 @@ fn session_capture_id(session_id: &str, kind: CaptureKind) -> Option<String> {
 
 /// Whether any capture names this session as its owner, as an import's does.
 pub fn is_session_owner(session_id: &str) -> bool {
-    let registry = CAPTURE_REGISTRY.read().unwrap();
+    let registry = registry();
     registry
         .captures
         .values()
@@ -828,7 +826,7 @@ pub fn get_session_bytes_capture_id(session_id: &str) -> Option<String> {
 /// bytes reports bytes, which is what tells a joining app it is looking at a serial
 /// link rather than a CAN one.
 pub fn get_session_capture(session_id: &str) -> Option<(String, CaptureKind)> {
-    let registry = CAPTURE_REGISTRY.read().unwrap();
+    let registry = registry();
     let mut bytes = None;
     for capture in registry.captures.values() {
         if !is_session_stream(capture, session_id) {
@@ -870,7 +868,7 @@ pub fn append_raw_bytes_to_session(session_id: &str, new_bytes: Vec<TimestampedB
 /// Finalize all streaming captures owned by this session.
 /// Removes them from streaming_ids, persists final metadata.
 pub fn finalize_session_captures(session_id: &str) -> Vec<CaptureMetadata> {
-    let mut registry = CAPTURE_REGISTRY.write().unwrap();
+    let mut registry = registry_mut();
 
     let owned: Vec<String> = {
         let streaming = &registry.streaming_ids;
@@ -907,7 +905,7 @@ pub fn finalize_session_captures(session_id: &str) -> Vec<CaptureMetadata> {
 
 /// Mark a capture as being rendered by a UI panel.
 pub fn mark_capture_active(capture_id: &str) -> Result<(), String> {
-    let mut registry = CAPTURE_REGISTRY.write().unwrap();
+    let mut registry = registry_mut();
     if registry.captures.contains_key(capture_id) {
         registry.active_ids.insert(capture_id.to_string());
         tlog!("[CaptureStore] Marked capture active: {}", capture_id);
@@ -920,7 +918,7 @@ pub fn mark_capture_active(capture_id: &str) -> Result<(), String> {
 /// List only orphaned buffers (no owning session).
 /// These are available for standalone selection.
 pub fn list_orphaned_captures() -> Vec<CaptureMetadata> {
-    let registry = CAPTURE_REGISTRY.read().unwrap();
+    let registry = registry();
 
     registry
         .captures
@@ -939,7 +937,7 @@ pub fn list_orphaned_captures() -> Vec<CaptureMetadata> {
 /// Returns the new capture ID.
 pub fn copy_capture(source_capture_id: &str, new_name: String) -> Result<String, String> {
     let (source_metadata, inventory) = {
-        let registry = CAPTURE_REGISTRY.read().unwrap();
+        let registry = registry();
         let source = registry
             .captures
             .get(source_capture_id)
@@ -949,7 +947,7 @@ pub fn copy_capture(source_capture_id: &str, new_name: String) -> Result<String,
 
     // Create new capture entry in registry
     let (id, metadata) = {
-        let mut registry = CAPTURE_REGISTRY.write().unwrap();
+        let mut registry = registry_mut();
 
         let id = generate_capture_id(&registry);
 
@@ -1016,7 +1014,7 @@ pub fn append_frames_to_capture(capture_id: &str, new_frames: Vec<FrameMessage>)
 
     let unowned;
     {
-        let mut registry = CAPTURE_REGISTRY.write().unwrap();
+        let mut registry = registry_mut();
 
         if let Some(cap) = registry.captures.get_mut(capture_id) {
             if cap.metadata.kind != CaptureKind::Frames {
@@ -1060,7 +1058,7 @@ pub fn append_frames_to_capture(capture_id: &str, new_frames: Vec<FrameMessage>)
 #[cfg(not(target_os = "ios"))]
 pub fn clear_and_refill_capture(capture_id: &str, new_frames: Vec<FrameMessage>) {
     {
-        let mut registry = CAPTURE_REGISTRY.write().unwrap();
+        let mut registry = registry_mut();
 
         if let Some(cap) = registry.captures.get_mut(capture_id) {
             if cap.metadata.kind != CaptureKind::Frames {
@@ -1096,54 +1094,47 @@ pub fn clear_and_refill_capture(capture_id: &str, new_frames: Vec<FrameMessage>)
 
 /// Get frames from a specific capture.
 /// Returns None if capture doesn't exist or is not a frame capture.
-pub fn get_capture_frames(id: &str) -> Option<Vec<FrameMessage>> {
-    let registry = CAPTURE_REGISTRY.read().unwrap();
-    let cap = registry.captures.get(id)?;
-    if cap.metadata.kind != CaptureKind::Frames {
-        return None;
+pub fn get_capture_frames(id: &str) -> Result<Option<Vec<FrameMessage>>, String> {
+    if !is_frame_capture(id) {
+        return Ok(None);
     }
-    drop(registry);
-
-    capture_db::get_all_frames(id).ok()
+    capture_db::get_all_frames(id).map(Some)
 }
 
 /// The newest frame per identity in a frame capture. See `capture_db::get_latest_frames`.
-pub fn get_capture_latest_frames(id: &str) -> Option<Vec<FrameMessage>> {
-    let registry = CAPTURE_REGISTRY.read().unwrap();
-    let cap = registry.captures.get(id)?;
-    if cap.metadata.kind != CaptureKind::Frames {
-        return None;
+pub fn get_capture_latest_frames(id: &str) -> Result<Option<Vec<FrameMessage>>, String> {
+    if !is_frame_capture(id) {
+        return Ok(None);
     }
-    drop(registry);
+    capture_db::get_latest_frames(id).map(Some)
+}
 
-    capture_db::get_latest_frames(id).ok()
+fn is_frame_capture(id: &str) -> bool {
+    let registry = registry();
+    matches!(registry.captures.get(id), Some(b) if b.metadata.kind == CaptureKind::Frames)
 }
 
 /// Get a page of frames from a specific capture.
 /// Returns (frames, buffer_indices, total_count).
-pub fn get_capture_frames_paginated(id: &str, offset: usize, limit: usize) -> (Vec<FrameMessage>, Vec<usize>, usize) {
+pub fn get_capture_frames_paginated(
+    id: &str,
+    offset: usize,
+    limit: usize,
+) -> Result<(Vec<FrameMessage>, Vec<usize>, usize), String> {
     let total = {
-        let registry = CAPTURE_REGISTRY.read().unwrap();
+        let registry = registry();
         match registry.captures.get(id) {
             Some(b) if b.metadata.kind == CaptureKind::Frames => b.metadata.count,
-            _ => return (Vec::new(), Vec::new(), 0),
+            _ => return Ok((Vec::new(), Vec::new(), 0)),
         }
     };
 
     if offset >= total {
-        return (Vec::new(), Vec::new(), total);
+        return Ok((Vec::new(), Vec::new(), total));
     }
 
-    match capture_db::get_frames_paginated(id, offset, limit) {
-        Ok((frames, rowids)) => {
-            let indices = rowids.into_iter().map(|r| r as usize).collect();
-            (frames, indices, total)
-        }
-        Err(e) => {
-            tlog!("[CaptureStore] Failed to get paginated frames: {}", e);
-            (Vec::new(), Vec::new(), total)
-        }
-    }
+    let (frames, rowids) = capture_db::get_frames_paginated(id, offset, limit)?;
+    Ok((frames, rowids.into_iter().map(|r| r as usize).collect(), total))
 }
 
 /// Get a page of frames filtered by selected IDs.
@@ -1153,29 +1144,17 @@ pub fn get_capture_frames_paginated_filtered(
     offset: usize,
     limit: usize,
     selection: &FrameSelection,
-) -> (Vec<FrameMessage>, Vec<usize>, usize) {
-    {
-        let registry = CAPTURE_REGISTRY.read().unwrap();
-        match registry.captures.get(id) {
-            Some(b) if b.metadata.kind == CaptureKind::Frames => {},
-            _ => return (Vec::new(), Vec::new(), 0),
-        }
+) -> Result<(Vec<FrameMessage>, Vec<usize>, usize), String> {
+    if !is_frame_capture(id) {
+        return Ok((Vec::new(), Vec::new(), 0));
     }
 
     if selection.is_empty() {
         return get_capture_frames_paginated(id, offset, limit);
     }
 
-    match capture_db::get_frames_paginated_filtered(id, offset, limit, selection) {
-        Ok((frames, rowids, total)) => {
-            let indices = rowids.into_iter().map(|r| r as usize).collect();
-            (frames, indices, total)
-        }
-        Err(e) => {
-            tlog!("[CaptureStore] Failed to get filtered paginated frames: {}", e);
-            (Vec::new(), Vec::new(), 0)
-        }
-    }
+    let (frames, rowids, total) = capture_db::get_frames_paginated_filtered(id, offset, limit, selection)?;
+    Ok((frames, rowids.into_iter().map(|r| r as usize).collect(), total))
 }
 
 /// Response from tail fetch operation
@@ -1202,12 +1181,12 @@ impl TailResponse {
 
 /// Get the most recent N frames from a capture, optionally filtered by frame IDs.
 /// Returns the frames in chronological order (oldest first) for display.
-pub fn get_capture_frames_tail(id: &str, limit: usize, selection: &FrameSelection) -> TailResponse {
+pub fn get_capture_frames_tail(id: &str, limit: usize, selection: &FrameSelection) -> Result<TailResponse, String> {
     // The registry tracks the count, the end time and the distinct frame ids for every
     // capture. The live view refetches this on each frame-count signal, so answering from
     // RAM keeps a COUNT(*) and a MAX() scan of the whole capture off that path.
     let (total, end_time_us, covers_everything) = {
-        let registry = CAPTURE_REGISTRY.read().unwrap();
+        let registry = registry();
         match registry.captures.get(id) {
             Some(b) if b.metadata.kind == CaptureKind::Frames => {
                 // Discovery auto-selects every id it discovers, so the common case is a
@@ -1216,28 +1195,21 @@ pub fn get_capture_frames_tail(id: &str, limit: usize, selection: &FrameSelectio
                 let covers = selection.covers(&b.inventory);
                 (b.metadata.count, b.metadata.end_time_us, covers)
             }
-            _ => return TailResponse::empty(),
+            _ => return Ok(TailResponse::empty()),
         }
     };
 
-    let result = if selection.is_empty() || covers_everything {
-        capture_db::get_frames_tail_rows(id, limit).map(|(frames, rowids)| (frames, rowids, total))
+    let (frames, rowids, total_filtered_count) = if selection.is_empty() || covers_everything {
+        capture_db::get_frames_tail_rows(id, limit).map(|(frames, rowids)| (frames, rowids, total))?
     } else {
-        capture_db::get_frames_tail_filtered(id, limit, selection)
+        capture_db::get_frames_tail_filtered(id, limit, selection)?
     };
-
-    match result {
-        Ok((frames, rowids, total_filtered_count)) => TailResponse {
-            frames,
-            capture_indices: rowids.into_iter().map(|r| r as usize).collect(),
-            total_filtered_count,
-            capture_end_time_us: end_time_us,
-        },
-        Err(e) => {
-            tlog!("[CaptureStore] Failed to get tail frames: {}", e);
-            TailResponse::empty()
-        }
-    }
+    Ok(TailResponse {
+        frames,
+        capture_indices: rowids.into_iter().map(|r| r as usize).collect(),
+        total_filtered_count,
+        capture_end_time_us: end_time_us,
+    })
 }
 
 /// Frame info extracted from a capture
@@ -1255,22 +1227,11 @@ pub struct CaptureFrameInfo {
 }
 
 /// Get unique frame IDs and their metadata from a capture.
-pub fn get_capture_frame_info(id: &str) -> Vec<CaptureFrameInfo> {
-    {
-        let registry = CAPTURE_REGISTRY.read().unwrap();
-        match registry.captures.get(id) {
-            Some(b) if b.metadata.kind == CaptureKind::Frames => {},
-            _ => return Vec::new(),
-        }
+pub fn get_capture_frame_info(id: &str) -> Result<Vec<CaptureFrameInfo>, String> {
+    if !is_frame_capture(id) {
+        return Ok(Vec::new());
     }
-
-    match capture_db::get_frame_info(id) {
-        Ok(info) => info,
-        Err(e) => {
-            tlog!("[CaptureStore] Failed to get frame info: {}", e);
-            Vec::new()
-        }
-    }
+    capture_db::get_frame_info(id)
 }
 
 /// Find the offset for a given timestamp in a capture.
@@ -1278,22 +1239,11 @@ pub fn find_capture_offset_for_timestamp(
     id: &str,
     target_time_us: u64,
     selection: &FrameSelection,
-) -> usize {
-    {
-        let registry = CAPTURE_REGISTRY.read().unwrap();
-        match registry.captures.get(id) {
-            Some(b) if b.metadata.kind == CaptureKind::Frames => {},
-            _ => return 0,
-        }
+) -> Result<usize, String> {
+    if !is_frame_capture(id) {
+        return Ok(0);
     }
-
-    match capture_db::find_offset_for_timestamp(id, target_time_us, selection) {
-        Ok(offset) => offset,
-        Err(e) => {
-            tlog!("[CaptureStore] Failed to find offset for timestamp: {}", e);
-            0
-        }
-    }
+    capture_db::find_offset_for_timestamp(id, target_time_us, selection)
 }
 
 // ============================================================================
@@ -1309,7 +1259,7 @@ pub fn append_raw_bytes_to_capture(capture_id: &str, new_bytes: Vec<TimestampedB
 
     let unowned;
     {
-        let mut registry = CAPTURE_REGISTRY.write().unwrap();
+        let mut registry = registry_mut();
 
         if let Some(cap) = registry.captures.get_mut(capture_id) {
             if cap.metadata.kind != CaptureKind::Bytes {
@@ -1347,63 +1297,44 @@ pub fn append_raw_bytes_to_capture(capture_id: &str, new_bytes: Vec<TimestampedB
 
 /// Get raw bytes from a specific capture.
 /// Returns None if capture doesn't exist or is not a byte capture.
-pub fn get_capture_bytes(id: &str) -> Option<Vec<TimestampedByte>> {
+pub fn get_capture_bytes(id: &str) -> Result<Option<Vec<TimestampedByte>>, String> {
     if !is_byte_capture(id) {
-        return None;
+        return Ok(None);
     }
-
-    capture_db::get_all_bytes(id).ok()
+    capture_db::get_all_bytes(id).map(Some)
 }
 
 /// Whether `id` names a capture that holds bytes. Byte queries return empty rather
 /// than erroring for a frames capture, so every one of them checks first.
 fn is_byte_capture(id: &str) -> bool {
-    let registry = CAPTURE_REGISTRY.read().unwrap();
+    let registry = registry();
     matches!(registry.captures.get(id), Some(b) if b.metadata.kind == CaptureKind::Bytes)
 }
 
 /// Get a page of bytes from a specific capture.
 /// Returns (bytes, total_count).
-pub fn get_capture_bytes_paginated(id: &str, offset: usize, limit: usize) -> (Vec<TimestampedByte>, usize) {
+pub fn get_capture_bytes_paginated(id: &str, offset: usize, limit: usize) -> Result<(Vec<TimestampedByte>, usize), String> {
     if !is_byte_capture(id) {
-        return (Vec::new(), 0);
+        return Ok((Vec::new(), 0));
     }
-
-    match capture_db::get_bytes_paginated(id, offset, limit) {
-        Ok((bytes, total)) => (bytes, total),
-        Err(e) => {
-            tlog!("[CaptureStore] Failed to get paginated bytes: {}", e);
-            (Vec::new(), 0)
-        }
-    }
+    capture_db::get_bytes_paginated(id, offset, limit)
 }
 
 /// Get the last `limit` bytes from a specific capture, oldest first.
 /// The caller takes the total from `get_capture_count`, which is O(1).
-pub fn get_capture_bytes_tail(id: &str, limit: usize) -> Vec<TimestampedByte> {
+pub fn get_capture_bytes_tail(id: &str, limit: usize) -> Result<Vec<TimestampedByte>, String> {
     if !is_byte_capture(id) {
-        return Vec::new();
+        return Ok(Vec::new());
     }
-
-    capture_db::get_bytes_tail_rows(id, limit).unwrap_or_else(|e| {
-        tlog!("[CaptureStore] Failed to get bytes tail: {}", e);
-        Vec::new()
-    })
+    capture_db::get_bytes_tail_rows(id, limit)
 }
 
 /// Find the byte offset for a given timestamp in a specific byte capture.
-pub fn find_capture_bytes_offset_for_timestamp_by_id(capture_id: &str, target_time_us: u64) -> usize {
+pub fn find_capture_bytes_offset_for_timestamp_by_id(capture_id: &str, target_time_us: u64) -> Result<usize, String> {
     if !is_byte_capture(capture_id) {
-        return 0;
+        return Ok(0);
     }
-
-    match capture_db::find_bytes_offset_for_timestamp(capture_id, target_time_us) {
-        Ok(offset) => offset,
-        Err(e) => {
-            tlog!("[CaptureStore] Failed to find bytes offset for timestamp: {}", e);
-            0
-        }
-    }
+    capture_db::find_bytes_offset_for_timestamp(capture_id, target_time_us)
 }
 
 // ============================================================================
@@ -1412,20 +1343,20 @@ pub fn find_capture_bytes_offset_for_timestamp_by_id(capture_id: &str, target_ti
 
 /// Check if any capture has data.
 pub fn has_any_data() -> bool {
-    let registry = CAPTURE_REGISTRY.read().unwrap();
+    let registry = registry();
     registry.captures.values().any(|b| b.metadata.count > 0)
 }
 
 /// Get the count for a specific capture.
 pub fn get_capture_count(id: &str) -> usize {
-    let registry = CAPTURE_REGISTRY.read().unwrap();
+    let registry = registry();
     registry.captures.get(id).map(|b| b.metadata.count).unwrap_or(0)
 }
 
 /// Distinct (bus, frame_id) count seen while streaming into this capture.
 /// O(1). Returns 0 for DB-hydrated captures that have had no live appends.
 pub fn get_capture_unique_count(id: &str) -> usize {
-    let registry = CAPTURE_REGISTRY.read().unwrap();
+    let registry = registry();
     registry
         .captures
         .get(id)
@@ -1435,7 +1366,7 @@ pub fn get_capture_unique_count(id: &str) -> usize {
 
 /// The capture's inventory rows that changed since the last take, or all of them.
 pub fn take_frame_inventory(id: &str, everything: bool) -> Vec<CaptureFrameInfo> {
-    let mut registry = CAPTURE_REGISTRY.write().unwrap();
+    let mut registry = registry_mut();
     registry
         .captures
         .get_mut(id)
@@ -1445,7 +1376,7 @@ pub fn take_frame_inventory(id: &str, everything: bool) -> Vec<CaptureFrameInfo>
 
 /// Get the kind of a specific capture.
 pub fn get_capture_kind(id: &str) -> Option<CaptureKind> {
-    let registry = CAPTURE_REGISTRY.read().unwrap();
+    let registry = registry();
     registry.captures.get(id).map(|b| b.metadata.kind.clone())
 }
 
@@ -1483,7 +1414,7 @@ mod tests {
 
     #[test]
     fn a_copy_keeps_the_frame_ids_its_source_saw() {
-        crate::capture_db::use_in_memory_database();
+        let _db = crate::capture_db::use_own_database();
         let source = create_standalone_capture(CaptureKind::Frames, "copied".to_string());
         let frame = |frame_id| FrameMessage {
             protocol: "can".into(),
@@ -1507,7 +1438,7 @@ mod tests {
 
     #[test]
     fn every_change_to_the_list_is_pushed_but_a_session_append() {
-        crate::capture_db::use_in_memory_database();
+        let _db = crate::capture_db::use_own_database();
         let pushes = |change: &mut dyn FnMut()| {
             let before = CAPTURE_LIST_CHANGES.with(std::cell::Cell::get);
             change();
@@ -1668,6 +1599,93 @@ mod tests {
 
         assert_eq!(get_session_frame_capture_id(second), None);
         assert!(is_derived_capture(&capture, second));
+    }
+
+    #[test]
+    fn a_panic_holding_the_registry_leaves_it_usable() {
+        let _db = crate::capture_db::use_own_database();
+        let poisoner = std::thread::spawn(|| {
+            let _held = registry_mut();
+            panic!("poisoning the capture registry");
+        });
+        assert!(poisoner.join().is_err());
+        assert!(CAPTURE_REGISTRY.is_poisoned());
+
+        let id = create_standalone_capture(CaptureKind::Frames, "after a poisoning".into());
+        assert!(is_known_capture(&id));
+        assert!(list_captures().iter().any(|c| c.id == id));
+        assert_eq!(delete_capture(&id), Ok(()));
+    }
+
+    fn failing_database() -> crate::connection_slot::ThreadConnection {
+        crate::capture_db::use_own_connection(rusqlite::Connection::open_in_memory().unwrap())
+    }
+
+    /// A failed query is an error, not an empty page, while the registry keeps counting
+    /// what the database never stored.
+    #[test]
+    fn a_failed_frame_query_is_an_error() {
+        let _db = failing_database();
+        let id = create_standalone_capture(CaptureKind::Frames, "failing frames".into());
+        let frame = FrameMessage { protocol: "can".into(), frame_id: 0x100, timestamp_us: 1, ..Default::default() };
+        append_frames_to_capture(&id, vec![frame.clone(), frame.clone(), frame]);
+        let everything = FrameSelection::from_groups(Vec::new());
+        let one = FrameSelection::from_groups(groups(&[("can", &[0x100])]));
+
+        assert_eq!(get_capture_count(&id), 3);
+        assert!(get_capture_frames_paginated(&id, 0, 10).is_err());
+        assert!(get_capture_frames_paginated_filtered(&id, 0, 10, &one).is_err());
+        assert!(get_capture_frames_tail(&id, 10, &everything).is_err());
+        assert!(get_capture_frame_info(&id).is_err());
+        assert!(find_capture_offset_for_timestamp(&id, 1, &one).is_err());
+        assert!(get_capture_frames(&id).is_err());
+        assert!(get_capture_latest_frames(&id).is_err());
+    }
+
+    #[test]
+    fn a_failed_byte_query_is_an_error() {
+        let _db = failing_database();
+        let id = create_standalone_capture(CaptureKind::Bytes, "failing bytes".into());
+        append_raw_bytes_to_capture(&id, vec![TimestampedByte { byte: 0xAA, timestamp_us: 1, bus: 0 }]);
+
+        assert_eq!(get_capture_count(&id), 1);
+        assert!(get_capture_bytes_paginated(&id, 0, 10).is_err());
+        assert!(get_capture_bytes_tail(&id, 10).is_err());
+        assert!(find_capture_bytes_offset_for_timestamp_by_id(&id, 1).is_err());
+        assert!(get_capture_bytes(&id).is_err());
+    }
+
+    /// A capture that is not there, or holds the other kind, is still an empty answer.
+    #[test]
+    fn a_query_of_no_such_capture_answers_empty() {
+        let _db = failing_database();
+        let one = FrameSelection::from_groups(groups(&[("can", &[0x100])]));
+        assert!(matches!(get_capture_frames_paginated("absent", 0, 10), Ok((f, _, 0)) if f.is_empty()));
+        assert!(matches!(get_capture_frames_paginated_filtered("absent", 0, 10, &one), Ok((f, _, 0)) if f.is_empty()));
+        assert_eq!(get_capture_frame_info("absent"), Ok(Vec::new()));
+        assert_eq!(find_capture_offset_for_timestamp("absent", 1, &one), Ok(0));
+        assert!(matches!(get_capture_frames("absent"), Ok(None)));
+        assert!(matches!(get_capture_bytes("absent"), Ok(None)));
+        assert!(matches!(get_capture_bytes_tail("absent", 10), Ok(b) if b.is_empty()));
+    }
+
+    /// Pinned as-is (registered): hydrate reads a failed count as "no data" and deletes
+    /// the capture's metadata, so a transient error at boot loses the capture.
+    #[test]
+    fn a_failed_count_at_hydrate_deletes_the_capture_metadata() {
+        let conn = crate::capture_db::in_memory();
+        conn.execute_batch(
+            "INSERT INTO capture_metadata (capture_id, capture_kind, name, count, created_at)
+             VALUES ('hydrate_count_fails', 'frames', 'kept', 3, 0);
+             DROP TABLE frames;",
+        )
+        .unwrap();
+        let _db = crate::capture_db::use_own_connection(conn);
+
+        hydrate_from_db();
+
+        assert!(get_capture_metadata("hydrate_count_fails").is_none());
+        assert!(crate::capture_db::load_all_capture_metadata().unwrap().is_empty());
     }
 
     /// Framed serial streams both kinds; frames is the session's identity, and the

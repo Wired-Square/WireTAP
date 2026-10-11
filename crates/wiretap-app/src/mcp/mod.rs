@@ -8,6 +8,7 @@
 //! (`open_app`, `dom.*`) reach the page via [`bridge`].
 
 pub mod bridge;
+pub mod commands;
 pub(crate) mod session;
 mod tools;
 mod types;
@@ -22,7 +23,10 @@ use wslib_ai_mcp::http::{self, ConnectionObserver, HttpConfig};
 use wslib_ai_mcp::server::ToolServer;
 
 use tools::WireTapTools;
+use crate::boot::Paths;
+use crate::catalog::CatalogFile;
 use crate::io::session_log::{self, SessionLogEvent, Subject};
+use crate::settings::{self, AppSettings, SettingsSource};
 
 /// The gates/port/token-presence the server was started with — reported to the
 /// settings UI so it can tell when the running server differs from the saved
@@ -55,6 +59,55 @@ impl McpRunningConfig {
             ui_control: s.mcp_allow_ui_control,
             token_set: !s.mcp_server_token.is_empty(),
         }
+    }
+}
+
+/// What the MCP needs from the app it serves beyond its `Paths`: the
+/// announcements a write makes, and the catalogue cache.
+pub trait Host: Send + Sync {
+    fn settings_saved(&self, settings: &AppSettings);
+    fn catalogs(&self) -> Vec<CatalogFile>;
+    fn catalogs_changed(&self);
+}
+
+/// The MCP's state: the directories resolved once, and the app around it.
+#[derive(Clone)]
+pub struct McpContext {
+    paths: Arc<Paths>,
+    host: Arc<dyn Host>,
+}
+
+impl McpContext {
+    pub(crate) fn new(paths: Paths, host: Arc<dyn Host>) -> Self {
+        Self { paths: Arc::new(paths), host }
+    }
+
+    fn save_settings(&self, mut s: AppSettings) -> Result<(), String> {
+        settings::save_settings_to(&settings::settings_path_in(&self.paths.config)?, &mut s)?;
+        self.host.settings_saved(&s);
+        Ok(())
+    }
+
+    fn find_catalog(&self, name: &str) -> Result<CatalogFile, String> {
+        crate::catalog::find_catalog(&self.host.catalogs(), name)
+    }
+
+    fn save_catalog(&self, path: &str, content: String) -> Result<(), String> {
+        crate::catalog::write_file_atomically(std::path::Path::new(path), content.as_bytes())?;
+        self.host.catalogs_changed();
+        Ok(())
+    }
+}
+
+impl SettingsSource for McpContext {
+    fn load(&self) -> Result<AppSettings, String> {
+        let documents = self.paths.documents.as_deref();
+        settings::load_settings_in(&self.paths.config, documents, |s| self.host.settings_saved(s))
+    }
+
+    fn saved_profiles(&self) -> crate::io::ProfileLoader {
+        let ctx = self.clone();
+        Arc::new(move || ctx.load().map(|s| s.io_profiles))
     }
 }
 
@@ -94,7 +147,7 @@ pub fn restart_pending(enabled: bool, desired: McpRunningConfig, token: &str) ->
 /// synchronously so a port conflict is returned as an error rather than
 /// crashing the spawned task.
 pub fn start(
-    app: tauri::AppHandle,
+    ctx: McpContext,
     mut config: McpRunningConfig,
     token: String,
 ) -> Result<(), String> {
@@ -124,7 +177,7 @@ pub fn start(
         ..HttpConfig::default()
     };
     let factory = move || {
-        ToolServer::new(WireTapTools { app: app.clone() }, router.clone(), identity.clone())
+        ToolServer::new(WireTapTools { ctx: ctx.clone() }, router.clone(), identity.clone())
             .with_list_cache(tools::TOOL_LIST_CACHE)
     };
 

@@ -5,24 +5,15 @@
 // Shared cadence primitive for interval-driven loops.
 //
 // The transmit "repeat" tasks (transmit.rs) run the same skeleton: fire an
-// action immediately, then once every N ms, stopping when a cancel flag is set.
+// action immediately, then once every N ms, until cancelled.
 // `Cadence` owns that so the sites share one source of truth.
 //
 // The per-tick mutable state stays in the caller's task, so a closure-based
 // runner isn't used here — that would force the state into Arc/Mutex or run
 // into async-closure `Send` limitations on stable Rust.
 
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
-use tokio::time::{interval, sleep, Duration, Interval};
-
-/// How often `next()` re-checks the cancel flag while waiting for the next tick.
-/// Long intervals would otherwise keep the task — and the
-/// connection it holds — alive long after `stop()` was requested, stalling teardown
-/// and leaving the device busy for a restart. Bounding the wait to this makes
-/// cancellation prompt without affecting tick timing (the timer still wins the
-/// select when its deadline is sooner).
-const CANCEL_POLL_MS: u64 = 100;
+use tokio::time::{interval, Duration, Interval};
+use tokio_util::sync::CancellationToken;
 
 /// Drives an interval loop with cancel support.
 ///
@@ -31,13 +22,12 @@ const CANCEL_POLL_MS: u64 = 100;
 /// subsequent ticks are spaced by `interval_ms`.
 pub struct Cadence {
     timer: Interval,
-    cancel: Arc<AtomicBool>,
+    cancel: CancellationToken,
 }
 
 impl Cadence {
-    /// Create a cadence firing every `interval_ms`. `cancel` stops the loop when
-    /// set.
-    pub fn new(interval_ms: u64, cancel: Arc<AtomicBool>) -> Self {
+    /// Create a cadence firing every `interval_ms` until `cancel` is cancelled.
+    pub fn new(interval_ms: u64, cancel: CancellationToken) -> Self {
         Self {
             timer: interval(Duration::from_millis(interval_ms)),
             cancel,
@@ -47,21 +37,54 @@ impl Cadence {
     /// Await the next due tick.
     ///
     /// Returns `Some(())` when the caller should run its per-tick body, or
-    /// `None` when the loop should stop (cancel flag set), so callers can simply
-    /// write `while cadence.next().await.is_some() { ... }`.
+    /// `None` once cancelled, so callers can simply write
+    /// `while cadence.next().await.is_some() { ... }`.
     pub async fn next(&mut self) -> Option<()> {
-        // Wait for the next due tick, but wake at least every CANCEL_POLL_MS so a set
-        // cancel flag is noticed promptly instead of after a full interval. The timer
-        // still wins the select when its deadline is sooner, so tick timing is unchanged.
-        loop {
-            if self.cancel.load(Ordering::Relaxed) {
-                return None;
-            }
-            tokio::select! {
-                _ = self.timer.tick() => break,
-                _ = sleep(Duration::from_millis(CANCEL_POLL_MS)) => {}
-            }
+        tokio::select! {
+            biased;
+            () = self.cancel.cancelled() => None,
+            _ = self.timer.tick() => Some(()),
         }
-        (!self.cancel.load(Ordering::Relaxed)).then_some(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tokio::time::Instant;
+
+    #[tokio::test(start_paused = true)]
+    async fn the_first_tick_is_immediate_and_the_rest_are_an_interval_apart() {
+        let mut cadence = Cadence::new(1_000, CancellationToken::new());
+        let start = Instant::now();
+        cadence.next().await.unwrap();
+        assert_eq!(start.elapsed(), Duration::ZERO);
+        cadence.next().await.unwrap();
+        assert_eq!(start.elapsed(), Duration::from_millis(1_000));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_cancel_mid_interval_is_seen_at_once() {
+        let cancel = CancellationToken::new();
+        let mut cadence = Cadence::new(10_000, cancel.clone());
+        cadence.next().await.unwrap();
+        let start = Instant::now();
+        tokio::spawn({
+            let cancel = cancel.clone();
+            async move {
+                tokio::time::sleep(Duration::from_millis(250)).await;
+                cancel.cancel();
+            }
+        });
+        assert!(cadence.next().await.is_none());
+        assert_eq!(start.elapsed(), Duration::from_millis(250));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_cancel_before_the_first_tick_stops_at_once() {
+        let cancel = CancellationToken::new();
+        cancel.cancel();
+        let mut cadence = Cadence::new(1_000, cancel);
+        assert!(cadence.next().await.is_none());
     }
 }

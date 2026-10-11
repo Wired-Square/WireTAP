@@ -4,19 +4,19 @@
 // session's reader on wiretap-io's CAN task.
 
 use std::io;
-use std::sync::atomic::AtomicBool;
-use std::sync::Arc;
 
 use tokio::sync::mpsc;
+use tokio_util::sync::CancellationToken;
 use wiretap_io::can::gsusb::{self, GsUsbDevice, GsUsbOptions};
 use wiretap_io::can::{CanError, CanEvent, CanOptions, DeviceInfo};
 
 use super::{GsUsbDeviceInfo, GsUsbProbeResult};
 use crate::io::bus_mapping::BusMapping;
 use crate::io::can_task::{
-    can_options, link_lost, mapped_bus_state, mapped_frames, open_failed, serve, PROBE_TIMEOUT,
+    announce_on_event, can_options, link_lost, mapped_bus_state, open_or_report,
+    serve, PROBE_TIMEOUT,
 };
-use crate::io::error::IoError;
+use crate::io::error::{IoError, IoFailure};
 use crate::io::types::SourceMessage;
 
 // ============================================================================
@@ -47,7 +47,7 @@ pub async fn probe_device(
         Err(CanError::Open { source, .. }) if source.kind() == io::ErrorKind::NotFound => {
             Err(IoError::not_found(&device).to_string())
         }
-        Err(e) => Err(open_failed(&device, e)),
+        Err(e) => Err(IoFailure::from_can(&device, e).message),
     }
 }
 
@@ -88,7 +88,8 @@ fn on_channel(mappings: Vec<BusMapping>, channel: u8) -> Vec<BusMapping> {
         .collect()
 }
 
-/// What the broker is told of `event`, or the loss that ends the source.
+/// What the broker is told of `event`, or the loss that ends the source. A
+/// gs_usb channel also reports its bus state.
 fn on_event(
     source_idx: usize,
     address: &str,
@@ -96,32 +97,27 @@ fn on_event(
     mappings: &[BusMapping],
     event: CanEvent,
 ) -> Result<Vec<SourceMessage>, CanError> {
-    match event {
-        CanEvent::Connected(info) => {
-            tlog!(
-                "[gs_usb] Source {} connected to {} channel {} (channels: {:?}, fd: {})",
-                source_idx,
-                address,
-                channel,
-                info.buses,
-                info.fd
-            );
-            Ok(vec![SourceMessage::Connected(
-                source_idx,
-                "gs_usb".to_string(),
-                address.to_string(),
-                Some(channel),
-            )])
-        }
-        CanEvent::Read(reads) => Ok(mapped_frames(source_idx, reads, mappings)
+    if let CanEvent::Bus(state) = event {
+        return Ok(mapped_bus_state(source_idx, state, mappings)
             .into_iter()
-            .collect()),
-        CanEvent::Bus(state) => Ok(mapped_bus_state(source_idx, state, mappings)
-            .into_iter()
-            .collect()),
-        CanEvent::Disconnected { error, .. } => Err(error),
-        _ => Ok(Vec::new()),
+            .collect());
     }
+    announce_on_event(source_idx, mappings, event, |info| {
+        tlog!(
+            "[gs_usb] Source {} connected to {} channel {} (channels: {:?}, fd: {})",
+            source_idx,
+            address,
+            channel,
+            info.buses,
+            info.fd
+        );
+        vec![SourceMessage::Connected(
+            source_idx,
+            "gs_usb".to_string(),
+            address.to_string(),
+            Some(channel),
+        )]
+    })
 }
 
 /// Run a gs_usb source on the library's CAN task, one channel per source.
@@ -139,7 +135,7 @@ pub async fn run_source(
     data_bitrate: u32,
     data_sample_point: f32,
     bus_mappings: Vec<BusMapping>,
-    stop_flag: Arc<AtomicBool>,
+    stop: CancellationToken,
     tx: mpsc::Sender<SourceMessage>,
 ) {
     let device = format!("gs_usb({}:{})", bus, address);
@@ -154,14 +150,10 @@ pub async fn run_source(
     gs.sample_point = Some(sample_point);
     gs.data = enable_fd.then_some((data_bitrate, Some(data_sample_point)));
 
-    let task = match gsusb::open(gs, gs_usb_options(listen_only)).await {
-        Ok(task) => task,
-        Err(e) => {
-            let _ = tx
-                .send(SourceMessage::Error(source_idx, open_failed(&device, e)))
-                .await;
-            return;
-        }
+    let opening = gsusb::open(gs, gs_usb_options(listen_only));
+    let Some(task) = open_or_report(opening, source_idx, &tx, |e| IoFailure::from_can(&device, e)).await
+    else {
+        return;
     };
 
     let mappings = on_channel(bus_mappings, channel);
@@ -176,7 +168,7 @@ pub async fn run_source(
         task,
         source_idx,
         listen_only,
-        &stop_flag,
+        &stop,
         &tx,
         |event| on_event(source_idx, &address, channel, &mappings, event),
         |error| link_lost(source_idx, &device, error),
@@ -342,7 +334,7 @@ mod tests {
             SourceMessage::Ended(3, EndReason::Disconnected)
         ));
         let timed_out = std::io::Error::from(std::io::ErrorKind::TimedOut);
-        let SourceMessage::Error(3, message) = lost(CanError::Read(timed_out)) else {
+        let SourceMessage::Error(3, IoFailure { message, .. }) = lost(CanError::Read(timed_out)) else {
             panic!("expected an error");
         };
         assert!(message.starts_with("gs_usb(0:5): "), "got: {message}");

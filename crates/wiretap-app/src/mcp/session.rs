@@ -58,7 +58,7 @@ pub struct OpenOptions {
 /// come from that catalogue, or from an explicit range spec when the device has
 /// no decoder yet.
 pub async fn open(
-    app: tauri::AppHandle,
+    source: &dyn crate::settings::SettingsSource,
     profile_id: String,
     session_id: Option<String>,
     opts: OpenOptions,
@@ -67,7 +67,7 @@ pub async fn open(
         window,
         modbus_ranges,
     } = opts;
-    let settings = crate::settings::load_settings_sync(&app)?;
+    let settings = source.load()?;
     let profile = settings.profile(&profile_id)?;
 
     // Read the preferred catalogue once: Modbus needs it for poll groups, and
@@ -131,7 +131,7 @@ pub async fn open(
         connect_only: Some(true),
         ..Default::default()
     };
-    let opened = crate::sessions::open_from(&app, Some(&sid), &subscriber_for(&sid), Some("mcp"), opts)
+    let opened = crate::sessions::open_from(source, Some(&sid), &subscriber_for(&sid), Some("mcp"), opts)
         .await
         .map_err(|e| e.to_string())?;
     let capabilities = opened.registration.capabilities;
