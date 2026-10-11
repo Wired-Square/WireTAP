@@ -61,6 +61,7 @@ All notable changes to WireTAP will be documented in this file.
 - **Frames that share an id keep all their signals in the Decoder, Dashboard and Query.** Two catalogue frames on one id, such as a Modbus register read as both input and holding, used to show only one frame's signals, so the other's units, confidence colours and register labels were lost and the Dashboard's signal picker could not offer them. Query's mirror picker now finds a mirror's source by the key the mirror names. The Decoder's jump to the Catalog Editor now also finds Modbus frames.
 - **Discovery's Tools dialog lists every tool when it reopens.** After a run it showed only the tool last used, and the way back to the others was to click that tool again. It now lists them all, with the last tool still picked and ready to run again.
 - **Stopping a session no longer hides a failure that mentions "not found".** Only a session that is already gone is passed over; any other failure to stop now surfaces as an error.
+- **A frame id is padded by whether it is extended, never by its value.** The Decoder's Unmatched and Modbus tabs and the Catalog Editor now pad a standard id to 3 hex digits and an extended one to 8, so an extended id below 0x800, such as 0x123, reads `0x00000123` there as it does elsewhere. The Catalog Editor shows a Modbus register by its key rather than as padded hex.
 
 ## [0.14.0] - 2026-10-06
 

@@ -210,6 +210,7 @@ export type FilteredFrame = {
  */
 export type TunnelTransaction = DecodedTunnelMessage & {
   frameId: number;
+  isExtended: boolean;
   bus: number;
   /** Host timestamp (µs) of the frame that completed the message. */
   timestampUs: number;
@@ -591,7 +592,7 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
       if (msg.mirror) nextMirrorValidation.set(id, msg.mirror);
 
       for (const t of msg.tunnel ?? []) {
-        tunnel.push({ ...t, frameId: id, bus: msg.bus, timestampUs: msg.t });
+        tunnel.push({ ...t, frameId: id, isExtended: msg.isExtended, bus: msg.bus, timestampUs: msg.t });
       }
 
       const headerFields: HeaderFieldValue[] = msg.headerFields.map((h) => ({

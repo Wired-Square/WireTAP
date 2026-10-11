@@ -36,6 +36,7 @@ type FrameSignal = {
 
 type FrameWithSignals = {
   id: string;
+  frame: Frame;
   length: number;
   signals: FrameSignal[];
 };
@@ -94,7 +95,7 @@ export default function NodeView({
       (catalog?.frames ?? [])
         .filter((f) => f.protocol === frameProtocol && (isModbus ? f.modbusNode === nodeName : f.transmitter === nodeName))
         .sort((a, b) => a.frameId - b.frameId)
-        .map((f) => ({ id: f.key, length: f.length, signals: ownSignals(f) })),
+        .map((f) => ({ id: f.key, frame: f, length: f.length, signals: ownSignals(f) })),
     [catalog, nodeName, frameProtocol, isModbus]
   );
   const nodeNotes = selectedNode.metadata?.nodeDef?.notes;
@@ -184,7 +185,7 @@ export default function NodeView({
           framesForNode.map((frame) => (
             <Card key={frame.id} padding="lg">
               {(() => {
-                const formatted = formatFrameId(frame.id, displayFrameIdFormat);
+                const formatted = formatFrameId(frame.frame, displayFrameIdFormat);
                 return (
               <div className="flex items-center justify-between mb-2">
                 <div className="font-medium text-primary flex items-center gap-2">

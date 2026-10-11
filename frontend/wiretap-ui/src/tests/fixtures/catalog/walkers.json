@@ -1,22 +1,60 @@
 {
   "cases": [
     {
-      "name": "id parsing and the editor's id formatting",
+      "name": "the editor's id formatting, its hex width by the extended flag",
       "input": [
-        "0x7FF",
-        "0x800",
-        "0x1FFFFFFF",
-        "2047",
-        " 256 ",
-        "0X10",
-        "-1",
-        "status",
-        "",
-        "1e3"
+        {
+          "key": "0x7FF",
+          "frameId": 2047,
+          "protocol": "can",
+          "isExtended": false
+        },
+        {
+          "key": "0x800",
+          "frameId": 2048,
+          "protocol": "can",
+          "isExtended": true
+        },
+        {
+          "key": "0x005",
+          "frameId": 5,
+          "protocol": "can",
+          "isExtended": true
+        },
+        {
+          "key": "0x100",
+          "frameId": 256,
+          "protocol": "can"
+        },
+        {
+          "key": "0x1FFFFFFF",
+          "frameId": 536870911,
+          "protocol": "can",
+          "isExtended": true
+        },
+        {
+          "key": "0x10",
+          "frameId": 16,
+          "protocol": "serial"
+        },
+        {
+          "key": "status",
+          "frameId": 4294967295,
+          "protocol": "serial"
+        },
+        {
+          "key": "5000",
+          "frameId": 5000,
+          "protocol": "modbus"
+        },
+        {
+          "key": "ems_control",
+          "frameId": 13000,
+          "protocol": "modbus"
+        }
       ],
       "expected": [
         {
-          "number": 2047,
           "hex": {
             "primary": "7FF",
             "secondary": "2047"
@@ -27,7 +65,6 @@
           }
         },
         {
-          "number": 2048,
           "hex": {
             "primary": "00000800",
             "secondary": "2048"
@@ -38,29 +75,16 @@
           }
         },
         {
-          "number": 536870911,
           "hex": {
-            "primary": "1FFFFFFF",
-            "secondary": "536870911"
+            "primary": "00000005",
+            "secondary": "5"
           },
           "decimal": {
-            "primary": "536870911",
-            "secondary": "1FFFFFFF"
+            "primary": "5",
+            "secondary": "00000005"
           }
         },
         {
-          "number": 2047,
-          "hex": {
-            "primary": "7FF",
-            "secondary": "2047"
-          },
-          "decimal": {
-            "primary": "2047",
-            "secondary": "7FF"
-          }
-        },
-        {
-          "number": 256,
           "hex": {
             "primary": "100",
             "secondary": "256"
@@ -71,25 +95,26 @@
           }
         },
         {
-          "number": null,
           "hex": {
-            "primary": "0X10"
+            "primary": "1FFFFFFF",
+            "secondary": "536870911"
           },
           "decimal": {
-            "primary": "0X10"
+            "primary": "536870911",
+            "secondary": "1FFFFFFF"
           }
         },
         {
-          "number": null,
           "hex": {
-            "primary": "-1"
+            "primary": "010",
+            "secondary": "16"
           },
           "decimal": {
-            "primary": "-1"
+            "primary": "16",
+            "secondary": "010"
           }
         },
         {
-          "number": null,
           "hex": {
             "primary": "status"
           },
@@ -98,21 +123,21 @@
           }
         },
         {
-          "number": null,
           "hex": {
-            "primary": ""
+            "primary": "1388",
+            "secondary": "5000"
           },
           "decimal": {
-            "primary": ""
+            "primary": "5000",
+            "secondary": "1388"
           }
         },
         {
-          "number": null,
           "hex": {
-            "primary": "1e3"
+            "primary": "ems_control"
           },
           "decimal": {
-            "primary": "1e3"
+            "primary": "ems_control"
           }
         }
       ]

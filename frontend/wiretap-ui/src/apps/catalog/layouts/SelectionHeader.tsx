@@ -3,13 +3,15 @@
 import { Link2, Layers, Pencil, Trash2 } from "lucide-react";
 import { iconMd, iconXl, flexRowGap2 } from "../../../styles/spacing";
 import type { TomlNode } from "../types";
+import type { Frame } from "../../../types/catalogModel";
+import type { FormattedId } from "../utils";
 import { muxSignalCount } from "../views/signalRanges";
 import { IconButton } from "../../../components/Button";
 import { Badge } from "../../../components/Badge";
 
 export type SelectionHeaderProps = {
   selectedNode: TomlNode;
-  formatFrameId?: (id: string) => { primary: string; secondary?: string };
+  formatFrameId?: (frame: Frame) => FormattedId;
   onEdit?: () => void;
   onDelete?: () => void;
 };
@@ -45,10 +47,10 @@ function labelForNode(node: TomlNode): string {
 }
 
 export default function SelectionHeader({ selectedNode, formatFrameId, onEdit, onDelete }: SelectionHeaderProps) {
-  const isCanFrame = selectedNode.type === "can-frame";
-  const copyFrom = selectedNode.metadata?.frame?.copyFrom;
-  const mirrorOf = selectedNode.metadata?.frame?.mirrorOf;
-  const idLabel = isCanFrame && formatFrameId ? formatFrameId(selectedNode.key) : null;
+  const frame = selectedNode.metadata?.frame;
+  const copyFrom = frame?.copyFrom;
+  const mirrorOf = frame?.mirrorOf;
+  const idLabel = selectedNode.type === "can-frame" && frame && formatFrameId ? formatFrameId(frame) : null;
 
   return (
     <div className="mb-6">
