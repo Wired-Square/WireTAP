@@ -412,24 +412,22 @@ pub fn hydrate_from_db() {
     let mut hydrated = 0u32;
 
     for meta in metadata_rows {
-        // Verify data actually exists in SQLite (skip orphaned metadata)
-        let has_data = match meta.kind {
-            CaptureKind::Frames => {
-                capture_db::get_frame_count(&meta.id).unwrap_or(0) > 0
-            }
-            CaptureKind::Bytes => {
-                // Check byte count via paginated query (limit 1 is enough to verify existence)
-                capture_db::get_bytes_paginated(&meta.id, 0, 1)
-                    .map(|(_, total)| total > 0)
-                    .unwrap_or(false)
-            }
+        let stored_count = match meta.kind {
+            CaptureKind::Frames => capture_db::get_frame_count(&meta.id),
+            CaptureKind::Bytes => capture_db::get_bytes_paginated(&meta.id, 0, 1).map(|(_, total)| total),
         };
 
-        if !has_data {
-            tlog!("[CaptureStore] Skipping metadata for '{}' — no data in SQLite", meta.id);
-            // Clean up the orphaned metadata row
-            let _ = capture_db::delete_capture_metadata(&meta.id);
-            continue;
+        match stored_count {
+            Err(e) => {
+                tlog!("[CaptureStore] Skipping capture '{}' this run — its count failed: {}", meta.id, e);
+                continue;
+            }
+            Ok(0) => {
+                tlog!("[CaptureStore] Skipping metadata for '{}' — no data in SQLite", meta.id);
+                let _ = capture_db::delete_capture_metadata(&meta.id);
+                continue;
+            }
+            Ok(_) => {}
         }
 
         // Auto-orphan captures whose owning session no longer exists.
@@ -1406,23 +1404,29 @@ mod tests {
         assert!(matches!(get_capture_bytes_tail("absent", 10), Ok(b) if b.is_empty()));
     }
 
-    /// Pinned as-is (registered): hydrate reads a failed count as "no data" and deletes
-    /// the capture's metadata, so a transient error at boot loses the capture.
-    #[test]
-    fn a_failed_count_at_hydrate_deletes_the_capture_metadata() {
+    fn hydrate_one_metadata_row(id: &str, then: &str, metadata_kept: bool) {
         let conn = crate::capture_db::in_memory();
-        conn.execute_batch(
+        conn.execute_batch(&format!(
             "INSERT INTO capture_metadata (capture_id, capture_kind, name, count, created_at)
-             VALUES ('hydrate_count_fails', 'frames', 'kept', 3, 0);
-             DROP TABLE frames;",
-        )
+             VALUES ('{id}', 'frames', 'kept', 3, 0);
+             {then}"
+        ))
         .unwrap();
         let _db = crate::capture_db::use_own_connection(conn);
-
         hydrate_from_db();
+        assert!(get_capture_metadata(id).is_none());
+        let remaining = crate::capture_db::load_all_capture_metadata().unwrap();
+        assert_eq!(remaining.iter().any(|m| m.id == id), metadata_kept);
+    }
 
-        assert!(get_capture_metadata("hydrate_count_fails").is_none());
-        assert!(crate::capture_db::load_all_capture_metadata().unwrap().is_empty());
+    #[test]
+    fn a_failed_count_at_load_keeps_the_capture_metadata() {
+        hydrate_one_metadata_row("hydrate_count_fails", "DROP TABLE frames;", true);
+    }
+
+    #[test]
+    fn a_capture_with_no_frames_at_load_is_cleaned() {
+        hydrate_one_metadata_row("hydrate_count_zero", "", false);
     }
 
     /// Framed serial streams both kinds; frames is the session's identity, and the
