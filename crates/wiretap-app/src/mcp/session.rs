@@ -74,7 +74,7 @@ pub async fn open(
     // every protocol needs it to decode.
     let catalog_toml = match &profile.preferred_catalog {
         Some(name) => {
-            let name = crate::catalog::sanitise_catalog_filename(name)?;
+            let name = wiretap_catalog::text::sanitise_filename(name).map_err(|e| e.to_string())?;
             let path = std::path::PathBuf::from(&settings.decoder_dir).join(&name);
             let toml = std::fs::read_to_string(&path)
                 .map_err(|e| format!("Failed to read catalog '{name}': {e}"))?;

@@ -36,7 +36,7 @@ use url::{parse_catalog_source, CatalogSource};
 
 /// Largest number of frames we will accept in an imported catalogue. Well beyond any
 /// real device; an early rejection so an absurd file is refused before it reaches
-/// the editor tree. (The line diff bounds itself — see `catalog::MAX_LCS_CELLS`.)
+/// the editor tree. (The line diff bounds itself.)
 const MAX_FRAMES: usize = 5000;
 
 // ── Browse ───────────────────────────────────────────────────────────────────
@@ -456,8 +456,9 @@ fn write_import(
         )
     })?;
 
-    let desired = crate::catalog::sanitise_catalog_filename(basename(&blob.path))
-        .map_err(|e| ImportResult::refused(&blob.path, ImportOutcome::Failed, None, e))?;
+    let desired = wiretap_catalog::text::sanitise_filename(basename(&blob.path)).map_err(|e| {
+        ImportResult::refused(&blob.path, ImportOutcome::Failed, None, e.to_string())
+    })?;
     let taken = decoder_dir.join(&desired).exists();
 
     // A file we previously imported from this exact source is an update, not a
@@ -1012,9 +1013,7 @@ pub async fn apply_catalog_update(
         ));
     };
 
-    let target = decoder_dir.join(
-        crate::catalog::sanitise_catalog_filename(&filename).map_err(ShareError::invalid)?,
-    );
+    let target = decoder_dir.join(wiretap_catalog::text::sanitise_filename(&filename)?);
     // Unconditional: `None` legitimately means "there was no local file when I
     // reviewed", so it must still be compared rather than waved through.
     if registry::git_blob_sha_of_file(&target) != expected_local_sha {
@@ -1048,9 +1047,7 @@ fn install_update(
         ));
     }
 
-    let target = decoder_dir.join(
-        crate::catalog::sanitise_catalog_filename(filename).map_err(ShareError::invalid)?,
-    );
+    let target = decoder_dir.join(wiretap_catalog::text::sanitise_filename(filename)?);
     // Derived rather than taken from the caller, so the stored hash is always the
     // hash of the bytes actually written.
     let blob_sha = registry::git_blob_sha(toml.as_bytes());

@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use wiretap_catalog::text;
 
 /// Open and parse a catalog TOML file using the Python CLI
 #[tauri::command]
@@ -214,129 +215,12 @@ pub(crate) fn refuse_unless_valid(text: &str) -> Result<(), String> {
     ))
 }
 
-/// What a diff row says happened to its line.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-#[cfg_attr(test, derive(ts_rs::TS))]
-pub(crate) enum DiffKind {
-    Context,
-    Add,
-    Remove,
-}
-
-/// One row of a unified diff, with 1-based line numbers for the gutter.
-///
-/// A struct rather than `serde_json::Value` because two commands return these and one
-/// of them counts them by kind: `row["kind"] == "add"` on untyped JSON compiles just
-/// as happily when the string is wrong, and reports zero.
-#[derive(Debug, Clone, serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-#[cfg_attr(test, derive(ts_rs::TS), ts(rename = "DiffLine"))]
-pub(crate) struct DiffRow {
-    pub kind: DiffKind,
-    pub text: String,
-    pub old_line: Option<usize>,
-    pub new_line: Option<usize>,
-}
-
-/// A unified line diff (baseline → current). Full-context: every line is emitted as
-/// context, add or remove.
-///
-/// Exposed for callers that already hold both texts — the push dialog's `publish_diff`
-/// reads them out of the git clone, so routing them back through the `catalog.diff`
-/// command would ship both files to the frontend and straight back again.
-pub(crate) fn diff_lines(baseline: &str, current: &str) -> Vec<DiffRow> {
-    let a: Vec<&str> = baseline.split('\n').collect();
-    let b: Vec<&str> = current.split('\n').collect();
-    lcs_diff(&a, &b)
-}
-
-/// [`diff_lines`] plus a `dirty` flag, as JSON for the editor.
+/// [`text::diff_lines`] plus a `dirty` flag, as JSON for the editor.
 fn diff_lines_json(baseline: &str, current: &str) -> serde_json::Value {
     serde_json::json!({
         "dirty": baseline != current,
-        "lines": diff_lines(baseline, current),
+        "lines": text::diff_lines(baseline, current),
     })
-}
-
-fn diff_row(kind: DiffKind, text: &str, old_line: Option<usize>, new_line: Option<usize>) -> DiffRow {
-    DiffRow {
-        kind,
-        text: text.to_string(),
-        old_line,
-        new_line,
-    }
-}
-
-/// Above this many `n * m` cells the LCS table costs more than the diff is worth
-/// (4 bytes per cell, so 25M cells ≈ 100 MB). Catalogues are a few thousand lines
-/// at most; anything past this is pathological or hostile — an imported file, an
-/// MCP write, or a paste into text mode — so degrade instead of allocating.
-const MAX_LCS_CELLS: usize = 25_000_000;
-
-/// Longest-common-subsequence line diff. O(n·m) in time and memory, so bounded
-/// by [`MAX_LCS_CELLS`]; beyond that it falls back to remove-all/add-all, which
-/// is a truthful (if coarse) diff rather than an out-of-memory abort.
-fn lcs_diff(a: &[&str], b: &[&str]) -> Vec<DiffRow> {
-    let (n, m) = (a.len(), b.len());
-    if n.saturating_mul(m) > MAX_LCS_CELLS {
-        let mut rows = Vec::with_capacity(n + m);
-        rows.extend(
-            a.iter()
-                .enumerate()
-                .map(|(i, line)| diff_row(DiffKind::Remove, line, Some(i + 1), None)),
-        );
-        rows.extend(
-            b.iter()
-                .enumerate()
-                .map(|(j, line)| diff_row(DiffKind::Add, line, None, Some(j + 1))),
-        );
-        return rows;
-    }
-    // One flat allocation rather than `vec![vec![]; n + 1]`: the nested form is n+1
-    // separate heap blocks for the same bytes, and a contiguous row keeps the inner
-    // loop's reads adjacent.
-    let stride = m + 1;
-    let mut dp = vec![0u32; (n + 1) * stride];
-    for i in (0..n).rev() {
-        for j in (0..m).rev() {
-            dp[i * stride + j] = if a[i] == b[j] {
-                dp[(i + 1) * stride + j + 1] + 1
-            } else {
-                dp[(i + 1) * stride + j].max(dp[i * stride + j + 1])
-            };
-        }
-    }
-    let mut rows = Vec::new();
-    let (mut i, mut j, mut oln, mut nln) = (0, 0, 1usize, 1usize);
-    while i < n && j < m {
-        if a[i] == b[j] {
-            rows.push(diff_row(DiffKind::Context, a[i], Some(oln), Some(nln)));
-            i += 1;
-            j += 1;
-            oln += 1;
-            nln += 1;
-        } else if dp[(i + 1) * stride + j] >= dp[i * stride + j + 1] {
-            rows.push(diff_row(DiffKind::Remove, a[i], Some(oln), None));
-            i += 1;
-            oln += 1;
-        } else {
-            rows.push(diff_row(DiffKind::Add, b[j], None, Some(nln)));
-            j += 1;
-            nln += 1;
-        }
-    }
-    while i < n {
-        rows.push(diff_row(DiffKind::Remove, a[i], Some(oln), None));
-        i += 1;
-        oln += 1;
-    }
-    while j < m {
-        rows.push(diff_row(DiffKind::Add, b[j], None, Some(nln)));
-        j += 1;
-        nln += 1;
-    }
-    rows
 }
 
 use tauri::{AppHandle, Manager};
@@ -432,7 +316,7 @@ fn scan_catalogs(decoder_dir: &Path, index: &SyncIndex) -> Vec<CatalogFile> {
         let bytes = std::fs::read(&path).ok();
         let name = bytes
             .as_deref()
-            .and_then(|b| extract_catalog_name(&String::from_utf8_lossy(b)))
+            .and_then(|b| text::meta_name(&String::from_utf8_lossy(b)))
             .unwrap_or_else(|| filename.clone());
         let sync = index.status_for(&filename, bytes.as_deref());
         catalogs.push(CatalogFile {
@@ -633,75 +517,10 @@ fn catalog_named<'a>(catalogs: &'a [CatalogFile], name: &str) -> Option<&'a Cata
         .find(|c| c.filename == want || c.name == want || c.filename == with_suffix)
 }
 
-/// `[meta].name` alone, so a catalogue that fails validation still shows its name.
-fn extract_catalog_name(content: &str) -> Option<String> {
-    #[derive(Deserialize)]
-    struct Head {
-        meta: Option<Meta>,
-    }
-    #[derive(Deserialize)]
-    struct Meta {
-        name: Option<String>,
-    }
-    toml::from_str::<Head>(content)
-        .ok()?
-        .meta?
-        .name
-        .filter(|n| !n.trim().is_empty())
-}
-
-/// Reject a filename that is not a bare, visible name.
-///
-/// Shared by every path that turns outside input into a file under a
-/// user-data directory — catalogues here, dashboards in `dashboard.rs` — so the
-/// traversal guard has one implementation rather than one per suffix.
-pub fn reject_unsafe_filename(filename: &str) -> Result<&str, String> {
-    let name = filename.trim();
-    if name.is_empty() {
-        return Err("Filename is empty".to_string());
-    }
-    if name.contains('/') || name.contains('\\') || name.contains("..") {
-        return Err(format!(
-            "Invalid filename '{name}' — must be a bare name with no path separators"
-        ));
-    }
-    // A leading dot would hide the file from the directory scanners.
-    if name.starts_with('.') {
-        return Err(format!("Invalid filename '{name}' — must not start with a dot"));
-    }
-    Ok(name)
-}
-
-/// Reduce an untrusted name to a bare `*.toml` filename.
-///
-/// The single implementation for every path that names a file in the decoder
-/// directory: the MCP write tools, the git import, and the duplicate/rename
-/// commands below.
-pub fn sanitise_catalog_filename(filename: &str) -> Result<String, String> {
-    let name = reject_unsafe_filename(filename)?;
-    if name.to_lowercase().ends_with(".toml") {
-        Ok(name.to_string())
-    } else {
-        Ok(format!("{name}.toml"))
-    }
-}
-
-/// The filename a new catalogue named `name` is first offered under: a numeric
-/// name in the save format's id style, anything else slugged.
+/// The filename a new catalogue named `name` is first offered under.
 #[tauri::command]
 pub fn new_catalog_filename(name: String, hex_ids: bool) -> String {
-    let name = name.trim();
-    let numeric = name.bytes().all(|b| b.is_ascii_digit());
-    let stem = match name.parse::<u64>() {
-        Ok(id) if numeric && hex_ids => format!("{id:#x}"),
-        Ok(id) if numeric => id.to_string(),
-        _ => name
-            .to_lowercase()
-            .split_whitespace()
-            .collect::<Vec<_>>()
-            .join("-"),
-    };
-    sanitise_catalog_filename(&stem).unwrap_or_else(|_| "decoder.toml".to_string())
+    text::suggested_filename(&name, hex_ids)
 }
 
 /// Write a file via a temp name plus rename, so no reader can observe a partial
@@ -722,11 +541,10 @@ pub fn write_file_atomically(path: &Path, bytes: &[u8]) -> Result<(), String> {
 
 /// First unused `name-N.toml` beside `name.toml`, for a non-destructive save.
 pub fn next_free_catalog_filename(dir: &Path, desired: &str) -> String {
-    let stem = desired.strip_suffix(".toml").unwrap_or(desired);
-    (2..1000)
-        .map(|n| format!("{stem}-{n}.toml"))
-        .find(|candidate| !dir.join(candidate).exists())
-        .unwrap_or_else(|| format!("{stem}-{}.toml", chrono::Utc::now().timestamp()))
+    text::next_free_filename(desired, |c| dir.join(c).exists()).unwrap_or_else(|| {
+        let stem = desired.strip_suffix(".toml").unwrap_or(desired);
+        format!("{stem}-{}.toml", chrono::Utc::now().timestamp())
+    })
 }
 
 /// The configured decoder directory, whether or not it exists yet.
@@ -755,7 +573,7 @@ pub async fn import_catalog(
     std::fs::create_dir_all(&dir)
         .map_err(|e| format!("Failed to create {}: {e}", dir.display()))?;
 
-    let desired = sanitise_catalog_filename(&filename)?;
+    let desired = text::sanitise_filename(&filename).map_err(|e| e.to_string())?;
     let free = if dir.join(&desired).exists() {
         next_free_catalog_filename(&dir, &desired)
     } else {
@@ -811,7 +629,7 @@ fn refuse_existing(dest: &Path, filename: &str) -> Result<(), String> {
 fn duplicate_catalogue_file(source: &Path, new_filename: &str, new_name: &str) -> Result<(), String> {
     let parent_dir = source.parent()
         .ok_or_else(|| "Invalid source path".to_string())?;
-    let new_filename = sanitise_catalog_filename(new_filename)?;
+    let new_filename = text::sanitise_filename(new_filename).map_err(|e| e.to_string())?;
     let dest = parent_dir.join(&new_filename);
     refuse_existing(&dest, &new_filename)?;
 
@@ -837,7 +655,7 @@ pub async fn duplicate_catalog(
 fn rename_catalogue_file(old_path: &Path, new_filename: &str, new_name: &str) -> Result<String, String> {
     let parent_dir = old_path.parent()
         .ok_or_else(|| "Invalid path".to_string())?;
-    let new_filename = sanitise_catalog_filename(new_filename)?;
+    let new_filename = text::sanitise_filename(new_filename).map_err(|e| e.to_string())?;
     let new_path = parent_dir.join(&new_filename);
     if !is_same_file(old_path, &new_path) {
         refuse_existing(&new_path, &new_filename)?;
@@ -911,24 +729,12 @@ mod tests {
     }
 
     #[test]
-    fn a_new_catalogue_is_offered_a_bare_toml_filename() {
-        let offer = |name: &str, hex| new_catalog_filename(name.to_string(), hex);
-        assert_eq!(offer("  My  Pack ", false), "my-pack.toml");
-        assert_eq!(offer("256", true), "0x100.toml");
-        assert_eq!(offer("0256", false), "256.toml");
-        assert_eq!(offer("pack.TOML", false), "pack.toml");
-        assert_eq!(offer("", false), "decoder.toml");
-        assert_eq!(offer("a/b", false), "decoder.toml");
-        assert_eq!(offer(".hidden", false), "decoder.toml");
-    }
-
-    #[test]
     fn renaming_a_catalogue_leaves_its_signal_names_alone() {
         let catalogue = "[[frame.can.0x100.signals]]\nname = \"Voltage\"\nstart_bit = 0\nbit_length = 16\n\n[meta]\nname = \"Pack\"\nversion = 1\n";
 
         let renamed = with_catalogue_name(catalogue, "Pack copy").expect("rename");
 
-        assert_eq!(extract_catalog_name(&renamed).as_deref(), Some("Pack copy"));
+        assert_eq!(text::meta_name(&renamed).as_deref(), Some("Pack copy"));
         assert!(renamed.contains("name = \"Voltage\""), "signal renamed:\n{renamed}");
     }
 
@@ -943,7 +749,7 @@ mod tests {
 
         assert!(err.contains("other.toml"), "error should name the file: {err}");
         let other = std::fs::read_to_string(dir.join("other.toml")).unwrap();
-        assert_eq!(extract_catalog_name(&other).as_deref(), Some("Other"));
+        assert_eq!(text::meta_name(&other).as_deref(), Some("Other"));
     }
 
     #[test]
@@ -958,7 +764,7 @@ mod tests {
         assert!(err.contains("other.toml"), "error should name the file: {err}");
         assert!(dir.join("pack.toml").exists());
         let other = std::fs::read_to_string(dir.join("other.toml")).unwrap();
-        assert_eq!(extract_catalog_name(&other).as_deref(), Some("Other"));
+        assert_eq!(text::meta_name(&other).as_deref(), Some("Other"));
     }
 
     #[test]
@@ -969,7 +775,7 @@ mod tests {
         rename_catalogue_file(&dir.join("pack.toml"), "pack.toml", "Battery").expect("rename");
 
         let body = std::fs::read_to_string(dir.join("pack.toml")).unwrap();
-        assert_eq!(extract_catalog_name(&body).as_deref(), Some("Battery"));
+        assert_eq!(text::meta_name(&body).as_deref(), Some("Battery"));
     }
 
     #[test]
@@ -1003,20 +809,6 @@ mod tests {
             assert!(catalog_named(&catalogs, spelling).is_some(), "{spelling:?}");
         }
         assert!(catalog_named(&catalogs, "sungrow").is_none());
-    }
-
-    #[test]
-    fn catalogue_name_is_read_from_meta_only() {
-        let below_a_signal = "[[frame.can.0x100.signals]]\nname = \"Voltage\"\n\n[meta]\nname = \"Pack\"\n";
-        assert_eq!(extract_catalog_name(below_a_signal).as_deref(), Some("Pack"));
-
-        let commented = "[meta]\nname = \"Pack = BMS\" # the display name\n";
-        assert_eq!(extract_catalog_name(commented).as_deref(), Some("Pack = BMS"));
-
-        let prefix_first = "name_prefix = \"hyp_\"\n[meta]\nname = \"Pack\"\n";
-        assert_eq!(extract_catalog_name(prefix_first).as_deref(), Some("Pack"));
-
-        assert_eq!(extract_catalog_name("[meta]\nversion = 1\n"), None);
     }
 
     /// The scan labels each row from the registry as it walks, using the bytes it read

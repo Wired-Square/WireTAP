@@ -104,7 +104,8 @@ fn resolve_catalog_path(
     settings: &dyn SettingsSource,
     filename: &str,
 ) -> Result<(std::path::PathBuf, bool), McpError> {
-    let name = crate::catalog::sanitise_catalog_filename(filename).map_err(err)?;
+    let name =
+        wiretap_catalog::text::sanitise_filename(filename).map_err(|e| err(e.to_string()))?;
     let settings = settings.load().map_err(err)?;
     let path = std::path::PathBuf::from(&settings.decoder_dir).join(&name);
     let exists = path.exists();
