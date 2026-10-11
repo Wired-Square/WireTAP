@@ -311,7 +311,7 @@ function configForms(catalog: Catalog | null) {
     canFrameIdMask: can?.frameIdMask === undefined ? '' : hexMask(can.frameIdMask),
     canHeaderFields: Object.entries(can?.fields ?? {}).map(([name, f]): CanHeaderFieldEntry => ({
       name,
-      mask: hexMask(f.mask),
+      mask: hexMask(f.mask ?? 0),
       shift: f.shift ?? undefined,
       format: (f.format ?? 'hex') as HeaderFieldFormat,
     })),
@@ -319,7 +319,7 @@ function configForms(catalog: Catalog | null) {
     serialByteOrder: serial?.byteOrder ?? undefined,
     serialHeaderFields: Object.entries(serial?.fields ?? {}).map(([name, f]): SerialHeaderFieldEntry => ({
       name,
-      mask: f.mask,
+      mask: f.mask ?? 0,
       endianness: f.endianness ?? 'big',
       format: (f.format ?? 'hex') as HeaderFieldFormat,
     })),

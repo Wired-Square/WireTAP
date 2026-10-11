@@ -1155,8 +1155,6 @@ function DiscoveryInner() {
             .map((f) =>
               t("catalogueExport.headerFieldOutOfRange", {
                 field: t(`catalogueExport.fields.${f.field}`, { defaultValue: f.field }),
-                bytes: f.bytes,
-                start: f.startByte,
               }),
             )
             .join(" ")}
