@@ -9,7 +9,7 @@ import { useDashboardStore } from "../../../stores/dashboardStore";
 import { useDiscoveryToolboxStore } from "../../../stores/discoveryToolboxStore";
 import type { ChangesFrame } from "../../../api/byteRoles";
 import { candidateSignals } from "../../../api/drafting";
-import type { ByteOrder } from "../../../generated/ByteOrder";
+import type { Endianness } from "../../../generated/Endianness";
 import type { CandidateSignal } from "../../../generated/CandidateSignal";
 import { useFrameIdFormat } from "../../../hooks/useFrameIdFormat";
 import { Button } from "../../../components/Button";
@@ -43,7 +43,7 @@ export default function CandidateSignalsDialog({ isOpen, onClose }: Props) {
 
   const [selectedFrameId, setSelectedFrameId] = useState("");
   const [bitLengths, setBitLengths] = useState<Set<number>>(new Set([8, 16]));
-  const [endianness, setEndianness] = useState<Set<ByteOrder>>(new Set(["little"]));
+  const [endianness, setEndianness] = useState<Set<Endianness>>(new Set(["little"]));
   const [startByte, setStartByte] = useState("0");
   const [endByte, setEndByte] = useState("7");
   const [useAnalysisHints, setUseAnalysisHints] = useState(false);
@@ -70,7 +70,7 @@ export default function CandidateSignalsDialog({ isOpen, onClose }: Props) {
     });
   }, []);
 
-  const toggleEndianness = useCallback((e: ByteOrder) => {
+  const toggleEndianness = useCallback((e: Endianness) => {
     setEndianness((prev) => {
       const next = new Set(prev);
       if (next.has(e)) next.delete(e);

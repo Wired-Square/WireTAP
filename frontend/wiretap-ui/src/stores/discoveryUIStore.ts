@@ -17,7 +17,7 @@ import {
 } from '../api/drafting';
 import { withAppError } from '../utils/appError';
 import { frameNoteLines } from '../utils/analysis/byteNoteText';
-import type { SerialFrameConfig } from '../utils/frameExport';
+import { serialConfigOf, type SerialFrameConfig } from '../utils/frameExport';
 import { parseFrameKey } from '../utils/frameKey';
 import { normalizeMeta } from '../utils/catalogMeta';
 import { configFromCandidate, serialChecksumFromConfig } from '../apps/discovery/views/serial/checksumConfig';
@@ -260,7 +260,7 @@ export const useDiscoveryUIStore = create<DiscoveryUIState>((set, get) => ({
         dlc: f.length,
       }));
       await saveBuilt(async () => ({
-        text: await exportModbusCatalog(registers, meta, { ...modbusExportConfig, default_interval: Math.round(defaultInterval) }),
+        text: await exportModbusCatalog(registers, meta, { ...modbusExportConfig, default_interval: defaultInterval }),
         findings: [],
       }));
       return;
@@ -285,7 +285,7 @@ export const useDiscoveryUIStore = create<DiscoveryUIState>((set, get) => ({
     }
 
     await saveBuilt(() =>
-      draftCatalog(draft, meta, enrichedSerialConfig, {
+      draftCatalog(draft, meta, enrichedSerialConfig && serialConfigOf(enrichedSerialConfig), {
         frames: selectedFramesList,
         notes: selectedFramesList.map((f) => draftNotes(draft, f)),
         defaultEndianness: meta.default_byte_order,

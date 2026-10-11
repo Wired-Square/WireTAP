@@ -1,4 +1,4 @@
 // Generated from the Rust serde types by `npm run gen:types`. Do not edit.
-import type { ByteOrder } from "./ByteOrder";
+import type { Endianness } from "./Endianness";
 
-export type CandidateSignal = { name: string, offset: number, bits: number, endianness: ByteOrder, };
+export type CandidateSignal = { name: string, offset: number, bits: number, endianness: Endianness, };

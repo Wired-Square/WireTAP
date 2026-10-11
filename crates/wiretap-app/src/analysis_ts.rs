@@ -232,17 +232,10 @@ pub enum PatternKind {
 #[derive(Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct Draft {
-    pub default_endianness: ByteOrder,
+    pub default_endianness: wiretap_decode::Endianness,
     pub default_interval_ms: Option<f64>,
     pub serial_reserved: Vec<ByteSpan>,
     pub frames: Vec<FrameDraft>,
-}
-
-#[derive(Serialize, TS)]
-#[serde(rename_all = "lowercase")]
-pub enum ByteOrder {
-    Big,
-    Little,
 }
 
 #[derive(Serialize, TS)]
@@ -293,7 +286,7 @@ pub struct DraftSignal {
     pub bit_length: u32,
     pub source: SignalSource,
     pub confidence: Confidence,
-    pub byte_order: Option<ByteOrder>,
+    pub byte_order: Option<wiretap_decode::Endianness>,
 }
 
 #[derive(Serialize, TS)]
@@ -333,5 +326,5 @@ pub struct CandidateSignal {
     pub name: String,
     pub offset: u32,
     pub bits: u32,
-    pub endianness: ByteOrder,
+    pub endianness: wiretap_decode::Endianness,
 }

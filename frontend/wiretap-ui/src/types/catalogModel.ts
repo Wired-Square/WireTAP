@@ -8,8 +8,12 @@
 export type Protocol = "can" | "serial" | "modbus";
 import type { Endianness } from "../generated/Endianness";
 import type { RegisterType } from "../generated/RegisterType";
+import type { ChecksumConfig } from "../generated/ChecksumConfig";
+import type { HeaderField } from "../generated/HeaderField";
+import type { HeaderFieldPosition } from "../generated/HeaderFieldPosition";
+import type { SerialConfig } from "../generated/SerialConfig";
 
-export type { Endianness, RegisterType };
+export type { ChecksumConfig, Endianness, HeaderField, HeaderFieldPosition, RegisterType, SerialConfig };
 export type SignalFormat = "ascii" | "utf8" | "hex" | "enum" | "unix_time" | "other";
 export type Confidence = "none" | "low" | "medium" | "high";
 
@@ -152,13 +156,6 @@ export interface Frame {
   inheritedFields?: string[];
 }
 
-export interface HeaderField {
-  mask: number;
-  shift?: number;
-  format?: string;
-  endianness?: Endianness;
-}
-
 export interface CanConfig {
   defaultByteOrder?: Endianness;
   defaultInterval?: number;
@@ -166,44 +163,6 @@ export interface CanConfig {
   defaultFd?: boolean;
   frameIdMask?: number;
   fields?: Record<string, HeaderField>;
-}
-
-export interface ChecksumConfig {
-  algorithm: string;
-  startByte: number;
-  byteLength: number;
-  calcStartByte: number;
-  calcEndByte?: number;
-  bigEndian: boolean;
-}
-
-/** A serial header field with its byte position derived from the mask at parse time. */
-export interface HeaderFieldPosition {
-  name: string;
-  mask: number;
-  byteOrder: Endianness;
-  /** `hex` or `decimal` display. */
-  format: string;
-  startByte: number;
-  bytes: number;
-}
-
-export interface SerialConfig {
-  encoding?: string;
-  byteOrder?: Endianness;
-  frameIdMask?: number;
-  headerLength?: number;
-  minFrameLength?: number;
-  checksum?: ChecksumConfig;
-  fields?: Record<string, HeaderField>;
-  // Derived from `fields` at parse time (byte positions of named fields).
-  frameIdStartByte?: number;
-  frameIdBytes?: number;
-  frameIdByteOrder?: Endianness;
-  sourceAddressStartByte?: number;
-  sourceAddressBytes?: number;
-  sourceAddressByteOrder?: Endianness;
-  headerFields?: HeaderFieldPosition[];
 }
 
 export interface ModbusConfig {

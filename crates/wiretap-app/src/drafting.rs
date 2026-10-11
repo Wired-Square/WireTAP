@@ -13,7 +13,7 @@ use wiretap_analysis::draft::{
 };
 use wiretap_analysis::{ByteColumn, ByteRole, Direction, FrameKey};
 use wiretap_catalog::edit::EditOp;
-use wiretap_catalog::model::{ChecksumConfig, Protocol, SerialConfig};
+use wiretap_catalog::model::{Protocol, SerialConfig};
 use wiretap_checksum::columns::ColumnStats;
 use wiretap_decode::Endianness;
 
@@ -115,7 +115,6 @@ pub struct DraftWrite {
     /// The frames to write, each with its notes worded.
     pub frames: Vec<DraftFrame>,
     pub notes: Vec<Vec<String>>,
-    #[cfg_attr(test, ts(as = "crate::analysis_ts::ByteOrder"))]
     pub default_endianness: Endianness,
     pub default_interval_ms: Option<f64>,
     /// Key CAN and serial frames by decimal id rather than hex.
@@ -189,62 +188,6 @@ fn rekey(ops: Vec<EditOp>, from: &str, to: &str) -> Vec<EditOp> {
         .collect()
 }
 
-/// Discovery's serial framing as the frontend's `SerialFrameConfig` holds it,
-/// where a start byte may count from the end.
-#[derive(Debug, Default, Deserialize)]
-pub struct ExportSerialConfig {
-    encoding: Option<String>,
-    frame_id_start_byte: Option<i32>,
-    frame_id_bytes: Option<u32>,
-    frame_id_byte_order: Option<Endianness>,
-    frame_id_mask: Option<u32>,
-    source_address_start_byte: Option<i32>,
-    source_address_bytes: Option<u32>,
-    source_address_byte_order: Option<Endianness>,
-    min_frame_length: Option<u32>,
-    header_length: Option<u32>,
-    checksum: Option<ExportChecksum>,
-}
-
-#[derive(Debug, Deserialize)]
-struct ExportChecksum {
-    algorithm: String,
-    start_byte: i32,
-    byte_length: u32,
-    calc_start_byte: i32,
-    calc_end_byte: Option<i32>,
-    #[serde(default)]
-    big_endian: bool,
-}
-
-impl ExportSerialConfig {
-    /// A header field counted from the end is not one a header mask can name, so it is dropped.
-    fn config(self) -> SerialConfig {
-        let start = |byte: Option<i32>| byte.and_then(|b| u32::try_from(b).ok());
-        SerialConfig {
-            encoding: self.encoding,
-            frame_id_mask: self.frame_id_mask,
-            header_length: self.header_length,
-            min_frame_length: self.min_frame_length,
-            checksum: self.checksum.map(|c| ChecksumConfig {
-                algorithm: c.algorithm,
-                start_byte: c.start_byte,
-                byte_length: c.byte_length,
-                calc_start_byte: c.calc_start_byte,
-                calc_end_byte: c.calc_end_byte,
-                big_endian: c.big_endian,
-            }),
-            frame_id_start_byte: start(self.frame_id_start_byte),
-            frame_id_bytes: self.frame_id_bytes,
-            frame_id_byte_order: self.frame_id_byte_order,
-            source_address_start_byte: start(self.source_address_start_byte),
-            source_address_bytes: self.source_address_bytes,
-            source_address_byte_order: self.source_address_byte_order,
-            ..Default::default()
-        }
-    }
-}
-
 /// A catalogue the export wrote, and what it left out.
 #[derive(Debug, Serialize)]
 #[cfg_attr(test, derive(ts_rs::TS))]
@@ -266,7 +209,7 @@ fn built(ops: &[EditOp]) -> Result<String, String> {
 pub fn draft_catalog_cmd(
     draft: Option<Draft>,
     meta: ExportMeta,
-    serial: Option<ExportSerialConfig>,
+    serial: Option<SerialConfig>,
     write: DraftWrite,
 ) -> Result<ExportedCatalog, String> {
     let named: Vec<ExportFrame> = write
@@ -280,7 +223,7 @@ pub fn draft_catalog_cmd(
         })
         .collect();
     let protocol = wiretap_analysis::draft::catalog_protocol(&named).map_err(|e| e.to_string())?;
-    let serial = serial.unwrap_or_default().config();
+    let serial = serial.unwrap_or_default();
     let (head, findings) = head_ops(protocol, &meta, &serial);
     let ops: Vec<EditOp> = head.into_iter().chain(catalog_ops(draft, write, ByteSpan::serial(&serial))).collect();
     Ok(ExportedCatalog { text: built(&ops)?, findings })
@@ -460,10 +403,10 @@ mod tests {
     fn a_serial_frame_leaves_its_header_and_checksum_bytes_unclaimed() {
         let serial = serde_json::json!({
             "encoding": "slip",
-            "frame_id_start_byte": 0,
-            "frame_id_bytes": 1,
+            "frameIdStartByte": 0,
+            "frameIdBytes": 1,
             "checksum": {
-                "algorithm": "xor", "start_byte": -1, "byte_length": 1, "calc_start_byte": 0, "calc_end_byte": -1,
+                "algorithm": "xor", "startByte": -1, "byteLength": 1, "calcStartByte": 0, "calcEndByte": -1, "bigEndian": false,
             },
         });
         let exported = build_framed(None, write(vec![frame("serial", 0x10, false, 4)], false), serial);
@@ -474,24 +417,13 @@ mod tests {
     }
 
     #[test]
-    fn a_header_field_counted_from_the_end_is_left_out_and_claims_no_bytes() {
-        let serial = serde_json::json!({
-            "encoding": "raw", "frame_id_start_byte": -2, "frame_id_bytes": 2, "source_address_start_byte": 1,
-        });
-        let exported = build_framed(None, write(vec![frame("serial", 0x10, false, 4)], false), serial);
-        assert!(exported.findings.is_empty());
-        assert!(!exported.text.contains("[meta.serial.fields"), "{}", exported.text);
-        assert!(exported.text.contains("bit_length = 32"), "{}", exported.text);
-    }
-
-    #[test]
     fn a_header_field_past_byte_four_comes_back_as_a_finding() {
         let serial = serde_json::json!({
             "encoding": "raw",
-            "frame_id_start_byte": 0,
-            "frame_id_bytes": 1,
-            "source_address_start_byte": 4,
-            "source_address_bytes": 2,
+            "frameIdStartByte": 0,
+            "frameIdBytes": 1,
+            "sourceAddressStartByte": 4,
+            "sourceAddressBytes": 2,
         });
         let exported = build_framed(None, write(vec![frame("serial", 0x10, false, 8)], false), serial);
         assert_eq!(
@@ -525,8 +457,31 @@ mod tests {
         format!("{ops:#?}")
     }
 
+    /// The golden's framing as `serialConfigOf` sends it: camelCase, a start byte
+    /// counted from the end dropped.
     fn serial_of(input: &serde_json::Value) -> SerialConfig {
-        from::<ExportSerialConfig>(input).config()
+        fn camel(key: &str) -> String {
+            let mut words = key.split('_');
+            let first = words.next().unwrap().to_string();
+            words.fold(first, |out, w| out + &w[..1].to_uppercase() + &w[1..])
+        }
+        fn walk(v: &serde_json::Value) -> serde_json::Value {
+            let Some(object) = v.as_object() else { return v.clone() };
+            object
+                .iter()
+                .filter(|(k, v)| !(k.ends_with("_start_byte") && v.as_i64().is_some_and(|n| n < 0)))
+                .map(|(k, v)| match k.as_str() {
+                    "default_byte_order" => ("byteOrder".into(), v.clone()),
+                    _ => (camel(k), walk(v)),
+                })
+                .collect::<serde_json::Map<_, _>>()
+                .into()
+        }
+        let mut config = walk(input);
+        if let Some(checksum) = config.get_mut("checksum") {
+            checksum["bigEndian"] = checksum.get("bigEndian").cloned().unwrap_or(false.into());
+        }
+        from(&config)
     }
 
     fn check_head(name: &str, input: &serde_json::Value, expected: &serde_json::Value) {

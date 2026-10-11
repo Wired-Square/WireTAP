@@ -193,6 +193,7 @@ fn render() -> BTreeMap<PathBuf, String> {
     r.visit::<crate::drafting::DraftWrite>();
     r.visit::<crate::drafting::ExportedCatalog>();
     r.visit::<wiretap_analysis::draft::ExportFrame>();
+    r.visit::<wiretap_catalog::model::SerialConfig>();
     r.visit::<wiretap_analysis::draft::ExportMeta>();
     r.visit::<wiretap_analysis::draft::ModbusExportConfig>();
     r.visit::<wiretap_analysis::draft::ModbusRegister>();

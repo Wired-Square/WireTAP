@@ -4,7 +4,7 @@
 // `wiretap_analysis::draft` in Rust; the frontend only carries it between calls.
 
 import { invoke } from "@tauri-apps/api/core";
-import type { ByteOrder } from "../generated/ByteOrder";
+import type { Endianness } from "../generated/Endianness";
 import type { CandidateSignal } from "../generated/CandidateSignal";
 import type { Draft } from "../generated/Draft";
 import type { DraftFrame } from "../generated/DraftFrame";
@@ -16,7 +16,7 @@ import type { ExportFrame } from "../generated/ExportFrame";
 import type { ExportMeta } from "../generated/ExportMeta";
 import type { ModbusExportConfig } from "../generated/ModbusExportConfig";
 import type { ModbusRegister } from "../generated/ModbusRegister";
-import type { SerialFrameConfig } from "../utils/frameExport";
+import type { SerialConfig } from "../types/catalogModel";
 
 export type { Draft, DraftFrame, ExportFinding, ExportFrame, ExportMeta, ModbusExportConfig };
 
@@ -32,7 +32,7 @@ export async function draftPreview(draft: Draft | null, frames: DraftFrame[]): P
 export async function draftCatalog(
   draft: Draft | null,
   meta: ExportMeta,
-  serial: SerialFrameConfig | null,
+  serial: SerialConfig | null,
   write: DraftWrite,
 ): Promise<ExportedCatalog> {
   return invoke<ExportedCatalog>("draft_catalog_cmd", { draft, meta, serial, write });
@@ -57,7 +57,7 @@ export async function candidateSignals(
   start: number,
   end: number,
   widths: number[],
-  orders: ByteOrder[],
+  orders: Endianness[],
   hints?: { position: number; role: string }[],
 ): Promise<CandidateSignal[]> {
   return invoke<CandidateSignal[]>("candidate_signals_cmd", { start, end, widths, orders, hints });
