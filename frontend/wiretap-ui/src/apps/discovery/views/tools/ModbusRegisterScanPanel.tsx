@@ -21,7 +21,7 @@ import {
   MODBUS_SCAN_DEFAULTS,
   maxChunkFor,
 } from "../../../../components/modbus/modbusScanDefaults";
-import type { ModbusScanConfig, ModbusRegisterType } from "../../../../api/io";
+import type { ModbusScanConfig, RegisterType } from "../../../../api/io";
 import { Button } from "../../../../components/Button";
 
 type Props = {
@@ -32,7 +32,7 @@ export default function ModbusRegisterScanPanel({ onStartScan }: Props) {
   const { t } = useTranslation("discovery");
   const target = useModbusTarget();
 
-  const [registerType, setRegisterType] = useState<ModbusRegisterType>(
+  const [registerType, setRegisterType] = useState<RegisterType>(
     MODBUS_SCAN_DEFAULTS.registerType
   );
   const [startRegister, setStartRegister] = useState(MODBUS_SCAN_DEFAULTS.startRegister);
@@ -55,7 +55,7 @@ export default function ModbusRegisterScanPanel({ onStartScan }: Props) {
 
   const maxChunk = maxChunkFor(registerType);
 
-  const handleRegisterTypeChange = (type: ModbusRegisterType) => {
+  const handleRegisterTypeChange = (type: RegisterType) => {
     setRegisterType(type);
     setChunkSize(maxChunkFor(type));
   };

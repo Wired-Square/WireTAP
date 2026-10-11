@@ -20,7 +20,6 @@ use wiretap_catalog::modbus::PollItem;
 /// Register type for Modbus polling
 #[derive(Clone, Debug, serde::Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
-#[cfg_attr(test, derive(ts_rs::TS), ts(rename = "ModbusRegisterType"))]
 pub enum RegisterType {
     Holding,
     Input,

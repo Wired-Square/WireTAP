@@ -1,5 +1,5 @@
 // Generated from the Rust serde types by `npm run gen:types`. Do not edit.
-import type { ModbusRegisterType } from "./ModbusRegisterType";
+import type { RegisterType } from "./RegisterType";
 
 /**
  * Configuration for register range scanning.
@@ -23,7 +23,7 @@ unit_id: number,
 /**
  * Register type to scan
  */
-register_type: ModbusRegisterType, 
+register_type: RegisterType, 
 /**
  * First register address to scan (protocol-level, 0-based)
  */

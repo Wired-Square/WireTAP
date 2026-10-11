@@ -24,11 +24,12 @@ import type { StreamEndedInfo, PlaybackPosition, FcProbeConfig, ModbusScanConfig
 import { createModbusScanSession, generateSessionId, probeModbusFunctionCodes, startReaderSession, stopReaderSession } from '../../api/io';
 import { MODBUS_SCAN_SOURCE_TYPE } from '../../generated/wireConstants';
 import type { ScanJob } from '../../api/io';
-import type { ModbusExportConfig } from '../../utils/frameExport';
+import type { ModbusExportConfig } from '../../api/drafting';
 import type { ModbusPollerRef } from '../../utils/modbusProfiles';
 import { useModbusPollControl } from '../../hooks/useModbusPollControl';
 import { REALTIME_CLOCK_INTERVAL_MS } from "../../constants";
 import AppLayout from "../../components/AppLayout";
+import FlashNotification from "../../components/FlashNotification";
 import DiscoveryTopBar from "./views/DiscoveryTopBar";
 import DiscoveryFramesView from "./views/DiscoveryFramesView";
 import SerialDiscoveryView from "./views/SerialDiscoveryView";
@@ -106,6 +107,8 @@ function DiscoveryInner() {
   const framesViewActiveTab = useDiscoveryUIStore((s) => s.framesViewActiveTab);
   const setShowBusColumn = useDiscoveryUIStore((s) => s.setShowBusColumn);
   const setModbusExportConfig = useDiscoveryUIStore((s) => s.setModbusExportConfig);
+  const exportFindings = useDiscoveryUIStore((s) => s.exportFindings);
+  const clearExportFindings = useDiscoveryUIStore((s) => s.clearExportFindings);
   const setMaxBuffer = useDiscoveryUIStore((s) => s.setMaxBuffer);
   const setIoProfile = useDiscoveryUIStore((s) => s.setIoProfile);
   const setPlaybackSpeed = useDiscoveryUIStore((s) => s.setPlaybackSpeed);
@@ -1144,6 +1147,22 @@ function DiscoveryInner() {
         onCancel={closeSaveDialog}
         onSave={handlers.handleSaveFrames}
       />
+      {exportFindings.length > 0 && (
+        <FlashNotification
+          type="warning"
+          duration={0}
+          message={exportFindings
+            .map((f) =>
+              t("catalogueExport.headerFieldOutOfRange", {
+                field: t(`catalogueExport.fields.${f.field}`, { defaultValue: f.field }),
+                bytes: f.bytes,
+                start: f.startByte,
+              }),
+            )
+            .join(" ")}
+          onDismiss={clearExportFindings}
+        />
+      )}
 
       <EventDialog
         isOpen={sessionEvents.draft !== null}

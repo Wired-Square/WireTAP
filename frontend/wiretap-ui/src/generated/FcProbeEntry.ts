@@ -1,6 +1,6 @@
 // Generated from the Rust serde types by `npm run gen:types`. Do not edit.
 import type { FcVerdict } from "./FcVerdict";
-import type { ModbusRegisterType } from "./ModbusRegisterType";
+import type { RegisterType } from "./RegisterType";
 
 /**
  * One slave's answers across all four read function codes.
@@ -29,4 +29,4 @@ responded: boolean,
 /**
  * The register types worth sweeping on this unit.
  */
-supported_types: Array<ModbusRegisterType>, };
+supported_types: Array<RegisterType>, };

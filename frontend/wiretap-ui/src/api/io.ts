@@ -27,7 +27,7 @@ import type { IOCapabilities } from "../generated/IOCapabilities";
 import type { IOState } from "../generated/IOState";
 import type { ModbusRange } from "../generated/ModbusRange";
 import type { ModbusRangeSpec } from "../generated/ModbusRangeSpec";
-import type { ModbusRegisterType } from "../generated/ModbusRegisterType";
+import type { RegisterType } from "../generated/RegisterType";
 import type { ModbusScanConfig } from "../generated/ModbusScanConfig";
 import type { MultiSourceInput } from "../generated/MultiSourceInput";
 import type { OpenedSession } from "../generated/OpenedSession";
@@ -75,7 +75,7 @@ export type {
   IoFailure,
   ModbusRange,
   ModbusRangeSpec,
-  ModbusRegisterType,
+  RegisterType,
   ModbusScanConfig,
   MultiSourceInput,
   OpenedSession,

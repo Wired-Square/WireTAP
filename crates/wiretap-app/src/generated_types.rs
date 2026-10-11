@@ -191,9 +191,13 @@ fn render() -> BTreeMap<PathBuf, String> {
     r.visit::<crate::analysis_ts::CandidateSignal>();
     r.visit::<crate::drafting::DraftPreview>();
     r.visit::<crate::drafting::DraftWrite>();
+    r.visit::<crate::drafting::ExportedCatalog>();
+    r.visit::<wiretap_analysis::draft::ExportFrame>();
+    r.visit::<wiretap_analysis::draft::ExportMeta>();
+    r.visit::<wiretap_analysis::draft::ModbusExportConfig>();
+    r.visit::<wiretap_analysis::draft::ModbusRegister>();
     r.visit::<crate::decode_views::RegisterRead>();
     r.visit::<crate::decode_views::RegisterReading>();
-    r.visit::<wiretap_decode::Endianness>();
     r.visit::<crate::decode_views::MaskMatch>();
     r.files.into_iter().map(|(path, (_, text))| (path, text)).collect()
 }
@@ -447,7 +451,9 @@ fn outputs_serialise_as_declared() {
         Log::Reconfigured,
         Log::Cleared,
     ]);
-    assert_serialises_as_declared(&[RegisterType::Holding, RegisterType::Input, RegisterType::Coil, RegisterType::Discrete]);
+    for rt in [RegisterType::Holding, RegisterType::Input, RegisterType::Coil, RegisterType::Discrete] {
+        assert_declared::<wiretap_catalog::RegisterType>(&serde_json::to_value(rt).unwrap());
+    }
     assert_serialises_as_declared(&[modbus_tcp::PollEmitMode::Block, modbus_tcp::PollEmitMode::PerRegister]);
     use modbus_tcp::scanner::FcVerdict;
     assert_serialises_as_declared(&[

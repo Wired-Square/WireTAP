@@ -29,6 +29,7 @@ All notable changes to WireTAP will be documented in this file.
 
 ### Fixed
 
+- **Discovery's catalogue export says which serial header field it left out.** A frame ID or source address that ends past byte 4, where a header mask cannot reach, used to stop the save; the catalogue is now saved without that field, and a warning names it. A header field counted from the end of the frame is still left out and no longer holds its bytes back from the frame's data signals, and a default interval taken from Frame Order is rounded to whole milliseconds.
 - **A Modbus scan's 32-bit float column names a value that is not a number.** A register pair that reads as NaN or an infinity now shows `NaN`, `Infinity` or `-Infinity`, where it showed "—", so a pair holding no float can be told from one holding an infinity.
 - **A window that stops reading no longer slows the others or grows the app's memory.** Each window now has its own bounded queue; one that falls more than a second or so behind a fast replay is disconnected, reconnects on its own and carries on from the current frames. Loading a decoder over a long capture sends the already-received frames' signals a page at a time instead of in one piece, so the capture database stays free while it does.
 - **A capture that cannot be read now says why instead of reading as empty.** An export, a replay, an upload to a WireTAP backend and the MCP capture tools now report the database's error. An upload used to stop early and report success with frames missing, and an export said the capture was not a frame capture.

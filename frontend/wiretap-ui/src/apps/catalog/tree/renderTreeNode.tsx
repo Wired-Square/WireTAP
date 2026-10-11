@@ -14,7 +14,7 @@ import type { TomlNode } from "../types";
 import { IconButton } from "../../../components/Button";
 import { Badge } from "../../../components/Badge";
 import { MODBUS_REGISTER_TONES } from "../../../utils/profileTraits";
-import type { ModbusRegisterType } from "../../../api/io";
+import type { RegisterType } from "../../../api/io";
 
 export type RenderTreeNode = (node: TomlNode, depth?: number) => React.ReactNode;
 
@@ -129,7 +129,7 @@ export function createRenderTreeNode({
               const regType = frame.modbusRegisterType;
               const address = formatId(frame.frameId, displayFrameIdFormat);
               // The colour conveys the register type, so the row drops the `[holding]` text.
-              const tone = regType ? MODBUS_REGISTER_TONES[regType as ModbusRegisterType] : undefined;
+              const tone = regType ? MODBUS_REGISTER_TONES[regType as RegisterType] : undefined;
               return (
                 <span className="flex items-center gap-1.5">
                   {address && (

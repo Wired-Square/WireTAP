@@ -11,7 +11,7 @@ import { Play } from "lucide-react";
 import { borderDefault, textMuted } from "../../styles";
 import { iconMd } from "../../styles/spacing";
 import CheckboxField, { type CheckboxFieldProps } from "../forms/CheckboxField";
-import type { ModbusRegisterType } from "../../api/io";
+import type { RegisterType } from "../../api/io";
 import { Button } from "../../components/Button";
 import { Input, Select } from "../forms";
 
@@ -168,7 +168,7 @@ export function ScanNote({ ready, children }: { ready: boolean; children: ReactN
  */
 export function registerTypeOptions(
   t: TFunction
-): Array<{ value: ModbusRegisterType; label: string }> {
+): Array<{ value: RegisterType; label: string }> {
   return [
     { value: "holding", label: t("common:modbus.holding") },
     { value: "input", label: t("common:modbus.input") },

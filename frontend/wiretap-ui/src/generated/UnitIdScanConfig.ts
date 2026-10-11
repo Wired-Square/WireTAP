@@ -1,5 +1,5 @@
 // Generated from the Rust serde types by `npm run gen:types`. Do not edit.
-import type { ModbusRegisterType } from "./ModbusRegisterType";
+import type { RegisterType } from "./RegisterType";
 
 /**
  * Configuration for unit ID scanning
@@ -28,7 +28,7 @@ test_register: number,
 /**
  * Register type to probe (default Holding)
  */
-register_type: ModbusRegisterType, 
+register_type: RegisterType, 
 /**
  * Delay between scan requests in milliseconds
  */

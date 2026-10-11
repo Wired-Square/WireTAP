@@ -38,6 +38,7 @@ fn default_max_groups() -> u16 {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[cfg_attr(test, derive(ts_rs::TS))]
 pub struct ModbusRange {
+    #[cfg_attr(test, ts(as = "wiretap_catalog::RegisterType"))]
     pub register_type: RegisterType,
     /// Protocol-level start address (0-based).
     pub start: u16,

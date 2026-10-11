@@ -6,8 +6,10 @@
 // command (see api/catalog.ts `parseCatalog`). Keep in sync with the crate.
 
 export type Protocol = "can" | "serial" | "modbus";
-export type Endianness = "big" | "little";
-export type RegisterType = "input" | "holding" | "coil" | "discrete";
+import type { Endianness } from "../generated/Endianness";
+import type { RegisterType } from "../generated/RegisterType";
+
+export type { Endianness, RegisterType };
 export type SignalFormat = "ascii" | "utf8" | "hex" | "enum" | "unix_time" | "other";
 export type Confidence = "none" | "low" | "medium" | "high";
 
