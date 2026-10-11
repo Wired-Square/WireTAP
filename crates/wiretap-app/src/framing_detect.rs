@@ -38,7 +38,8 @@ mod desktop {
     use wiretap_catalog::framing_detect::{self, Candidate, Evidence, Framing};
 
     use crate::capture_store;
-    use crate::io::{FramingMode, ModbusRtuOptions};
+    use crate::io::FramingMode;
+    use wiretap_catalog::{ModbusRtuOptions, RtuSettings};
 
     /// How much of the tail to analyse. Matches what the frontend used to fetch.
     const DEFAULT_SAMPLE_BYTES: usize = 100_000;
@@ -146,7 +147,7 @@ mod desktop {
     }
 
     /// Rank the framings that could explain `bytes`, framing RTU as `rtu` would.
-    pub fn detect(bytes: &[u8], rtu: &wiretap_catalog::ModbusRtuOptions) -> FramingDetectionResult {
+    pub fn detect(bytes: &[u8], rtu: &ModbusRtuOptions) -> FramingDetectionResult {
         let detection = framing_detect::detect(bytes, rtu);
         if detection.byte_count == 0 {
             return FramingDetectionResult {
@@ -202,7 +203,7 @@ mod desktop {
     pub fn detect_serial_framing(
         capture_id: String,
         sample_bytes: Option<usize>,
-        modbus: Option<ModbusRtuOptions>,
+        modbus: Option<RtuSettings>,
         session_id: Option<String>,
     ) -> Result<FramingDetectionResult, String> {
         if capture_store::get_capture_kind(&capture_id) != Some(capture_store::CaptureKind::Bytes) {
@@ -214,7 +215,8 @@ mod desktop {
         let catalog = session_id
             .as_deref()
             .and_then(crate::ws::dispatch::attached_catalog);
-        let options = modbus.unwrap_or_default().with_catalog(catalog.as_deref());
+        let options =
+            ModbusRtuOptions::from_settings(&modbus.unwrap_or_default(), catalog.as_deref());
         let sample = sample_bytes.unwrap_or(DEFAULT_SAMPLE_BYTES);
 
         // The tail spans every bus, so read a few windows' worth to leave the

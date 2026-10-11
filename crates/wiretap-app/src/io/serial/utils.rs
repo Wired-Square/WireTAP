@@ -2,10 +2,11 @@
 //
 // Shared utilities for serial port readers.
 
+use wiretap_catalog::RtuSettings;
 use wiretap_io::serial::{LineSettings, Parity};
 
 use super::framer::{DelimiterOptions, FrameIdConfig, FramingEncoding};
-use crate::io::types::{FramingMode, ModbusRtuOptions};
+use crate::io::types::FramingMode;
 use crate::io::device_kinds::{conn_bool, conn_i64, conn_str, conn_u8_list};
 use crate::io::SerialOverrides;
 use crate::io::error::DevicePresence;
@@ -45,7 +46,7 @@ pub struct SerialSourceConfig {
 
 /// A [`FramingEncoding`] with default options, for live framing changes that
 /// carry no profile context.
-pub fn framing_from_mode(mode: FramingMode, modbus: Option<&ModbusRtuOptions>) -> FramingEncoding {
+pub fn framing_from_mode(mode: FramingMode, modbus: Option<&RtuSettings>) -> FramingEncoding {
     match mode {
         FramingMode::Slip => FramingEncoding::default(),
         FramingMode::ModbusRtu => FramingEncoding::ModbusRtu(modbus.cloned().unwrap_or_default()),
@@ -144,7 +145,7 @@ pub fn parse_profile_for_source(
         FramingMode::Slip => FramingEncoding::Slip { max_frame_len },
         // Session override first, then the profile, then the default — the
         // picker's "Validate CRC" tick had no way through before and did nothing.
-        FramingMode::ModbusRtu => FramingEncoding::ModbusRtu(ModbusRtuOptions {
+        FramingMode::ModbusRtu => FramingEncoding::ModbusRtu(RtuSettings {
             device_address: overrides
                 .modbus_device_address
                 .or_else(|| conn_i64(profile, "modbus_device_address").map(|n| n as u8)),

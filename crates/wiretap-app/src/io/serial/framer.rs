@@ -5,7 +5,9 @@
 
 use serde::{Deserialize, Serialize};
 
-use wiretap_catalog::{Catalog, ModbusRtuMessage, ModbusRtuStream};
+use wiretap_catalog::{
+    Catalog, ModbusRtuMessage, ModbusRtuOptions, ModbusRtuStream, RtuSettings,
+};
 use wiretap_decode::frame_id::{extract_frame_id, FrameIdField, FrameIdWidth};
 use wiretap_decode::Endianness;
 pub use wiretap_protocol::framing::DelimiterOptions;
@@ -13,7 +15,6 @@ use wiretap_protocol::framing::{DelimiterFramer, Framed};
 use wiretap_protocol::slip::SlipDecoder;
 
 use crate::io::device_kinds::degenerate_framing_field;
-use crate::io::types::ModbusRtuOptions;
 
 // =============================================================================
 // Types
@@ -27,7 +28,7 @@ pub enum FramingEncoding {
     /// SLIP framing (RFC 1055); a frame outgrowing `max_frame_len` is abandoned
     Slip { max_frame_len: usize },
     /// Modbus RTU framing
-    ModbusRtu(ModbusRtuOptions),
+    ModbusRtu(RtuSettings),
     /// Raw mode - no framing, emit bytes as read
     Raw,
 }
@@ -174,7 +175,9 @@ impl SerialFramer {
             FramingEncoding::Slip { max_frame_len } => {
                 Self::Slip(SlipDecoder::with_max_frame_len(max_frame_len))
             }
-            FramingEncoding::ModbusRtu(opts) => Self::Rtu(opts.with_catalog(catalog).stream()),
+            FramingEncoding::ModbusRtu(opts) => {
+                Self::Rtu(ModbusRtuOptions::from_settings(&opts, catalog).stream())
+            }
             FramingEncoding::Raw => return None,
         })
     }

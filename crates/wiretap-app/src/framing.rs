@@ -59,7 +59,7 @@ mod desktop {
         /// For modbus_rtu mode: the RTU settings. Re-framing has to agree with
         /// the live framer or the Framed tab changes on stop.
         #[serde(default)]
-        pub modbus: Option<crate::io::ModbusRtuOptions>,
+        pub modbus: Option<wiretap_catalog::RtuSettings>,
     }
 
     /// Configuration for backend framing

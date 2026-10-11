@@ -10,7 +10,7 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
-use wiretap_catalog::{Catalog, RtuTap, TappedMessage};
+use wiretap_catalog::{Catalog, ModbusRtuOptions, RtuSettings, RtuTap, TappedMessage};
 use wiretap_io::serial::{
     self, ports, Access, LineSettings, PortInfo, PortKind, SerialEvent,
     SerialOptions, SerialWriter, WriteRefused,
@@ -19,7 +19,7 @@ use wiretap_io::serial::{
 use crate::io::bus_mapping::{apply_bus_mapping, BusMapping};
 use crate::io::error::{outage, DevicePresence, IoFailure};
 use crate::io::types::{
-    next_request, transmit_channel, ByteEntry, EndReason, ModbusRtuOptions, SetFramingRequest,
+    next_request, transmit_channel, ByteEntry, EndReason, SetFramingRequest,
     SourceMessage, TransmitReceiver,
 };
 use crate::io::FrameMessage;
@@ -80,15 +80,16 @@ enum Framer {
     },
     /// Stamps each message at its last byte, rather than at the read that
     /// released it.
-    Rtu(RtuTap, ModbusRtuOptions),
+    Rtu(RtuTap, RtuSettings),
 }
 
 impl Framer {
     fn new(encoding: FramingEncoding, line: LineSettings, catalog: Option<&Catalog>) -> Self {
         match encoding {
-            FramingEncoding::ModbusRtu(options) => {
-                Self::Rtu(RtuTap::new(&options.with_catalog(catalog), line), options)
-            }
+            FramingEncoding::ModbusRtu(options) => Self::Rtu(
+                RtuTap::new(&ModbusRtuOptions::from_settings(&options, catalog), line),
+                options,
+            ),
             encoding => SerialFramer::new(encoding)
                 .map_or(Self::Unframed, |framer| Self::Serial {
                     framer,
@@ -537,7 +538,6 @@ mod tests {
     use crate::io::IoErrorKind;
     use wiretap_io::serial::SerialError;
     use crate::io::serial::DelimiterOptions;
-    use crate::io::types::ModbusRtuOptions;
     use wiretap_io::serial::Parity as LineParity;
 
     const LINE_9600_8N1: LineSettings = LineSettings {
@@ -660,7 +660,7 @@ mod tests {
         let request = rtu(&[0x01, 0x03, 0x00, 0x00, 0x00, 0x01]);
         let response = rtu(&[0x01, 0x03, 0x02, 0x12, 0x34]);
         let mut line = live(
-            FramingEncoding::ModbusRtu(ModbusRtuOptions::default()),
+            FramingEncoding::ModbusRtu(RtuSettings::default()),
             false,
         );
         assert!(line.read(&request[..4], at(1_000_000)).is_empty());
@@ -756,7 +756,7 @@ mod tests {
         let request = rtu(&[0x01, 0x03, 0x00, 0x00, 0x00, 0x01]);
         let response = rtu(&[0x01, 0x03, 0x02, 0x12, 0x34]);
         let mut line = live(
-            FramingEncoding::ModbusRtu(ModbusRtuOptions::default()),
+            FramingEncoding::ModbusRtu(RtuSettings::default()),
             false,
         );
 
@@ -789,7 +789,7 @@ mod tests {
     #[test]
     fn a_declared_vendor_code_is_framed_on_the_live_line() {
         let vendor = rtu(&[0x01, 0x65, 0x03, 0x00, 0x00, 0x01, 0x00, 0x01]);
-        let options = ModbusRtuOptions {
+        let options = RtuSettings {
             vendor_functions: vec![0x65],
             ..Default::default()
         };
@@ -813,7 +813,7 @@ mod tests {
             dispatch[..18],
             "the fixture is not ambiguous"
         );
-        let options = ModbusRtuOptions {
+        let options = RtuSettings {
             vendor_functions: vec![0x60],
             allow_broadcast: true,
             ..Default::default()

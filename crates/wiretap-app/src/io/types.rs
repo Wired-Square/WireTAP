@@ -229,88 +229,6 @@ impl FramingMode {
     }
 }
 
-/// Everything a `ModbusRtuStream` needs, in one place.
-///
-/// Threaded whole for the reason [`crate::io::SerialOverrides`] gives: these were
-/// four loose values built at five sites, three of which had quietly settled on
-/// `device_address: None`. It lives here rather than beside the serial framer
-/// because the CAN tunnel wants it too, and because `SetFramingRequest` below
-/// must stay buildable on a platform with no serial port.
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(test, derive(ts_rs::TS))]
-#[serde(default)]
-pub struct ModbusRtuOptions {
-    /// Device address filter (1-247). `None` syncs on any valid address.
-    #[cfg_attr(test, ts(optional))]
-    pub device_address: Option<u8>,
-    /// Whether a message has to pass its CRC to be framed. `false` is a lenient
-    /// mode, not "no framing" — see `CrcPolicy::Lenient`.
-    #[cfg_attr(test, ts(optional = nullable))]
-    pub validate_crc: bool,
-    /// Function codes the RTU length rules do not model but this line carries.
-    /// Framed by CRC search instead; empty leaves stock Modbus untouched.
-    #[cfg_attr(test, ts(optional = nullable))]
-    pub vendor_functions: Vec<u8>,
-    /// Whether address 0 may start a message, for a master that broadcasts.
-    #[cfg_attr(test, ts(optional = nullable))]
-    pub allow_broadcast: bool,
-    /// Frame every function code, declared or not. What a tap on an unknown
-    /// line wants, at the cost of a fabricated message about once in 260
-    /// resyncs — see `ModbusRtuStream::frame_any_function`.
-    #[cfg_attr(test, ts(optional = nullable))]
-    pub any_function: bool,
-}
-
-/// Stock Modbus: CRC enforced, no vendor codes, no broadcast. Guessing at any of
-/// the three is how a framer invents messages out of noise.
-impl Default for ModbusRtuOptions {
-    fn default() -> Self {
-        Self {
-            device_address: None,
-            validate_crc: true,
-            vendor_functions: Vec::new(),
-            allow_broadcast: false,
-            any_function: false,
-        }
-    }
-}
-
-impl ModbusRtuOptions {
-    /// A line somebody else already framed — an archive's whole messages. Every
-    /// code and address interprets, since refusing one here would only drop a
-    /// message the tap had already judged.
-    pub fn tapped() -> Self {
-        Self { any_function: true, allow_broadcast: true, ..Default::default() }
-    }
-
-    /// A stream configured for this line. Both opt-ins union with whatever a
-    /// catalogue declares, which is the crate's contract for them.
-    pub fn stream(&self) -> wiretap_catalog::ModbusRtuStream {
-        self.with_catalog(None).stream()
-    }
-
-    /// The line's options: what `catalog` declares, with these settings on top.
-    pub fn with_catalog(
-        &self,
-        catalog: Option<&wiretap_catalog::Catalog>,
-    ) -> wiretap_catalog::ModbusRtuOptions {
-        let crc = if self.validate_crc {
-            wiretap_catalog::CrcPolicy::Strict
-        } else {
-            wiretap_catalog::CrcPolicy::Lenient
-        };
-        let mut rtu = catalog
-            .map(wiretap_catalog::Catalog::rtu_options)
-            .unwrap_or_default()
-            .with_vendor_functions(&self.vendor_functions)
-            .with_device_address(self.device_address)
-            .with_crc_policy(crc);
-        rtu.allow_broadcast |= self.allow_broadcast;
-        rtu.any_function |= self.any_function;
-        rtu
-    }
-}
-
 /// A live framing change for a running serial source. Carries primitives only
 /// (no serial-only types) so the shared broker can hold/dispatch it on every
 /// platform; the serial reader rebuilds the `FramingEncoding`/`FrameIdConfig`.
@@ -327,7 +245,7 @@ pub struct SetFramingRequest {
     pub emit_raw_bytes: bool,
     /// Modbus RTU settings, when `encoding` names that framer. `None` keeps the
     /// stock defaults.
-    pub modbus: Option<ModbusRtuOptions>,
+    pub modbus: Option<wiretap_catalog::RtuSettings>,
 }
 
 /// Sender type for control requests (sync-safe).
@@ -336,88 +254,6 @@ pub type ControlSender = std_mpsc::SyncSender<SetFramingRequest>;
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn rtu(body: &str) -> Vec<u8> {
-        let mut out: Vec<u8> = (0..body.len())
-            .step_by(2)
-            .map(|i| u8::from_str_radix(&body[i..i + 2], 16).unwrap())
-            .collect();
-        out.extend(wiretap_checksum::algorithms::crc16_modbus_checksum(&out).to_le_bytes());
-        out
-    }
-
-    /// `any_function` is what lets an undeclared code frame; the codes the RTU
-    /// length rules model must still come out at their spec lengths under it,
-    /// not at whatever boundary a CRC search finds first.
-    #[test]
-    fn any_function_frames_the_undeclared_and_keeps_the_length_rules() {
-        let request = rtu("01044DE20002");
-        let response = rtu("010404CAFEF00D");
-        let vendor = rtu("0165030000010001");
-        let line: Vec<u8> = [&request[..], &response[..], &vendor[..]].concat();
-
-        let stock: Vec<Vec<u8>> = ModbusRtuOptions::default()
-            .stream()
-            .push_bytes(&line)
-            .into_iter()
-            .map(|m| m.raw)
-            .collect();
-        assert_eq!(stock, vec![request.clone(), response.clone()]);
-
-        let any: Vec<Vec<u8>> = ModbusRtuOptions { any_function: true, ..Default::default() }
-            .stream()
-            .push_bytes(&line)
-            .into_iter()
-            .map(|m| m.raw)
-            .collect();
-        assert_eq!(any, vec![request, response, vendor]);
-    }
-
-    #[test]
-    fn the_catalogues_codes_and_rules_union_under_the_pickers_settings() {
-        use wiretap_catalog::{Catalog, CrcPolicy, VendorLen, VendorLength};
-        let catalog = Catalog::parse(
-            r#"
-[meta]
-name = "line"
-[meta.modbus.function_code.0x60]
-lengths = [{ len = { count_at = 6, overhead = 9 } }]
-[meta.modbus.function_code.0x65]
-"#,
-        )
-        .unwrap();
-        let picker = ModbusRtuOptions {
-            device_address: Some(3),
-            validate_crc: false,
-            vendor_functions: vec![0x20],
-            allow_broadcast: true,
-            any_function: false,
-        };
-        let dispatch = VendorLength {
-            function: 0x60,
-            when: None,
-            len: VendorLen::Counted {
-                count_at: 6,
-                overhead: 9,
-            },
-        };
-        let manual = wiretap_catalog::ModbusRtuOptions::default()
-            .with_device_address(Some(3))
-            .with_crc_policy(CrcPolicy::Lenient)
-            .allow_broadcast();
-
-        assert_eq!(
-            picker.with_catalog(Some(&catalog)),
-            manual
-                .clone()
-                .with_vendor_functions(&[0x60, 0x65, 0x20])
-                .with_vendor_lengths(&[dispatch])
-        );
-        assert_eq!(
-            picker.with_catalog(None),
-            manual.with_vendor_functions(&[0x20])
-        );
-    }
 
     /// The whole point of the type: exactly one ending is a fault, and the merge
     /// task raises a session error for it. A device pulled mid-session used to
