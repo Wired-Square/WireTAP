@@ -14,6 +14,7 @@ import type { IOProfile } from "../types/common";
 import type { CaptureMetadata } from "../api/capture";
 import type { BusSourceInfo } from "../utils/busFormat";
 import { getIOKindLabel } from "../utils/ioKindLabel";
+import { sessionStatus } from "../utils/sessionStatus";
 import { isCaptureSession, useSessionStore } from "../stores/sessionStore";
 import { openPanel } from "../utils/windowCommunication";
 import { useDeviceEditorStore } from "../stores/deviceEditorStore";
@@ -180,17 +181,7 @@ export function SessionButton({
 
   const isDefaultReader = !isCaptureProfile && !showAsMultiBus && selectedProfile?.id === defaultReadProfileId;
 
-  // Determine status dot colour based on ioState
-  const getStatusColour = (): string | null => {
-    if (!ioState || !ioProfile) return null;
-    if (ioState === "running") return "bg-success-text";
-    if (ioState === "paused") return "bg-warning-text";
-    if (ioState === "stopped") return "bg-text-muted";
-    if (ioState === "starting") return "bg-info-text animate-pulse";
-    if (ioState.startsWith("Error")) return "bg-danger-text";
-    return null;
-  };
-  const statusColour = getStatusColour();
+  const statusColour = ioState && ioProfile ? sessionStatus(ioState).dotColour : null;
 
   return (
     <Button
@@ -246,12 +237,8 @@ function getSessionDetails({
 
   let statusLabel: SessionDetails["statusLabel"] = null;
   if (ioState && ioProfile) {
-    if (ioState === "running")       statusLabel = { label: "Running",  colour: "text-success" };
-    else if (ioState === "paused")   statusLabel = { label: "Paused",   colour: "text-warning" };
-    else if (ioState === "stopped")  statusLabel = { label: "Stopped",  colour: "text-muted" };
-    else if (ioState === "starting") statusLabel = { label: "Starting", colour: "text-info" };
-    else if (ioState.startsWith("Error")) statusLabel = { label: ioState, colour: "text-danger" };
-    else statusLabel = { label: ioState, colour: "text-secondary" };
+    const { label, textColour } = sessionStatus(ioState);
+    statusLabel = { label, colour: textColour };
   }
 
   let typeLabel: string;
