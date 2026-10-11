@@ -50,8 +50,8 @@ function ownSignals(frame: Frame): FrameSignal[] {
       if (s.inherited) return;
       out.push({
         name: s.name || `Signal ${index + 1}`,
-        startBit: s.startBit,
-        bitLength: s.bitLength,
+        startBit: s.startBit ?? undefined,
+        bitLength: s.bitLength ?? undefined,
         location,
         path: [...parentPath, "signals", String(index)],
         parentPath,
@@ -86,7 +86,7 @@ export default function NodeView({
   const nodeName = selectedNode.key;
   // A Modbus node is a slave: it owns a device address and registers reference
   // it by `node_address`. CAN/serial nodes are transmitters referenced by `transmitter`.
-  const deviceAddress = selectedNode.metadata?.nodeDef?.deviceAddress;
+  const deviceAddress = selectedNode.metadata?.nodeDef?.deviceAddress ?? undefined;
   const isModbus = deviceAddress != null;
   const frameProtocol = isModbus ? "modbus" : "can";
   const catalog = useCatalogEditorStore((s) => s.tree.catalog);

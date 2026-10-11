@@ -538,7 +538,7 @@
     "close": "Close"
   },
   "catalogueExport": {
-    "headerFieldOutOfRange": "Saved without the {{field}} header field ({{bytes}} bytes from byte {{start}}): a header mask reaches only bytes 0 to 3.",
+    "headerFieldOutOfRange": "Saved without the {{field}} header field: it covers no bytes.",
     "fields": {
       "id": "frame ID",
       "source_address": "source address"

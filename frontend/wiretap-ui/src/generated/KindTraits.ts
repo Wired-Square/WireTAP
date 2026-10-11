@@ -1,5 +1,5 @@
 // Generated from the Rust serde types by `npm run gen:types`. Do not edit.
-import type { Protocol } from "./Protocol";
+import type { FrameProtocol } from "./FrameProtocol";
 import type { TemporalMode } from "./TemporalMode";
 import type { TxBlock } from "./TxBlock";
 
@@ -10,7 +10,7 @@ export type KindTraits = { kind: string, available: boolean,
 /**
  * The protocol a single-bus profile's one bus carries.
  */
-bus_protocol: Protocol, multi_bus: boolean, tx_blocked: TxBlock | null, 
+bus_protocol: FrameProtocol, multi_bus: boolean, tx_blocked: TxBlock | null, 
 /**
  * Temporal mode of the interface
  */
@@ -18,7 +18,7 @@ temporal_mode: TemporalMode,
 /**
  * Protocols supported by the interface
  */
-protocols: Array<Protocol>, 
+protocols: Array<FrameProtocol>, 
 /**
  * Whether the interface can transmit frames (CAN, Modbus, framed serial)
  */

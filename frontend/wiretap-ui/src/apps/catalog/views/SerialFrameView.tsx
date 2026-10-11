@@ -298,7 +298,7 @@ export default function SerialFrameView({
 
                               {onRequestDeleteSignal && (
                                 <IconButton
-                                  onClick={() => onRequestDeleteSignal(idKey, index, selectedNode.path, signal.name)}
+                                  onClick={() => onRequestDeleteSignal(idKey, index, selectedNode.path, signal.name ?? undefined)}
                                   tone="danger"
                                   title={t("serialFrame.deleteSignal")}
                                 >

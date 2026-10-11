@@ -71,7 +71,7 @@ export default function SignalView({
           </IconButton>
 
           <IconButton
-            onClick={() => onRequestDeleteSignal(idKey, signalIndex, signalsParentPath, signal.name)}
+            onClick={() => onRequestDeleteSignal(idKey, signalIndex, signalsParentPath, signal.name ?? undefined)}
             tone="danger"
             title={t("signalDetails.delete")}
           >

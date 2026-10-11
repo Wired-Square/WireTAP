@@ -86,7 +86,7 @@ export default function QueryBuilderPanel({
 
   // Format/parse a frame id using the active display format.
   const fmtId = useCallback(
-    (id: number, isExtended?: boolean) => formatFrameId(id, displayIdFormat, isExtended),
+    (id: number, isExtended?: boolean | null) => formatFrameId(id, displayIdFormat, isExtended ?? undefined),
     [displayIdFormat]
   );
 
@@ -228,7 +228,7 @@ export default function QueryBuilderPanel({
         return;
       }
       const signal = currentFrameSignals.find((s) => s.name === signalName);
-      if (signal && signal.startBit !== undefined && signal.bitLength !== undefined) {
+      if (signal && signal.startBit != null && signal.bitLength != null) {
         const newSignal: SelectedSignal = {
           frameId: queryParams.frameId,
           signalName: signal.name ?? signalName,
@@ -416,7 +416,7 @@ export default function QueryBuilderPanel({
             {currentFrameSignals
               .filter((s) => s.name && s.startBit !== undefined)
               .map((signal) => (
-                <option key={signal.name} value={signal.name}>
+                <option key={signal.name} value={signal.name ?? undefined}>
                   {signal.name}
                   {signal.unit ? ` (${signal.unit})` : ""}
                   {t("builder.signalOption", { byte: Math.floor((signal.startBit ?? 0) / 8) })}

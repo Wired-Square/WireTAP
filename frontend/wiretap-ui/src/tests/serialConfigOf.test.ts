@@ -1,11 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { serialConfigOf } from "../utils/frameExport";
+import { serialConfigOf, serialFrameConfigOf, type SerialFrameConfig } from "../utils/frameExport";
 
 describe("serialConfigOf", () => {
-  it("drops a header field start counted from the end", () => {
-    const config = serialConfigOf({ frame_id_start_byte: -2, frame_id_bytes: 2, source_address_start_byte: 1 });
-    expect(config.frameIdStartByte).toBeUndefined();
-    expect(config.sourceAddressStartByte).toBe(1);
+  it("round-trips an end-relative id and a source address past byte 4", () => {
+    const framing: SerialFrameConfig = {
+      frame_id_start_byte: -2,
+      frame_id_bytes: 2,
+      frame_id_byte_order: "little",
+      source_address_start_byte: 4,
+      source_address_bytes: 2,
+      source_address_byte_order: "big",
+    };
+    expect(serialFrameConfigOf(serialConfigOf(framing))).toMatchObject(framing);
   });
 
   it("carries the framing and a little-endian checksum over", () => {

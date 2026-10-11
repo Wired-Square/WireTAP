@@ -8631,8 +8631,8 @@ dependencies = [
 
 [[package]]
 name = "wiretap-analysis"
-version = "0.8.0"
-source = "git+ssh://git@github.com/Wired-Square/wslib-wiretap-rs.git?tag=v0.8.0#80aa95bdaf2172aa38eebebc2694ea47162191af"
+version = "0.9.1"
+source = "git+ssh://git@github.com/Wired-Square/wslib-wiretap-rs.git?tag=v0.9.1#068aac79616e14aae97e62380bff1c8c1a25291d"
 dependencies = [
  "rayon",
  "serde",
@@ -8657,8 +8657,8 @@ dependencies = [
 
 [[package]]
 name = "wiretap-capture"
-version = "0.8.0"
-source = "git+ssh://git@github.com/Wired-Square/wslib-wiretap-rs.git?tag=v0.8.0#80aa95bdaf2172aa38eebebc2694ea47162191af"
+version = "0.9.1"
+source = "git+ssh://git@github.com/Wired-Square/wslib-wiretap-rs.git?tag=v0.9.1#068aac79616e14aae97e62380bff1c8c1a25291d"
 dependencies = [
  "rusqlite",
  "serde",
@@ -8672,8 +8672,8 @@ dependencies = [
 
 [[package]]
 name = "wiretap-catalog"
-version = "0.8.0"
-source = "git+ssh://git@github.com/Wired-Square/wslib-wiretap-rs.git?tag=v0.8.0#80aa95bdaf2172aa38eebebc2694ea47162191af"
+version = "0.9.1"
+source = "git+ssh://git@github.com/Wired-Square/wslib-wiretap-rs.git?tag=v0.9.1#068aac79616e14aae97e62380bff1c8c1a25291d"
 dependencies = [
  "can-dbc",
  "rust_decimal",
@@ -8690,8 +8690,8 @@ dependencies = [
 
 [[package]]
 name = "wiretap-checksum"
-version = "0.8.0"
-source = "git+ssh://git@github.com/Wired-Square/wslib-wiretap-rs.git?tag=v0.8.0#80aa95bdaf2172aa38eebebc2694ea47162191af"
+version = "0.9.1"
+source = "git+ssh://git@github.com/Wired-Square/wslib-wiretap-rs.git?tag=v0.9.1#068aac79616e14aae97e62380bff1c8c1a25291d"
 dependencies = [
  "rayon",
  "serde",
@@ -8701,8 +8701,8 @@ dependencies = [
 
 [[package]]
 name = "wiretap-decode"
-version = "0.8.0"
-source = "git+ssh://git@github.com/Wired-Square/wslib-wiretap-rs.git?tag=v0.8.0#80aa95bdaf2172aa38eebebc2694ea47162191af"
+version = "0.9.1"
+source = "git+ssh://git@github.com/Wired-Square/wslib-wiretap-rs.git?tag=v0.9.1#068aac79616e14aae97e62380bff1c8c1a25291d"
 dependencies = [
  "rust_decimal",
  "serde",
@@ -8711,8 +8711,8 @@ dependencies = [
 
 [[package]]
 name = "wiretap-gateway"
-version = "0.8.0"
-source = "git+ssh://git@github.com/Wired-Square/wslib-wiretap-rs.git?tag=v0.8.0#80aa95bdaf2172aa38eebebc2694ea47162191af"
+version = "0.9.1"
+source = "git+ssh://git@github.com/Wired-Square/wslib-wiretap-rs.git?tag=v0.9.1#068aac79616e14aae97e62380bff1c8c1a25291d"
 dependencies = [
  "reqwest 0.12.28",
  "serde",
@@ -8724,8 +8724,8 @@ dependencies = [
 
 [[package]]
 name = "wiretap-io"
-version = "0.8.0"
-source = "git+ssh://git@github.com/Wired-Square/wslib-wiretap-rs.git?tag=v0.8.0#80aa95bdaf2172aa38eebebc2694ea47162191af"
+version = "0.9.1"
+source = "git+ssh://git@github.com/Wired-Square/wslib-wiretap-rs.git?tag=v0.9.1#068aac79616e14aae97e62380bff1c8c1a25291d"
 dependencies = [
  "libc",
  "libloading 0.8.9",
@@ -8745,13 +8745,13 @@ dependencies = [
 
 [[package]]
 name = "wiretap-protocol"
-version = "0.8.0"
-source = "git+ssh://git@github.com/Wired-Square/wslib-wiretap-rs.git?tag=v0.8.0#80aa95bdaf2172aa38eebebc2694ea47162191af"
+version = "0.9.1"
+source = "git+ssh://git@github.com/Wired-Square/wslib-wiretap-rs.git?tag=v0.9.1#068aac79616e14aae97e62380bff1c8c1a25291d"
 
 [[package]]
 name = "wiretap-serialport"
 version = "0.1.0"
-source = "git+ssh://git@github.com/Wired-Square/wslib-wiretap-rs.git?tag=v0.8.0#80aa95bdaf2172aa38eebebc2694ea47162191af"
+source = "git+ssh://git@github.com/Wired-Square/wslib-wiretap-rs.git?tag=v0.9.1#068aac79616e14aae97e62380bff1c8c1a25291d"
 dependencies = [
  "serialport",
 ]

@@ -28,7 +28,6 @@ interface ByteExtractionDialogProps {
   onApply: (config: ExtractionConfig) => void;
   onClear?: () => void; // Optional clear handler to remove the config
   color: string; // 'cyan', 'purple', or 'amber'
-  supportsNegativeIndex?: boolean; // Enable negative indexing (for checksum at end of frame)
 }
 
 export default function ByteExtractionDialog({
@@ -40,7 +39,6 @@ export default function ByteExtractionDialog({
   onApply,
   onClear,
   color,
-  supportsNegativeIndex = false,
 }: ByteExtractionDialogProps) {
   const { t } = useTranslation("discovery");
   const [startByte, setStartByte] = useState(initialConfig.startByte);
@@ -152,23 +150,21 @@ export default function ByteExtractionDialog({
 
         {/* Manual controls */}
         <div className={`flex items-center gap-4 pt-2 border-t ${borderDefault} flex-wrap`}>
-          {supportsNegativeIndex && (
-            <label className={`flex items-center gap-2 text-sm ${textSecondary}`}>
-              <Checkbox
-                checked={useNegativeIndex}
-                onChange={(e) => {
-                  setUseNegativeIndex(e.target.checked);
-                  // Convert current startByte to/from negative
-                  if (e.target.checked && startByte >= 0) {
-                    setStartByte(startByte - representativeLength);
-                  } else if (!e.target.checked && startByte < 0) {
-                    setStartByte(representativeLength + startByte);
-                  }
-                }}
-              />
-              {t("serial.fromEnd")}
-            </label>
-          )}
+          <label className={`flex items-center gap-2 text-sm ${textSecondary}`}>
+            <Checkbox
+              checked={useNegativeIndex}
+              onChange={(e) => {
+                setUseNegativeIndex(e.target.checked);
+                // Convert current startByte to/from negative
+                if (e.target.checked && startByte >= 0) {
+                  setStartByte(startByte - representativeLength);
+                } else if (!e.target.checked && startByte < 0) {
+                  setStartByte(representativeLength + startByte);
+                }
+              }}
+            />
+            {t("serial.fromEnd")}
+          </label>
           <label className={`flex items-center gap-2 text-sm ${textSecondary}`}>
             {useNegativeIndex ? t("serial.offsetFromEnd") : t("serial.startByte")}
             <Input

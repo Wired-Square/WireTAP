@@ -7,7 +7,7 @@
 use serde::Serialize;
 use wiretap_catalog::decode::Decoded;
 use wiretap_catalog::modbus::{decode_rtu_message, exception_label, function_label};
-use wiretap_catalog::{Catalog, Direction, DirectionBasis, ModbusRtuMessage, Payload};
+use wiretap_catalog::{Catalog, Direction, DirectionBasis, ModbusRtuMessage, Payload, TunnelProtocol};
 
 /// One decoded tunnel message: the signals to merge into the frame's entry, and
 /// the transaction record for the Modbus tab.
@@ -55,13 +55,6 @@ pub struct DecodedTunnelMessage<'a> {
     pub register: Option<u16>,
     /// Register values; empty unless `payload` is `registers`.
     pub values: &'a [u16],
-}
-
-#[derive(Serialize, Clone, Copy)]
-#[cfg_attr(test, derive(ts_rs::TS))]
-#[serde(rename_all = "snake_case")]
-pub enum TunnelProtocol {
-    ModbusRtu,
 }
 
 #[derive(Serialize, Clone, Copy)]

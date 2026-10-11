@@ -1,3 +1,3 @@
 // Generated from the Rust serde types by `npm run gen:types`. Do not edit.
 
-export type CatalogProtocol = "can" | "serial" | "modbus";
+export type RangeKind = "signal" | "selector" | "checksum";

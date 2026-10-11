@@ -92,7 +92,7 @@ fn frame_signals(draft: &Draft, frame: &FrameDraft) -> Vec<DraftSignal> {
 pub struct DraftPreview {
     #[cfg_attr(test, ts(as = "crate::analysis_ts::Draft"))]
     pub draft: Draft,
-    #[cfg_attr(test, ts(as = "Option<crate::analysis_ts::CatalogProtocol>"))]
+    #[cfg_attr(test, ts(as = "Option<Protocol>"))]
     pub default_frame: Option<Protocol>,
     /// Each of `draft`'s frames' signals, as it would be written.
     #[cfg_attr(test, ts(as = "Vec<Vec<crate::analysis_ts::DraftSignal>>"))]
@@ -416,38 +416,55 @@ mod tests {
         assert!(toml.contains("start_bit = 8\nbit_length = 16"), "{toml}");
     }
 
+    fn reloaded_serial(serial: serde_json::Value) -> wiretap_catalog::model::SerialConfig {
+        let exported = build_framed(None, write(vec![frame("serial", 0x10, false, 8)], false), serial);
+        assert!(exported.findings.is_empty());
+        wiretap_catalog::Catalog::parse(&exported.text).unwrap().serial.unwrap()
+    }
+
     #[test]
-    fn a_header_field_past_byte_four_comes_back_as_a_finding() {
-        let serial = serde_json::json!({
+    fn a_header_field_past_byte_four_reloads_where_it_was_saved() {
+        let serial = reloaded_serial(serde_json::json!({
             "encoding": "raw",
             "frameIdStartByte": 0,
             "frameIdBytes": 1,
             "sourceAddressStartByte": 4,
             "sourceAddressBytes": 2,
-        });
-        let exported = build_framed(None, write(vec![frame("serial", 0x10, false, 8)], false), serial);
-        assert_eq!(
-            exported.findings,
-            [ExportFinding::HeaderFieldOutOfRange { field: "source_address".into(), start_byte: 4, bytes: 2 }]
-        );
+        }));
+        assert_eq!((serial.source_address_start_byte, serial.source_address_bytes), (Some(4), Some(2)));
     }
 
-    /// A field's name, start byte and bytes.
-    type Unwritten = &'static [(&'static str, u32, u32)];
+    #[test]
+    fn an_end_relative_id_reloads_where_it_was_saved() {
+        let serial = reloaded_serial(serde_json::json!({ "encoding": "raw", "frameIdStartByte": -2, "frameIdBytes": 2 }));
+        assert_eq!((serial.frame_id_start_byte, serial.frame_id_bytes), (Some(-2), Some(2)));
+    }
 
-    /// wiretap-analysis' D7: a header field ending past byte 4 is not written, and
-    /// comes back as a finding. Each serial config is a `headOps` case under both metas.
-    const OUT_OF_RANGE: &[(&str, Unwritten)] = &[
-        ("id 2/2 big, source 4/2 little, crc16 at -2 big", &[("source_address", 4, 2)]),
-        ("id 3/3, source 6/1", &[("id", 3, 3), ("source_address", 6, 1)]),
-        ("id 4/4 (mask past 2^53)", &[("id", 4, 4)]),
-        ("id 0/7 (mask past 2^53)", &[("id", 0, 7)]),
-        ("id 0/8 (mask past 2^53)", &[("id", 0, 8)]),
-        ("id 6/2", &[("id", 6, 2)]),
-    ];
+    #[test]
+    fn a_header_field_of_no_bytes_comes_back_as_a_finding() {
+        let serial = serde_json::json!({ "encoding": "raw", "frameIdStartByte": 0, "frameIdBytes": 0 });
+        let exported = build_framed(None, write(vec![frame("serial", 0x10, false, 8)], false), serial);
+        assert_eq!(exported.findings, [ExportFinding::HeaderFieldOutOfRange { field: "id".into(), start_byte: 0, bytes: 0 }]);
+    }
 
-    /// A start byte counted from the end names no header field, so it reserves no span.
-    const NEGATIVE_START_SPANS: &str = "serialReservedSpans negative id start is no field";
+    /// Where the lib departs from the golden (R17): a field ending past byte 4 is
+    /// written by start byte and bytes, and a start byte without bytes is one byte.
+    /// Each serial config is a `headOps` case under both metas.
+    fn lib_fields(config: &str) -> Vec<(&'static str, serde_json::Value)> {
+        use serde_json::json;
+        let at = |start_byte: i32, bytes: u32| json!({ "start_byte": start_byte, "bytes": bytes });
+        match config {
+            "id 2/2 big, source 4/2 little, crc16 at -2 big" => vec![("source_address", at(4, 2))],
+            "id 3/3, source 6/1" => vec![("id", at(3, 3)), ("source_address", at(6, 1))],
+            "id 4/4 (mask past 2^53)" => vec![("id", at(4, 4))],
+            "id 0/7 (mask past 2^53)" => vec![("id", at(0, 7))],
+            "id 0/8 (mask past 2^53)" => vec![("id", at(0, 8))],
+            "id 6/2" => vec![("id", at(6, 2))],
+            "negative id start is no field" => vec![("id", at(-2, 2)), ("source_address", json!({ "mask": 0xFF00 }))],
+            "id start without bytes" => vec![("id", json!({ "mask": 0xFF00 }))],
+            _ => vec![],
+        }
+    }
 
     fn from<T: serde::de::DeserializeOwned>(v: &serde_json::Value) -> T {
         serde_json::from_value(v.clone()).unwrap()
@@ -457,8 +474,7 @@ mod tests {
         format!("{ops:#?}")
     }
 
-    /// The golden's framing as `serialConfigOf` sends it: camelCase, a start byte
-    /// counted from the end dropped.
+    /// The golden's framing as `serialConfigOf` sends it, in camelCase.
     fn serial_of(input: &serde_json::Value) -> SerialConfig {
         fn camel(key: &str) -> String {
             let mut words = key.split('_');
@@ -469,7 +485,6 @@ mod tests {
             let Some(object) = v.as_object() else { return v.clone() };
             object
                 .iter()
-                .filter(|(k, v)| !(k.ends_with("_start_byte") && v.as_i64().is_some_and(|n| n < 0)))
                 .map(|(k, v)| match k.as_str() {
                     "default_byte_order" => ("byteOrder".into(), v.clone()),
                     _ => (camel(k), walk(v)),
@@ -488,16 +503,14 @@ mod tests {
         let serial = input.get("serialConfig").map(serial_of).unwrap_or_default();
         let (ops, findings) = head_ops(from(&input["protocol"]), &from(&input["meta"]), &serial);
         let mut expected = expected.clone();
-        let mut wanted = Vec::new();
-        let unwritten = name
-            .strip_prefix("headOps serial ")
-            .and_then(|config| OUT_OF_RANGE.iter().find(|(c, _)| config.ends_with(&format!(" {c}"))));
-        for &(field, start_byte, bytes) in unwritten.map_or(&[][..], |(_, fields)| fields) {
-            let written = expected[1]["config"]["fields"].as_object_mut().unwrap();
-            assert!(written.remove(field).is_some(), "{name}: golden has no {field}");
-            wanted.push(ExportFinding::HeaderFieldOutOfRange { field: field.into(), start_byte, bytes });
+        let config = name.strip_prefix("headOps serial ").and_then(|c| c.split_once(" interval ").or(c.split_once("plain ")));
+        for (field, lib) in config.map_or(vec![], |(_, config)| lib_fields(config)) {
+            let fields = expected[1]["config"]["fields"].as_object_mut().unwrap();
+            let written = fields.entry(field).or_insert_with(|| serde_json::json!({})).as_object_mut().unwrap();
+            written.remove("mask");
+            written.extend(lib.as_object().unwrap().clone());
         }
-        assert_eq!(findings, wanted, "{name}");
+        assert!(findings.is_empty(), "{name}");
         assert_eq!(ops_text(&ops), ops_text(&from::<Vec<EditOp>>(&expected)), "{name}");
     }
 
@@ -526,13 +539,12 @@ mod tests {
     }
 
     fn check_spans(name: &str, input: &serde_json::Value, expected: &serde_json::Value) {
-        let got = serde_json::to_value(ByteSpan::serial(&serial_of(input))).unwrap();
-        if name == NEGATIVE_START_SPANS {
-            assert_eq!(*expected, serde_json::json!([{ "start": -2, "len": 2 }]), "{name}");
-            assert_eq!(got, serde_json::json!([]), "{name}");
-        } else {
-            assert_eq!(got, *expected, "{name}");
-        }
+        let expected = match name.strip_prefix("serialReservedSpans ") {
+            Some("negative id start is no field") => serde_json::json!([{ "start": -2, "len": 2 }, { "start": 1, "len": 1 }]),
+            Some("id start without bytes") => serde_json::json!([{ "start": 1, "len": 1 }]),
+            _ => expected.clone(),
+        };
+        assert_eq!(serde_json::to_value(ByteSpan::serial(&serial_of(input))).unwrap(), expected, "{name}");
     }
 
     #[test]

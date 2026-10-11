@@ -42,7 +42,7 @@ export function signalFieldsFor(signal: Signal): SignalFields {
     max: signal.max,
     format: signal.format,
     confidence: signal.confidence,
-    enum: signal.enum,
+    enum: signal.enum ?? undefined,
     display: signal.display,
     notes: signal.notes?.join("\n"),
   };

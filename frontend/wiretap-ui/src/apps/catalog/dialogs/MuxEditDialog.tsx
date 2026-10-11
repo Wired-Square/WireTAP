@@ -103,7 +103,7 @@ export default function MuxEditDialog({
       </DialogBody>
       <DialogFooter>
         <SecondaryButton onClick={onCancel}>Cancel</SecondaryButton>
-        <PrimaryButton onClick={onSave} disabled={fields.bit_length < 1}>
+        <PrimaryButton onClick={onSave} disabled={(fields.bit_length ?? 0) < 1}>
           OK
         </PrimaryButton>
       </DialogFooter>

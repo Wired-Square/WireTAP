@@ -24,22 +24,6 @@ export type SerialChecksumConfig = {
  * Serial frame configuration - stored in [frame.serial.config]
  * Used by Decoder to extract frame IDs and source addresses from serial frames.
  */
-/** Header field definition for serial protocols */
-export type SerialHeaderFieldDef = {
-  /** Field name (e.g., "id", "source_address", "Type", "Command") */
-  name: string;
-  /** Bitmask over header bytes */
-  mask: number;
-  /** Byte order for multi-byte fields */
-  byte_order?: "big" | "little";
-  /** Display format */
-  format?: "hex" | "decimal";
-  /** Start byte position (computed from mask) */
-  start_byte: number;
-  /** Number of bytes (computed from mask) */
-  bytes: number;
-};
-
 export type SerialFrameConfig = {
   /** Default byte order for signal decoding (can be overridden per signal) */
   default_byte_order?: "big" | "little";
@@ -65,8 +49,6 @@ export type SerialFrameConfig = {
   checksum?: SerialChecksumConfig;
   /** Global header length in bytes (for protocols with fixed header size) */
   header_length?: number;
-  /** All header field definitions from [meta.serial.fields] */
-  header_fields?: SerialHeaderFieldDef[];
 };
 
 /** The served serial config in the framing shape sessions and Discovery share. */
@@ -83,14 +65,6 @@ export function serialFrameConfigOf(c: SerialConfig): SerialFrameConfig {
     source_address_byte_order: c.sourceAddressByteOrder ?? undefined,
     min_frame_length: c.minFrameLength ?? undefined,
     header_length: c.headerLength ?? undefined,
-    header_fields: c.headerFields?.map((h) => ({
-      name: h.name,
-      mask: h.mask,
-      byte_order: h.byteOrder,
-      format: h.format === 'decimal' ? 'decimal' : 'hex',
-      start_byte: h.startByte,
-      bytes: h.bytes,
-    })),
     checksum: c.checksum ? {
       algorithm: c.checksum.algorithm,
       start_byte: c.checksum.startByte,
@@ -102,12 +76,8 @@ export function serialFrameConfigOf(c: SerialConfig): SerialFrameConfig {
   };
 }
 
-/**
- * The framing as the catalogue model holds it. A start byte counted from the end
- * names no header field there, so it has no place in it.
- */
+/** The framing as the catalogue model holds it. */
 export function serialConfigOf(c: SerialFrameConfig): SerialConfig {
-  const start = (byte?: number) => (byte !== undefined && byte >= 0 ? byte : undefined);
   return {
     encoding: c.encoding,
     byteOrder: c.default_byte_order,
@@ -122,10 +92,10 @@ export function serialConfigOf(c: SerialFrameConfig): SerialConfig {
       calcEndByte: c.checksum.calc_end_byte,
       bigEndian: c.checksum.big_endian ?? false,
     },
-    frameIdStartByte: start(c.frame_id_start_byte),
+    frameIdStartByte: c.frame_id_start_byte,
     frameIdBytes: c.frame_id_bytes,
     frameIdByteOrder: c.frame_id_byte_order,
-    sourceAddressStartByte: start(c.source_address_start_byte),
+    sourceAddressStartByte: c.source_address_start_byte,
     sourceAddressBytes: c.source_address_bytes,
     sourceAddressByteOrder: c.source_address_byte_order,
   };

@@ -90,7 +90,7 @@ export default function UnifiedConfigDialog({
   useEffect(() => {
     if (open) {
       seedConfigForms(catalog);
-      if (catalog) setMetaFields({ name: catalog.meta.name, version: catalog.meta.version, default_frame: catalog.meta.defaultFrame });
+      if (catalog) setMetaFields({ name: catalog.meta.name, version: catalog.meta.version, default_frame: catalog.meta.defaultFrame ?? undefined });
       setCanEnabled(!!canConfig);
       setSerialEnabled(!!serialConfig);
       setModbusEnabled(!!modbusConfig);

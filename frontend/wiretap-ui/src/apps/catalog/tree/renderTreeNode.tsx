@@ -126,7 +126,7 @@ export function createRenderTreeNode({
                 </span>
               );
             })() : node.type === "modbus-frame" && frame ? (() => {
-              const regType = frame.modbusRegisterType;
+              const regType = frame.modbusRegisterType ?? undefined;
               const address = formatId(frame.frameId, displayFrameIdFormat);
               // The colour conveys the register type, so the row drops the `[holding]` text.
               const tone = regType ? MODBUS_REGISTER_TONES[regType as RegisterType] : undefined;

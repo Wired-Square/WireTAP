@@ -19,10 +19,12 @@ export interface CanHeaderFieldEntry {
   format: HeaderFieldFormat;
 }
 
-/** Serial header field form entry - name + mask over header bytes */
+/** Serial header field form entry - name + a mask over header bytes, or a start byte and bytes */
 export interface SerialHeaderFieldEntry {
   name: string;
-  mask: number;           // Bitmask over header bytes (e.g., 0xFF00 for first byte of 2-byte header)
+  mask?: number;          // Bitmask over header bytes (e.g., 0xFF00 for first byte of 2-byte header)
+  startByte?: number;     // Negative counts from the end
+  bytes?: number;
   endianness: "big" | "little";
   format: HeaderFieldFormat;
 }
@@ -304,14 +306,14 @@ function configForms(catalog: Catalog | null) {
   const serial = catalog?.serial;
   const modbus = catalog?.modbus;
   return {
-    canDefaultEndianness: can?.defaultByteOrder,
-    canDefaultInterval: can?.defaultInterval,
-    canDefaultExtended: can?.defaultExtended,
-    canDefaultFd: can?.defaultFd,
-    canFrameIdMask: can?.frameIdMask === undefined ? '' : hexMask(can.frameIdMask),
+    canDefaultEndianness: can?.defaultByteOrder ?? undefined,
+    canDefaultInterval: can?.defaultInterval ?? undefined,
+    canDefaultExtended: can?.defaultExtended ?? undefined,
+    canDefaultFd: can?.defaultFd ?? undefined,
+    canFrameIdMask: can?.frameIdMask == null ? '' : hexMask(can.frameIdMask),
     canHeaderFields: Object.entries(can?.fields ?? {}).map(([name, f]): CanHeaderFieldEntry => ({
       name,
-      mask: hexMask(f.mask),
+      mask: hexMask(f.mask ?? 0),
       shift: f.shift ?? undefined,
       format: (f.format ?? 'hex') as HeaderFieldFormat,
     })),
@@ -319,7 +321,9 @@ function configForms(catalog: Catalog | null) {
     serialByteOrder: serial?.byteOrder ?? undefined,
     serialHeaderFields: Object.entries(serial?.fields ?? {}).map(([name, f]): SerialHeaderFieldEntry => ({
       name,
-      mask: f.mask,
+      mask: f.mask ?? undefined,
+      startByte: f.startByte ?? undefined,
+      bytes: f.bytes ?? undefined,
       endianness: f.endianness ?? 'big',
       format: (f.format ?? 'hex') as HeaderFieldFormat,
     })),
@@ -336,9 +340,9 @@ function configForms(catalog: Catalog | null) {
       : null,
     modbusDeviceAddress: modbus?.deviceAddress ?? 1,
     modbusRegisterBase: (modbus?.registerBase ?? 0) as 0 | 1,
-    modbusDefaultInterval: modbus?.defaultInterval,
-    modbusDefaultByteOrder: modbus?.defaultByteOrder,
-    modbusDefaultWordOrder: modbus?.defaultWordOrder,
+    modbusDefaultInterval: modbus?.defaultInterval ?? undefined,
+    modbusDefaultByteOrder: modbus?.defaultByteOrder ?? undefined,
+    modbusDefaultWordOrder: modbus?.defaultWordOrder ?? undefined,
   };
 }
 

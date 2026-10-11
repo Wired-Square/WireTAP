@@ -26,7 +26,7 @@ export function createDefaultFrameFields(protocol: ProtocolType): FrameEditField
 }
 
 export function frameDefaultInterval(catalog: Catalog | null, protocol: ProtocolType): number | undefined {
-  return protocol === "can" ? catalog?.can?.defaultInterval : protocol === "modbus" ? catalog?.modbus?.defaultInterval : undefined;
+  return (protocol === "can" ? catalog?.can?.defaultInterval : protocol === "modbus" ? catalog?.modbus?.defaultInterval : undefined) ?? undefined;
 }
 
 /** The form for an existing frame, every value as the model resolves it. */
@@ -34,8 +34,8 @@ export function frameEditFieldsFor(frame: Frame, catalog: Catalog | null): Frame
   const { protocol } = frame;
   const base = {
     length: protocol === "modbus" ? frame.modbusRegisterCount ?? 1 : frame.length,
-    transmitter: frame.transmitter,
-    interval: frame.interval,
+    transmitter: frame.transmitter ?? undefined,
+    interval: frame.interval ?? undefined,
     notes: frame.notes,
   };
   const isIntervalInherited =
@@ -49,11 +49,11 @@ export function frameEditFieldsFor(frame: Frame, catalog: Catalog | null): Frame
         config: {
           protocol,
           id: frame.key,
-          extended: frame.isExtended,
-          fd: frame.isFd,
-          bus: frame.bus,
-          copy: frame.copyFrom,
-          mirror_of: frame.mirrorOf,
+          extended: frame.isExtended ?? undefined,
+          fd: frame.isFd ?? undefined,
+          bus: frame.bus ?? undefined,
+          copy: frame.copyFrom ?? undefined,
+          mirror_of: frame.mirrorOf ?? undefined,
         },
       };
     case "modbus":
@@ -70,7 +70,7 @@ export function frameEditFieldsFor(frame: Frame, catalog: Catalog | null): Frame
         },
       };
     case "serial":
-      return { protocol, base, isIntervalInherited, config: { protocol, frame_id: frame.key, delimiter: frame.delimiter } };
+      return { protocol, base, isIntervalInherited, config: { protocol, frame_id: frame.key, delimiter: frame.delimiter ?? undefined } };
   }
 }
 
@@ -78,7 +78,7 @@ export function frameEditFieldsFor(frame: Frame, catalog: Catalog | null): Frame
  *  one; an address the legacy fallback would not give must be the frame's own. */
 function ownNodeAddress(frame: Frame, catalog: Catalog | null): number | undefined {
   const fallback = catalog?.modbus?.deviceAddress ?? 1;
-  return frame.modbusNode || frame.modbusDeviceAddress !== fallback ? frame.modbusDeviceAddress : undefined;
+  return frame.modbusNode || frame.modbusDeviceAddress !== fallback ? frame.modbusDeviceAddress ?? undefined : undefined;
 }
 
 export function frameKeyOf(fields: FrameEditFields): string {

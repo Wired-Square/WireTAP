@@ -13,11 +13,11 @@ export type SerialConfig = {
  */
 encoding?: string | null, byteOrder?: Endianness | null, frameIdMask?: number | null, headerLength?: number | null, minFrameLength?: number | null, checksum?: ChecksumConfig | null, fields?: { [key in string]: HeaderField }, 
 /**
- * Byte position of the `id` field, when present.
+ * Byte position of the `id` field, when present; end-relative when negative.
  */
 frameIdStartByte?: number | null, frameIdBytes?: number | null, frameIdByteOrder?: Endianness | null, 
 /**
- * Byte position of the `source_address` field, when present.
+ * Byte position of the `source_address` field, when present; end-relative when negative.
  */
 sourceAddressStartByte?: number | null, sourceAddressBytes?: number | null, sourceAddressByteOrder?: Endianness | null, 
 /**

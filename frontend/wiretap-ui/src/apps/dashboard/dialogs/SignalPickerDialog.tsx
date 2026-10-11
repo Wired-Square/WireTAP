@@ -282,7 +282,7 @@ export default function SignalPickerDialog({ isOpen, onClose, panelId, replacing
                               tone={isReplaceMode ? "purple" : undefined}
                               mark={isReplaceMode ? "radio" : "check"}
                               className="gap-2"
-                              onClick={() => handleSignalClick(frameId, signal.name!, signal.unit)}
+                              onClick={() => handleSignalClick(frameId, signal.name!, signal.unit ?? undefined)}
                             >
                               <span className="text-sm text-primary">
                                 {signal.name}

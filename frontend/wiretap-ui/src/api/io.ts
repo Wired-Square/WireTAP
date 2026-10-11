@@ -34,7 +34,7 @@ import type { OpenedSession } from "../generated/OpenedSession";
 import type { OpenSessionOptions } from "../generated/OpenSessionOptions";
 import type { PlaybackPosition } from "../generated/PlaybackPosition";
 import type { ProfileUsageInfo } from "../generated/ProfileUsageInfo";
-import type { Protocol } from "../generated/Protocol";
+import type { FrameProtocol as Protocol } from "../generated/FrameProtocol";
 import type { RegisterSubscriberResult } from "../generated/RegisterSubscriberResult";
 import type { ReinitializeResult } from "../generated/ReinitializeResult";
 import type { IoFailure } from "../generated/IoFailure";

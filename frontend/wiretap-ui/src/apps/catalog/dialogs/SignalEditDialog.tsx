@@ -254,7 +254,7 @@ export default function SignalEditDialog({
         <SecondaryButton onClick={onCancel}>{t("signalEdit.cancel")}</SecondaryButton>
         <PrimaryButton
           onClick={onSave}
-          disabled={!fields.name || fields.bit_length < 1}
+          disabled={!fields.name || (fields.bit_length ?? 0) < 1}
         >
           {editingIndex !== null ? t("signalEdit.updateButton") : t("signalEdit.addButton")}
         </PrimaryButton>

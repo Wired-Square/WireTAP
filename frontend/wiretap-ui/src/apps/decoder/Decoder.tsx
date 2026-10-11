@@ -874,8 +874,8 @@ function DecoderInner() {
     () => frameList.map((f) => ({
       id: frameKey(protocol, f.frameId),
       len: f.length,
-      isExtended: f.isExtended,
-      bus: f.bus,
+      isExtended: f.isExtended ?? undefined,
+      bus: f.bus ?? undefined,
       protocol,
     })),
     [frameList, protocol]

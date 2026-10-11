@@ -1,6 +1,6 @@
 // Generated from the Rust serde types by `npm run gen:types`. Do not edit.
+import type { FrameProtocol } from "./FrameProtocol";
 import type { InterfaceTraits } from "./InterfaceTraits";
-import type { Protocol } from "./Protocol";
 
 /**
  * Configuration for mapping device buses to output buses
@@ -26,12 +26,12 @@ interface_id: string,
  * The protocol this bus carries — the *input*. Set from the profile, and
  * overridable per session by the source picker's protocol dropdown.
  */
-protocol: Protocol, 
+protocol: FrameProtocol, 
 /**
  * What this bus may be set to, for the picker to render. Advisory *output*:
  * Rust answers it from the profile kind, the frontend never sends it.
  */
-supported_protocols: Array<Protocol>, 
+supported_protocols: Array<FrameProtocol>, 
 /**
  * Traits for this specific interface. Derived *output* — always
  * `traits_for_protocol(protocol)`, never what a caller supplied.
