@@ -151,7 +151,7 @@ function generatePanelId(): string {
 }
 
 function signalConfidence(frame: Frame | undefined, name: string): Confidence | undefined {
-  return frame && allFrameSignals(frame).find((s) => s.name === name && s.confidence)?.confidence;
+  return (frame && allFrameSignals(frame).find((s) => s.name === name && s.confidence)?.confidence) ?? undefined;
 }
 
 /** Auto-save store key */
@@ -381,8 +381,8 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     for (const { frameId, signalName, unit } of entries) {
       const frame = frames.get(frameId);
       const def = frame && allFrameSignals(frame).find((s) => s.name === signalName);
-      const meta = { unit: unit ?? def?.unit, min: def?.min, max: def?.max, enum: def?.enum, format: def?.format };
-      const widget = widgetForSignal(meta, def?.display);
+      const meta = { unit: unit ?? def?.unit ?? undefined, min: def?.min ?? undefined, max: def?.max ?? undefined, enum: def?.enum ?? undefined, format: def?.format ?? undefined };
+      const widget = widgetForSignal(meta, def?.display ?? undefined);
 
       const size = WIDGET_META[widget.type]?.defaultSize ?? { w: 3, h: 3 };
       if (x + size.w > 12) { x = 0; rowY += rowH; rowH = 0; }

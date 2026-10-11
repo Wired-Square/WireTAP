@@ -83,7 +83,7 @@ export default function MetaView({ catalog, onEditMeta }: MetaViewProps) {
               {canConfig.defaultInterval !== undefined && (
                 <span> • {t("metaView.intervalMs", { ms: canConfig.defaultInterval })}</span>
               )}
-              {canConfig.frameIdMask !== undefined && (
+              {canConfig.frameIdMask != null && (
                 <span> • {t("metaView.maskHex", { hex: canConfig.frameIdMask.toString(16).toUpperCase() })}</span>
               )}
               {canConfig.fields && Object.keys(canConfig.fields).length > 0 && (

@@ -21,7 +21,7 @@ async function savedOps(model: Partial<Catalog>, enabled = { can: true, serial: 
   const store = useCatalogEditorStore.getState();
   useCatalogEditorStore.setState((s) => ({ tree: { ...s.tree, catalog } }));
   store.seedConfigForms(catalog);
-  store.setMetaForm({ name: catalog.meta.name, version: catalog.meta.version, default_frame: catalog.meta.defaultFrame });
+  store.setMetaForm({ name: catalog.meta.name, version: catalog.meta.version, default_frame: catalog.meta.defaultFrame ?? undefined });
   const handlers = renderHookOnce(() => useFrameHandlers({}));
   await handlers.handleSaveConfig(enabled);
   const { calls } = vi.mocked(editCatalogOps).mock;

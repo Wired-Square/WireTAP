@@ -304,11 +304,11 @@ function configForms(catalog: Catalog | null) {
   const serial = catalog?.serial;
   const modbus = catalog?.modbus;
   return {
-    canDefaultEndianness: can?.defaultByteOrder,
-    canDefaultInterval: can?.defaultInterval,
-    canDefaultExtended: can?.defaultExtended,
-    canDefaultFd: can?.defaultFd,
-    canFrameIdMask: can?.frameIdMask === undefined ? '' : hexMask(can.frameIdMask),
+    canDefaultEndianness: can?.defaultByteOrder ?? undefined,
+    canDefaultInterval: can?.defaultInterval ?? undefined,
+    canDefaultExtended: can?.defaultExtended ?? undefined,
+    canDefaultFd: can?.defaultFd ?? undefined,
+    canFrameIdMask: can?.frameIdMask == null ? '' : hexMask(can.frameIdMask),
     canHeaderFields: Object.entries(can?.fields ?? {}).map(([name, f]): CanHeaderFieldEntry => ({
       name,
       mask: hexMask(f.mask ?? 0),
@@ -336,9 +336,9 @@ function configForms(catalog: Catalog | null) {
       : null,
     modbusDeviceAddress: modbus?.deviceAddress ?? 1,
     modbusRegisterBase: (modbus?.registerBase ?? 0) as 0 | 1,
-    modbusDefaultInterval: modbus?.defaultInterval,
-    modbusDefaultByteOrder: modbus?.defaultByteOrder,
-    modbusDefaultWordOrder: modbus?.defaultWordOrder,
+    modbusDefaultInterval: modbus?.defaultInterval ?? undefined,
+    modbusDefaultByteOrder: modbus?.defaultByteOrder ?? undefined,
+    modbusDefaultWordOrder: modbus?.defaultWordOrder ?? undefined,
   };
 }
 

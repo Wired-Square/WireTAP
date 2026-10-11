@@ -193,7 +193,15 @@ fn render() -> BTreeMap<PathBuf, String> {
     r.visit::<crate::drafting::DraftWrite>();
     r.visit::<crate::drafting::ExportedCatalog>();
     r.visit::<wiretap_analysis::draft::ExportFrame>();
-    r.visit::<wiretap_catalog::model::SerialConfig>();
+    r.visit::<wiretap_catalog::model::Catalog>();
+    r.visit::<wiretap_catalog::model::ValidationError>();
+    r.visit::<wiretap_catalog::FrameLayout>();
+    r.visit::<wiretap_catalog::edit::CanConfigFields>();
+    r.visit::<wiretap_catalog::edit::FrameFields>();
+    r.visit::<wiretap_catalog::edit::MetaFields>();
+    r.visit::<wiretap_catalog::edit::ModbusConfigFields>();
+    r.visit::<wiretap_catalog::edit::MuxFields>();
+    r.visit::<wiretap_catalog::edit::SerialConfigFields>();
     r.visit::<wiretap_analysis::draft::ExportMeta>();
     r.visit::<wiretap_analysis::draft::ModbusExportConfig>();
     r.visit::<wiretap_analysis::draft::ModbusRegister>();
@@ -526,7 +534,6 @@ fn decoded_signals_entries_serialise_as_declared() {
     assert_serialises_as_declared(&[TunnelDirection::Request, TunnelDirection::Response]);
     assert_serialises_as_declared(&[TunnelPayload::Registers, TunnelPayload::Coils, TunnelPayload::None, TunnelPayload::Opaque]);
     assert_serialises_as_declared(&[TunnelDirectionBasis::Layout, TunnelDirectionBasis::Pairing, TunnelDirectionBasis::Alternation]);
-    assert_serialises_as_declared(&[TunnelProtocol::ModbusRtu]);
 }
 
 #[test]

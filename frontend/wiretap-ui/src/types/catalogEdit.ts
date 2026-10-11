@@ -1,117 +1,23 @@
 // src/types/catalogEdit.ts
 //
-// TypeScript mirror of the `wiretap-catalog` crate's typed edit ops (src/edit.rs,
-// src/edit/typed.rs), as `catalog.edits` and `catalog.build` deserialise them. The
-// op field sets are snake_case; the model types nested in them (a header field, a
-// checksum) keep the model's camelCase. Keep in sync with the crate.
+// The `wiretap-catalog` typed edit ops as `catalog.edits` and `catalog.build` read
+// them, generated from Rust. `SignalFields` and `EditOp` are copied from the lib's
+// pinned declarations (`tests/ts_edit.rs`) until its generated `SignalFields.ts`
+// imports the `Endianness` and `Confidence` it names.
 
-import type { Confidence, DisplayHint, Endianness, Protocol, RegisterType } from "./catalogModel";
+import type { CanConfigFields } from "../generated/CanConfigFields";
+import type { Confidence } from "../generated/Confidence";
+import type { DisplayHint } from "../generated/DisplayHint";
+import type { Endianness } from "../generated/Endianness";
+import type { FrameFields } from "../generated/FrameFields";
+import type { MetaFields } from "../generated/MetaFields";
+import type { ModbusConfigFields } from "../generated/ModbusConfigFields";
+import type { MuxFields } from "../generated/MuxFields";
+import type { Protocol } from "../generated/Protocol";
+import type { SerialConfigFields } from "../generated/SerialConfigFields";
 
-/** Trimmed and blank ones dropped by the crate; one is written as a string. */
-export type Notes = string | string[];
+export type { CanConfigFields, FrameFields, MetaFields, ModbusConfigFields, MuxFields, SerialConfigFields };
 
-export interface SignalFields {
-  name: string;
-  start_bit: number;
-  bit_length: number;
-  factor?: number;
-  offset?: number;
-  unit?: string;
-  signed?: boolean;
-  byte_order?: Endianness;
-  min?: number;
-  max?: number;
-  format?: string;
-  confidence?: Confidence | "";
-  enum?: Record<string, string>;
-  notes?: Notes;
-  display?: DisplayHint;
-}
+export type SignalFields = { name?: string, start_bit?: number, bit_length?: number, factor?: number | null, offset?: number | null, unit?: string | null, signed?: boolean | null, byte_order?: Endianness | "" | null, min?: number | null, max?: number | null, format?: string | null, confidence?: Confidence | "" | null, enum?: { [key in string]: string }, notes?: string | Array<string> | null, display?: DisplayHint | null, };
 
-export interface FrameFields {
-  length?: number;
-  transmitter?: string;
-  interval_ms?: number;
-  notes?: Notes;
-  extended?: boolean;
-  fd?: boolean;
-  bus?: number;
-  copy?: string;
-  mirror_of?: string;
-  delimiter?: number[];
-  register_number?: number;
-  node_address?: number;
-  register_type?: RegisterType;
-}
-
-/** Blank is named by the crate. */
-export interface MuxFields {
-  name?: string;
-  start_bit: number;
-  bit_length: number;
-  notes?: Notes;
-}
-
-export interface MetaFields {
-  name: string;
-  version: number;
-  default_frame?: Protocol;
-}
-
-/** A number, or hex text with or without `0x`; text that is not hex is refused. */
-export type Mask = number | string;
-
-export interface HeaderField {
-  mask: Mask;
-  shift?: number;
-  format?: string;
-  endianness?: Endianness;
-}
-
-export interface ChecksumConfig {
-  algorithm: string;
-  startByte: number;
-  byteLength?: number;
-  calcStartByte?: number;
-  calcEndByte?: number;
-  bigEndian?: boolean;
-}
-
-export interface CanConfigFields {
-  default_byte_order?: Endianness;
-  default_interval?: number;
-  default_extended?: boolean;
-  default_fd?: boolean;
-  frame_id_mask?: Mask;
-  fields?: Record<string, HeaderField>;
-}
-
-export interface SerialConfigFields {
-  encoding?: string;
-  byte_order?: Endianness;
-  frame_id_mask?: number;
-  header_length?: number;
-  min_frame_length?: number;
-  checksum?: ChecksumConfig;
-  fields?: Record<string, HeaderField>;
-}
-
-export interface ModbusConfigFields {
-  device_address?: number;
-  register_base?: number;
-  default_interval?: number;
-  default_byte_order?: Endianness;
-  default_word_order?: Endianness;
-}
-
-export type EditOp =
-  | { op: "UpsertSignal"; owner_path: string[]; index?: number; signal: SignalFields }
-  | { op: "SetFrame"; protocol: Protocol; key: string; rename_from?: string; frame: FrameFields }
-  | { op: "AddFrame"; protocol: Protocol; key: string; frame: FrameFields }
-  | { op: "SetMux"; owner_path: string[]; mux: MuxFields }
-  | { op: "SetMeta"; meta: MetaFields }
-  | { op: "SetCanConfig"; config: CanConfigFields }
-  | { op: "SetSerialConfig"; config: SerialConfigFields }
-  | { op: "SetModbusConfig"; config: ModbusConfigFields }
-  | { op: "DeleteAtPath"; path: string[] }
-  | { op: "SetTable"; path: string[]; value: Record<string, unknown>; managed_keys?: string[]; sort_parent_numeric?: boolean; skip_if_exists?: boolean };
+export type EditOp = { "op": "SetTable", path: Array<string>, value: { [key in string]: unknown }, managed_keys?: Array<string>, replace_contents?: boolean, sort_parent_numeric?: boolean, skip_if_exists?: boolean, error_if_exists?: boolean, } | { "op": "UpsertFrame", protocol: string, key: string, value: { [key in string]: unknown }, managed_keys?: Array<string>, rename_from?: string | null, initial_signals?: Array<{ [key in string]: unknown }>, } | { "op": "UpsertArrayItem", array_path: Array<string>, value: { [key in string]: unknown }, index?: number | null, sort_keys?: Array<string>, } | { "op": "RemoveArrayItem", array_path: Array<string>, index: number, remove_if_empty?: boolean, } | { "op": "RenameKey", parent_path: Array<string>, old: string, new: string, set_value?: { [key in string]: unknown } | null, managed_keys?: Array<string>, sort_numeric?: boolean, update_transmitter_refs?: boolean, error_if_exists?: boolean, } | { "op": "DeleteAtPath", path: Array<string>, sort_parent_numeric?: boolean, } | { "op": "UpsertSignal", owner_path: Array<string>, index?: number | null, signal: SignalFields, } | { "op": "SetFrame", protocol: Protocol, key: string, rename_from?: string | null, frame: FrameFields, } | { "op": "AddFrame", protocol: Protocol, key: string, frame: FrameFields, } | { "op": "SetMux", owner_path: Array<string>, mux: MuxFields, } | { "op": "SetMeta", meta: MetaFields, } | { "op": "SetCanConfig", config: CanConfigFields, } | { "op": "SetSerialConfig", config: SerialConfigFields, } | { "op": "SetModbusConfig", config: ModbusConfigFields, };

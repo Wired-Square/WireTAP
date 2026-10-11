@@ -1256,20 +1256,20 @@
               "fields": {
                 "id": {
                   "mask": 65280,
-                  "endianness": "big",
+                  "byte_order": "big",
                   "format": "hex"
                 },
                 " ": {
                   "mask": 255,
-                  "endianness": "big",
+                  "byte_order": "big",
                   "format": "decimal"
                 }
               },
               "checksum": {
                 "algorithm": "sum8",
-                "startByte": -1,
-                "byteLength": 1,
-                "calcStartByte": 0
+                "start_byte": -1,
+                "byte_length": 1,
+                "calc_start_byte": 0
               }
             }
           },

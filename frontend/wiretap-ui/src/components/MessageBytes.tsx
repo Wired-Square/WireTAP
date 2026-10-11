@@ -7,7 +7,7 @@
 import { textDataGreen, textDataTertiary } from '../styles';
 import { byteToHex } from '../utils/byteUtils';
 import { TRAILING_CHECK_BYTES } from '../generated/protocolTraits';
-import type { Protocol } from '../generated/Protocol';
+import type { FrameProtocol as Protocol } from '../generated/FrameProtocol';
 
 type Props = {
   bytes: number[];

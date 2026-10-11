@@ -239,23 +239,6 @@ pub struct Draft {
 }
 
 #[derive(Serialize, TS)]
-#[serde(rename_all = "lowercase")]
-pub enum CatalogProtocol {
-    Can,
-    Serial,
-    Modbus,
-}
-
-#[derive(Serialize, TS)]
-#[serde(rename_all = "lowercase")]
-pub enum Confidence {
-    None,
-    Low,
-    Medium,
-    High,
-}
-
-#[derive(Serialize, TS)]
 pub struct ByteSpan {
     pub start: i32,
     pub len: u32,
@@ -264,7 +247,7 @@ pub struct ByteSpan {
 #[derive(Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct FrameDraft {
-    pub protocol: CatalogProtocol,
+    pub protocol: wiretap_catalog::model::Protocol,
     #[serde(flatten)]
     pub key: FrameKey,
     pub length: usize,
@@ -285,7 +268,7 @@ pub struct DraftSignal {
     pub start_bit: u32,
     pub bit_length: u32,
     pub source: SignalSource,
-    pub confidence: Confidence,
+    pub confidence: wiretap_catalog::model::Confidence,
     pub byte_order: Option<wiretap_decode::Endianness>,
 }
 

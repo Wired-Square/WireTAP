@@ -306,7 +306,6 @@ export function useFrameHandlers({
           })
         : deleteOp(["meta", "can"]),
     );
-    const checksum = forms.serialChecksum;
     ops.push(
       enabledConfigs.serial
         ? serialConfigOp({
@@ -316,16 +315,9 @@ export function useFrameHandlers({
             frame_id_mask: catalog?.serial?.frameIdMask ?? undefined,
             min_frame_length: catalog?.serial?.minFrameLength ?? undefined,
             fields: Object.fromEntries(
-              forms.serialHeaderFields.map((f) => [f.name, { mask: f.mask, endianness: f.endianness, format: f.format }]),
+              forms.serialHeaderFields.map((f) => [f.name, { mask: f.mask, byte_order: f.endianness, format: f.format }]),
             ),
-            checksum: checksum ? {
-              algorithm: checksum.algorithm,
-              startByte: checksum.start_byte,
-              byteLength: checksum.byte_length,
-              calcStartByte: checksum.calc_start_byte,
-              calcEndByte: checksum.calc_end_byte,
-              bigEndian: checksum.big_endian,
-            } : undefined,
+            checksum: forms.serialChecksum ?? undefined,
           })
         : deleteOp(["meta", "serial"]),
     );

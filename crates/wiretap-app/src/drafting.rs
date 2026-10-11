@@ -92,7 +92,7 @@ fn frame_signals(draft: &Draft, frame: &FrameDraft) -> Vec<DraftSignal> {
 pub struct DraftPreview {
     #[cfg_attr(test, ts(as = "crate::analysis_ts::Draft"))]
     pub draft: Draft,
-    #[cfg_attr(test, ts(as = "Option<crate::analysis_ts::CatalogProtocol>"))]
+    #[cfg_attr(test, ts(as = "Option<Protocol>"))]
     pub default_frame: Option<Protocol>,
     /// Each of `draft`'s frames' signals, as it would be written.
     #[cfg_attr(test, ts(as = "Vec<Vec<crate::analysis_ts::DraftSignal>>"))]

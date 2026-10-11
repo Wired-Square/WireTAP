@@ -1,7 +1,7 @@
 // Generated from the Rust serde types by `npm run gen:types`. Do not edit.
 import type { CsvColumnMapping } from "./CsvColumnMapping";
 import type { Delimiter } from "./Delimiter";
-import type { Protocol } from "./Protocol";
+import type { FrameProtocol } from "./FrameProtocol";
 import type { TimestampUnit } from "./TimestampUnit";
 
 /**
@@ -39,4 +39,4 @@ has_negative_timestamps: boolean,
 /**
  * Detected or user-specified delimiter
  */
-delimiter: Delimiter, suggested_protocol: Protocol, };
+delimiter: Delimiter, suggested_protocol: FrameProtocol, };

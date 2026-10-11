@@ -6,7 +6,7 @@
 import type { IOProfile } from "../hooks/useSettings";
 import type { BadgeTone } from "../components/Badge";
 import type { RegisterType } from "../api/io";
-import type { Protocol } from "../generated/Protocol";
+import type { FrameProtocol as Protocol } from "../generated/FrameProtocol";
 
 export type { Protocol };
 

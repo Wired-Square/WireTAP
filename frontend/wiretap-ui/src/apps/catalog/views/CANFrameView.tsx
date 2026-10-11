@@ -314,7 +314,7 @@ export default function CANFrameView({
                       </IconButton>
 
                       <IconButton
-                        onClick={() => onRequestDeleteSignal(idKey, index, selectedNode.path, signal.name)}
+                        onClick={() => onRequestDeleteSignal(idKey, index, selectedNode.path, signal.name ?? undefined)}
                         tone="danger"
                         title={t("canFrameView.deleteSignal")}
                       >

@@ -262,7 +262,7 @@ pub enum TemporalMode {
 /// Protocol family for frame-based communication
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
-#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, derive(ts_rs::TS), ts(rename = "FrameProtocol"))]
 pub enum Protocol {
     /// CAN 2.0A/2.0B (standard/extended)
     #[default]

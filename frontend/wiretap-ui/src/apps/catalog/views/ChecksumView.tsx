@@ -36,10 +36,10 @@ export default function ChecksumView({
   const algorithmInfo = getAlgorithmInfo(algorithm);
   const notes = checksum.notes?.join("\n");
   const resolve = useResolvedByteIndices(
-    [checksum.startByte, checksum.calcStartByte, checksum.calcEndByte].filter((i) => i !== undefined),
+    [checksum.startByte, checksum.calcStartByte, checksum.calcEndByte].filter((i) => i != null),
     [frameLength],
   );
-  const at = (index: number | undefined) => (index === undefined ? undefined : resolve(index, frameLength) ?? undefined);
+  const at = (index: number | null | undefined) => (index == null ? undefined : resolve(index, frameLength) ?? undefined);
   const resolvedStartByte = at(checksum.startByte);
   const resolvedCalcStart = at(checksum.calcStartByte);
   const resolvedCalcEnd = at(checksum.calcEndByte);
@@ -58,7 +58,7 @@ export default function ChecksumView({
           </IconButton>
 
           <IconButton
-            onClick={() => onRequestDeleteChecksum(idKey, checksumIndex, checksumsParentPath, checksum.name)}
+            onClick={() => onRequestDeleteChecksum(idKey, checksumIndex, checksumsParentPath, checksum.name ?? undefined)}
             tone="danger"
             title={t("checksumDetails.delete")}
           >
@@ -164,7 +164,7 @@ export default function ChecksumView({
           <div className={labelSmallMuted}>{t("checksumDetails.calculationRange")}</div>
           {(() => {
             const hasNegativeStart = checksum.calcStartByte !== undefined && checksum.calcStartByte < 0;
-            const hasNegativeEnd = checksum.calcEndByte !== undefined && checksum.calcEndByte < 0;
+            const hasNegativeEnd = checksum.calcEndByte != null && checksum.calcEndByte < 0;
             const resolvedStart = checksum.calcStartByte === undefined ? 0 : resolvedCalcStart;
             const resolvedEnd = checksum.calcEndByte === undefined ? frameLength : resolvedCalcEnd;
             if (resolvedStart === undefined || resolvedEnd === undefined) return null;

@@ -1,5 +1,5 @@
 // Generated from the Rust serde types by `npm run gen:types`. Do not edit.
-import type { Protocol } from "./Protocol";
+import type { FrameProtocol } from "./FrameProtocol";
 import type { TemporalMode } from "./TemporalMode";
 
 /**
@@ -13,7 +13,7 @@ temporal_mode: TemporalMode,
 /**
  * Protocols supported by the interface
  */
-protocols: Array<Protocol>, 
+protocols: Array<FrameProtocol>, 
 /**
  * Whether the interface can transmit frames (CAN, Modbus, framed serial)
  */

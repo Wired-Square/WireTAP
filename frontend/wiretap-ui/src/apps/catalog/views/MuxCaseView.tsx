@@ -182,7 +182,7 @@ export default function MuxCaseView({
                           idKey,
                           idx,
                           selectedNode.path,
-                          signal.name
+                          signal.name ?? undefined
                         )
                       }
                       tone="danger"

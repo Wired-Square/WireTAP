@@ -498,9 +498,9 @@ function FrameCard({
     };
   }, []);
 
-  const renderFrameId = (id: number, isExtended?: boolean) => formatFrameId(id, displayFrameIdFormat, isExtended);
+  const renderFrameId = (id: number, isExtended?: boolean | null) => formatFrameId(id, displayFrameIdFormat, isExtended ?? undefined);
 
-  const colourForConfidence = (conf?: string) => {
+  const colourForConfidence = (conf?: string | null) => {
     switch (conf) {
       case "low":
         return signalColours?.low;
@@ -630,7 +630,7 @@ function FrameCard({
             <Badge tone={MODBUS_REGISTER_TONES[frame.modbusRegisterType]} mono>
               {frame.modbusRegisterType}
             </Badge>
-            {frame.interval !== undefined && (
+            {frame.interval != null && (
               <span className={caption} title="Poll interval">
                 {frame.interval >= 1000 ? `${(frame.interval / 1000).toFixed(1)}s` : `${frame.interval}ms`}
               </span>
@@ -779,9 +779,9 @@ function FrameCard({
                   >
                     {decoded.name}
                   </span>
-                  {signalDef?.modbusRegister !== undefined && (
+                  {signalDef?.modbusRegister != null && (
                     <span className={`${caption} font-mono`} title="Modbus register">
-                      {modbusRegisterLabel(signalDef.modbusRegister, signalDef.modbusRegisterCount, displayFrameIdFormat)}
+                      {modbusRegisterLabel(signalDef.modbusRegister, signalDef.modbusRegisterCount ?? undefined, displayFrameIdFormat)}
                     </span>
                   )}
                   {signalDef?.inherited && (
@@ -1229,7 +1229,7 @@ export default function DecoderFramesView({
           gStore.updatePanel(panelId, { title: formatFrameId(frame.frameId, displayFrameIdFormat, frame.isExtended) });
           for (const signal of numericSignals) {
             if (signal.name) {
-              gStore.addSignalToPanel(panelId, frame.frameId, signal.name, signal.unit);
+              gStore.addSignalToPanel(panelId, frame.frameId, signal.name, signal.unit ?? undefined);
             }
           }
           if (sourceSessionId) useSessionStore.getState().requestSessionJoin("dashboard", sourceSessionId);
