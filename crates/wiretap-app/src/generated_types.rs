@@ -196,6 +196,9 @@ fn render() -> BTreeMap<PathBuf, String> {
     r.visit::<wiretap_analysis::draft::ExportMeta>();
     r.visit::<wiretap_analysis::draft::ModbusExportConfig>();
     r.visit::<wiretap_analysis::draft::ModbusRegister>();
+    r.visit::<crate::decode_views::Grouping>();
+    r.visit::<wiretap_decode::groups::Group>();
+    r.visit::<wiretap_decode::groups::GroupOrder>();
     r.visit::<crate::decode_views::RegisterRead>();
     r.visit::<crate::decode_views::RegisterReading>();
     r.visit::<crate::decode_views::MaskMatch>();

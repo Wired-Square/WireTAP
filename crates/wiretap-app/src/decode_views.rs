@@ -1,14 +1,37 @@
 // crates/wiretap-app/src/decode_views.rs
 //
-// Thin commands over `wiretap_decode`'s readings: a Modbus scan's registers
-// and the ids a CAN filter mask accepts.
+// Thin commands over `wiretap_decode`'s readings: the Frame Calculator's groups,
+// a Modbus scan's registers and the ids a CAN filter mask accepts.
 
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 use wiretap_decode::frame_id::{matched_id_count, matched_range, MatchedRange};
+use wiretap_decode::groups::{decode_groups, parse_sizes, Group, GroupMode, GroupOrder};
 use wiretap_decode::register::{interpret_pair, interpret_register, RegisterPairView, RegisterView};
 use wiretap_decode::Endianness;
+
+/// A preset, or the widths typed into the calculator in a unit of bits.
+#[derive(Debug, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[serde(untagged)]
+pub enum Grouping {
+    Preset(GroupMode),
+    Typed {
+        text: String,
+        #[serde(rename = "unitBits")]
+        unit_bits: u32,
+    },
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub fn decode_groups_cmd(bytes: Vec<u8>, grouping: Grouping, order: GroupOrder) -> Vec<Group> {
+    let mode = match grouping {
+        Grouping::Preset(mode) => mode,
+        Grouping::Typed { text, unit_bits } => GroupMode::Custom(parse_sizes(&text, unit_bits)),
+    };
+    decode_groups(&bytes, &mode, order)
+}
 
 #[derive(Debug, Deserialize)]
 #[cfg_attr(test, derive(ts_rs::TS))]
@@ -55,6 +78,8 @@ pub fn can_mask_match_cmd(id: u32, mask: u32, width: u32) -> MaskMatch {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeSet;
+
     use serde_json::{json, Value};
 
     use super::*;
@@ -62,6 +87,105 @@ mod tests {
 
     fn from<T: serde::de::DeserializeOwned>(v: &Value) -> T {
         serde_json::from_value(v.clone()).unwrap()
+    }
+
+    /// wiretap-decode's D6 case 1, a 1B mid-* group naming the byte its value came from.
+    const ONE_BYTE_MID: &[&str] = &[
+        "1B mid-big 12 mixed",
+        "1B mid-big 123456789abcdef0",
+        "1B mid-big 16 ascii+control",
+        "1B mid-big 7fff",
+        "1B mid-big 800000",
+        "1B mid-big 80017f",
+        "1B mid-big 8x 00",
+        "1B mid-big 8x ff",
+        "1B mid-big e808",
+        "1B mid-big Hello",
+        "1B mid-little 12 mixed",
+        "1B mid-little 123456789abcdef0",
+        "1B mid-little 16 ascii+control",
+        "1B mid-little 800000",
+        "1B mid-little 80017f",
+        "1B mid-little 8x 00",
+        "1B mid-little 8x ff",
+        "1B mid-little Hello",
+    ];
+
+    /// D6 case 4, a big custom group's display bytes and text covering every byte its bits touch.
+    const BIG_CUSTOM_SPAN: &[&str] = &[
+        "custom-bits [1,7,12] big 12 mixed",
+        "custom-bits [1,7,12] big 123456789abcdef0",
+        "custom-bits [1,7,12] big 16 ascii+control",
+        "custom-bits [1,7,12] big Hello",
+        "custom-bits [3,8] big 12 mixed",
+        "custom-bits [3,8] big 123456789abcdef0",
+        "custom-bits [3,8] big 16 ascii+control",
+        "custom-bits [3,8] big 80017f",
+        "custom-bits [3,8] big e808",
+        "custom-bits [3,8] big Hello",
+        "custom-bits [3] big 123456789abcdef0",
+        "custom-bits [3] big 80017f",
+        "custom-bits [3] big e808",
+        "custom-bits [3] big Hello",
+    ];
+
+    /// The fields of `got` that differ from `expected`, group by group.
+    fn changed(got: &[Value], expected: &[Value]) -> BTreeSet<String> {
+        assert_eq!(got.len(), expected.len());
+        got.iter()
+            .zip(expected)
+            .flat_map(|(g, e)| {
+                g.as_object().unwrap().iter().filter(|(k, v)| e[k.as_str()] != **v).map(|(k, _)| k.clone())
+            })
+            .collect()
+    }
+
+    #[test]
+    fn the_calculator_matches_its_golden_but_the_libs_d6_fixes() {
+        let golden = fixture("calculatorGolden.json");
+        let cases = golden.as_array().unwrap();
+        assert_eq!(cases.len(), 820);
+        let (mut mid_custom, mut mid_custom_changed) = (0, 0);
+        for case in cases {
+            let name = case["name"].as_str().unwrap();
+            let text = case["customInput"].as_str().unwrap().to_string();
+            let grouping = match case["mode"].as_str().unwrap() {
+                "custom-bits" => Grouping::Typed { text, unit_bits: 1 },
+                "custom-bytes" => Grouping::Typed { text, unit_bits: 8 },
+                _ => Grouping::Preset(from(&case["mode"])),
+            };
+            let custom = matches!(grouping, Grouping::Typed { .. });
+            let got: Vec<Value> = decode_groups_cmd(from(&case["bytes"]), grouping, from(&case["endianness"]))
+                .iter()
+                .map(|g| serde_json::to_value(g).unwrap())
+                .collect();
+            let expected: Vec<Value> = from(&case["groups"]);
+            let fields = changed(&got, &expected);
+            let allowed: &[&str] = if ONE_BYTE_MID.contains(&name) {
+                &["displayHex", "startByteIndex", "usedBitStart", "usedBitEnd", "bitOffset"]
+            } else if BIG_CUSTOM_SPAN.contains(&name) {
+                &["displayHex", "text"]
+            } else if custom && name.contains(" mid-") {
+                mid_custom += 1;
+                mid_custom_changed += usize::from(!fields.is_empty());
+                continue;
+            } else {
+                assert!(fields.is_empty(), "{name} changes {fields:?}");
+                continue;
+            };
+            assert!(!fields.is_empty(), "{name} no longer differs from the golden");
+            assert!(fields.iter().all(|f| allowed.contains(&f.as_str())), "{name} changes {fields:?}");
+        }
+        assert_eq!((mid_custom, mid_custom_changed), (278, 206));
+    }
+
+    #[test]
+    fn a_grouping_is_a_preset_or_typed_widths() {
+        let typed: Grouping = from(&json!({ "text": "4,4", "unitBits": 8 }));
+        let groups = decode_groups_cmd(vec![0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0], typed, GroupOrder::MidBig);
+        let hexes: Vec<_> = groups.iter().map(|g| g.hex.as_str()).collect();
+        assert_eq!(hexes, ["0x34127856", "0xbc9af0de"]);
+        assert!(matches!(from::<Grouping>(&json!("2B")), Grouping::Preset(GroupMode::TwoBytes)));
     }
 
     fn reading(registers: &[(u32, &[u8])], word_order: Endianness) -> Vec<Value> {

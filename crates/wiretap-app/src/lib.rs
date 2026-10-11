@@ -295,6 +295,7 @@ pub fn run() {
             drafting::draft_catalog_cmd,
             drafting::export_frames_catalog_cmd,
             drafting::export_modbus_catalog_cmd,
+            decode_views::decode_groups_cmd,
             decode_views::interpret_registers_cmd,
             decode_views::can_mask_match_cmd,
             drafting::candidate_signals_cmd,
