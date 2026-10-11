@@ -11,8 +11,8 @@ use std::time::{Duration, UNIX_EPOCH};
 
 use tokio::sync::mpsc;
 use wiretap_io::can::{
-    BusState, CanError, CanEvent, CanFrame, CanOptions, CanRead, CanTask, CanWriter, Direction,
-    SendRefused,
+    BusState, CanError, CanEvent, CanFrame, CanOptions, CanRead, CanTask, CanWriter, DeviceInfo,
+    Direction, SendRefused,
 };
 use wiretap_protocol::dlc_to_len;
 
@@ -143,6 +143,40 @@ pub(crate) fn mapped_bus_state(
         rx_errors: state.rx_errors,
     };
     Some(SourceMessage::BusState(source_idx, status, state.tx_dropped))
+}
+
+/// The opened task, or `None` once the session has been told why it would not open.
+pub(crate) async fn open_or_report(
+    opening: impl Future<Output = Result<CanTask, CanError>>,
+    source_idx: usize,
+    tx: &mpsc::Sender<SourceMessage>,
+    failed: impl FnOnce(CanError) -> String,
+) -> Option<CanTask> {
+    match opening.await {
+        Ok(task) => Some(task),
+        Err(e) => {
+            let _ = tx.send(SourceMessage::Error(source_idx, failed(e))).await;
+            None
+        }
+    }
+}
+
+/// What the broker is told of `event`, or the loss that ends the source: reads
+/// on the session's buses, and a connect as `on_connect` announces it.
+pub(crate) fn announce_on_event(
+    source_idx: usize,
+    mappings: &[BusMapping],
+    event: CanEvent,
+    on_connect: impl FnOnce(DeviceInfo) -> Vec<SourceMessage>,
+) -> Result<Vec<SourceMessage>, CanError> {
+    match event {
+        CanEvent::Connected(info) => Ok(on_connect(info)),
+        CanEvent::Read(reads) => Ok(mapped_frames(source_idx, reads, mappings)
+            .into_iter()
+            .collect()),
+        CanEvent::Disconnected { error, .. } => Err(error),
+        _ => Ok(Vec::new()),
+    }
 }
 
 pub(crate) fn open_failed(device: &str, error: CanError) -> String {

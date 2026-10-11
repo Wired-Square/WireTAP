@@ -13,7 +13,9 @@ use wiretap_io::can::socketcan::{open as open_socketcan, SocketCanOptions};
 use wiretap_io::can::{CanError, CanEvent};
 
 use crate::io::bus_mapping::BusMapping;
-use crate::io::can_task::{can_options, link_lost, mapped_frames, open_failed, serve};
+use crate::io::can_task::{
+    announce_on_event, can_options, link_lost, open_failed, open_or_report, serve,
+};
 use crate::io::types::SourceMessage;
 
 // ============================================================================
@@ -112,27 +114,20 @@ fn on_event(
     mappings: &[BusMapping],
     event: CanEvent,
 ) -> Result<Vec<SourceMessage>, CanError> {
-    match event {
-        CanEvent::Connected(info) => {
-            tlog!(
-                "[socketcan] Source {} connected to {} (fd: {})",
-                source_idx,
-                interface,
-                info.fd
-            );
-            Ok(vec![SourceMessage::Connected(
-                source_idx,
-                "socketcan".to_string(),
-                interface.to_string(),
-                None,
-            )])
-        }
-        CanEvent::Read(reads) => Ok(mapped_frames(source_idx, reads, mappings)
-            .into_iter()
-            .collect()),
-        CanEvent::Disconnected { error, .. } => Err(error),
-        _ => Ok(Vec::new()),
-    }
+    announce_on_event(source_idx, mappings, event, |info| {
+        tlog!(
+            "[socketcan] Source {} connected to {} (fd: {})",
+            source_idx,
+            interface,
+            info.fd
+        );
+        vec![SourceMessage::Connected(
+            source_idx,
+            "socketcan".to_string(),
+            interface.to_string(),
+            None,
+        )]
+    })
 }
 
 /// Run a SocketCAN source on the library's CAN task.
@@ -164,14 +159,10 @@ pub async fn run_source(
         interface: interface.clone(),
         fd: true,
     };
-    let task = match open_socketcan(options, can_options(false, None)).await {
-        Ok(task) => task,
-        Err(e) => {
-            let _ = tx
-                .send(SourceMessage::Error(source_idx, open_failed(&device, e)))
-                .await;
-            return;
-        }
+    let opening = open_socketcan(options, can_options(false, None));
+    let Some(task) = open_or_report(opening, source_idx, &tx, |e| open_failed(&device, e)).await
+    else {
+        return;
     };
 
     serve(

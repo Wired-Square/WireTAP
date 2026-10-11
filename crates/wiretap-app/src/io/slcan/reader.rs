@@ -22,8 +22,8 @@ use wiretap_protocol::slcan::{bitrate_command, data_bitrate_command, DATA_BITRAT
 use crate::io::bus_mapping::BusMapping;
 use crate::io::device_kinds::{req_bool, req_i64};
 use crate::io::can_task::{
-    can_options, link_lost, mapped_frames, open_failed, serve, PortOutage, PORT_REOPEN,
-    PROBE_TIMEOUT,
+    announce_on_event, can_options, link_lost, open_failed, open_or_report, serve, PortOutage,
+    PORT_REOPEN, PROBE_TIMEOUT,
 };
 use crate::io::serial::utils::probe_serial_presence;
 use crate::io::types::SourceMessage;
@@ -153,28 +153,21 @@ fn on_event(
     mappings: &[BusMapping],
     event: CanEvent,
 ) -> Result<Vec<SourceMessage>, CanError> {
-    match event {
-        CanEvent::Connected(info) => {
-            tlog!(
-                "[slcan] Source {} connected to {} (firmware: {:?}, fd: {})",
-                source_idx,
-                port,
-                info.firmware,
-                info.fd
-            );
-            Ok(vec![SourceMessage::Connected(
-                source_idx,
-                "slcan".to_string(),
-                port.to_string(),
-                None,
-            )])
-        }
-        CanEvent::Read(reads) => Ok(mapped_frames(source_idx, reads, mappings)
-            .into_iter()
-            .collect()),
-        CanEvent::Disconnected { error, .. } => Err(error),
-        _ => Ok(Vec::new()),
-    }
+    announce_on_event(source_idx, mappings, event, |info| {
+        tlog!(
+            "[slcan] Source {} connected to {} (firmware: {:?}, fd: {})",
+            source_idx,
+            port,
+            info.firmware,
+            info.fd
+        );
+        vec![SourceMessage::Connected(
+            source_idx,
+            "slcan".to_string(),
+            port.to_string(),
+            None,
+        )]
+    })
 }
 
 /// The nominal and CAN FD data rates a profile asks for, refused when SLCAN has
@@ -218,14 +211,10 @@ pub async fn run_source(
         bitrate,
         data_bitrate,
     };
-    let task = match open_slcan(options, can_options(silent_mode, PORT_REOPEN)).await {
-        Ok(task) => task,
-        Err(e) => {
-            let _ = tx
-                .send(SourceMessage::Error(source_idx, open_failed(&device, e)))
-                .await;
-            return;
-        }
+    let opening = open_slcan(options, can_options(silent_mode, PORT_REOPEN));
+    let Some(task) = open_or_report(opening, source_idx, &tx, |e| open_failed(&device, e)).await
+    else {
+        return;
     };
 
     let mut outage = PortOutage::new(source_idx, &port);

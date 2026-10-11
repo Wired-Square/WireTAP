@@ -12,7 +12,7 @@ use wiretap_io::can::{tcp_endpoint, CanError, ResolveError, TransportError};
 
 use super::common::{handshake_failed, probed_bus_count, GvretDeviceInfo, Stream};
 use crate::io::bus_mapping::BusMapping;
-use crate::io::can_task::{can_options, link_lost, serve};
+use crate::io::can_task::{can_options, link_lost, open_or_report, serve};
 use crate::io::error::IoError;
 use crate::io::types::SourceMessage;
 
@@ -80,17 +80,11 @@ pub async fn run_source(
 ) {
     let device = gvret_tcp_device(&host, port);
     let link = tcp_link(&host, port, Duration::from_secs_f64(timeout_sec));
-    let task = match open_gvret(link, GvretOptions::default(), can_options(false, None)).await {
-        Ok(task) => task,
-        Err(e) => {
-            let _ = tx
-                .send(SourceMessage::Error(
-                    source_idx,
-                    open_failed(&host, &device, e),
-                ))
-                .await;
-            return;
-        }
+    let opening = open_gvret(link, GvretOptions::default(), can_options(false, None));
+    let Some(task) =
+        open_or_report(opening, source_idx, &tx, |e| open_failed(&host, &device, e)).await
+    else {
+        return;
     };
 
     let address = format!("{}:{}", host, port);

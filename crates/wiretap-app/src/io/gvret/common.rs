@@ -12,7 +12,7 @@ use std::time::Duration;
 use wiretap_io::can::{CanError, CanEvent, DeviceInfo};
 
 use crate::io::bus_mapping::{gvret_protocols, BusMapping};
-use crate::io::can_task::{mapped_frames, open_failed};
+use crate::io::can_task::{announce_on_event, open_failed};
 use crate::io::types::SourceMessage;
 
 // ============================================================================
@@ -202,37 +202,35 @@ impl Stream {
     /// Every connect re-resolves the mappings from the bus count, since
     /// `MappingsResolved` is what feeds `available_buses` and transmit routing.
     pub fn on_event(&mut self, event: CanEvent) -> Result<Vec<SourceMessage>, CanError> {
-        match event {
-            CanEvent::Connected(info) => {
-                if !info.keepalive {
-                    tlog!(
-                        "[gvret] {} does not answer keepalives, so a silent drop will not be seen",
-                        self.device
-                    );
-                }
-                let outcome = info.buses.map_or(NumBusesOutcome::Silent, |n| {
-                    NumBusesOutcome::Answered(clamp_bus_count(n))
-                });
-                if let Ok(mappings) =
-                    mappings_from_num_buses(outcome, &self.profile_mappings, &self.device)
-                {
-                    self.mappings = mappings;
-                }
-                Ok(vec![
-                    SourceMessage::MappingsResolved(self.source_idx, self.mappings.clone()),
-                    SourceMessage::Connected(
-                        self.source_idx,
-                        self.kind.to_string(),
-                        self.address.clone(),
-                        None,
-                    ),
-                ])
-            }
-            CanEvent::Read(reads) => Ok(mapped_frames(self.source_idx, reads, &self.mappings)
-                .into_iter()
-                .collect()),
-            CanEvent::Disconnected { error, .. } => Err(error),
-            _ => Ok(Vec::new()),
+        if let CanEvent::Connected(info) = &event {
+            self.resolve(info);
+        }
+        announce_on_event(self.source_idx, &self.mappings, event, |_| {
+            vec![
+                SourceMessage::MappingsResolved(self.source_idx, self.mappings.clone()),
+                SourceMessage::Connected(
+                    self.source_idx,
+                    self.kind.to_string(),
+                    self.address.clone(),
+                    None,
+                ),
+            ]
+        })
+    }
+
+    fn resolve(&mut self, info: &DeviceInfo) {
+        if !info.keepalive {
+            tlog!(
+                "[gvret] {} does not answer keepalives, so a silent drop will not be seen",
+                self.device
+            );
+        }
+        let outcome = info.buses.map_or(NumBusesOutcome::Silent, |n| {
+            NumBusesOutcome::Answered(clamp_bus_count(n))
+        });
+        if let Ok(mappings) = mappings_from_num_buses(outcome, &self.profile_mappings, &self.device)
+        {
+            self.mappings = mappings;
         }
     }
 }

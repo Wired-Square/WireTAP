@@ -14,7 +14,9 @@ use wiretap_io::serial::LineSettings;
 
 use super::common::{handshake_failed, probed_bus_count, GvretDeviceInfo, Stream};
 use crate::io::bus_mapping::BusMapping;
-use crate::io::can_task::{can_options, link_lost, serve, PortOutage, PORT_REOPEN, PROBE_TIMEOUT};
+use crate::io::can_task::{
+    can_options, link_lost, open_or_report, serve, PortOutage, PORT_REOPEN, PROBE_TIMEOUT,
+};
 use crate::io::serial::utils::probe_serial_presence;
 use crate::io::types::SourceMessage;
 
@@ -77,23 +79,15 @@ pub async fn run_source(
         path: port.clone(),
         line,
     };
-    let task = match open_gvret(
+    let opening = open_gvret(
         link,
         GvretOptions::default(),
         can_options(false, PORT_REOPEN),
-    )
-    .await
-    {
-        Ok(task) => task,
-        Err(e) => {
-            let _ = tx
-                .send(SourceMessage::Error(
-                    source_idx,
-                    handshake_failed(&device, e),
-                ))
-                .await;
-            return;
-        }
+    );
+    let Some(task) =
+        open_or_report(opening, source_idx, &tx, |e| handshake_failed(&device, e)).await
+    else {
+        return;
     };
 
     let mut stream = Stream::new(
