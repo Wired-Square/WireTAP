@@ -56,6 +56,16 @@ describe("saving the catalogue configuration", () => {
     expect(opNamed(ops, "SetSerialConfig")).toMatchObject({ config: { encoding: "slip", min_frame_length: 4, frame_id_mask: 0xff00 } });
   });
 
+  it("keeps a serial header field placed by start byte and bytes beside a masked one", async () => {
+    const fields = { id: { startByte: -3, bytes: 2, endianness: "little" as const }, kind: { mask: 0xff00 } };
+    const ops = await savedOps({ serial: { encoding: "slip", fields } });
+    const saved = opNamed(ops, "SetSerialConfig") as Extract<EditOp, { op: "SetSerialConfig" }>;
+    expect(JSON.parse(JSON.stringify(saved.config.fields))).toEqual({
+      id: { start_byte: -3, bytes: 2, byte_order: "little", format: "hex" },
+      kind: { mask: 0xff00, byte_order: "big", format: "hex" },
+    });
+  });
+
   it("deletes a protocol's section when it is turned off", async () => {
     const ops = await savedOps({ can: {} }, { can: false, serial: false, modbus: false });
     expect(ops.slice(1)).toEqual([

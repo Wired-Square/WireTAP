@@ -335,6 +335,7 @@ export default function SerialConfigSection({
                       <IconButton
                         onClick={() => toggleFieldPicker(index)}
                         size="sm"
+                        disabled={field.mask === undefined}
                         title={expandedFieldPickers[index] ? "Hide bit picker" : "Show bit picker"}
                       >
                         {expandedFieldPickers[index] ? (
@@ -349,13 +350,34 @@ export default function SerialConfigSection({
                         {field.name}
                       </span>
 
-                      {/* Mask value */}
-                      <Badge mono>{formatMaskHex(field.mask, effectiveHeaderLength)}</Badge>
-
-                      {/* Byte info */}
-                      <span className={caption}>
-                        ({computeByteInfo(field.mask, effectiveHeaderLength)})
-                      </span>
+                      {field.mask === undefined ? (
+                        <>
+                          <Input
+                            type="number"
+                            size="sm"
+                            className="w-16"
+                            title="Start byte (negative counts from the end)"
+                            value={field.startByte ?? 0}
+                            onChange={(e) => handleUpdateField(index, { startByte: Number(e.target.value) })}
+                          />
+                          <Input
+                            type="number"
+                            size="sm"
+                            className="w-16"
+                            min={1}
+                            title="Bytes"
+                            value={field.bytes ?? 1}
+                            onChange={(e) => handleUpdateField(index, { bytes: Number(e.target.value) })}
+                          />
+                        </>
+                      ) : (
+                        <>
+                          <Badge mono>{formatMaskHex(field.mask, effectiveHeaderLength)}</Badge>
+                          <span className={caption}>
+                            ({computeByteInfo(field.mask, effectiveHeaderLength)})
+                          </span>
+                        </>
+                      )}
 
                       {/* Spacer */}
                       <div className="flex-1" />
@@ -395,7 +417,7 @@ export default function SerialConfigSection({
                     </Card>
 
                     {/* Expanded bit picker */}
-                    {expandedFieldPickers[index] && (
+                    {expandedFieldPickers[index] && field.mask !== undefined && (
                       <Card className="ml-8">
                         <MaskBitPicker
                           mask={field.mask}

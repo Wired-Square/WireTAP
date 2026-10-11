@@ -315,7 +315,7 @@ export function useFrameHandlers({
             frame_id_mask: catalog?.serial?.frameIdMask ?? undefined,
             min_frame_length: catalog?.serial?.minFrameLength ?? undefined,
             fields: Object.fromEntries(
-              forms.serialHeaderFields.map((f) => [f.name, { mask: f.mask, byte_order: f.endianness, format: f.format }]),
+              forms.serialHeaderFields.map((f) => [f.name, { mask: f.mask, start_byte: f.startByte, bytes: f.bytes, byte_order: f.endianness, format: f.format }]),
             ),
             checksum: forms.serialChecksum ?? undefined,
           })

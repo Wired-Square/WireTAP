@@ -19,10 +19,12 @@ export interface CanHeaderFieldEntry {
   format: HeaderFieldFormat;
 }
 
-/** Serial header field form entry - name + mask over header bytes */
+/** Serial header field form entry - name + a mask over header bytes, or a start byte and bytes */
 export interface SerialHeaderFieldEntry {
   name: string;
-  mask: number;           // Bitmask over header bytes (e.g., 0xFF00 for first byte of 2-byte header)
+  mask?: number;          // Bitmask over header bytes (e.g., 0xFF00 for first byte of 2-byte header)
+  startByte?: number;     // Negative counts from the end
+  bytes?: number;
   endianness: "big" | "little";
   format: HeaderFieldFormat;
 }
@@ -319,7 +321,9 @@ function configForms(catalog: Catalog | null) {
     serialByteOrder: serial?.byteOrder ?? undefined,
     serialHeaderFields: Object.entries(serial?.fields ?? {}).map(([name, f]): SerialHeaderFieldEntry => ({
       name,
-      mask: f.mask ?? 0,
+      mask: f.mask ?? undefined,
+      startByte: f.startByte ?? undefined,
+      bytes: f.bytes ?? undefined,
       endianness: f.endianness ?? 'big',
       format: (f.format ?? 'hex') as HeaderFieldFormat,
     })),
