@@ -194,6 +194,20 @@ pub(crate) fn boot_desktop(app: &mut tauri::App) -> Result<(), Box<dyn std::erro
 pub(crate) fn on_run_event(_app: &AppHandle, event: tauri::RunEvent) {
     // macOS's Quit ends the loop with no ExitRequested, so this is the one event every quit reaches.
     if let tauri::RunEvent::Exit = event {
+        if let Err(e) = store_manager::flush() {
+            tlog!("[exit] Failed to save UI state: {}", e);
+        }
         tauri::async_runtime::block_on(io::stop_all_sessions(std::time::Duration::from_secs(3)));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn quitting_saves_ui_state_still_waiting_out_its_debounce() {
+        let source = include_str!("boot.rs");
+        let run_event = &source[source.find("fn on_run_event").unwrap()..];
+        let run_event = &run_event[..run_event.find("\n}\n").unwrap()];
+        assert!(run_event.contains("store_manager::flush()"), "the exit hook does not flush the UI store");
     }
 }

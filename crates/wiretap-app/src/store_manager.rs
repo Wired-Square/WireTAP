@@ -280,7 +280,6 @@ pub fn keys() -> Vec<String> {
 }
 
 /// Force an immediate save (useful before app shutdown)
-#[allow(unused)]
 pub fn flush() -> Result<(), String> {
     save_to_disk_internal()
 }

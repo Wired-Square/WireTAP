@@ -52,6 +52,7 @@ All notable changes to WireTAP will be documented in this file.
 - **An empty search pattern is refused in the form.** It used to be queued and fail.
 - **Frame frequency counts each frame once.** A frame on a bucket's edge was counted in two buckets; it now counts in the bucket its own time falls in.
 - **Quitting WireTAP stops every open session first.** A CAN adapter such as a gs_usb or PEAK device is now stopped as the app quits, rather than left on the bus until it is unplugged. A device that does not stop within a few seconds no longer holds up the quit.
+- **A layout or panel change made just before quitting is kept.** UI state is saved half a second after the last change, so one made in that half-second was lost on quit; quitting now saves it first.
 - **Transmit's CAN FD length list offers 0 to 8 bytes.** An FD frame can carry any length up to 8 as well as 12 to 64 bytes, but the list started at 8.
 - **The Dashboard's bit-change heatmap shows every byte of a CAN FD frame.** It used to draw only bytes 0–7, so changes in bytes 8–63 were counted but never shown. The panel now grows a row per byte of the longest payload seen, and a classic frame keeps its eight rows.
 - **A Dashboard list panel shows "—" for a signal that has never had a value.** It used to read 0.000, the same as a real zero, for a signal with no samples yet, such as one whose value the catalogue refuses to scale. A real zero still reads 0.000.
