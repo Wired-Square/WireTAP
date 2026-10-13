@@ -410,11 +410,7 @@ pub fn start_catalog_cache(app: &AppHandle) {
 /// React to a settings save: if the decoder directory changed, rebuild the cache
 /// for the new directory and re-point the filesystem watcher.
 pub fn handle_decoder_dir_change(app: &AppHandle, new_dir: &str) {
-    // `try_state`, not `state`: a settings write can happen during early setup
-    // (a load that migrates the file) before the cache is managed.
-    let Some(cache) = app.try_state::<CatalogCache>() else {
-        return;
-    };
+    let cache = app.state::<CatalogCache>();
     let changed = {
         let st = cache.state.lock().unwrap();
         st.dir.as_deref() != Some(Path::new(new_dir))
@@ -728,6 +724,14 @@ mod tests {
 
     fn write(dir: &Path, name: &str, body: &str) {
         std::fs::write(dir.join(name), body).expect("write catalogue");
+    }
+
+    #[test]
+    fn the_cache_is_managed_before_setup_starts_a_server_that_reads_it() {
+        assert!(
+            include_str!("lib.rs").contains(".manage(catalog::CatalogCache::default())"),
+            "the app builder must manage the catalogue cache, so the MCP and WS servers boot_desktop starts never find it missing"
+        );
     }
 
     #[test]

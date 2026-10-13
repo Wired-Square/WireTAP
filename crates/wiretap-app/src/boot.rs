@@ -186,7 +186,6 @@ pub(crate) fn boot_desktop(app: &mut tauri::App) -> Result<(), Box<dyn std::erro
     // Warm the backend-owned catalogue cache (and start watching the
     // decoder dir) now that settings have resolved, so the frontend's
     // first list_catalogs() is served from memory instead of racing a scan.
-    app.manage(catalog::CatalogCache::default());
     catalog::start_catalog_cache(app.handle());
 
     Ok(())
