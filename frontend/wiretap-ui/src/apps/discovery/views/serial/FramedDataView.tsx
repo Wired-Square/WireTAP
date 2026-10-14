@@ -255,10 +255,12 @@ export default function FramedDataView({ captureId, sessionId, onAccept, onApply
   const closeContextMenu = useCallback(() => setContextMenu(null), []);
 
   // Serial frames only carry an id when a field has been declared for one, so
-  // Copy ID is offered on the same condition the column is.
+  // Copy ID is offered on the same condition the column is. A Modbus RTU message
+  // always carries its unit and function.
   const showIdColumn =
     idConfig !== null ||
-    (serialConfig?.frame_id_start_byte !== undefined && serialConfig?.frame_id_bytes !== undefined);
+    (serialConfig?.frame_id_start_byte !== undefined && serialConfig?.frame_id_bytes !== undefined) ||
+    frames.some((f) => f.protocol === 'modbus_rtu');
 
   const contextMenuItems: ContextMenuItem[] = useMemo(() => {
     if (!contextMenu) return [];

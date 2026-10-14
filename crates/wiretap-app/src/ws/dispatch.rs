@@ -310,8 +310,8 @@ fn mirror_verdicts(session_id: &str, frames: &[FrameMessage]) -> Option<MirrorVe
 ///
 /// A serial frame under a Modbus catalogue takes the other path: the port was
 /// framed by the reader, so the frame is a whole message and the boundary is
-/// taken as given rather than searched for. So does a `modbus_rtu` frame — an
-/// archive row that is one whole message already.
+/// taken as given rather than searched for. So does a `modbus_rtu` frame, one
+/// whole message already, whether a live line's or an archive row.
 fn feed_tunnels(
     tunnels: Option<&SharedTunnels>,
     catalog: &wiretap_catalog::Catalog,
@@ -480,6 +480,25 @@ fn unrouted_entry(kind: UnroutedKind, f: &FrameMessage) -> DecodedSignalsEntry<'
     })
 }
 
+/// The id `catalog` knows `f` by, if any. A `modbus_rtu` row's id is its unit and
+/// function, which only a serial catalogue reads, and by its own `id` field.
+fn catalogue_id(catalog: &wiretap_catalog::Catalog, f: &FrameMessage) -> Option<u32> {
+    if f.protocol != wiretap_protocol::ingest::MODBUS_RTU_PROTOCOL {
+        return Some(f.frame_id);
+    }
+    if catalog.protocol != wiretap_catalog::model::Protocol::Serial {
+        return None;
+    }
+    let id_field = catalog.serial.as_ref().and_then(|s| {
+        Some(wiretap_catalog::FrameIdConfig {
+            start_byte: s.frame_id_start_byte?,
+            num_bytes: s.frame_id_bytes? as u8,
+            big_endian: s.frame_id_byte_order != Some(wiretap_catalog::model::Endianness::Little),
+        })
+    });
+    Some(id_field.and_then(|field| field.extract(&f.bytes)).unwrap_or(f.frame_id))
+}
+
 /// One frame's entry in the `DecodedSignals` payload, or `None` when the
 /// catalogue says nothing about it or it is a remote request, which carries no
 /// data to decode. Shared by the live stream and the MCP
@@ -493,14 +512,16 @@ pub(crate) fn decode_entry<'a>(
     if f.is_rtr {
         return None;
     }
+    let id = catalogue_id(catalog, f);
     // decode_by_id applies frame_id_mask, looks up the frame, decodes
     // signals/mux, and extracts header fields (CAN id / serial bytes).
     // Defaulted, not skipped, when the catalogue has no frame for this id:
     // a serial RTU message has no frame layout of its own — its registers
     // are decoded from the message — so a frame that decoded nothing still
     // has something to render when it carried a message.
-    let decoded =
-        wiretap_catalog::decode::decode_by_id(catalog, f.frame_id, &f.bytes).unwrap_or_default();
+    let decoded = id
+        .and_then(|id| wiretap_catalog::decode::decode_by_id(catalog, id, &f.bytes))
+        .unwrap_or_default();
     if tunnel_messages.is_empty()
         && decoded.signals.is_empty()
         && decoded.selectors.is_empty()
@@ -508,8 +529,8 @@ pub(crate) fn decode_entry<'a>(
     {
         return None;
     }
-    let masked_id =
-        wiretap_catalog::decode::frame_id_mask(catalog).map_or(f.frame_id, |m| f.frame_id & m);
+    let id = id.unwrap_or(f.frame_id);
+    let masked_id = wiretap_catalog::decode::frame_id_mask(catalog).map_or(id, |m| id & m);
     let mismatches = verdict.zip(catalog.frame(masked_id)).map_or_else(Vec::new, |(v, frame)| {
         mirror_mismatches(v, frame, &decoded.selectors)
     });
@@ -1456,6 +1477,23 @@ bit_length = 16
         assert_eq!(feed_tunnels(Some(&tunnels), &catalog, "test", &broadcast, 0).len(), 1, "a broadcast is a message");
     }
 
+    /// A live line publishes how it frames, and its `modbus_rtu` rows interpret
+    /// under that; only a row from a session that published nothing reads as
+    /// an archive's, which interprets any code.
+    #[test]
+    fn a_live_lines_rtu_rows_interpret_under_its_own_settings() {
+        let vendor = archive_frame(rtu(&[0x02, 0x65, 0x03, 0x00, 0x2E, 0x00, 0x0E]));
+        let interpreted = |session: &str| {
+            let tunnels = Arc::new(modbus_session());
+            feed_tunnels(Some(&tunnels), &bare(), session, &vendor, 0).len()
+        };
+
+        set_serial_rtu_options("live-rtu-line", wiretap_catalog::RtuSettings::default());
+        assert_eq!(interpreted("live-rtu-line"), 0, "a stock line refuses an undeclared code");
+        detach_catalog("live-rtu-line");
+        assert_eq!(interpreted("archive-rtu-rows"), 1);
+    }
+
     /// A message whose CRC disagrees is still reported, flagged — that flag is
     /// the whole of what a lenient policy has to be honest with.
     #[test]
@@ -1476,6 +1514,74 @@ bit_length = 16
         let tunnels = Arc::new(SessionTunnels::new(HashMap::new(), false));
         let frame = serial_frame(rtu(&[0x01, 0x03, 0x00, 0x6B, 0x00, 0x03]));
         assert!(feed_tunnels(Some(&tunnels), &bare(), "test", &frame, 0).is_empty());
+    }
+
+    /// Its id is a unit and function, not a register: unit 8's read is not
+    /// register 0x0803, nor 0x0803 a CAN id.
+    #[test]
+    fn a_modbus_rtu_row_is_not_decoded_as_the_frame_its_id_spells() {
+        let modbus = wiretap_catalog::Catalog::parse(
+            r#"
+[meta]
+name = "registers"
+
+[frame.modbus.at_0803]
+register_number = 0x0803
+register_type = "holding"
+length = 1
+
+[[frame.modbus.at_0803.signals]]
+name = "Spelt"
+start_bit = 0
+bit_length = 16
+"#,
+        )
+        .expect("catalogue parses");
+        let can = wiretap_catalog::Catalog::parse(
+            "[meta]\nname = \"can\"\n[frame.can.\"0x803\"]\nlength = 8\n[[frame.can.\"0x803\".signals]]\nname = \"Spelt\"\nstart_bit = 0\nbit_length = 16\n",
+        )
+        .expect("catalogue parses");
+        let request = archive_frame(rtu(&[0x08, 0x03, 0x08, 0x03, 0x00, 0x01]));
+        for catalog in [&modbus, &can] {
+            assert!(decode_entry(catalog, &request, None, &[]).is_none());
+        }
+    }
+
+    /// A serial catalogue that frames RTU keys its frames by its own `id` field,
+    /// which still finds the message the line now stores by unit and function.
+    #[test]
+    fn a_serial_catalogue_finds_an_rtu_row_by_its_id_field() {
+        let catalog = wiretap_catalog::Catalog::parse(
+            r#"
+[meta]
+name = "rtu as serial"
+[meta.serial]
+encoding = "modbus_rtu"
+[meta.serial.fields.id]
+start_byte = 1
+bytes = 1
+[frame.serial."0x04"]
+length = 8
+[[frame.serial."0x04".signals]]
+name = "Register"
+start_bit = 16
+bit_length = 16
+byte_order = "big"
+"#,
+        )
+        .expect("catalogue parses");
+        let request = archive_frame(rtu(&[0x08, 0x04, 0x4D, 0xE2, 0x00, 0x02]));
+
+        let entry = decode_entry(&catalog, &request, None, &[]).expect("found by its id field");
+        let entry = serde_json::to_value(entry).unwrap();
+        assert_eq!((entry["frameId"].clone(), entry["maskedFrameId"].clone()), (0x0804.into(), 0x04.into()));
+        assert_eq!(entry["signals"][0]["value"], f64::from(0x4DE2));
+
+        let no_id_field = wiretap_catalog::Catalog::parse(
+            "[meta]\nname = \"by unit and function\"\n[meta.serial]\nencoding = \"modbus_rtu\"\n[frame.serial.\"0x0804\"]\nlength = 8\n[[frame.serial.\"0x0804\".signals]]\nname = \"Register\"\nstart_bit = 16\nbit_length = 16\nbyte_order = \"big\"\n",
+        )
+        .expect("catalogue parses");
+        assert!(decode_entry(&no_id_field, &request, None, &[]).is_some(), "keyed by unit and function");
     }
 
     /// Serial bytes that are not a whole RTU message yield nothing rather than
