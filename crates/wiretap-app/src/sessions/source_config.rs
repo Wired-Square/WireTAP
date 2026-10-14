@@ -731,7 +731,8 @@ mod bus_mapping_tests {
         let slcan = |connection| profile("slcan", connection);
         let error = refuse_at_start(&slcan(json!({ "port": "/dev/x", "bitrate": 33_333 })))
             .expect_err("SLCAN has no command for 33 333 bit/s");
-        assert!(error.contains("33333") && error.contains("10000"), "{error}");
+        let refusal = wiretap_io::can::slcan::check_rates(33_333, None).unwrap_err();
+        assert_eq!(error, format!("{}: {refusal}", slcan(json!({})).name));
         assert!(refuse_at_start(&slcan(json!({ "port": "/dev/x", "bitrate": 500_000 }))).is_ok());
         let fd = json!({ "port": "/dev/x", "bitrate": 500_000, "enable_fd": true, "data_bitrate": 3_000_000 });
         assert!(refuse_at_start(&slcan(fd)).is_err(), "nor a data rate it cannot name");

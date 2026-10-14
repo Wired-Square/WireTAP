@@ -14,10 +14,9 @@ use serde::{Deserialize, Serialize};
 
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
-use wiretap_io::can::slcan::{open as open_slcan, probe, SlcanOptions};
+use wiretap_io::can::slcan::{check_rates, open as open_slcan, probe, SlcanOptions};
 use wiretap_io::can::{CanError, CanEvent, DeviceInfo};
 use wiretap_io::serial::LineSettings;
-use wiretap_protocol::slcan::{bitrate_command, data_bitrate_command, DATA_BITRATES, NOMINAL_BITRATES};
 
 use crate::io::bus_mapping::BusMapping;
 use crate::io::can_task::{
@@ -178,18 +177,8 @@ pub fn slcan_rates(profile: &IOProfile) -> Result<(u32, Option<u32>), String> {
     let data_bitrate = profile.req_bool("enable_fd")?
         .then(|| profile.req_i64("data_bitrate").map(|bps| bps as u32))
         .transpose()?;
-    nameable(bitrate, bitrate_command, &NOMINAL_BITRATES)?;
-    if let Some(bps) = data_bitrate {
-        nameable(bps, data_bitrate_command, &DATA_BITRATES)?;
-    }
+    check_rates(bitrate, data_bitrate).map_err(|e| e.to_string())?;
     Ok((bitrate, data_bitrate))
-}
-
-fn nameable(bps: u32, lookup: fn(u32) -> Option<&'static str>, table: &[(u32, &str)]) -> Result<(), String> {
-    lookup(bps).map(drop).ok_or_else(|| {
-        let rates: Vec<String> = table.iter().map(|(rate, _)| rate.to_string()).collect();
-        format!("{bps} bit/s is not an SLCAN rate; it takes {}", rates.join(", "))
-    })
 }
 
 /// Run slcan source and send frames to merge task
