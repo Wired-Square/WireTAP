@@ -976,6 +976,7 @@ pub async fn destroy_session_by(session_id: &str, reset: bool, by: Option<&str>)
         // already been removed (see `detach_all_from_session`).
         Err(_) => {
             detach_all_from_session(session_id);
+            crate::ws::dispatch::detach_catalog(session_id);
             forget_session(session_id);
         }
     }
@@ -997,6 +998,7 @@ async fn tear_down(session_id: &str, mut session: SessionGuard, how: Teardown<'_
     let destroying = matches!(how, Teardown::Destroy { .. });
     if destroying {
         detach_all_from_session(session_id);
+        crate::ws::dispatch::detach_catalog(session_id);
     }
     let _ = session.source.stop().await;
     session_states().remove(session_id);
@@ -1796,9 +1798,12 @@ mod tests {
         store_playback_position(id, position);
         with_state(id, |s| s.suspended_at = Some(Instant::now()));
         CLOSING_SESSIONS.write().unwrap().insert(id.into());
+        let catalog = wiretap_catalog::Catalog::parse("[meta]\nname = \"gone\"\n").unwrap();
+        crate::ws::dispatch::attach_catalog(id, Some("gone.toml".into()), catalog);
 
         destroy_session(id, false).await.unwrap();
 
+        assert_eq!(crate::ws::dispatch::attached_catalog_path(id), None);
         assert!(!session_states().contains_key(id));
         assert_eq!(current_session_of_app(&format!("{id}-app")), None);
         assert!(sessions::get_session_profile_ids(id).is_empty());

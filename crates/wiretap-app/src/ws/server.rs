@@ -464,7 +464,11 @@ async fn connection_manager_task(
                         if let Some(conn) = conns.by_id.get_mut(&conn_id) {
                             conn.subscribed_channels.remove(&channel);
                             conn.last_activity = Instant::now();
-                            decrement_refcount(&mut conns.channel_refcount, &mut conns.channel_map, channel);
+                            // Only a deliberate leave drops the decoder: a dropped connection
+                            // reconnects to a session that still has one.
+                            if let Some(sid) = decrement_refcount(&mut conns.channel_refcount, &mut conns.channel_map, channel) {
+                                crate::ws::dispatch::detach_catalog(&sid);
+                            }
                             tlog!("[ws] Connection {conn_id} unsubscribed from channel {channel}");
                         }
                     }
@@ -549,28 +553,28 @@ async fn connection_manager_task(
     tlog!("[ws] Connection manager task exiting");
 }
 
+/// The session whose channel this released, once no connection subscribes to it.
 fn decrement_refcount(
     refcount: &mut HashMap<u8, usize>,
     channel_map: &mut ChannelMap,
     channel: u8,
-) {
-    if let Some(count) = refcount.get_mut(&channel) {
-        *count = count.saturating_sub(1);
-        if *count == 0 {
-            refcount.remove(&channel);
-            // Grab the session_id before releasing so we can clear its frame offset.
-            let session_id = channel_map.channel_to_session.get(&channel).cloned();
-            channel_map.release(channel);
-            if let Some(sid) = session_id {
-                // Remove from shared channel map
-                if let Ok(mut map) = CHANNEL_MAP.write() {
-                    map.remove(&sid);
-                }
-                crate::ws::dispatch::clear_frame_offset(&sid);
-                crate::ws::dispatch::detach_catalog(&sid);
-            }
-        }
+) -> Option<String> {
+    let count = refcount.get_mut(&channel)?;
+    *count = count.saturating_sub(1);
+    if *count > 0 {
+        return None;
     }
+    refcount.remove(&channel);
+    // Grab the session_id before releasing so we can clear its frame offset.
+    let sid = channel_map.channel_to_session.get(&channel).cloned();
+    channel_map.release(channel);
+    let sid = sid?;
+    // Remove from shared channel map
+    if let Ok(mut map) = CHANNEL_MAP.write() {
+        map.remove(&sid);
+    }
+    crate::ws::dispatch::clear_frame_offset(&sid);
+    Some(sid)
 }
 
 /// Writes a connection's queue to its socket, so a slow one holds up no other. Ends when the
@@ -943,6 +947,31 @@ mod tests {
         assert!((0..3).all(|_| conn.enqueue(msg())));
         assert!(!conn.enqueue(msg()));
         assert_eq!(conn.queued(), 3);
+    }
+
+    #[test]
+    fn a_sessions_catalogue_outlives_the_connection_that_last_subscribed_to_it() {
+        let session = "ws-catalogue-outlives-connection";
+        let conn_id = usize::MAX;
+        let mut conns = Connections { by_id: HashMap::new(), channel_map: ChannelMap::new(), channel_refcount: HashMap::new() };
+        let channel = conns.channel_map.allocate(session).unwrap();
+        conns.channel_refcount.insert(channel, 1);
+        let (queue, _outbound) = mpsc::channel(1);
+        conns.by_id.insert(conn_id, Connection {
+            queue,
+            closer: CancellationToken::new(),
+            authenticated: false,
+            subscribed_channels: HashSet::from([channel]),
+            last_activity: Instant::now(),
+        });
+        let catalog = wiretap_catalog::Catalog::parse("[meta]\nname = \"kept\"\n").unwrap();
+        crate::ws::dispatch::attach_catalog(session, Some("kept.toml".into()), catalog);
+
+        conns.close(conn_id, "outbound queue full");
+
+        let kept = crate::ws::dispatch::attached_catalog_path(session);
+        crate::ws::dispatch::detach_catalog(session);
+        assert_eq!(kept.as_deref(), Some("kept.toml"));
     }
 
     fn within<T>(limit: Duration, work: impl std::future::Future<Output = T>) -> T {
