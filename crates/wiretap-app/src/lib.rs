@@ -3,8 +3,6 @@ pub(crate) mod logging;
 mod adhoc;
 mod blocking;
 mod boot;
-#[cfg(test)]
-mod analysis_ts;
 mod payload_source;
 mod byte_roles;
 mod app_registry;

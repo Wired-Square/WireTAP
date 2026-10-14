@@ -27,7 +27,6 @@ use crate::report::{held, ReportFormat};
 #[cfg_attr(test, derive(ts_rs::TS))]
 pub struct ProtocolMirrors {
     pub protocol: String,
-    #[cfg_attr(test, ts(as = "Vec<crate::analysis_ts::MirrorGroup>"))]
     pub groups: Vec<MirrorGroup>,
 }
 

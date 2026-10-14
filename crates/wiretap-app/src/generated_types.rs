@@ -184,11 +184,11 @@ fn render() -> BTreeMap<PathBuf, String> {
     r.visit::<crate::flashers::EspFlashOptions>();
     r.visit::<crate::flashers::FlasherProgress>();
     r.visit::<crate::flashers::Stm32FlashOptions>();
-    r.visit::<crate::analysis_ts::ProtocolOrder>();
+    r.visit::<wiretap_analysis::source::ProtocolOrder>();
     r.visit::<wiretap_analysis::source::OrderStart>();
     r.visit::<crate::byte_roles::ProtocolMirrors>();
-    r.visit::<crate::analysis_ts::ByteNotes>();
-    r.visit::<crate::analysis_ts::CandidateSignal>();
+    r.visit::<wiretap_analysis::ByteNotes>();
+    r.visit::<wiretap_analysis::draft::CandidateSignal>();
     r.visit::<crate::drafting::DraftPreview>();
     r.visit::<crate::drafting::DraftWrite>();
     r.visit::<crate::drafting::ExportedCatalog>();
@@ -597,8 +597,7 @@ fn inputs_accept_the_declared_minimum() {
 
 #[test]
 fn analysis_results_serialise_as_declared() {
-    use crate::analysis_ts as ts;
-    use wiretap_analysis::order::BurstFlag;
+    use wiretap_analysis::order::{BurstFlag, BurstTiming, CyclePattern, IntervalGroup, MultiBusFrame, MuxTiming, StartCandidate};
     use wiretap_analysis::*;
 
     let frame = |bus, id, ms: u64, payload: &[u8]| TimedFrame {
@@ -623,25 +622,25 @@ fn analysis_results_serialise_as_declared() {
     }
     frames.sort_by_key(|f| f.timestamp_us);
     let order = serde_json::to_value(analyse_order(&frames, None)).unwrap();
-    assert_declared::<ts::OrderAnalysis>(&order);
+    assert_declared::<OrderAnalysis>(&order);
     let bus = &order["buses"][0];
-    assert_declared::<ts::BusOrder>(bus);
+    assert_declared::<BusOrder>(bus);
     for (key, check) in [
-        ("patterns", assert_declared::<ts::CyclePattern> as fn(&serde_json::Value)),
-        ("intervalGroups", assert_declared::<ts::IntervalGroup>),
-        ("startCandidates", assert_declared::<ts::StartCandidate>),
-        ("mux", assert_declared::<ts::MuxTiming>),
-        ("bursts", assert_declared::<ts::BurstTiming>),
+        ("patterns", assert_declared::<CyclePattern> as fn(&serde_json::Value)),
+        ("intervalGroups", assert_declared::<IntervalGroup>),
+        ("startCandidates", assert_declared::<StartCandidate>),
+        ("mux", assert_declared::<MuxTiming>),
+        ("bursts", assert_declared::<BurstTiming>),
     ] {
         assert!(each(bus, key).next().is_some(), "no {key} to check");
         each(bus, key).for_each(check);
     }
-    each(bus, "patterns").for_each(|p| assert_declared::<ts::FrameKey>(&p["start"]));
-    each(bus, "mux").for_each(|m| assert_declared::<ts::MuxSelector>(&m["selector"]));
+    each(bus, "patterns").for_each(|p| assert_declared::<FrameKey>(&p["start"]));
+    each(bus, "mux").for_each(|m| assert_declared::<MuxSelector>(&m["selector"]));
     assert!(each(&order, "multiBus").next().is_some());
-    each(&order, "multiBus").for_each(assert_declared::<ts::MultiBusFrame>);
+    each(&order, "multiBus").for_each(assert_declared::<MultiBusFrame>);
     for flag in [BurstFlag::VariableLength, BurstFlag::BurstPattern, BurstFlag::RequestResponse] {
-        assert_declared::<ts::BurstFlag>(&serde_json::to_value(flag).unwrap());
+        assert_declared::<BurstFlag>(&serde_json::to_value(flag).unwrap());
     }
 
     let stream = |offset: u64| -> Vec<TimedPayload> {
@@ -650,7 +649,7 @@ fn analysis_results_serialise_as_declared() {
     let streams = BTreeMap::from([(FrameKey::new(1, false), stream(0)), (FrameKey::new(2, true), stream(1000))]);
     let groups = mirror_groups(&streams, DEFAULT_MIRROR_WINDOW_US);
     assert_eq!(groups.len(), 1);
-    assert_declared::<ts::MirrorGroup>(&serde_json::to_value(&groups[0]).unwrap());
+    assert_declared::<MirrorGroup>(&serde_json::to_value(&groups[0]).unwrap());
 
     let pattern = MultiBytePattern {
         start: 1,
@@ -687,15 +686,15 @@ fn analysis_results_serialise_as_declared() {
         cases: vec![MuxCaseNotes { value: 1, notes: vec![] }],
     };
     let json = serde_json::to_value(&notes).unwrap();
-    assert_declared::<ts::ByteNotes>(&json);
-    each(&json, "cases").for_each(assert_declared::<ts::MuxCaseNotes>);
+    assert_declared::<ByteNotes>(&json);
+    each(&json, "cases").for_each(assert_declared::<MuxCaseNotes>);
     for note in each(&json, "frame") {
         let mut note = note.clone();
         if note["code"] == "pattern" {
             note.as_object_mut().unwrap().remove("code");
-            assert_declared::<ts::MultiBytePattern>(&note);
+            assert_declared::<MultiBytePattern>(&note);
         } else {
-            assert_declared::<ts::ByteNote>(&note);
+            assert_declared::<ByteNote>(&note);
         }
     }
 }
@@ -703,7 +702,6 @@ fn analysis_results_serialise_as_declared() {
 #[tokio::test]
 async fn drafts_serialise_as_declared() {
     use wiretap_analysis::source::MemorySource;
-    use crate::analysis_ts as ts;
 
     let mut source = MemorySource::default();
     for i in 0..30u8 {
@@ -714,36 +712,37 @@ async fn drafts_serialise_as_declared() {
         source.push_at("can", 0, 0x200, false, t + 3_000, vec![0x80, 0x22, 0x33]);
     }
     let changes = crate::byte_roles::payload_changes(&source, vec![], None, usize::MAX).await.unwrap();
-    let mut draft = wiretap_analysis::draft::Draft::default();
+    let mut draft = Draft::default();
     crate::drafting::apply_changes(&mut draft, &changes);
+    use wiretap_analysis::draft::*;
     let orders = wiretap_analysis::source::message_order(&source, &wiretap_analysis::source::FrameSelection::default(), None, None)
         .await
         .unwrap();
     draft.apply_orders(orders.iter().map(|o| (wiretap_catalog::model::Protocol::Can, &o.order)));
-    draft.serial_reserved.push(wiretap_analysis::draft::ByteSpan { start: -1, len: 1 });
+    draft.serial_reserved.push(ByteSpan { start: -1, len: 1 });
     let preview = crate::drafting::draft_preview_cmd(Some(draft), Vec::new());
 
     let json = serde_json::to_value(&preview).unwrap();
-    assert_declared::<ts::Draft>(&json["draft"]);
-    each(&json["draft"], "serialReserved").for_each(assert_declared::<ts::ByteSpan>);
+    assert_declared::<Draft>(&json["draft"]);
+    each(&json["draft"], "serialReserved").for_each(assert_declared::<ByteSpan>);
     let frames: Vec<_> = each(&json["draft"], "frames").collect();
-    frames.iter().for_each(|f| assert_declared::<ts::FrameDraft>(f));
+    frames.iter().for_each(|f| assert_declared::<FrameDraft>(f));
     assert!(frames.iter().any(|f| f["mux"].is_object()), "no mux to check");
     assert!(frames.iter().any(|f| f["burst"].is_object()), "no burst to check");
     for f in &frames {
         if let Some(mux) = f["mux"].as_object() {
-            assert_declared::<ts::MuxDraft>(&serde_json::Value::Object(mux.clone()));
-            mux["cases"].as_object().unwrap().values().for_each(assert_declared::<ts::MuxCaseDraft>);
+            assert_declared::<MuxDraft>(&serde_json::Value::Object(mux.clone()));
+            mux["cases"].as_object().unwrap().values().for_each(assert_declared::<MuxCaseDraft>);
         }
         if f["burst"].is_object() {
-            assert_declared::<ts::BurstDraft>(&f["burst"]);
+            assert_declared::<BurstDraft>(&f["burst"]);
         }
     }
     for signal in json["signals"].as_array().unwrap().iter().flat_map(|s| s.as_array().unwrap()) {
-        assert_declared::<ts::DraftSignal>(signal);
+        assert_declared::<DraftSignal>(signal);
     }
     let candidates = crate::drafting::candidate_signals_cmd(0, 1, vec![8, 16], vec![wiretap_decode::Endianness::Big], None);
-    assert_declared::<ts::CandidateSignal>(&serde_json::to_value(&candidates[0]).unwrap());
+    assert_declared::<CandidateSignal>(&serde_json::to_value(&candidates[0]).unwrap());
 }
 
 /// The lib's byte notes for each `byteNotes.json` profile, the codes the
