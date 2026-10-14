@@ -397,6 +397,7 @@ pub fn run() {
             apiclient::api_probe_backend,
             apiclient::api_database_protocols,
             apiclient::api_import_capture,
+            apiclient::api_valid_database_name,
             gateway_admin::gateway_list_daemons,
             gateway_admin::gateway_assign_catalogue,
             gateway_admin::gateway_clear_assignment,

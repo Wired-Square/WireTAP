@@ -260,7 +260,7 @@
     "profile": "Backend profile",
     "database": "Target database",
     "newDatabase": "Create a new database",
-    "invalidName": "Use lowercase letters, digits and underscores; must start with a letter.",
+    "invalidName": "Use at most {{max}} lowercase letters, digits and underscores, starting with a letter.",
     "upload": "Upload",
     "starting": "Starting upload…",
     "progress": "Uploaded {{sent}} of {{total}} frames",

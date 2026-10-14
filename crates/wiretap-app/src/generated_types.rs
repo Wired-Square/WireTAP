@@ -244,6 +244,7 @@ fn wire_constants() -> String {
             crate::io::modbus_tcp::scan_source::MODBUS_SCAN_SOURCE_TYPE
         ),
         format!("export const NAME_KEYED_FRAME_ID = {};\n", wiretap_catalog::NAME_KEYED_FRAME_ID),
+        format!("export const MAX_DATABASE_NAME_LEN = {};\n", wiretap_protocol::ingest::MAX_DATABASE_NAME_LEN),
     ]
     .join("\n")
 }

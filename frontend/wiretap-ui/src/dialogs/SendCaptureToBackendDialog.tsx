@@ -15,10 +15,12 @@ import { useAllIOProfiles } from "../hooks/useAllIOProfiles";
 import {
   apiImportCapture,
   apiListDatabases,
+  apiValidDatabaseName,
   type ApiDatabase,
   type CaptureUploadProgress,
 } from "../api/backendApi";
 import { labelDefault, helpText, textPrimary } from "../styles";
+import { MAX_DATABASE_NAME_LEN } from "../generated/wireConstants";
 import { SecondaryButton, PrimaryButton, Checkbox } from "../components/forms";
 
 interface Props {
@@ -52,6 +54,7 @@ export default function SendCaptureToBackendDialog({
   const [progress, setProgress] = useState<CaptureUploadProgress | null>(null);
   const [error, setError] = useState("");
   const [imported, setImported] = useState(0);
+  const [checkedName, setCheckedName] = useState({ name: "", valid: false });
 
   // Default to the first wiretap profile when opened
   useEffect(() => {
@@ -75,6 +78,15 @@ export default function SendCaptureToBackendDialog({
       live = false;
     };
   }, [profileId]);
+
+  useEffect(() => {
+    if (!newDatabase || !database) return;
+    let live = true;
+    apiValidDatabaseName(database).then((valid) => live && setCheckedName({ name: database, valid }));
+    return () => {
+      live = false;
+    };
+  }, [newDatabase, database]);
 
   // Subscribe to upload progress while uploading
   useEffect(() => {
@@ -118,7 +130,8 @@ export default function SendCaptureToBackendDialog({
       ? Math.min(100, Math.round((progress.sent / progress.total) * 100))
       : 0;
 
-  const dbNameValid = /^[a-z][a-z0-9_]*$/.test(database);
+  const dbNameChecked = checkedName.name === database;
+  const dbNameValid = dbNameChecked && checkedName.valid;
 
   return (
     <Dialog
@@ -176,9 +189,9 @@ export default function SendCaptureToBackendDialog({
                 />
                 <span className={helpText}>{t("sendToBackend.newDatabase")}</span>
               </label>
-              {newDatabase && database && !dbNameValid && (
+              {newDatabase && database && dbNameChecked && !dbNameValid && (
                 <p className="text-danger text-xs">
-                  {t("sendToBackend.invalidName")}
+                  {t("sendToBackend.invalidName", { max: MAX_DATABASE_NAME_LEN })}
                 </p>
               )}
             </div>

@@ -86,6 +86,10 @@ export async function apiImportCapture(
   return invoke<number>("api_import_capture", { profileId, captureId, database, create });
 }
 
+export async function apiValidDatabaseName(name: string): Promise<boolean> {
+  return invoke<boolean>("api_valid_database_name", { name });
+}
+
 /** Each daemon's devices, with what is assigned against what each is running. */
 export async function gatewayListDaemons(profileId: string): Promise<GatewayDaemon[]> {
   return invoke<GatewayDaemon[]>("gateway_list_daemons", { profileId });

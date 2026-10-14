@@ -96,3 +96,5 @@ export const SESSION_LOG_CAPACITY = 500;
 export const MODBUS_SCAN_SOURCE_TYPE = "modbus_scan";
 
 export const NAME_KEYED_FRAME_ID = 4294967295;
+
+export const MAX_DATABASE_NAME_LEN = 63;
