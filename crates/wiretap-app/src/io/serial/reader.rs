@@ -132,10 +132,12 @@ impl Framer {
         }
     }
 
-    /// Only SLIP and delimited framing know it: `RtuTap` exposes no pending
-    /// message, and an unframed line has no boundaries.
     fn mid_message(&self) -> bool {
-        matches!(self, Self::Serial { mid_message: true, .. })
+        match self {
+            Self::Unframed => false,
+            Self::Serial { mid_message, .. } => *mid_message,
+            Self::Rtu(tap, _) => tap.mid_message(),
+        }
     }
 
     /// End of stream. Modbus RTU can still recover whole messages from what it
@@ -887,6 +889,17 @@ lengths = [{ len = { count_at = 6, overhead = 9 } }]
         let delayed = line.read(&[4, 0xC0], at(1_002_083 + 12_000));
 
         assert_eq!(byte_stamps(&delayed), [1_001_042, 1_002_083]);
+        assert_eq!(frames(delayed)[0].timestamp_us, 1_002_083);
+    }
+
+    #[test]
+    fn an_rtu_read_delayed_mid_message_continues_the_last_one_at_wire_rate() {
+        let request = rtu(&[0x01, 0x03, 0x00, 0x00, 0x00, 0x01]);
+        let mut line = live(FramingEncoding::ModbusRtu(RtuSettings::default()), false);
+        line.read(&request[..6], at(1_000_000));
+
+        let delayed = line.read(&request[6..], at(1_002_083 + 12_000));
+
         assert_eq!(frames(delayed)[0].timestamp_us, 1_002_083);
     }
 

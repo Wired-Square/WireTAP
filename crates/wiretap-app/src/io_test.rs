@@ -94,22 +94,15 @@ impl std::fmt::Display for TestMode {
 }
 
 impl TestMode {
-    /// The mode byte a `Start` carries.
-    ///
-    /// A responder does not act on it — it echoes whatever it is asked — so
-    /// this only tells a peer's log what it is taking part in. The table
-    /// belongs in the crate beside the rest of the contract; it is here until
-    /// the crate names one, which is why the two modes that never reach a peer
-    /// have no code rather than a made-up one.
+    /// The mode byte a `Start` carries; a responder only logs it. Loopback
+    /// never sends a `Start` and Auto starts each phase in its own mode.
     fn code(self) -> u8 {
         match self {
-            TestMode::Echo => 0x01,
-            TestMode::Sweep => 0x02,
-            TestMode::Throughput => 0x03,
-            TestMode::Latency => 0x04,
-            TestMode::Reliability => 0x05,
-            // Loopback never sends a `Start`, and Auto dispatches per-phase
-            // configs, so neither is ever named on the wire.
+            TestMode::Echo => tp::mode::ECHO,
+            TestMode::Sweep => tp::mode::SWEEP,
+            TestMode::Throughput => tp::mode::THROUGHPUT,
+            TestMode::Latency => tp::mode::LATENCY,
+            TestMode::Reliability => tp::mode::RELIABILITY,
             TestMode::Loopback | TestMode::Auto => 0x00,
         }
     }
@@ -1539,6 +1532,19 @@ pub(crate) mod tests {
         assert_eq!(state.status, TestStatus::Failed);
         assert!(state.errors.iter().any(|e| e.contains("send queue full")), "{:?}", state.errors);
         assert!(started.elapsed() < Duration::from_secs(3), "gave up before the send phase ended");
+    }
+
+    #[test]
+    fn a_start_names_each_mode_by_the_crates_byte() {
+        for (test_mode, byte) in [
+            (TestMode::Echo, tp::mode::ECHO),
+            (TestMode::Sweep, tp::mode::SWEEP),
+            (TestMode::Throughput, tp::mode::THROUGHPUT),
+            (TestMode::Latency, tp::mode::LATENCY),
+            (TestMode::Reliability, tp::mode::RELIABILITY),
+        ] {
+            assert_eq!(test_mode.code(), byte, "{test_mode}");
+        }
     }
 
     /// `testPatternGauge.json`'s `expected_tx` and `testPatternSuite.json`'s `rust` column.

@@ -5,8 +5,9 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 
 const invoke = vi.hoisted(() =>
-  vi.fn(async (command: string) => {
+  vi.fn(async (command: string, args?: { name?: string }) => {
     if (command === "api_list_databases") return [];
+    if (command === "api_valid_database_name") return args!.name!.length <= 63;
     if (command === "api_import_capture") throw "Only CAN frames can be sent to a backend; this capture holds modbus";
     return undefined;
   }),
@@ -43,6 +44,22 @@ describe("Send capture to backend", () => {
     const commands = invoke.mock.calls.map(([command]) => command);
     expect(commands).toContain("api_import_capture");
     expect(commands).not.toContain("api_create_database");
+    act(() => root.unmount());
+  });
+
+  it("refuses a new database name the backend would, before sending", async () => {
+    const host = document.body.appendChild(document.createElement("div"));
+    const root = createRoot(host);
+    await act(async () => {
+      root.render(<SendCaptureToBackendDialog isOpen onClose={() => {}} captureId="c1" captureName="long" />);
+    });
+
+    await act(async () => document.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click());
+    await act(async () => type(document.querySelector<HTMLInputElement>('input[placeholder="vehicle_2"]')!, "x".repeat(64)));
+    const upload = [...document.querySelectorAll("button")].find((b) => b.textContent === "sendToBackend.upload")!;
+
+    expect(upload.disabled).toBe(true);
+    expect(host.textContent).toContain("sendToBackend.invalidName");
     act(() => root.unmount());
   });
 });

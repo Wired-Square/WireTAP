@@ -29,7 +29,7 @@ export function mergeSerialConfig(
     sourceAddressBytes: serialConfig?.source_address_bytes,
     sourceAddressEndianness: serialConfig?.source_address_byte_order,
     minFrameLength: serialConfig?.min_frame_length,
-    framingEncoding: serialConfig?.encoding as ManagerLoadOptions["framingEncoding"],
+    framingEncoding: serialConfig?.encoding,
   };
 }
 

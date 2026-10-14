@@ -183,7 +183,7 @@ interface FramedDataViewProps {
   onApplySourceMapping: (config: ExtractionConfig) => void;
   onClearSourceMapping?: () => void;
   accepted: boolean;
-  framingMode?: string;
+  framingMode?: SerialFrameConfig['encoding'];
   displayTimeFormat?: TimeDisplayFormat;
   useLocalTimezone?: boolean;
   isStreaming?: boolean;

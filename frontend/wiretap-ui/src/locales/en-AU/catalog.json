@@ -423,10 +423,20 @@
     "encodingApplies": "This encoding applies to all serial frames in the catalog.",
     "noteTitle": "Note:",
     "noteText": "Individual serial frames inherit this encoding. To change the encoding, click the edit button above.",
-    "encodingSlip": "SLIP (RFC 1055)",
-    "encodingCobs": "COBS",
-    "encodingRaw": "Raw (unframed)",
-    "encodingLengthPrefixed": "Length Prefixed"
+    "encodings": {
+      "slip": "SLIP (RFC 1055)",
+      "raw": "Raw (unframed)",
+      "delimiter": "Delimiter",
+      "modbus_rtu": "Modbus RTU"
+    },
+    "encodingHints": {
+      "slip": "Frames end at the SLIP END byte (0xC0)",
+      "raw": "No framing - the byte stream is not split into frames",
+      "delimiter": "Frames end at the delimiter set on the I/O profile",
+      "modbus_rtu": "Each frame is a whole Modbus RTU message, ending in its CRC"
+    },
+    "encodingUnknown": "Choose a framing",
+    "encodingUnknownHint": "This catalogue names no framing WireTAP can read. Choose one before saving."
   },
   "modbusConfig": {
     "title": "Modbus Configuration",
@@ -617,11 +627,6 @@
     "registerBase1": "1-based (Modbus standard)",
     "registerBase0": "0-based",
     "encoding": "Encoding",
-    "encodingSlip": "SLIP (RFC 1055)",
-    "encodingCobs": "COBS (Consistent Overhead Byte Stuffing)",
-    "encodingRaw": "Raw (unframed)",
-    "encodingLengthPrefixed": "Length Prefixed",
-    "encodingHint": "Framing method used to delimit messages on the serial bus",
     "cancel": "Cancel",
     "createButton": "Create Catalog"
   },

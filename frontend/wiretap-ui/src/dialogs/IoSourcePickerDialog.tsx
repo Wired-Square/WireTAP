@@ -581,9 +581,7 @@ export default function IoSourcePickerDialog({
     parseCatalogAtPath(selectedCatalogPath)
       .then((catalog) => {
         if (cancelled) return;
-        // Passed through whole: a catalogue framing no framer implements (COBS,
-        // length-prefixed) is refused by the backend rather than dropped here.
-        setCatalogSerialEncoding((catalog.serial?.encoding as FramingMode | undefined) ?? null);
+        setCatalogSerialEncoding(catalog.serial?.encoding ?? null);
       })
       .catch(() => { if (!cancelled) setCatalogSerialEncoding(null); });
     return () => { cancelled = true; };

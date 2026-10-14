@@ -354,6 +354,11 @@ fn import_body(frames: &[crate::io::FrameMessage]) -> Vec<u8> {
     body
 }
 
+#[tauri::command]
+pub fn api_valid_database_name(name: String) -> bool {
+    wiretap_protocol::ingest::valid_database_name(&name)
+}
+
 /// Upload a local SQLite capture's frames to a backend capture database.
 /// Pages through the capture and POSTs chunks so memory stays bounded;
 /// emits `capture-upload-progress` events for the UI.

@@ -1346,7 +1346,7 @@
         {
           "canFrameIdMask": "",
           "canHeaderFields": [],
-          "serialEncoding": "slip",
+          "serialEncoding": null,
           "serialHeaderFields": [],
           "serialChecksum": {
             "algorithm": "xor",

@@ -5,8 +5,9 @@ import { tlog } from '../api/settings';
 import { emit } from '@tauri-apps/api/event';
 import { WINDOW_EVENTS } from '../events/registry';
 import type { CatalogSavedPayload } from '../events/registry';
-import type { EditMode, MetaFields, TomlNode, ValidationError, SerialEncoding, HeaderFieldFormat, SerialChecksumConfig, ProtocolType, SlaveOption } from '../apps/catalog/types';
+import type { EditMode, MetaFields, TomlNode, ValidationError, HeaderFieldFormat, SerialChecksumConfig, ProtocolType, SlaveOption } from '../apps/catalog/types';
 import type { Catalog, Endianness } from '../types/catalogModel';
+import type { FramingMode } from '../generated/FramingMode';
 import type { CatalogViewMode } from '../apps/catalog/tree/frameGroups';
 import { openCatalog } from '../api/catalog';
 import type { CatalogDiff } from '../api/catalog';
@@ -149,7 +150,8 @@ export interface CatalogEditorState {
     canDefaultFd: boolean | undefined;        // For CAN config - default to CAN FD frames
     canFrameIdMask: string;           // For CAN config - hex string like "0x1FFFFF00"
     canHeaderFields: CanHeaderFieldEntry[];  // For CAN config - header fields extracted from CAN ID
-    serialEncoding: SerialEncoding;  // For new catalog dialog - stored in [frame.serial.config]
+    /** Null where the file names no framing WireTAP can read. */
+    serialEncoding: FramingMode | null;
     serialByteOrder: Endianness | undefined;
     serialHeaderFields: SerialHeaderFieldEntry[];  // For Serial config - header field masks over header bytes
     serialHeaderLength: number | undefined;  // For Serial config - global header length in bytes
@@ -284,7 +286,7 @@ export interface CatalogEditorState {
   setCanDefaultFd: (fd: boolean | undefined) => void;
   setCanFrameIdMask: (mask: string) => void;
   setCanHeaderFields: (fields: CanHeaderFieldEntry[]) => void;
-  setSerialEncoding: (encoding: SerialEncoding) => void;
+  setSerialEncoding: (encoding: FramingMode) => void;
   setSerialByteOrder: (byteOrder: Endianness | undefined) => void;
   setSerialHeaderFields: (fields: SerialHeaderFieldEntry[]) => void;
   setSerialHeaderLength: (length: number | undefined) => void;
@@ -317,7 +319,7 @@ function configForms(catalog: Catalog | null) {
       shift: f.shift ?? undefined,
       format: (f.format ?? 'hex') as HeaderFieldFormat,
     })),
-    serialEncoding: (serial?.encoding ?? 'slip') as SerialEncoding,
+    serialEncoding: serial ? serial.encoding ?? null : 'slip',
     serialByteOrder: serial?.byteOrder ?? undefined,
     serialHeaderFields: Object.entries(serial?.fields ?? {}).map(([name, f]): SerialHeaderFieldEntry => ({
       name,
