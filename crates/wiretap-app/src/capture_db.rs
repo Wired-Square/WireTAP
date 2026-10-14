@@ -78,6 +78,9 @@ impl FrameRecord for FrameMessage {
     fn incomplete(&self) -> Option<bool> {
         self.incomplete
     }
+    fn crc_valid(&self) -> Option<bool> {
+        self.crc_valid
+    }
     fn direction(&self) -> Option<Direction> {
         match self.direction.as_deref()? {
             "rx" => Some(Direction::Rx),
@@ -107,6 +110,7 @@ impl From<StoredFrame> for FrameMessage {
                 Direction::Rx => "rx".into(),
                 Direction::Tx => "tx".into(),
             }),
+            crc_valid: f.crc_valid,
         }
     }
 }
@@ -595,6 +599,11 @@ mod tests {
                 source_address: Some(0x2A),
                 incomplete: Some(true),
                 ..can(0x102, 1, vec![3], Some("rx"))
+            },
+            FrameMessage {
+                protocol: wiretap_protocol::ingest::MODBUS_RTU_PROTOCOL.into(),
+                crc_valid: Some(false),
+                ..can(0x0103, 4, vec![1, 3, 0xAA, 0xBB], None)
             },
         ];
         insert_frames("c1", &frames).unwrap();

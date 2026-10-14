@@ -131,6 +131,10 @@ pub struct FrameMessage {
     #[serde(skip_serializing_if = "Option::is_none", default)]
     #[cfg_attr(test, ts(type = r#""rx" | "tx""#))]
     pub direction: Option<String>,
+    /// Whether a Modbus RTU message's CRC matched; absent where nothing checked one.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    #[cfg_attr(test, ts(optional))]
+    pub crc_valid: Option<bool>,
 }
 
 /// Playback position - stored and signalled via playback-position events during capture streaming
