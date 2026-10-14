@@ -48,17 +48,17 @@ impl DeviceProbeResult {
     }
 }
 
-/// Cache of successful probe results by profile_id.
-/// When a device is probed successfully, the result is cached so subsequent probes
-/// (e.g., when the device is already running) return instantly without reconnecting.
+/// The last successful probe of each profile, answered while a session holds the
+/// device, which often cannot be opened a second time.
 static PROBE_CACHE: Lazy<Mutex<HashMap<String, DeviceProbeResult>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
 
-/// Cache a successful probe result for a profile
 fn cache_probe_result(profile_id: &str, result: &DeviceProbeResult) {
-    if result.success {
-        if let Ok(mut cache) = PROBE_CACHE.lock() {
+    if let Ok(mut cache) = PROBE_CACHE.lock() {
+        if result.success {
             cache.insert(profile_id.to_string(), result.clone());
+        } else {
+            cache.remove(profile_id);
         }
     }
 }
@@ -68,7 +68,7 @@ pub(crate) fn get_cached_probe(profile_id: &str) -> Option<DeviceProbeResult> {
     PROBE_CACHE.lock().ok()?.get(profile_id).cloned()
 }
 
-/// Clear the cached probe result for a profile (called when device errors or disconnects)
+/// Forget a profile's probe, once its device has been edited, replaced or removed.
 pub fn clear_probe_cache(profile_id: &str) {
     if let Ok(mut cache) = PROBE_CACHE.lock() {
         cache.remove(profile_id);
@@ -89,7 +89,8 @@ fn log_probe(profile_id: &str, result: &DeviceProbeResult, cached: bool) {
     );
 }
 
-/// Probe a capture or a saved profile. `settings` is awaited only on a cache miss.
+/// Probe a capture or a saved profile. A profile a session holds is answered from
+/// the cache if it has an entry, without awaiting `settings`.
 pub async fn probe_device(
     profile_id: &str,
     settings: impl Future<Output = Result<AppSettings, String>>,
@@ -117,8 +118,9 @@ pub async fn probe_device(
         }
     }
 
-    // Check cache first - if we have a successful probe result, return it immediately
-    if let Some(cached) = get_cached_probe(profile_id) {
+    if let Some(cached) = get_cached_probe(profile_id)
+        .filter(|_| !crate::sessions::get_sessions_for_profile(profile_id).is_empty())
+    {
         tlog!("[probe_device] Returning cached probe result for profile '{}'", profile_id);
         log_probe(profile_id, &cached, true);
         return Ok(cached);
@@ -127,7 +129,8 @@ pub async fn probe_device(
     probe_profile(settings.await?.profile(profile_id)?).await
 }
 
-/// Connect to a profile's device, query it and close again; a fresh success is cached.
+/// Connect to a profile's device, query it and close again; a success is cached and a
+/// failure clears the cache.
 ///
 /// Supported device types:
 /// - gvret_tcp, gvret_usb: Multi-bus GVRET devices
@@ -374,7 +377,6 @@ pub async fn probe_profile(profile: &IOProfile) -> Result<DeviceProbeResult, Str
     // Emit probe result event (fresh probe, not cached)
     if let Ok(ref probe_result) = result {
         log_probe(&profile.id, probe_result, false);
-        // Cache successful probe results for future use
         cache_probe_result(&profile.id, probe_result);
     }
 
@@ -473,7 +475,7 @@ mod tests {
     }
 
     #[test]
-    fn only_a_successful_probe_is_cached_until_cleared() {
+    fn only_the_latest_probe_is_cached_and_only_a_success() {
         cache_probe_result("p_failed", &probe(false));
         assert!(get_cached_probe("p_failed").is_none());
 
@@ -481,8 +483,9 @@ mod tests {
         assert_eq!(get_cached_probe("p_ok").map(|r| r.bus_count), Some(2));
 
         cache_probe_result("p_ok", &probe(false));
-        assert!(get_cached_probe("p_ok").is_some(), "a later failure leaves the success cached");
+        assert!(get_cached_probe("p_ok").is_none(), "a later failure clears the success");
 
+        cache_probe_result("p_ok", &probe(true));
         clear_probe_cache("p_ok");
         assert!(get_cached_probe("p_ok").is_none());
     }
@@ -592,15 +595,25 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_cached_success_is_answered_without_reading_the_settings() {
-        let virtual_device = profile("probe-cached", "virtual", json!({ "bus_count": 2 }));
+    async fn a_held_profile_is_answered_from_the_cache_without_reading_the_settings() {
+        let virtual_device = profile("probe-held", "virtual", json!({ "bus_count": 2 }));
+        let fresh = probe_device("probe-held", settings_with(virtual_device)).await.expect("probed");
 
-        let fresh = probe_device("probe-cached", settings_with(virtual_device)).await.expect("probed");
-        let cached = probe_device("probe-cached", never_read()).await;
-        clear_probe_cache("probe-cached");
+        crate::sessions::register_session_profile("f_probe_held", "probe-held");
+        let cached = probe_device("probe-held", never_read()).await;
+        crate::sessions::release_session_profiles("f_probe_held");
+        clear_probe_cache("probe-held");
         assert_eq!(cached.expect("cached").bus_count, fresh.bus_count);
+    }
 
-        assert_eq!(probe_device("probe-cached", unreadable()).await.unwrap_err(), "unreadable");
+    #[tokio::test]
+    async fn an_idle_profile_is_probed_again_and_a_failure_clears_its_entry() {
+        cache_probe_result("probe-idle", &probe(true));
+        let gone = tcp("probe-idle", "modbus_tcp", closed_port().await);
+
+        let result = probe_device("probe-idle", settings_with(gone)).await.expect("a result");
+        assert!(!result.success, "an idle profile's cached success was answered");
+        assert!(get_cached_probe("probe-idle").is_none());
     }
 
     #[tokio::test]

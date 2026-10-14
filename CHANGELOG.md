@@ -76,6 +76,7 @@ All notable changes to WireTAP will be documented in this file.
 - **Stopping a session no longer hides a failure that mentions "not found".** Only a session that is already gone is passed over; any other failure to stop now surfaces as an error.
 - **A frame id is padded by whether it is extended, never by its value.** The Decoder's Unmatched and Modbus tabs and the Catalog Editor now pad a standard id to 3 hex digits and an extended one to 8, so an extended id below 0x800, such as 0x123, reads `0x00000123` there as it does elsewhere. The Catalog Editor shows a Modbus register by its key rather than as padded hex.
 - **A window joining a device another window already has open shows its buses.** Connecting a single device that is already open in another window, from the picker or by opening the same source, now brings the session's bus-to-source map with it, so each bus is labelled with its source as it is in the first window.
+- **A device that has gone away no longer probes as present.** Once a device had answered a probe, the source picker kept showing it as online until the app restarted or its profile was edited, even after it was unplugged or switched off. A device no session is using is now asked again each time, and one that fails to answer reads as offline. A device a session is already using still shows its last answer, since it often cannot be opened twice.
 
 ## [0.14.0] - 2026-10-06
 
