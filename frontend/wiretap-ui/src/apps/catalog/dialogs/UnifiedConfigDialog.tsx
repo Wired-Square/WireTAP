@@ -168,7 +168,7 @@ export default function UnifiedConfigDialog({
 
   // Validation
   const isMetaValid = metaFields.name.trim() !== "" && metaFields.version >= 1;
-  const isValid = isMetaValid;
+  const isValid = isMetaValid && !(serialEnabled && serialEncoding === null);
 
   return (
     <Dialog

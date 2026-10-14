@@ -7,7 +7,9 @@ import { iconLg } from "../../../styles/spacing";
 import Dialog, { DialogBody, DialogFooter } from "../../../components/Dialog";
 import { Input, Select, FormField, SecondaryButton, SuccessButton } from "../../../components/forms";
 import { caption } from "../../../styles";
-import type { MetaFields, ValidationError, ProtocolType, SerialEncoding } from "../types";
+import type { MetaFields, ValidationError, ProtocolType } from "../types";
+import type { FramingMode } from "../../../generated/FramingMode";
+import SerialEncodingSelect from "./config-sections/SerialEncodingSelect";
 import { Button } from "../../../components/Button";
 import { Alert } from "../../../components/Alert";
 
@@ -30,8 +32,8 @@ export type NewCatalogDialogProps = {
   setModbusRegisterBase: (base: 0 | 1) => void;
 
   // Serial encoding - stored in [meta.serial]
-  serialEncoding: SerialEncoding;
-  setSerialEncoding: (encoding: SerialEncoding) => void;
+  serialEncoding: FramingMode | null;
+  setSerialEncoding: (encoding: FramingMode) => void;
 
   validationErrors: ValidationError[];
 
@@ -219,19 +221,7 @@ export default function NewCatalogDialog({
           {/* Serial-specific fields */}
           {selectedProtocol === "serial" && (
             <FormField label={t("newCatalog.encoding")} required variant="default">
-              <Select
-                size="lg"
-                value={serialEncoding}
-                onChange={(e) => setSerialEncoding(e.target.value as SerialEncoding)}
-              >
-                <option value="slip">{t("newCatalog.encodingSlip")}</option>
-                <option value="cobs">{t("newCatalog.encodingCobs")}</option>
-                <option value="raw">{t("newCatalog.encodingRaw")}</option>
-                <option value="length_prefixed">{t("newCatalog.encodingLengthPrefixed")}</option>
-              </Select>
-              <p className={`mt-1 ${caption}`}>
-                {t("newCatalog.encodingHint")}
-              </p>
+              <SerialEncodingSelect value={serialEncoding} onChange={setSerialEncoding} />
             </FormField>
           )}
         </div>

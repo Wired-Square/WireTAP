@@ -61,9 +61,6 @@ export interface ModbusConfig {
 /** Header field format for display */
 export type HeaderFieldFormat = "hex" | "decimal";
 
-/** Serial encoding types */
-export type SerialEncoding = "slip" | "cobs" | "raw" | "length_prefixed";
-
 /** Serial checksum config - protocol-level defaults stored in [meta.serial.checksum] */
 export interface SerialChecksumConfig {
   /** Checksum algorithm (e.g., "sum8", "crc8_sae_j1850", "xor") */

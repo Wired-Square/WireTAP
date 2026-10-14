@@ -1,6 +1,7 @@
 // ui/src/utils/frameExport.ts
 
 import type { SerialConfig } from '../types/catalogModel';
+import type { FramingMode } from '../generated/FramingMode';
 
 /**
  * Checksum configuration for serial frames
@@ -27,8 +28,7 @@ export type SerialChecksumConfig = {
 export type SerialFrameConfig = {
   /** Default byte order for signal decoding (can be overridden per signal) */
   default_byte_order?: "big" | "little";
-  /** Framing encoding type (e.g., "slip", "modbus_rtu", "raw") */
-  encoding?: string;
+  encoding?: FramingMode;
   /** Frame ID extraction: start byte position (0-indexed, can be negative for end-relative) */
   frame_id_start_byte?: number;
   /** Frame ID extraction: number of bytes (1 or 2) */

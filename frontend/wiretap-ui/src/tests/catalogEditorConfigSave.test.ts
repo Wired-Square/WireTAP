@@ -51,6 +51,11 @@ describe("saving the catalogue configuration", () => {
     expect(ops[0]).toEqual({ op: "SetMeta", meta: { name: "d", version: 3, default_frame: "serial" } });
   });
 
+  it("does not save a serial framing the file names but WireTAP cannot frame as SLIP", () => {
+    useCatalogEditorStore.getState().seedConfigForms({ meta: { name: "d", version: 1 }, frames: [], serial: { encoding: null } } as unknown as Catalog);
+    expect(useCatalogEditorStore.getState().forms.serialEncoding).toBeNull();
+  });
+
   it("keeps the file's minimum serial frame length and frame id mask", async () => {
     const ops = await savedOps({ serial: { encoding: "slip", minFrameLength: 4, frameIdMask: 0xff00 } });
     expect(opNamed(ops, "SetSerialConfig")).toMatchObject({ config: { encoding: "slip", min_frame_length: 4, frame_id_mask: 0xff00 } });

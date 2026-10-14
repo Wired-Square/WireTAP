@@ -5,9 +5,7 @@ import type { Frame } from "../types/catalogModel";
 
 describe("a catalogue's serial raw encoding is unframed", () => {
   it("a raw serial encoding is labelled unframed", () => {
-    for (const label of [catalog.newCatalog.encodingRaw, catalog.serialConfig.encodingRaw]) {
-      expect(label).toBe("Raw (unframed)");
-    }
+    expect(catalog.serialConfig.encodings.raw).toBe("Raw (unframed)");
   });
 
   it("a serial frame edit carries no delimiter", () => {

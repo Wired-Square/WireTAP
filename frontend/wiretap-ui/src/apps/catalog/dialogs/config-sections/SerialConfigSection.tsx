@@ -6,7 +6,8 @@ import { Cable, Plus, Trash2, ChevronDown, ChevronRight } from "lucide-react";
 import { iconMd, flexRowGap2 } from "../../../../styles/spacing";
 import { caption, textMedium } from "../../../../styles";
 import type { SerialHeaderFieldEntry } from "../../../../stores/catalogEditorStore";
-import type { SerialEncoding, HeaderFieldFormat, SerialChecksumConfig, ChecksumAlgorithm } from "../../types";
+import type { HeaderFieldFormat, SerialChecksumConfig, ChecksumAlgorithm } from "../../types";
+import type { FramingMode } from "../../../../generated/FramingMode";
 import MaskBitPicker from "../../../../components/MaskBitPicker";
 import { CHECKSUM_ALGORITHMS } from "../../../../utils/analysis/checksums";
 import { Button, IconButton } from "../../../../components/Button";
@@ -14,6 +15,7 @@ import { Select, Input, Checkbox } from "../../../../components/forms";
 import { Badge } from "../../../../components/Badge";
 import { Card } from "../../../../components/Card";
 import { ConfigSectionHeader } from "./ConfigSectionHeader";
+import SerialEncodingSelect from "./SerialEncodingSelect";
 /** Predefined header field types */
 type FieldType = "id" | "source_address" | "destination_address" | "custom";
 
@@ -53,13 +55,6 @@ function computeByteInfo(mask: number, headerLength: number): string {
   return `${numBytes} byte${numBytes !== 1 ? 's' : ''} @ offset ${startByte}`;
 }
 
-const encodingOptions: Array<{ value: SerialEncoding; label: string; description: string }> = [
-  { value: "slip", label: "SLIP (RFC 1055)", description: "Serial Line Internet Protocol - uses END (0xC0) as delimiter" },
-  { value: "cobs", label: "COBS", description: "Consistent Overhead Byte Stuffing - eliminates 0x00 bytes" },
-  { value: "raw", label: "Raw (unframed)", description: "No framing - the byte stream is not split into frames" },
-  { value: "length_prefixed", label: "Length Prefixed", description: "Each frame starts with its length" },
-];
-
 export type SerialConfigSectionProps = {
   isConfigured: boolean;
   hasFrames: boolean;
@@ -68,8 +63,8 @@ export type SerialConfigSectionProps = {
   onAdd: () => void;
   onRemove: () => void;
   // Config values (only used when configured)
-  encoding: SerialEncoding;
-  setEncoding: (encoding: SerialEncoding) => void;
+  encoding: FramingMode | null;
+  setEncoding: (encoding: FramingMode) => void;
   byteOrder: "little" | "big";
   setByteOrder: (byteOrder: "little" | "big") => void;
   headerFields: SerialHeaderFieldEntry[];
@@ -237,20 +232,7 @@ export default function SerialConfigSection({
               <label className={`block ${textMedium} mb-2`}>
                 Encoding <span className="text-danger">*</span>
               </label>
-              <Select
-                value={encoding}
-                onChange={(e) => setEncoding(e.target.value as SerialEncoding)}
-                size="lg"
-              >
-                {encodingOptions.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </Select>
-              <p className={`mt-1 ${caption}`}>
-                {encodingOptions.find((o) => o.value === encoding)?.description}
-              </p>
+              <SerialEncodingSelect value={encoding} onChange={setEncoding} />
             </div>
 
             {/* Byte Order */}
@@ -655,7 +637,7 @@ export default function SerialConfigSection({
       {/* Collapsed preview when configured but not expanded */}
       {!isExpanded && isConfigured && (
         <div className={`px-4 py-2 ${caption} border-t border-default`}>
-          Encoding: {encoding.toUpperCase()} • {byteOrder === 'big' ? 'BE' : 'LE'}
+          Encoding: {encoding?.toUpperCase() ?? "Not set"} • {byteOrder === 'big' ? 'BE' : 'LE'}
           {headerLength !== undefined && headerLength > 0 && ` • Header: ${headerLength}B`}
           {headerFields.length > 0 && ` • ${headerFields.length} field(s)`}
           {hasIdField && " • ID field"}
