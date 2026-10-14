@@ -23,4 +23,8 @@ incomplete?: boolean,
 /**
  * Direction: "rx" for received, "tx" for transmitted
  */
-direction?: "rx" | "tx", };
+direction?: "rx" | "tx", 
+/**
+ * Whether a Modbus RTU message's CRC matched; absent where nothing checked one.
+ */
+crc_valid?: boolean, };

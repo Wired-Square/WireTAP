@@ -91,11 +91,15 @@ export async function withSerialIds<T extends FrameMessage>(
     toFrameIdConfig(idConfig),
     toFrameIdConfig(srcConfig),
   );
-  return frames.map((frame, i) => ({
-    ...frame,
-    frame_id: idConfig ? ids[i].frame_id ?? frame.frame_id : frame.frame_id,
-    source_address: srcConfig ? ids[i].source_address ?? undefined : frame.source_address,
-  }));
+  return frames.map((frame, i) => {
+    const frameId = idConfig ? ids[i].frame_id : null;
+    return {
+      ...frame,
+      // An extracted id names no unit and function, so it renders as a serial frame's.
+      ...(frameId != null && { frame_id: frameId, protocol: 'serial' }),
+      source_address: srcConfig ? ids[i].source_address ?? undefined : frame.source_address,
+    };
+  });
 }
 
 /** Serial view tab IDs (string to support dynamic tool output tabs) */

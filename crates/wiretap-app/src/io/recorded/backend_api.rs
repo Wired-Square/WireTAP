@@ -221,6 +221,7 @@ fn frame_message(protocol: ArchiveProtocol, f: ArchiveFrame) -> FrameMessage {
         is_rtr: f.is_rtr,
         is_brs: f.is_brs,
         is_esi: f.is_esi,
+        crc_valid: f.crc_valid,
         ..Default::default()
     }
 }
@@ -480,5 +481,26 @@ mod tests {
 
         assert_eq!(streamed.frames.len(), 30);
         assert!(streamed.elapsed >= Duration::from_millis(350), "finished in {:?}", streamed.elapsed);
+    }
+
+    #[test]
+    fn an_archive_rows_crc_verdict_is_carried() {
+        let row = |crc_valid| ArchiveFrame {
+            ts_us: 1,
+            id: 0x0103,
+            extended: false,
+            len: 4,
+            data: vec![0x01, 0x03, 0xAA, 0xBB],
+            is_fd: false,
+            is_rtr: false,
+            is_brs: false,
+            is_esi: false,
+            crc_valid,
+            bus: 0,
+            dir: "rx".into(),
+        };
+        for crc_valid in [Some(false), Some(true), None] {
+            assert_eq!(frame_message(ArchiveProtocol::Modbus, row(crc_valid)).crc_valid, crc_valid);
+        }
     }
 }

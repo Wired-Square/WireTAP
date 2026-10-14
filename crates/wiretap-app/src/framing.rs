@@ -43,7 +43,7 @@ pub use ios_stub::*;
 mod desktop {
     use crate::{
         capture_store,
-        io::{FrameMessage, FramingMode},
+        io::{serial::utils::framed_serial, FrameMessage, FramingMode},
     };
     use wiretap_catalog::serial_framing::{
         DelimiterOptions, FrameIdConfig, FramingEncoding, SerialFramer,
@@ -337,34 +337,19 @@ mod desktop {
         // is how the live and flush paths in the serial reader had drifted apart
         // on `incomplete`; the only thing separating these two is which side of
         // the length filter the frame fell on.
-        //
-        // `crc_valid` is dropped here, and nothing is lost by it: the decode
-        // path recomputes the same verdict from the same bytes when it
-        // interprets the message, so the Decoder's Modbus tab reports it
-        // whether the frames are live or out of a capture. Persisting it would
-        // only matter to a view that wants the verdict without decoding.
-        let to_message = |(idx, (frame_bytes, end_idx, incomplete, _crc_valid, bus)): (
+        let to_message = |(idx, (frame_bytes, end_idx, incomplete, crc_valid, bus)): (
             usize,
             (Vec<u8>, usize, bool, Option<bool>, u8),
         )| {
-            let extract = |cfg: &Option<FrameIdConfig>| cfg.as_ref()?.extract(&frame_bytes);
-            let frame_id = extract(&config.frame_id_config).unwrap_or(idx as u32);
-            let source_address = extract(&config.source_address_config).map(|v| v as u16);
-            let dlc = frame_bytes.len() as u16;
-
+            let extract = |cfg: &Option<FrameIdConfig>, bytes: &[u8]| cfg.as_ref()?.extract(bytes);
             FrameMessage {
-                protocol: "serial".to_string(),
                 timestamp_us: bytes.get(end_idx).map(|b| b.timestamp_us).unwrap_or(0),
-                frame_id,
                 bus,
-                dlc,
-                bytes: frame_bytes,
-                is_extended: false,
-                is_fd: false,
-                source_address,
+                source_address: extract(&config.source_address_config, &frame_bytes).map(|v| v as u16),
                 incomplete: incomplete.then_some(true),
-                direction: None,
-                ..Default::default()
+                ..framed_serial(frame_bytes, crc_valid, |frame_bytes| {
+                    extract(&config.frame_id_config, frame_bytes).unwrap_or(idx as u32)
+                })
             }
         };
 
@@ -436,6 +421,35 @@ mod desktop {
                 last_bytes.push(1_000 + 10 * (line.len() as u64 - 1));
             }
             assert_eq!(stamps(&stamped(&line), &config("modbus_rtu")), last_bytes);
+        }
+
+        #[test]
+        fn a_reframed_rtu_message_is_stored_as_the_archive_stores_it() {
+            let (request, response) = (rtu("08044DE20002"), rtu("080404012C0000"));
+            let config = BackendFramingConfig {
+                frame_id_config: id_config(2, 1, true),
+                source_address_config: id_config(0, 1, true),
+                ..config("modbus_rtu")
+            };
+            let (passed, _) = frame_messages(&stamped(&[request.clone(), response.clone()].concat()), &config, None).unwrap();
+            let rows: Vec<_> = passed
+                .iter()
+                .map(|m| (m.protocol.as_str(), m.frame_id, m.bytes.clone(), m.crc_valid, m.source_address))
+                .collect();
+            assert_eq!(
+                rows,
+                [
+                    ("modbus_rtu", 0x0804, request, Some(true), Some(0x08)),
+                    ("modbus_rtu", 0x0804, response, Some(true), Some(0x08)),
+                ]
+            );
+        }
+
+        #[test]
+        fn only_rtu_framing_stores_modbus_rtu() {
+            let (passed, _) = frame_messages(&stamped(&[0x08, 0x04, 0xC0]), &config("slip"), None).unwrap();
+            let rows: Vec<_> = passed.iter().map(|m| (m.protocol.as_str(), m.frame_id, m.crc_valid)).collect();
+            assert_eq!(rows, [("serial", 0, None)]);
         }
 
         fn id_config(start_byte: i32, num_bytes: u8, big_endian: bool) -> Option<FrameIdConfig> {

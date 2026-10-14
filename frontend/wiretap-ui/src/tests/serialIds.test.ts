@@ -47,4 +47,16 @@ describe("withSerialIds", () => {
     await withSerialIds([frame([0x12], 7)], null, null);
     expect(invoke).not.toHaveBeenCalled();
   });
+
+  it("renders an extracted id on a Modbus RTU message as a serial id, not a unit and function", async () => {
+    invoke.mockResolvedValue([{ frame_id: 0x04, source_address: null }, { frame_id: null, source_address: null }]);
+    const rtu = (bytes: number[]) => ({ ...frame(bytes, (bytes[0] << 8) | bytes[1]), protocol: "modbus_rtu" });
+    const [extracted, tooShort] = await withSerialIds(
+      [rtu([0x08, 0x04, 0x00, 0x00]), rtu([0x08, 0x04])],
+      { startByte: 1, numBytes: 1, endianness: "big" },
+      null,
+    );
+    expect(extracted).toMatchObject({ protocol: "serial", frame_id: 0x04 });
+    expect(tooShort).toMatchObject({ protocol: "modbus_rtu", frame_id: 0x0804 });
+  });
 });

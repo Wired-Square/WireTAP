@@ -25,7 +25,7 @@ use crate::io::types::{
 };
 use crate::io::FrameMessage;
 
-use super::utils::probe_serial_presence;
+use super::utils::{framed_serial, probe_serial_presence};
 use wiretap_io::profile::SerialSourceConfig;
 
 /// How often the read loop looks for a framing or catalogue change.
@@ -310,25 +310,15 @@ impl LiveLine {
             .into_iter()
             .filter(|(f, _)| f.bytes.len() >= self.min_frame_length)
             .filter_map(|(frame, timestamp_us)| {
-                let extract = |cfg: &Option<FrameIdConfig>| cfg.as_ref()?.extract(&frame.bytes);
-                let frame_id = extract(&self.frame_id_config).unwrap_or(0);
-                let source_address = extract(&self.source_address_config).map(|v| v as u16);
-
-                // `frame.crc_valid` is deliberately not carried: the decode path
-                // recomputes it from these same bytes. See `framing.rs`.
+                let extract = |cfg: &Option<FrameIdConfig>, bytes: &[u8]| cfg.as_ref()?.extract(bytes);
+                let source_address = extract(&self.source_address_config, &frame.bytes).map(|v| v as u16);
                 let mut msg = FrameMessage {
-                    protocol: "serial".to_string(),
                     timestamp_us,
-                    frame_id,
-                    bus: 0,
-                    dlc: frame.bytes.len() as u16,
-                    bytes: frame.bytes,
-                    is_extended: false,
-                    is_fd: false,
                     source_address,
                     incomplete: frame.incomplete.then_some(true),
-                    direction: None,
-                    ..Default::default()
+                    ..framed_serial(frame.bytes, frame.crc_valid, |bytes| {
+                        extract(&self.frame_id_config, bytes).unwrap_or(0)
+                    })
                 };
                 apply_bus_mapping(&mut msg, &self.bus_mappings).then_some(msg)
             })
@@ -779,6 +769,41 @@ mod tests {
         assert_eq!(
             got.iter().map(|f| f.timestamp_us).collect::<Vec<_>>(),
             [1_000_000 - 7_291, 1_000_000]
+        );
+    }
+
+    /// The archive's shape, whatever id the line was told to extract: a
+    /// declared id field cannot key a message the archive keys by its unit and
+    /// function. A residue is no message, so it stays a serial row.
+    #[test]
+    fn a_live_rtu_message_is_stored_as_the_archive_stores_it() {
+        let good = rtu(&[0x08, 0x03, 0x00, 0x00, 0x00, 0x01]);
+        let mut bad = rtu(&[0x01, 0x04, 0x00, 0x00, 0x00, 0x01]);
+        *bad.last_mut().unwrap() ^= 0xFF;
+        let mut line = live(
+            FramingEncoding::ModbusRtu(RtuSettings {
+                validate_crc: false,
+                ..Default::default()
+            }),
+            false,
+        );
+        line.frame_id_config = Some(FrameIdConfig { start_byte: 2, num_bytes: 1, big_endian: true });
+        line.source_address_config = Some(FrameIdConfig { start_byte: 0, num_bytes: 1, big_endian: true });
+
+        let mut got = frames(line.read(&[&good[..], &bad[..], &[0x08][..]].concat(), at(1_000_000)));
+        got.extend(frames(line.stopped()));
+
+        let rows: Vec<_> = got
+            .iter()
+            .map(|f| (f.protocol.as_str(), f.frame_id, f.bytes.clone(), f.crc_valid, f.source_address))
+            .collect();
+        assert_eq!(
+            rows,
+            [
+                ("modbus_rtu", 0x0803, good, Some(true), Some(0x08)),
+                ("modbus_rtu", 0x0104, bad, Some(false), Some(0x01)),
+                ("serial", 0, vec![0x08], None, Some(0x08)),
+            ]
         );
     }
 
