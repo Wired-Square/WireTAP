@@ -201,7 +201,10 @@ pub async fn reconfigure_device(
 ) -> Result<(), DeviceWriteError> {
     rewrite(&app, &profile_id, |p| IOProfile { connection, ..p }).await?;
     match session_id {
-        Some(id) => Ok(crate::io::reload_session_source(&id, &profile_id).await?),
+        Some(id) => {
+            let rebuild = || crate::sessions::saved_profile_reader(&app, &id, &profile_id);
+            Ok(crate::io::reload_session_source(&id, &profile_id, rebuild).await?)
+        }
         None => Ok(()),
     }
 }

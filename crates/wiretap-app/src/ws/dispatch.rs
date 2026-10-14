@@ -228,8 +228,8 @@ fn reset_tunnels(session_id: &str) {
     }
 }
 
-/// Detach a session's catalogue (decoded stream stops). Called explicitly and
-/// on final unsubscribe.
+/// Detach a session's catalogue (decoded stream stops). Called explicitly, on
+/// final unsubscribe and when the session is destroyed.
 pub fn detach_catalog(session_id: &str) {
     if let Ok(mut m) = ATTACHED_CATALOGS.write() {
         m.remove(session_id);

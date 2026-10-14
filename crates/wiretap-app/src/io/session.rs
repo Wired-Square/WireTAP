@@ -976,6 +976,7 @@ pub async fn destroy_session_by(session_id: &str, reset: bool, by: Option<&str>)
         // already been removed (see `detach_all_from_session`).
         Err(_) => {
             detach_all_from_session(session_id);
+            crate::ws::dispatch::detach_catalog(session_id);
             forget_session(session_id);
         }
     }
@@ -997,6 +998,7 @@ async fn tear_down(session_id: &str, mut session: SessionGuard, how: Teardown<'_
     let destroying = matches!(how, Teardown::Destroy { .. });
     if destroying {
         detach_all_from_session(session_id);
+        crate::ws::dispatch::detach_catalog(session_id);
     }
     let _ = session.source.stop().await;
     session_states().remove(session_id);
@@ -1579,12 +1581,14 @@ pub async fn update_source_bus_mappings(
     Ok(capabilities)
 }
 
-/// Reconnect one source of a running session so it picks up its profile's
-/// current connection parameters.
+/// Reconnect one source of a session so it picks up its profile's current
+/// connection parameters.
 ///
-/// Re-applying the bus mappings the source already has is a remove-then-add,
-/// which is the whole job: the source config is unchanged, and the merge task
-/// re-reads the profile — which did change — when it respawns it.
+/// Re-applying the bus mappings a running broker source already has is a
+/// remove-then-add, which is the whole job: the source config is unchanged, and
+/// the merge task re-reads the profile — which did change — when it respawns it.
+/// A stopped broker reads it when it next starts. A source that is not a broker
+/// holds what it read at creation, so it is replaced by `rebuild`'s.
 ///
 /// Reconnecting is a session-lifecycle operation, not a device capability:
 /// no device can re-tune a bitrate or a baud rate in place, so there is nothing
@@ -1592,28 +1596,50 @@ pub async fn update_source_bus_mappings(
 pub async fn reload_session_source(
     session_id: &str,
     profile_id: &str,
+    rebuild: impl FnOnce() -> Result<Box<dyn IOSource>, String>,
 ) -> Result<(), String> {
     let mut session = lock_session(session_id).await?;
+    let not_a_source = || format!("Profile '{}' is not a source in this session", profile_id);
 
-    let mappings = session
-        .source
-        .broker_configs()
-        .ok_or_else(|| {
-            "This source cannot be reconfigured while it is open — stop the session first"
-                .to_string()
-        })?
+    let Some(configs) = session.source.broker_configs() else {
+        if !sessions::get_session_profile_ids(session_id).iter().any(|p| p == profile_id) {
+            return Err(not_a_source());
+        }
+        return restart_with(&mut session, session_id, rebuild()?).await;
+    };
+    let mappings = configs
         .into_iter()
         .find(|c| c.profile_id == profile_id)
-        .ok_or_else(|| format!("Profile '{}' is not a source in this session", profile_id))?
+        .ok_or_else(not_a_source)?
         .bus_mappings;
 
-    session.source.update_source_bus_mappings(profile_id, mappings)?;
+    if matches!(session.source.state(), IOState::Running) {
+        session.source.update_source_bus_mappings(profile_id, mappings)?;
+    }
 
     tlog!(
         "[reader] Reloaded source '{}' in session '{}'",
         profile_id, session_id
     );
     Ok(())
+}
+
+/// Swap in `source`, running it only if the one it replaces was running.
+async fn restart_with(session: &mut IOSession, session_id: &str, source: Box<dyn IOSource>) -> Result<(), String> {
+    let previous = session.source.state();
+    if !matches!(previous, IOState::Stopped) {
+        let _ = session.source.stop().await;
+    }
+    session.source = source;
+    let started = match previous {
+        IOState::Running => session.source.start().await,
+        _ => Ok(()),
+    };
+    let current = session.source.state();
+    if previous != current {
+        emit_state_change(session_id, &previous, &current);
+    }
+    started
 }
 
 /// Result of attempting a safe reinitialize
@@ -1796,9 +1822,12 @@ mod tests {
         store_playback_position(id, position);
         with_state(id, |s| s.suspended_at = Some(Instant::now()));
         CLOSING_SESSIONS.write().unwrap().insert(id.into());
+        let catalog = wiretap_catalog::Catalog::parse("[meta]\nname = \"gone\"\n").unwrap();
+        crate::ws::dispatch::attach_catalog(id, Some("gone.toml".into()), catalog);
 
         destroy_session(id, false).await.unwrap();
 
+        assert_eq!(crate::ws::dispatch::attached_catalog_path(id), None);
         assert!(!session_states().contains_key(id));
         assert_eq!(current_session_of_app(&format!("{id}-app")), None);
         assert!(sessions::get_session_profile_ids(id).is_empty());
@@ -2119,5 +2148,51 @@ mod tests {
         super::super::touch_subscriber_heartbeats(&[id.to_string()]).await;
         assert_eq!(current_session_of_app(me), None);
         destroy_session(id, false).await.unwrap();
+    }
+
+    fn virtual_device(session_id: &str) -> IOBroker {
+        let profile = crate::settings::IOProfile {
+            id: format!("{session_id}-device"),
+            name: "Virtual".into(),
+            kind: "virtual".into(),
+            connection: [("traffic_type".to_string(), "can".into())].into(),
+            ..Default::default()
+        };
+        let config = SourceConfig {
+            profile_id: profile.id.clone(),
+            profile_kind: profile.kind.clone(),
+            display_name: profile.name.clone(),
+            bus_mappings: crate::sessions::profile_bus_mappings(&profile),
+            ..Default::default()
+        };
+        IOBroker::single_source(std::sync::Arc::new(move || Ok(vec![profile.clone()])), session_id.into(), config).unwrap()
+    }
+
+    #[tokio::test]
+    async fn a_stopped_sessions_device_reconfigures_without_starting() {
+        let id = "f_reload_stopped";
+        create_session(id.into(), Box::new(virtual_device(id)), None, None, None, vec![]).await;
+
+        let reloaded = reload_session_source(id, &format!("{id}-device"), || unreachable!("a broker is not rebuilt")).await;
+        let state = super::super::get_session_state(id).await;
+        destroy_session(id, false).await.unwrap();
+
+        assert_eq!(reloaded, Ok(()));
+        assert_eq!(state, Some(IOState::Stopped));
+    }
+
+    #[tokio::test]
+    async fn a_single_source_sessions_device_reconfigures_while_open() {
+        let (id, profile) = ("f_reload_single", "p-reload-single");
+        open(id, TestSource::new(id)).await;
+        sessions::register_session_profile(id, profile);
+        start_session(id).await.unwrap();
+
+        let reloaded = reload_session_source(id, profile, || Ok(Box::new(TestSource::new(id)))).await;
+        let state = super::super::get_session_state(id).await;
+        destroy_session(id, false).await.unwrap();
+
+        assert_eq!(reloaded, Ok(()));
+        assert_eq!(state, Some(IOState::Running));
     }
 }
