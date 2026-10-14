@@ -82,7 +82,8 @@ pub fn run() {
         // Git-sharing provenance: which remote each local catalogue came from.
         // Loaded lazily on first access; managed here so the rename/delete hooks
         // in catalog.rs can always reach it.
-        .manage(catalog_share::registry::CatalogSourceRegistry::default());
+        .manage(catalog_share::registry::CatalogSourceRegistry::default())
+        .manage(catalog::CatalogCache::default());
 
     let builder = menu::manage_state(builder).invoke_handler(tauri::generate_handler![
             windows::show_current_window,

@@ -181,12 +181,16 @@ pub(super) async fn open_or_join(
     };
     let registered = register_subscriber_from(leaving, session_id, subscriber_id, app_name).await;
     let registration = refused_on(session_id, registered).await?;
+    let bus_mappings = match &created {
+        Some(c) => c.bus_mappings.clone(),
+        None => crate::io::get_session_bus_mappings(session_id).await,
+    };
     Ok(OpenedSession {
         session_id: session_id.to_string(),
         registration,
         created: created.is_some(),
         start_error,
-        bus_mappings: created.and_then(|c| c.bus_mappings),
+        bus_mappings,
     })
 }
 
@@ -456,6 +460,25 @@ mod tests {
         destroy_session(id, false).await.unwrap();
     }
 
+    #[tokio::test]
+    async fn a_join_reports_the_buses_of_the_session_it_joins() {
+        crate::capture_db::use_in_memory_database();
+        let id = "f_open_join_buses";
+        let profile = slcan_at(500_000);
+        let mappings = super::super::profile_bus_mappings(&profile);
+        create_session(id.into(), Box::new(slcan_broker(id, &profile).unwrap()), None, None, None, vec![]).await;
+
+        let joined = open_or_join(id, "join-buses-app", None, false, false, not_created()).await;
+        destroy_session(id, false).await.unwrap();
+
+        let joined = joined.unwrap();
+        assert!(!joined.created);
+        assert_eq!(
+            serde_json::to_value(joined.bus_mappings).unwrap(),
+            serde_json::json!({ (profile.id): mappings }),
+        );
+    }
+
     struct DefaultSettings;
 
     impl settings::SettingsSource for DefaultSettings {
@@ -527,22 +550,25 @@ mod tests {
         }
     }
 
+    fn slcan_broker(id: &str, profile: &IOProfile) -> Result<IOBroker, String> {
+        let config = SourceConfig {
+            profile_id: profile.id.clone(),
+            profile_kind: profile.kind.clone(),
+            display_name: profile.name.clone(),
+            bus_mappings: super::super::profile_bus_mappings(profile),
+            ..Default::default()
+        };
+        let saved = vec![profile.clone()];
+        IOBroker::new(Arc::new(move || Ok(saved.clone())), id.into(), vec![config])
+    }
+
     #[tokio::test]
     async fn a_refused_start_comes_back_from_the_open_and_the_session_stays() {
         crate::capture_db::use_in_memory_database();
         let id = "f_open_refused";
         let profile = slcan_at(33_333);
-        let saved = vec![profile.clone()];
         let create = async {
-            let config = SourceConfig {
-                profile_id: profile.id.clone(),
-                profile_kind: profile.kind.clone(),
-                display_name: profile.name.clone(),
-                bus_mappings: super::super::profile_bus_mappings(&profile),
-                ..Default::default()
-            };
-            let broker = IOBroker::new(Arc::new(move || Ok(saved.clone())), id.into(), vec![config])?;
-            create_session(id.into(), Box::new(broker), None, None, None, vec![]).await;
+            create_session(id.into(), Box::new(slcan_broker(id, &profile)?), None, None, None, vec![]).await;
             Ok(Created { starts: true, bus_mappings: None })
         };
         let opened = open_or_join(id, "open-refused-app", None, false, false, create).await.unwrap();

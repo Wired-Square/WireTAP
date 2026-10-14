@@ -351,6 +351,12 @@ pub async fn get_session_next_output_bus(session_id: &str) -> u8 {
         .unwrap_or(0)
 }
 
+/// Each source's buses in force, by profile id; `None` unless the session is a broker.
+pub async fn get_session_bus_mappings(session_id: &str) -> Option<HashMap<String, Vec<super::BusMapping>>> {
+    let configs = read_session(session_id).await.ok()?.source.broker_configs()?;
+    Some(configs.into_iter().map(|c| (c.profile_id, c.bus_mappings)).collect())
+}
+
 /// Get the stored source configs for a session (used for resume-to-live).
 /// Returns empty vec if session doesn't exist or has no stored configs.
 pub async fn get_session_source_configs(session_id: &str) -> Vec<SourceConfig> {

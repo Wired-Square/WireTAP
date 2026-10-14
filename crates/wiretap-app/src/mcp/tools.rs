@@ -723,7 +723,7 @@ impl WireTapTools {
             crate::byte_roles::payload_changes(c, groups, newest, max_frames).await
         })
         .await
-        .and_then(|r| r)
+        .and_then(|r| r.map_err(source_error))
         .map_err(err)?;
         ok_json(json!({
             "captureId": capture_id,
@@ -747,7 +747,9 @@ impl WireTapTools {
         let selection = FrameSelection::from_groups(groups.clone());
         let newest = Some(analysis_window(p.newest));
         let (changes, orders) = capture_db::analyse(&capture_id, async move |c| {
-            let changes = crate::byte_roles::payload_changes(c, groups, newest, max_frames).await?;
+            let changes = crate::byte_roles::payload_changes(c, groups, newest, max_frames)
+                .await
+                .map_err(source_error)?;
             let orders = wiretap_analysis::source::message_order(c, &selection, newest, None)
                 .await
                 .map_err(source_error)?;

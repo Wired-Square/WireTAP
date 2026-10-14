@@ -259,14 +259,8 @@ pub fn step_frame(
     } else if let Some(ts) = current_timestamp_us {
         match capture_db::find_rowid_for_timestamp(&buf_id, ts as u64)? {
             Some(rowid) => rowid,
-            None => {
-                // Fallback to start or end
-                let idx = if backward { total_frames.saturating_sub(1) } else { 0 };
-                match capture_db::get_frame_at_index(&buf_id, idx)? {
-                    Some((rowid, _)) => rowid,
-                    None => return Err("Capture empty".to_string()),
-                }
-            }
+            None if backward => i64::MAX,
+            None => return Ok(None),
         }
     } else if backward {
         i64::MAX
@@ -801,10 +795,10 @@ mod tests {
     }
 
     #[test]
-    fn a_timestamp_past_the_last_frame_falls_back_to_the_end_it_leaves() {
+    fn from_a_timestamp_past_the_last_frame_forward_is_the_end_and_backward_is_the_last_frame() {
         let id = capture_of("step-late-timestamp", THREE);
-        assert_eq!(step(&id, None, Some(99), false), Some((1, 20)));
-        assert_eq!(step(&id, None, Some(99), true), Some((1, 20)));
+        assert_eq!(step(&id, None, Some(99), false), None);
+        assert_eq!(step(&id, None, Some(99), true), Some((2, 30)));
     }
 
     #[test]
