@@ -73,7 +73,8 @@ pub async fn payload_changes_cmd(
     let result = capture_db::analyse(&capture_id, async move |c| {
         payload_changes(c, selection, newest, usize::MAX).await
     })
-    .await??;
+    .await?
+    .map_err(capture_db::source_error)?;
     held::hold_changes(key, result.clone());
     let mut draft = draft.unwrap_or_default();
     drafting::apply_changes(&mut draft, &result);
@@ -86,16 +87,12 @@ pub async fn payload_changes<S>(
     selection: Vec<ProtocolFrames>,
     newest: Option<usize>,
     max_frames: usize,
-) -> Result<PayloadChanges, String>
+) -> Result<PayloadChanges, S::Error>
 where
     S: PayloadSource + FrameSource,
-    S::Error: ToString,
 {
     let selection = FrameSelection::from_groups(selection);
-    let frames = source
-        .frames(&selection, newest)
-        .await
-        .map_err(|e| e.to_string())?;
+    let frames = source.frames(&selection, newest).await?;
     let frame_count = frames.len();
     let timed = timed_by_protocol(frames);
 
@@ -133,8 +130,7 @@ where
         DEFAULT_SAMPLE_LIMIT,
         max_frames,
     )
-    .await
-    .map_err(|e| e.to_string())?;
+    .await?;
     let frames = profiles
         .frames
         .into_iter()
@@ -232,6 +228,15 @@ mod tests {
         assert_eq!(profile.sample_count, DEFAULT_SAMPLE_LIMIT as usize);
         assert_eq!(profile.columns[2].stats.min, 0x03, "starts at frame 1000 = 0x03E8");
         assert_eq!(source.asked()[0].2, wiretap_analysis::source::Sampling::Recent);
+    }
+
+    #[tokio::test]
+    async fn a_failed_capture_read_says_it_was_reading_the_capture() {
+        let _db = capture_db::use_own_connection(rusqlite::Connection::open_in_memory().unwrap());
+
+        let error = payload_changes_cmd("c1".into(), vec![], None, None).await.unwrap_err();
+
+        assert!(error.starts_with("Failed to read the capture: no such table"), "{error}");
     }
 
     /// Two ids carrying one counter together, and a third sent in bursts of two.
