@@ -70,7 +70,7 @@ export function frameEditFieldsFor(frame: Frame, catalog: Catalog | null): Frame
         },
       };
     case "serial":
-      return { protocol, base, isIntervalInherited, config: { protocol, frame_id: frame.key, delimiter: frame.delimiter ?? undefined } };
+      return { protocol, base, isIntervalInherited, config: { protocol, frame_id: frame.key } };
   }
 }
 
@@ -108,7 +108,7 @@ export function frameFieldsOf(fields: FrameEditFields): FrameFields {
     case "modbus":
       return { ...common, register_number: config.register_number, node_address: config.node_address, register_type: config.register_type };
     case "serial":
-      return { ...common, delimiter: config.delimiter };
+      return common;
   }
 }
 

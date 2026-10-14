@@ -111,7 +111,6 @@ export interface FrameValidationInput {
   nodeAddress?: number;
   registerType?: string;
   registerBase?: number;
-  delimiter?: number[];
   existingKeys?: string[];
   originalKey?: string;
   availablePeers?: string[];

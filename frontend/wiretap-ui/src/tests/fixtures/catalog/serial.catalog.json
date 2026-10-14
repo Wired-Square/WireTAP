@@ -46,9 +46,6 @@
       "transmitter": "Controller"
     },
     {
-      "delimiter": [
-        192
-      ],
       "frameId": 32,
       "key": "0x20",
       "length": 16,

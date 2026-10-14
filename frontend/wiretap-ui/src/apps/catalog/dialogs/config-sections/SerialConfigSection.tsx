@@ -56,7 +56,7 @@ function computeByteInfo(mask: number, headerLength: number): string {
 const encodingOptions: Array<{ value: SerialEncoding; label: string; description: string }> = [
   { value: "slip", label: "SLIP (RFC 1055)", description: "Serial Line Internet Protocol - uses END (0xC0) as delimiter" },
   { value: "cobs", label: "COBS", description: "Consistent Overhead Byte Stuffing - eliminates 0x00 bytes" },
-  { value: "raw", label: "Raw (delimiter-based)", description: "Uses custom delimiter bytes to separate frames" },
+  { value: "raw", label: "Raw (unframed)", description: "No framing - the byte stream is not split into frames" },
   { value: "length_prefixed", label: "Length Prefixed", description: "Each frame starts with its length" },
 ];
 

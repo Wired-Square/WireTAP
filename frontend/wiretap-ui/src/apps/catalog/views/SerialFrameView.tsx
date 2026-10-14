@@ -48,7 +48,7 @@ export default function SerialFrameView({
   const frame = selectedNode.metadata!.frame!;
   const encoding = useCatalogEditorStore((s) => s.tree.catalog?.serial?.encoding);
   const idKey = frame.key;
-  const { length, delimiter, transmitter, interval, mux } = frame;
+  const { length, transmitter, interval, mux } = frame;
   const intervalInherited = frame.inheritedFields?.includes("interval");
   const notes = frame.notes ?? [];
   const muxSignals = mux ? muxSignalCount(mux) : 0;
@@ -160,18 +160,6 @@ export default function SerialFrameView({
           </div>
         )}
       </div>
-
-      {/* Delimiter (for raw encoding) */}
-      {delimiter && delimiter.length > 0 && (
-        <div className={`p-4 ${bgSurface} rounded-lg`}>
-          <div className={labelSmallMuted}>
-            {t("serialFrame.delimiter")}
-          </div>
-          <div className={monoBody}>
-            [{delimiter.map((b: number) => `0x${b.toString(16).padStart(2, "0").toUpperCase()}`).join(", ")}]
-          </div>
-        </div>
-      )}
 
       {/* Notes */}
       {notes.length > 0 && (

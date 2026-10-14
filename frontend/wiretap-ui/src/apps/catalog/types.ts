@@ -84,7 +84,6 @@ export interface SerialChecksumConfig {
 export interface SerialConfig {
   protocol: "serial";
   frame_id?: string;             // Unique identifier for this frame
-  delimiter?: number[];          // Byte sequence for raw framing (only when encoding=raw)
   // NOTE: encoding comes from SerialProtocolConfig ([frame.serial.config]), not here
 }
 

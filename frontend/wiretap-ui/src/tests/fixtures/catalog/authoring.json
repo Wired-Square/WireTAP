@@ -973,10 +973,7 @@
             "isIntervalInherited": false,
             "config": {
               "protocol": "serial",
-              "frame_id": "0x20",
-              "delimiter": [
-                192
-              ]
+              "frame_id": "0x20"
             }
           },
           "ops": [
@@ -985,10 +982,7 @@
               "protocol": "serial",
               "key": "0x20",
               "frame": {
-                "length": 16,
-                "delimiter": [
-                  192
-                ]
+                "length": 16
               }
             }
           ]
