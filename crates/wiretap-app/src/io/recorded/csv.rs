@@ -445,6 +445,7 @@ pub fn parse_csv_with_mapping(
         return Err("Column mapping must include a Frame ID or Frame ID + Data column".to_string());
     }
 
+    let is_can = matches!(protocol, Protocol::Can | Protocol::CanFd);
     let mut frames: Vec<FrameMessage> = Vec::new();
     let mut line_number = 0usize;
     let mut raw_timestamps = RawTimestamps::default();
@@ -535,7 +536,7 @@ pub fn parse_csv_with_mapping(
             bytes.len() as u16
         };
 
-        let is_extended = if let Some(ext_c) = extended_col {
+        let is_extended = is_can && if let Some(ext_c) = extended_col {
             parts
                 .get(ext_c)
                 .map(|s| s.trim().eq_ignore_ascii_case("true"))
@@ -565,8 +566,7 @@ pub fn parse_csv_with_mapping(
             dlc,
             bytes,
             is_extended,
-            is_fd: matches!(protocol, Protocol::Can | Protocol::CanFd)
-                && (dlc > 8 || id_data_frame.as_ref().is_some_and(|f| f.fd)),
+            is_fd: is_can && (dlc > 8 || id_data_frame.as_ref().is_some_and(|f| f.fd)),
             source_address: None,
             incomplete: None,
             direction,
@@ -1225,6 +1225,33 @@ mod tests {
         let frame = &parsed.frames[0];
         assert_eq!(frame.protocol, "modbus_rtu");
         assert!(!frame.is_fd, "only a CAN frame is FD");
+    }
+
+    #[test]
+    fn only_a_can_row_is_read_as_extended() {
+        let path = temp_csv("ids.csv", "0x0803,08030000\n");
+        let mappings = [
+            CsvColumnMapping { column_index: 0, role: CsvColumnRole::FrameId },
+            CsvColumnMapping { column_index: 1, role: CsvColumnRole::DataBytes },
+        ];
+        let extended = |protocol| {
+            let parsed = parse_csv_with_mapping(
+                path.to_str().unwrap(),
+                &mappings,
+                false,
+                TimestampUnit::Microseconds,
+                false,
+                Delimiter::Comma,
+                protocol,
+            )
+            .unwrap();
+            parsed.frames[0].is_extended
+        };
+
+        assert!(extended(Protocol::Can));
+        for protocol in [Protocol::ModbusRtu, Protocol::Modbus, Protocol::Serial] {
+            assert!(!extended(protocol), "{protocol:?}");
+        }
     }
 
     #[test]
