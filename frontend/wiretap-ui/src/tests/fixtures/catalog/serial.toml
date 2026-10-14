@@ -60,7 +60,6 @@ calc_end_byte = 10
 
 [frame.serial.0x20]
 length = 16
-delimiter = [0xC0]
 
 [frame.serial.0x20.mux]
 name = "Page"
