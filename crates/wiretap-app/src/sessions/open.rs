@@ -246,6 +246,21 @@ async fn create_from_profile(
     Ok(Created { starts: result.is_new, bus_mappings: None })
 }
 
+/// A fresh source for `profile_id` under `session_id`, as its saved profile now reads.
+pub fn saved_profile_reader(
+    source: &dyn settings::SettingsSource,
+    session_id: &str,
+    profile_id: &str,
+) -> Result<Box<dyn IOSource>, String> {
+    let settings = source.load()?;
+    let profile = settings
+        .io_profiles
+        .iter()
+        .find(|p| p.id == profile_id)
+        .ok_or_else(|| format!("Profile '{profile_id}' not found"))?;
+    profile_reader(source, &settings, session_id, profile, OpenSessionOptions::default())
+}
+
 fn profile_reader(
     source: &dyn settings::SettingsSource,
     settings: &AppSettings,
@@ -548,6 +563,29 @@ mod tests {
             preferred_catalog: None,
             ephemeral: true,
         }
+    }
+
+    struct Saved(IOProfile);
+
+    impl settings::SettingsSource for Saved {
+        fn load(&self) -> Result<AppSettings, String> {
+            Ok(AppSettings { io_profiles: vec![self.0.clone()], ..Default::default() })
+        }
+
+        fn saved_profiles(&self) -> crate::io::ProfileLoader {
+            let saved = vec![self.0.clone()];
+            Arc::new(move || Ok(saved.clone()))
+        }
+    }
+
+    #[tokio::test]
+    async fn a_reconfigured_source_is_built_from_its_profile_as_saved() {
+        let saved = Saved(slcan_at(250_000));
+        let reader = saved_profile_reader(&saved, "f_saved_reader", "p-open-slcan").unwrap();
+        let sources: Vec<String> = reader.broker_configs().unwrap().into_iter().map(|c| c.profile_id).collect();
+        assert_eq!(sources, ["p-open-slcan"]);
+        let missing = saved_profile_reader(&saved, "f_saved_reader", "p-gone").err();
+        assert_eq!(missing.as_deref(), Some("Profile 'p-gone' not found"));
     }
 
     fn slcan_broker(id: &str, profile: &IOProfile) -> Result<IOBroker, String> {
