@@ -2,4 +2,11 @@
 import type { ByteNote } from "./ByteNote";
 import type { MuxCaseNotes } from "./MuxCaseNotes";
 
-export type ByteNotes = { frame: Array<ByteNote>, cases: Array<MuxCaseNotes>, };
+/**
+ * A frame's notes and its mux cases'.
+ */
+export type ByteNotes = { frame: Array<ByteNote>, 
+/**
+ * Every case, in key order.
+ */
+cases: Array<MuxCaseNotes>, };

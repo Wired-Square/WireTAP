@@ -5,4 +5,27 @@ import type { IntervalGroup } from "./IntervalGroup";
 import type { MuxTiming } from "./MuxTiming";
 import type { StartCandidate } from "./StartCandidate";
 
-export type BusOrder = { bus: number, frameCount: number, patterns: Array<CyclePattern>, intervalGroups: Array<IntervalGroup>, startCandidates: Array<StartCandidate>, mux: Array<MuxTiming>, bursts: Array<BurstTiming>, };
+/**
+ * Message order on one bus.
+ */
+export type BusOrder = { bus: number, frameCount: number, 
+/**
+ * Best first, by confidence × sequence length.
+ */
+patterns: Array<CyclePattern>, 
+/**
+ * By interval.
+ */
+intervalGroups: Array<IntervalGroup>, 
+/**
+ * Longest gap before first.
+ */
+startCandidates: Array<StartCandidate>, 
+/**
+ * In order of first appearance.
+ */
+mux: Array<MuxTiming>, 
+/**
+ * In order of first appearance; never a mux id.
+ */
+bursts: Array<BurstTiming>, };

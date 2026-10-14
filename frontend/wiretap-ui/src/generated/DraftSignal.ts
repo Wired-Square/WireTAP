@@ -3,4 +3,8 @@ import type { Confidence } from "./Confidence";
 import type { Endianness } from "./Endianness";
 import type { SignalSource } from "./SignalSource";
 
-export type DraftSignal = { name: string, startBit: number, bitLength: number, source: SignalSource, confidence: Confidence, byteOrder: Endianness | null, };
+export type DraftSignal = { name: string, startBit: number, bitLength: number, source: SignalSource, confidence: Confidence, 
+/**
+ * Only when it is not the draft's default.
+ */
+byteOrder: Endianness | null, };

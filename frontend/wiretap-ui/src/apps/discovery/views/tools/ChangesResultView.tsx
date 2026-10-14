@@ -6,7 +6,7 @@ import { GitCompare, RefreshCw, Minus, Activity, ChevronDown, ChevronRight, Laye
 import { iconSm, iconXs, iconLg, flexRowGap2 } from "../../../../styles/spacing";
 import { caption, captionMuted, emptyStateContainer, emptyStateText, emptyStateHeading, emptyStateDescription, borderDivider, sectionHeaderText, textMuted } from "../../../../styles";
 import { useDiscoveryStore } from "../../../../stores/discoveryStore";
-import type { ByteColumn, ChangesFrame, MultiBytePattern, MuxCase } from "../../../../api/byteRoles";
+import type { ByteColumn, ChangesFrame, MultiBytePattern, MuxCaseProfile } from "../../../../api/byteRoles";
 import type { ByteNote } from "../../../../generated/ByteNote";
 import type { MirrorGroup } from "../../../../generated/MirrorGroup";
 import type { MuxSelector } from "../../../../generated/MuxSelector";
@@ -448,7 +448,7 @@ function RoleCounts({ counts, withIcons = false }: { counts: ReturnType<typeof c
 // ============================================================================
 
 type MuxCaseSectionProps = {
-  muxCase: MuxCase;
+  muxCase: MuxCaseProfile;
   notes: ByteNote[];
   selector: MuxSelector;
   analysedFrom: number;

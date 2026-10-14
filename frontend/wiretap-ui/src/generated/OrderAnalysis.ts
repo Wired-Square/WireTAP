@@ -2,4 +2,15 @@
 import type { BusOrder } from "./BusOrder";
 import type { MultiBusFrame } from "./MultiBusFrame";
 
-export type OrderAnalysis = { totalFrames: number, uniqueKeys: number, timeSpanMs: number, buses: Array<BusOrder>, multiBus: Array<MultiBusFrame>, };
+/**
+ * Message order across a capture.
+ */
+export type OrderAnalysis = { totalFrames: number, uniqueKeys: number, timeSpanMs: number, 
+/**
+ * By bus.
+ */
+buses: Array<BusOrder>, 
+/**
+ * By key.
+ */
+multiBus: Array<MultiBusFrame>, };

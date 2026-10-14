@@ -22,6 +22,7 @@ import type { WidgetConfig } from '../apps/dashboard/widgets/configTypes';
 import { widgetForSignal } from '../apps/dashboard/widgets/autoWidget';
 import type { DashboardFileContent } from '../utils/dashboards';
 import { BYTE_NAMES } from '../generated/byteNames';
+import type { ScaledField } from '../generated/ScaledField';
 
 // ─────────────────────────────────────────
 // Types
@@ -125,21 +126,7 @@ export interface LayoutItem {
   h: number;
 }
 
-/** Parameters for a hypothesis candidate signal */
-export interface HypothesisParams {
-  /** Bit-level start offset within the frame payload */
-  startBit: number;
-  /** Number of bits to extract */
-  bitLength: number;
-  /** Endianness for extraction */
-  endianness: 'little' | 'big';
-  /** Whether the extracted value is signed */
-  signed: boolean;
-  /** Scale factor: physicalValue = rawValue * factor + offset */
-  factor: number;
-  /** Offset: physicalValue = rawValue * factor + offset */
-  offset: number;
-}
+export type HypothesisParams = ScaledField;
 
 // ─────────────────────────────────────────
 // Helpers
