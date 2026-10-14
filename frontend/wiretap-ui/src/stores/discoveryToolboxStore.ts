@@ -15,8 +15,8 @@ import { tlog } from '../api/settings';
 import { byteToHex } from '../utils/byteUtils';
 import type { ModbusRtuOptions } from '../api/capture';
 import type {
-  ChecksumDiscoveryOptions,
-  ChecksumDiscoveryResult,
+  ChecksumScanOptions,
+  ChecksumScanResult,
 } from '../api/checksums';
 import type { Draft } from '../api/drafting';
 import type { FcProbeEntry, Protocol } from '../api/io';
@@ -220,7 +220,7 @@ export type ToolboxState = {
   activeView: ToolboxView;
   messageOrder: MessageOrderOptions;
   changes: ChangesOptions;
-  checksumDiscovery: ChecksumDiscoveryOptions;
+  checksumDiscovery: ChecksumScanOptions;
   modbusTarget: ModbusTargetOptions;
   messageOrderResults: ProtocolOrder[] | null;
   /** What `messageOrderResults` read, which its report reads again. */
@@ -228,7 +228,7 @@ export type ToolboxState = {
   changesResults: ChangesResult | null;
   serialFramingResults: SerialFramingResult | null;
   serialPayloadResults: SerialPayloadResult | null;
-  checksumDiscoveryResults: ChecksumDiscoveryResult | null;
+  checksumDiscoveryResults: ChecksumScanResult | null;
   modbusRegisterScanResults: ModbusScanResults | null;
   modbusUnitIdScanResults: ModbusScanResults | null;
   modbusFcProbeResults: ModbusFcProbeResults | null;
@@ -248,14 +248,14 @@ interface DiscoveryToolboxState {
   setActiveView: (view: ToolboxView) => void;
   updateMessageOrderOptions: (options: Partial<MessageOrderOptions>) => void;
   updateChangesOptions: (options: Partial<ChangesOptions>) => void;
-  updateChecksumDiscoveryOptions: (options: Partial<ChecksumDiscoveryOptions>) => void;
+  updateChecksumDiscoveryOptions: (options: Partial<ChecksumScanOptions>) => void;
   updateModbusTarget: (options: Partial<ModbusTargetOptions>) => void;
   setIsRunning: (running: boolean) => void;
   setMessageOrderResults: (results: ProtocolOrder[] | null) => void;
   setChangesResults: (results: ChangesResult | null) => void;
   setSerialFramingResults: (results: SerialFramingResult | null) => void;
   setSerialPayloadResults: (results: SerialPayloadResult | null) => void;
-  setChecksumDiscoveryResults: (results: ChecksumDiscoveryResult | null) => void;
+  setChecksumDiscoveryResults: (results: ChecksumScanResult | null) => void;
   startModbusScan: (scanType: 'register' | 'unit-id', sessionId: string) => void;
   startModbusFcProbe: (deviceName: string) => void;
   finishModbusFcProbe: (outcome: { entries: FcProbeEntry[] } | { error: string }) => void;
@@ -291,7 +291,7 @@ interface DiscoveryToolboxState {
 
   runChecksumDiscoveryAnalysis: (
     source: ChecksumScanSource
-  ) => Promise<ChecksumDiscoveryResult | null>;
+  ) => Promise<ChecksumScanResult | null>;
 }
 
 /**

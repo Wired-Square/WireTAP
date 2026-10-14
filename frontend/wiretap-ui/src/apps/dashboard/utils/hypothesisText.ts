@@ -1,10 +1,10 @@
 // ui/src/apps/dashboard/utils/hypothesisText.ts
 
 import type { TFunction } from "i18next";
-import type { CandidateReason } from "../../../api/adhoc";
+import type { HypothesisReason } from "../../../api/adhoc";
 import type { HypothesisParams } from "../../../stores/dashboardStore";
 
-export function reasonText(t: TFunction, reasons: CandidateReason[]): string {
+export function reasonText(t: TFunction, reasons: HypothesisReason[]): string {
   const text = reasons.map((r) => {
     switch (r.code) {
       case "role": return t("hypothesis.reasons.role", { role: t(`hypothesis.reasons.roles.${r.role}`) });

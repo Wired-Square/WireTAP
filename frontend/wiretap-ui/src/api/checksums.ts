@@ -5,25 +5,22 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import type { ProtocolFrames } from "../utils/frameKey";
-import type { CHECKSUM_OUTPUT_BYTES } from "../generated/checksumAlgorithms";
+import type { ChecksumAlgorithm } from "../generated/ChecksumAlgorithm";
+import type { ChecksumDetectionOptions } from "../generated/ChecksumDetectionOptions";
+import type { ChecksumDetectionResult } from "../generated/ChecksumDetectionResult";
+import type { ChecksumScanOptions } from "../generated/ChecksumScanOptions";
+import type { ChecksumScanResult } from "../generated/ChecksumScanResult";
+import type { ChecksumSpec } from "../generated/ChecksumSpec";
+import type { ChecksumSweepResponse } from "../generated/ChecksumSweepResponse";
+import type { ChecksumValidationResult } from "../generated/ChecksumValidationResult";
+import type { DiscoveryFrame } from "../generated/DiscoveryFrame";
 
-// ============================================================================
-// Types
-// ============================================================================
-
-export type ChecksumAlgorithm = keyof typeof CHECKSUM_OUTPUT_BYTES;
-
-/**
- * Result of checksum validation.
- */
-export interface ChecksumValidationResult {
-  /** The checksum value extracted from the frame */
-  extracted: number;
-  /** The calculated checksum value */
-  calculated: number;
-  /** Whether the checksum is valid (extracted === calculated) */
-  valid: boolean;
-}
+export type { ChecksumAlgorithm, ChecksumDetectionResult, ChecksumScanOptions, ChecksumScanResult, ChecksumValidationResult };
+export type { ChecksumCandidate } from "../generated/ChecksumCandidate";
+export type { ChecksumEvidence } from "../generated/ChecksumEvidence";
+export type { ChecksumSpecification } from "../generated/ChecksumSpecification";
+export type { DiscoveredChecksum } from "../generated/DiscoveredChecksum";
+export type { FrameChecksumFinding } from "../generated/FrameChecksumFinding";
 
 // ============================================================================
 // API Functions
@@ -91,105 +88,6 @@ export async function resolveByteIndices(indices: number[], frameLengths: number
   return invoke<number[][]>("resolve_byte_indices", { indices, frame_lengths: frameLengths });
 }
 
-/** One point in the checksum candidate space. */
-export interface ChecksumSpec {
-  algorithm: ChecksumAlgorithm;
-  /** Byte offset of the checksum; negative counts from the end. */
-  position: number;
-  byteLength: 1 | 2;
-  bigEndian: boolean;
-  calcStartByte: number;
-  calcEndByte: number;
-}
-
-export interface ChecksumSpecResult {
-  /** Index into the `specs` array passed in. */
-  specIndex: number;
-  matchCount: number;
-  /** Frames the spec fitted — frames too short for it are excluded, not counted as misses. */
-  totalCount: number;
-}
-
-export interface ChecksumSweepResponse {
-  results: ChecksumSpecResult[];
-}
-
-/**
- * A translatable note. Rust decides *what* to say, the frontend decides how —
- * render with `t(\`serial.checksumNote.${code}\`, values)`.
- */
-export interface ChecksumNote {
-  code: string;
-  values: Record<string, string | number>;
-}
-
-/**
- * What one end-relative byte column looks like across the sample: the structural
- * evidence behind the detector's priors.
- *
- * The same statistics the identification pass judges a column on, because both
- * halves now profile the columns once and share the result — a byte cannot be
- * called padding by one and swept as a candidate by the other.
- */
-export interface ColumnStats {
-  /** Negative index, e.g. -1 for the last byte. */
-  position: number;
-  distinctValues: number;
-  min: number;
-  max: number;
-  /** Set when the column holds one value across every sampled frame. */
-  constantValue: number | null;
-  /** Consecutive frame pairs in which this byte differed. */
-  changes: number;
-  /** Consecutive frame pairs the column took part in. */
-  transitions: number;
-  /** Shannon entropy of the observed values, in bits; 8.0 is a byte's most. */
-  entropyBits: number;
-  sampleCount: number;
-}
-
-export interface ChecksumCandidate {
-  algorithm: ChecksumAlgorithm;
-  position: number;
-  length: 1 | 2;
-  bigEndian: boolean;
-  calcStartByte: number;
-  calcEndByte: number;
-  matchCount: number;
-  totalCount: number;
-  /** 0-100 */
-  matchRate: number;
-  /** 0-100 composite score. */
-  confidence: number;
-  notes: ChecksumNote[];
-  /** Other calculation ranges that scored identically. */
-  equivalentRanges: { calcStartByte: number; calcEndByte: number }[];
-}
-
-export interface ChecksumDetectionResult {
-  candidates: ChecksumCandidate[];
-  bestCandidate: ChecksumCandidate | null;
-  tailColumns: ColumnStats[];
-  /** Result-level explanation, including why nothing was found. */
-  notes: ChecksumNote[];
-}
-
-export interface ChecksumDetectionOptions {
-  /** Checksum offsets to try, end-relative (default [-1, -2, -3]). */
-  positions?: number[];
-  /** Restrict to checksums of these byte lengths; omit for both. */
-  lengths?: (1 | 2)[];
-  /**
-   * Byte offsets just past a declared header field, from the view's ID/Source
-   * chips. These widen the calculation-range candidates; they never narrow them.
-   */
-  headerBoundaries?: number[];
-  /** Percentage below which a candidate is discarded (default 50). */
-  minMatchRate?: number;
-  /** Confidence below which a candidate is discarded (default 35). */
-  minConfidence?: number;
-}
-
 /**
  * Rank the checksum configurations that explain a set of frames.
  *
@@ -223,152 +121,6 @@ export async function sweepChecksumSpecs(
 // Discovery across a capture
 // ============================================================================
 
-/** The additive families the solver recognises. */
-export type AdditiveOp = "xor" | "sum" | "negatedSum";
-
-/** One conventional `init` and the `xorOut` it implies for a recovered residue. */
-export interface CrcAlternative {
-  init: number;
-  xorOut: number;
-}
-
-/**
- * A recovered CRC.
- *
- * `init`/`xorOut` are the canonical pair — always exact, and for fixed-length
- * payloads never the *only* pair that fits, which is what `alternatives` is
- * for. Present one of them as the answer and you are guessing.
- */
-export interface CrcParameters {
-  /** 8 or 16. */
-  width: number;
-  polynomial: number;
-  reflectIn: boolean;
-  reflectOut: boolean;
-  init: number;
-  xorOut: number;
-  /** True when the polynomial is a recognised standard. */
-  wellKnown: boolean;
-  alternatives: CrcAlternative[];
-}
-
-/**
- * How a checksum is computed. `named` came from the scored sweep of the eleven
- * built-in algorithms; the other two were solved, and carry parameters no fixed
- * list can express.
- */
-export type ChecksumSpecification =
-  | { kind: "named"; algorithm: ChecksumAlgorithm }
-  | { kind: "additive"; op: AdditiveOp; offset: number }
-  | ({ kind: "crc" } & CrcParameters);
-
-/** One configuration that explains a frame id, with the evidence for it. */
-export interface DiscoveredChecksum {
-  specification: ChecksumSpecification;
-  position: number;
-  length: number;
-  bigEndian: boolean;
-  calcStartByte: number;
-  calcEndByte: number;
-  /** Samples the configuration reproduced. */
-  matchCount: number;
-  /** Samples it was measured against. */
-  totalCount: number;
-  /**
-   * 0-100, and `null` for a solved configuration.
-   *
-   * A solve reproduces every sample it was verified against or is not reported
-   * at all, so there is no rate to state — render the sample count instead.
-   */
-  matchRate: number | null;
-  /** Samples left out because their calculation range was a different length. */
-  excludedCount: number;
-  /** 0-100 composite score. */
-  confidence: number;
-  notes: ChecksumNote[];
-  equivalentRanges: { calcStartByte: number; calcEndByte: number }[];
-}
-
-/** Why identification ruled a byte column out before the solver was asked. */
-export type ChecksumRejection =
-  | "constant"
-  | "notAFunctionOfTheOtherBytes"
-  | "tooOftenUnchanged"
-  | "tooFewTransitions"
-  | "tooFewDistinctValues";
-
-/**
- * What identification decided about one byte column.
- *
- * A checksum is a function of the other bytes, so a column that changes while
- * every other byte holds still cannot be one — that rejection is arithmetic,
- * not a threshold. What survives is judged on how reliably it moves with the
- * payload, and on taking roughly as many values as there are distinct payloads.
- */
-export interface ChecksumEvidence {
-  /** End-relative index: -1 is the last byte. */
-  position: number;
-  payloadChanged: number;
-  changedWithPayload: number;
-  changedAlone: number;
-  /** `changedWithPayload / payloadChanged`. */
-  responsiveness: number;
-  entropyBits: number;
-  distinctRatio: number;
-  /** 0-100. Zero when `rejected` is set. */
-  likeness: number;
-  rejected: ChecksumRejection | null;
-}
-
-/**
- * What the scan found for one frame id — including when it found nothing, so
- * the reason stays visible instead of the id vanishing from the results.
- */
-export interface FrameChecksumFinding {
-  frameId: number;
-  isExtended: boolean;
-  frameCount: number;
-  /**
-   * Distinct payloads among them. A checksum cannot be recovered from repeats,
-   * so this — not `frameCount` — is what bounds the search.
-   */
-  distinctPayloads: number;
-  candidates: DiscoveredChecksum[];
-  /**
-   * What identification decided about each byte column. This is the useful half
-   * of an empty result: not "nothing found" but "byte -1 never changes, byte -2
-   * is a counter".
-   */
-  columns: ChecksumEvidence[];
-  notes: ChecksumNote[];
-}
-
-export interface ChecksumDiscoveryResult {
-  findings: FrameChecksumFinding[];
-  frameCount: number;
-  uniqueFrameIds: number;
-  /** Ids skipped for having fewer than `minSamples` frames. */
-  skippedFrameIds: number;
-}
-
-export interface ChecksumDiscoveryOptions {
-  /** Frames an id needs before it is worth analysing (default 10). */
-  minSamples?: number;
-  /** Checksum offsets to try, end-relative (default [-1, -2, -3]). */
-  positions?: number[];
-  /** Recover arbitrary CRC polynomials, not only the named algorithms. */
-  searchCustomPolynomials?: boolean;
-  /**
-   * How checksum-shaped a byte column must look before the solver is asked
-   * about it (default 50). Zero solves every column not rejected outright.
-   *
-   * The only sensitivity control there is. Match rate, confidence floor and the
-   * per-id candidate cap are fixed in Rust — they were reachable from no
-   * surface, and none of them is a judgement a user is placed to make.
-   */
-  minLikeness?: number;
-}
-
 /**
  * Scan a capture for checksums: group by frame id, then work out what explains
  * each group.
@@ -381,21 +133,13 @@ export interface ChecksumDiscoveryOptions {
 export async function discoverChecksumsInCapture(
   captureId: string,
   selection: ProtocolFrames[],
-  options: ChecksumDiscoveryOptions = {}
-): Promise<ChecksumDiscoveryResult> {
-  return invoke<ChecksumDiscoveryResult>("discover_checksums_in_capture_cmd", {
+  options: ChecksumScanOptions = {}
+): Promise<ChecksumScanResult> {
+  return invoke<ChecksumScanResult>("discover_checksums_in_capture_cmd", {
     capture_id: captureId,
     selection,
     options,
   });
-}
-
-/** Frames as the scan wants them — a `FrameMessage` already satisfies this. */
-export interface DiscoveryFrame {
-  protocol?: string;
-  frame_id: number;
-  bytes: number[];
-  is_extended?: boolean;
 }
 
 /**
@@ -405,7 +149,7 @@ export interface DiscoveryFrame {
  */
 export async function discoverChecksums(
   frames: DiscoveryFrame[],
-  options: ChecksumDiscoveryOptions = {}
-): Promise<ChecksumDiscoveryResult> {
-  return invoke<ChecksumDiscoveryResult>("discover_checksums_cmd", { frames, options });
+  options: ChecksumScanOptions = {}
+): Promise<ChecksumScanResult> {
+  return invoke<ChecksumScanResult>("discover_checksums_cmd", { frames, options });
 }

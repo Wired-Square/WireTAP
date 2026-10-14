@@ -206,6 +206,20 @@ fn render() -> BTreeMap<PathBuf, String> {
     r.visit::<crate::decode_views::RegisterRead>();
     r.visit::<crate::decode_views::RegisterReading>();
     r.visit::<crate::decode_views::MaskMatch>();
+    r.visit::<crate::byte_roles::PayloadChanges>();
+    r.visit::<wiretap_analysis::SerialStructure>();
+    r.visit::<crate::adhoc::SignalRef>();
+    r.visit::<crate::adhoc::RankRequest>();
+    r.visit::<crate::adhoc::RankedHypotheses>();
+    r.visit::<crate::checksums::ChecksumSweepResponse>();
+    r.visit::<wiretap_checksum::ChecksumSpec>();
+    r.visit::<wiretap_checksum::ChecksumValidationResult>();
+    r.visit::<wiretap_checksum::ChecksumDetectionOptions>();
+    r.visit::<wiretap_checksum::ChecksumDetectionResult>();
+    r.visit::<crate::checksum_discovery::DiscoveryFrame>();
+    r.visit::<wiretap_analysis::ChecksumScanOptions>();
+    r.visit::<wiretap_analysis::ChecksumScanResult>();
+    r.visit::<wiretap_gateway::DatabaseActivityResult>();
     r.files.into_iter().map(|(path, (_, text))| (path, text)).collect()
 }
 
@@ -701,6 +715,7 @@ fn analysis_results_serialise_as_declared() {
 
 #[tokio::test]
 async fn drafts_serialise_as_declared() {
+    use wiretap_analysis::draft::*;
     use wiretap_analysis::source::MemorySource;
 
     let mut source = MemorySource::default();
@@ -714,7 +729,6 @@ async fn drafts_serialise_as_declared() {
     let changes = crate::byte_roles::payload_changes(&source, vec![], None, usize::MAX).await.unwrap();
     let mut draft = Draft::default();
     crate::drafting::apply_changes(&mut draft, &changes);
-    use wiretap_analysis::draft::*;
     let orders = wiretap_analysis::source::message_order(&source, &wiretap_analysis::source::FrameSelection::default(), None, None)
         .await
         .unwrap();

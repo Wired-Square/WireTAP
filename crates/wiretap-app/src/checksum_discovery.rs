@@ -44,10 +44,12 @@ pub async fn discover_checksums_in_capture_cmd(
 /// Just enough of a `FrameMessage` to group and analyse. Serde ignores the rest
 /// of the fields the frontend sends.
 #[derive(Debug, Clone, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct DiscoveryFrame {
     pub frame_id: u32,
     pub bytes: Vec<u8>,
     #[serde(default)]
+    #[cfg_attr(test, ts(as = "Option<bool>", optional))]
     pub is_extended: bool,
 }
 

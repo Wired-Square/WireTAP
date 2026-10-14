@@ -37,10 +37,12 @@ fn hypothesis_name(frame_id: u32, field: &PayloadField) -> String {
 /// One charted signal, as the Dashboard names it. `params` is a `hyp_*` name's
 /// saved scaling; every other name is parsed.
 #[derive(Debug, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(rename = "AdhocSignalRef"))]
 #[serde(rename_all = "camelCase")]
 pub struct SignalRef {
     frame_id: u32,
     name: String,
+    #[cfg_attr(test, ts(optional))]
     params: Option<ScaledField>,
 }
 
@@ -239,10 +241,12 @@ pub fn dispatch_adhoc_command(
 
 /// The explorer's sweep. `end_bit` absent means each frame's whole payload.
 #[derive(Debug, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct RankRequest {
     frame_ids: Vec<u32>,
     start_bit: u32,
+    #[cfg_attr(test, ts(optional))]
     end_bit: Option<u32>,
     bit_step: u32,
     bit_lengths: Vec<u32>,
@@ -254,6 +258,7 @@ pub struct RankRequest {
 }
 
 #[derive(Debug, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct RankedHypotheses {
     /// Best first, at most `MAX_CANDIDATES`.
@@ -263,6 +268,7 @@ pub struct RankedHypotheses {
 }
 
 #[derive(Debug, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 struct RankedCandidate {
     frame_id: u32,

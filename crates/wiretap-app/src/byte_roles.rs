@@ -33,6 +33,7 @@ pub struct ProtocolMirrors {
 /// One frame as Payload Changes reports it: its byte profile, what the profile
 /// says, and whether message order finds it sent in bursts.
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct ChangesFrame {
     #[serde(flatten)]
     pub profile: FrameByteProfile,
@@ -41,6 +42,7 @@ pub struct ChangesFrame {
 }
 
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
 pub struct PayloadChanges {
     /// The frames read for mirrors and bursts.
