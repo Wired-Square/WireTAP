@@ -126,7 +126,6 @@ export function useFrameHandlers({
       registerNumber: cfg.protocol === "modbus" ? cfg.register_number : undefined,
       nodeAddress: cfg.protocol === "modbus" ? cfg.node_address : undefined,
       registerType: cfg.protocol === "modbus" ? cfg.register_type : undefined,
-      delimiter: cfg.protocol === "serial" ? cfg.delimiter : undefined,
       existingKeys,
       originalKey: editingFrameOriginalKey ?? undefined,
       availablePeers,

@@ -18,7 +18,7 @@ import CatalogTreePanel from "./layouts/CatalogTreePanel";
 import CatalogToolbar from "./layouts/CatalogToolbar";
 import SelectionHeader from "./layouts/SelectionHeader";
 import { catalogToTree } from "./tree/catalogToTree";
-import type { SerialEncoding, TomlNode } from "./types";
+import type { TomlNode } from "./types";
 import type { Catalog, Frame } from "../../types/catalogModel";
 import { findNodeByPath } from "./tree/treeUtils";
 import { formatFrameId } from "./utils";
@@ -169,7 +169,6 @@ function CatalogEditorInner() {
 
   const catalogDefaults = useMemo(() => ({
     interval: frameDefaultInterval(catalog, forms.frameFields.protocol),
-    serialEncoding: catalog?.serial?.encoding as SerialEncoding | undefined,
   }), [catalog, forms.frameFields.protocol]);
 
   // Computed values — the store owns the dirty logic (prefer the Rust diff, fall

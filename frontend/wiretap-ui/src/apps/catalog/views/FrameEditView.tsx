@@ -13,7 +13,6 @@ import type {
   ModbusConfig,
   SerialConfig,
   FrameBaseFields,
-  SerialEncoding,
   SlaveOption,
 } from "../types";
 import { defaultFrameConfig } from "./frameEditUtils";
@@ -53,7 +52,6 @@ export type FrameEditViewProps = {
   /** Default values from catalog meta */
   defaults?: {
     interval?: number;
-    serialEncoding?: SerialEncoding;
   };
 
   primaryActionLabel?: string;
@@ -163,7 +161,6 @@ export default function FrameEditView({
           <SerialConfigSection
             config={fields.config as SerialConfig}
             onChange={handleSerialConfigChange}
-            catalogEncoding={defaults?.serialEncoding}
           />
         );
       default:
