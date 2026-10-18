@@ -18,11 +18,11 @@ use rmcp::handler::server::wrapper::Parameters;
 use rmcp::model::{CacheScope, CallToolResult};
 use rmcp::{ErrorData as McpError, tool, tool_router};
 use serde_json::{json, Value};
-use wslib_ai_mcp::dom::{self, DomBridge};
-use wslib_ai_mcp::result::{internal_error as err, ok_json, ok_text};
-use wslib_ai_mcp::rmcp;
-use wslib_ai_mcp::router::{compose, mark_read_only};
-use wslib_ai_mcp::server::{ServerIdentity, ToolListCache};
+use wslib_mcp::dom::{self, DomBridge};
+use wslib_mcp::result::{internal_error as err, ok_json, ok_text};
+use wslib_mcp::rmcp;
+use wslib_mcp::router::{compose, mark_read_only};
+use wslib_mcp::server::{ServerIdentity, ToolListCache};
 
 use super::types::*;
 use super::McpRunningConfig;
@@ -84,8 +84,8 @@ impl WireTapTools {
                  attach_source surfaces a session in a source-aware tab (discovery, \
                  decoder, transmit, query, or dashboard) so the human sees what the agent is \
                  working on. Every read tool answers with no window open. The DOM tools \
-                 need one: query and wait_for read the window, and with UI control click, \
-                 type and press drive it without needing focus.",
+                 need one: query and wait_for read the window, console reads what it logged, \
+                 and with UI control click, type and press drive it without needing focus.",
             )
     }
 }
@@ -1993,8 +1993,8 @@ bit_length = 8
     fn vendored_dom_ops_match_the_library() {
         let vendored = include_str!("../../../../frontend/wiretap-ui/src/services/domOps.ts");
         assert!(
-            vendored == wslib_ai_mcp::dom::OPS_TS,
-            "re-copy crates/wslib-ai-mcp/js/dom-ops.ts from wslib-ai-rs to frontend/wiretap-ui/src/services/domOps.ts"
+            vendored == wslib_mcp::dom::OPS_TS,
+            "re-copy crates/wslib-mcp/js/dom-ops.ts from wslib-rs to frontend/wiretap-ui/src/services/domOps.ts"
         );
     }
 }
@@ -2005,8 +2005,8 @@ mod context_tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::{Arc, Mutex};
 
-    use wslib_ai_mcp::rmcp::handler::server::wrapper::Parameters;
-    use wslib_ai_mcp::rmcp::model::CallToolResult;
+    use wslib_mcp::rmcp::handler::server::wrapper::Parameters;
+    use wslib_mcp::rmcp::model::CallToolResult;
     use serde_json::{json, Value};
 
     use super::{McpError, WireTapTools};

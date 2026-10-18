@@ -1,6 +1,6 @@
-// The page half of wslib-ai-mcp's `dom` tools. Vendored byte-for-byte from
-// wslib-ai-rs `crates/wslib-ai-mcp/js/dom-ops.ts`; the Rust side holds the
-// same text as `wslib_ai_mcp::dom::OPS_TS`. No framework or transport imports:
+// The page half of wslib-mcp's `dom` tools. Vendored byte-for-byte from
+// wslib-rs `crates/wslib-mcp/js/dom-ops.ts`; the Rust side holds the
+// same text as `wslib_mcp::dom::OPS_TS`. No framework or transport imports:
 // the consumer carries (op, args) here and the result or thrown error back.
 
 type Box = Pick<DOMRect, "left" | "top" | "right" | "bottom">;
@@ -160,12 +160,88 @@ async function waitFor({
   return { elapsedMs: Math.round(performance.now() - started) };
 }
 
+type ConsoleLevel = "error" | "warn" | "uncaught" | "rejection";
+
+interface ConsoleEntry {
+  seq: number;
+  level: ConsoleLevel;
+  message: string;
+  stack?: string;
+  at: number;
+}
+
+interface ConsoleCapture {
+  entries: ConsoleEntry[];
+  next: number;
+  dropped: number;
+}
+
+const CONSOLE_CAP = 200;
+const MESSAGE_CAP = 2000;
+
+function render(value: unknown): string {
+  if (value instanceof Error) return `${value.name}: ${value.message}`;
+  if (typeof value === "string") return value;
+  try {
+    return JSON.stringify(value) ?? String(value);
+  } catch {
+    return String(value);
+  }
+}
+
+function record(capture: ConsoleCapture, level: ConsoleLevel, values: unknown[]) {
+  const error = values.find((v): v is Error => v instanceof Error);
+  capture.entries.push({
+    seq: capture.next++,
+    level,
+    message: values.map(render).join(" ").slice(0, MESSAGE_CAP),
+    stack: error?.stack,
+    at: Date.now(),
+  });
+  if (capture.entries.length > CONSOLE_CAP) {
+    capture.entries.shift();
+    capture.dropped++;
+  }
+}
+
+function installConsoleCapture(): ConsoleCapture {
+  const capture: ConsoleCapture = { entries: [], next: 1, dropped: 0 };
+  for (const level of ["error", "warn"] as const) {
+    const original = console[level];
+    console[level] = (...values: unknown[]) => {
+      record(capture, level, values);
+      original.apply(console, values);
+    };
+  }
+  window.addEventListener("error", (e) =>
+    record(capture, "uncaught", [e.error ?? `${e.message} (${e.filename}:${e.lineno}:${e.colno})`]),
+  );
+  window.addEventListener("unhandledrejection", (e) => record(capture, "rejection", [e.reason]));
+  return capture;
+}
+
+// Installed on import, so errors from before the bridge is up are kept. Held on
+// the window so a hot-reloaded copy of this module neither wraps console twice
+// nor loses what was captured.
+const host = window as { __wslibConsoleCapture?: ConsoleCapture };
+const consoleCapture = host.__wslibConsoleCapture ?? (host.__wslibConsoleCapture = installConsoleCapture());
+
+function readConsole({ clear, levels, since }: { clear: boolean; levels?: ConsoleLevel[]; since?: number }) {
+  const entries = consoleCapture.entries.filter(
+    (e) => (since === undefined || e.seq > since) && (levels === undefined || levels.includes(e.level)),
+  );
+  const dropped = consoleCapture.dropped;
+  if (clear) consoleCapture.entries.length = 0;
+  return { entries, dropped };
+}
+
 export const domOps = {
   query,
   click,
   type,
   press,
   wait_for: waitFor,
+  console: readConsole,
 };
 
 export type DomOp = keyof typeof domOps;

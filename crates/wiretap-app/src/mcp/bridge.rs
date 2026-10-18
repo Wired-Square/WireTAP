@@ -6,23 +6,16 @@
 //! frontend replies with a `BridgeResponse` which `resolve` routes back to the
 //! awaiting caller.
 
-use std::collections::HashMap;
-use std::sync::Mutex;
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::LazyLock;
 use std::time::Duration;
 
-use once_cell::sync::Lazy;
 use serde_json::Value;
-use tokio::sync::oneshot;
+use wslib_mcp::bridge::Pending;
 
 use crate::ws::protocol::{self, MsgType};
 use crate::ws::server::{authenticated_connection_count, ws_server};
 
-static NEXT_ID: AtomicU32 = AtomicU32::new(1);
-
-/// Pending requests keyed by correlation id, awaiting a frontend response.
-static PENDING: Lazy<Mutex<HashMap<u32, oneshot::Sender<Result<Value, String>>>>> =
-    Lazy::new(|| Mutex::new(HashMap::new()));
+static PENDING: LazyLock<Pending> = LazyLock::new(Pending::default);
 
 /// Send a request to the frontend and await its JSON response.
 ///
@@ -37,50 +30,22 @@ pub async fn request(method: &str, params: Value, timeout: Duration) -> Result<V
         );
     }
 
-    let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
-    let (tx, rx) = oneshot::channel();
-    if let Ok(mut pending) = PENDING.lock() {
-        pending.insert(id, tx);
-    }
-
+    let (id, rx) = PENDING.open();
     let params_bytes = serde_json::to_vec(&params).unwrap_or_default();
     let payload = protocol::encode_bridge_request(id, method, &params_bytes);
     let msg = protocol::encode_message(MsgType::BridgeRequest, 0, &payload);
     server.send_global(msg);
-
-    match tokio::time::timeout(timeout, rx).await {
-        Ok(Ok(result)) => result,
-        Ok(Err(_)) => {
-            remove(id);
-            Err("Bridge request cancelled".to_string())
-        }
-        Err(_) => {
-            remove(id);
-            Err(format!(
-                "Bridge request '{method}' timed out — is the WireTAP window open?"
-            ))
-        }
-    }
-}
-
-fn remove(id: u32) {
-    if let Ok(mut pending) = PENDING.lock() {
-        pending.remove(&id);
-    }
+    PENDING.wait(id, rx, timeout).await
 }
 
 /// Resolve a pending request from a `BridgeResponse` received over WS.
 /// `status` is 0 for success (payload is JSON) or 1 for error (payload is text).
 pub fn resolve(correlation_id: u32, status: u8, payload: Vec<u8>) {
-    let tx = match PENDING.lock().ok().and_then(|mut p| p.remove(&correlation_id)) {
-        Some(tx) => tx,
-        None => return,
-    };
     let result = if status == 0 {
         serde_json::from_slice::<Value>(&payload)
             .map_err(|e| format!("Invalid bridge response JSON: {e}"))
     } else {
         Err(String::from_utf8_lossy(&payload).into_owned())
     };
-    let _ = tx.send(result);
+    PENDING.settle(correlation_id, result);
 }

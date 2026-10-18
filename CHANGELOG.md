@@ -2,6 +2,12 @@
 
 All notable changes to WireTAP will be documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- **MCP `console` reads the window's errors.** Agents driving the window can now read the errors and warnings it logged, including uncaught ones and those raised while it loaded, which a release build otherwise has no way to show.
+
 ## [0.15.0] - 2026-10-14
 
 ### Changed

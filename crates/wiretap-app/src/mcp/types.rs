@@ -6,7 +6,7 @@
 
 use rmcp::schemars::{self, JsonSchema};
 use serde::Deserialize;
-use wslib_ai_mcp::rmcp;
+use wslib_mcp::rmcp;
 
 use crate::io::CanTransmitFrame;
 

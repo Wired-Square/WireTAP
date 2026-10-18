@@ -1,0 +1,13 @@
+# Appended to $CARGO_HOME/config.toml in CI, which cannot reach Forgejo: the
+# read-only mirror stands in for it. Cargo.lock still records Forgejo. The
+# token is CARGO_REGISTRIES_WIRED_SQUARE_MIRROR_TOKEN.
+[registries.wired-square]
+index = "sparse+https://forge.wiredsquare.com/api/packages/wired-square/cargo/"
+
+[source.wired-square-forge]
+registry = "sparse+https://forge.wiredsquare.com/api/packages/wired-square/cargo/"
+replace-with = "wired-square-mirror"
+
+[registries.wired-square-mirror]
+index = "sparse+https://crates.wiredsquare.com/"
+credential-provider = "cargo:token"

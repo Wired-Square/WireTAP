@@ -8625,7 +8625,7 @@ dependencies = [
  "wiretap-gateway",
  "wiretap-io",
  "wiretap-protocol",
- "wslib-ai-mcp",
+ "wslib-mcp",
  "wslib-mcu-flash",
 ]
 
@@ -8920,9 +8920,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "wslib-ai-mcp"
-version = "0.1.2"
-source = "git+ssh://git@github.com/Wired-Square/wslib-ai-rs.git?tag=v0.1.2#c4674fed82786d7556cb072d22eecffab41e13ee"
+name = "wslib-mcp"
+version = "0.1.0"
+source = "sparse+https://forge.wiredsquare.com/api/packages/wired-square/cargo/"
+checksum = "d79dc783d13f509e9016f9532a62873fd1c0b5d132e21c32b9d03c3503b29348"
 dependencies = [
  "axum",
  "ipnet",

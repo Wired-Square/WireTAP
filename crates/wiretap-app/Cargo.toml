@@ -69,9 +69,8 @@ reqwest = { version = "0.12", features = ["json"] }
 # frontend @sentry/react SDK. Needs >= 0.42 for structured logs.
 sentry = { version = "0.42", features = ["logs"] }
 rumqttc = "0.24"
-# MCP server (opt-in via settings). rmcp comes through wslib-ai-mcp's re-export;
-# a local `.cargo/config.toml` paths override covers the dev loop.
-wslib-ai-mcp = { git = "ssh://git@github.com/Wired-Square/wslib-ai-rs.git", tag = "v0.1.2", features = ["http", "dom"] }
+# MCP server (opt-in via settings). rmcp comes through wslib-mcp's re-export.
+wslib-mcp = { version = "0.1", registry = "wired-square", features = ["http", "dom", "bridge"] }
 tokio-tungstenite = "0.26"
 rusqlite = { version = "0.40", features = ["bundled", "hooks", "fallible_uint"] }
 futures = "0.3"

@@ -68,7 +68,7 @@ script driving the MCP server can reach what only the page can do:
 | Method | MCP tool | Use |
 |---|---|---|
 | `ui.openPanel` | `open_app` | drive: open a panel |
-| `dom.*` | `query`, `wait_for`, `click`, `type`, `press` | read and drive the DOM |
+| `dom.*` | `query`, `wait_for`, `console`, `click`, `type`, `press` | read and drive the DOM, read the page's errors and warnings |
 
 Plus `attach_source`, which surfaces a session in a source-aware tab. Requires
 the app running, `mcp_server_enabled`, and the relevant control permissions in

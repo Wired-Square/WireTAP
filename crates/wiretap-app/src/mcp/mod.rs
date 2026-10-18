@@ -3,7 +3,7 @@
 //! MCP server — exposes live WireTAP runtime state to an external MCP client
 //! over a localhost streamable-HTTP transport. Opt-in via settings; read-only
 //! unless `mcp_allow_control` is also enabled. The transport, bearer gate and
-//! connection tracking are `wslib-ai-mcp`'s; this module owns the settings
+//! connection tracking are `wslib-mcp`'s; this module owns the settings
 //! mapping and the start/stop lifecycle. The tools that drive the window
 //! (`open_app`, `dom.*`) reach the page via [`bridge`].
 
@@ -18,9 +18,9 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use once_cell::sync::Lazy;
-use wslib_ai_mcp::CancellationToken;
-use wslib_ai_mcp::http::{self, ConnectionObserver, HttpConfig};
-use wslib_ai_mcp::server::ToolServer;
+use wslib_mcp::CancellationToken;
+use wslib_mcp::http::{self, ConnectionObserver, HttpConfig};
+use wslib_mcp::server::ToolServer;
 
 use tools::WireTapTools;
 use crate::boot::Paths;

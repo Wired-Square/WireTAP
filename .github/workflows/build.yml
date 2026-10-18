@@ -55,10 +55,16 @@ jobs:
             label: Windows_x64
 
     runs-on: ${{ matrix.platform }}
+    env:
+      CARGO_REGISTRIES_WIRED_SQUARE_MIRROR_TOKEN: ${{ secrets.CARGO_REGISTRIES_WIRED_SQUARE_TOKEN }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
+
+      - name: Read the wslib crates from the registry mirror
+        shell: bash
+        run: cat .cargo/mirror.toml >> "${CARGO_HOME:-$HOME/.cargo}/config.toml"
 
       # Deploy keys are per-repo and GitHub authenticates with the first key
       # offered, so each private repo gets its own ssh host alias pinned to its
@@ -67,7 +73,6 @@ jobs:
         shell: bash
         env:
           WSLIB_FRAMELINK_DEPLOYMENT_KEY: ${{ secrets.WSLIB_FRAMELINK_DEPLOYMENT_KEY }}
-          WSLIB_AI_DEPLOYMENT_KEY: ${{ secrets.WSLIB_AI_DEPLOYMENT_KEY }}
           WSLIB_MCU_DEPLOYMENT_KEY: ${{ secrets.WSLIB_MCU_DEPLOYMENT_KEY }}
         run: |
           mkdir -p ~/.ssh && chmod 700 ~/.ssh
@@ -81,7 +86,6 @@ jobs:
             git config --global url."ssh://git@$repo.github.com/Wired-Square/$repo".insteadOf "ssh://git@github.com/Wired-Square/$repo"
           }
           route framelink-rs WSLIB_FRAMELINK_DEPLOYMENT_KEY
-          route wslib-ai-rs WSLIB_AI_DEPLOYMENT_KEY
           route wslib-mcu-rs WSLIB_MCU_DEPLOYMENT_KEY
 
       - name: Force Cargo to use git CLI

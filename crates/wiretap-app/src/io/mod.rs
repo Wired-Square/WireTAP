@@ -90,7 +90,7 @@ use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Emitter};
 use session_log::SessionLogEvent;
-use wslib_ai_mcp::rmcp::schemars::{self, JsonSchema};
+use wslib_mcp::rmcp::schemars::{self, JsonSchema};
 
 // ============================================================================
 // Shared Types (used by multiple readers)

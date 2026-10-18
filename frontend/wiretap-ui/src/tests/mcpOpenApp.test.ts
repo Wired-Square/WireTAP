@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+
 import { describe, it, expect, vi } from "vitest";
 
 const handlers = new Map<string, (params: unknown) => unknown>();
