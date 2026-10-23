@@ -8,6 +8,10 @@ All notable changes to WireTAP will be documented in this file.
 
 - **MCP `console` reads the window's errors.** Agents driving the window can now read the errors and warnings it logged, including uncaught ones and those raised while it loaded, which a release build otherwise has no way to show.
 
+### Fixed
+
+- **Firmware flashing in the Serial app.** STM32 UART read-back now handles full 256-byte chunks, and cancelling an ESP or DFU flash now stops esptool and dfu-util too. If a read-back fails or is cancelled, the existing output file is left untouched, and esptool progress no longer shows terminal control codes.
+
 ## [0.15.0] - 2026-10-14
 
 ### Changed
