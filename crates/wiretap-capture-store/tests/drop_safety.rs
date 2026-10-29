@@ -5,7 +5,7 @@ use std::future::Future;
 use std::time::{Duration, Instant};
 
 use sqlx::Row;
-use wiretap_capture::{Cancel, Sql, Store, StoredFrame};
+use wiretap_capture_store::{Cancel, Sql, Store, StoredFrame};
 
 const POOL: usize = 5;
 

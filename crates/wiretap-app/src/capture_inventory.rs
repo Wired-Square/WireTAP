@@ -50,7 +50,7 @@ impl Rollup {
     }
 }
 
-/// The length the capture store reads a frame back under: see `wiretap_capture::STORED_LENGTH`.
+/// The length the capture store reads a frame back under: see `wiretap_capture_store::STORED_LENGTH`.
 fn stored_length(frame: &FrameMessage) -> u16 {
     frame.dlc.max(frame.bytes.len() as u16)
 }

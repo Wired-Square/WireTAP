@@ -9023,7 +9023,7 @@ dependencies = [
  "uuid",
  "windows-sys 0.59.0",
  "wiretap-analysis",
- "wiretap-capture",
+ "wiretap-capture-store",
  "wiretap-catalog",
  "wiretap-checksum",
  "wiretap-decode",
@@ -9063,7 +9063,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "wiretap-capture"
+name = "wiretap-capture-store"
 version = "0.15.0"
 dependencies = [
  "serde",

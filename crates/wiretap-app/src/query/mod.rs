@@ -21,7 +21,7 @@ use wiretap_gateway::{
 };
 
 use wiretap_analysis::source::InventoryRow;
-use wiretap_capture::Cancel;
+use wiretap_capture_store::Cancel;
 use crate::payload_source::QuerySource;
 use crate::settings::SettingsSource;
 

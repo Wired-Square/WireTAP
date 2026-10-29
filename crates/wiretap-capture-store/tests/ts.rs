@@ -3,7 +3,7 @@
 //! declaration it must keep, under the same name.
 
 use ts_rs::{Config, TS};
-use wiretap_capture::{
+use wiretap_capture_store::{
     CaptureEvent, CaptureEventPatch, CaptureFrameInfo, CaptureKind, CaptureMetadata,
     CaptureProtocol, FrameRowFilter, NewCaptureEvent, TimestampedByte,
 };

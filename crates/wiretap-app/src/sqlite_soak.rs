@@ -14,7 +14,7 @@ use std::sync::{mpsc, Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use wiretap_analysis::source::FrameSelection;
-use wiretap_capture::{Cancel, CaptureError, Sql, Store};
+use wiretap_capture_store::{Cancel, CaptureError, Sql, Store};
 
 use crate::capture_db::{self, wait};
 use crate::capture_store::{self, CaptureKind, CaptureMetadata};
@@ -1517,7 +1517,7 @@ fn crash_kill_mid_upgrade() {
 // 7: old-app compatibility, emulated with the sqlite3 CLI
 // ============================================================================
 
-const OLD_MIGRATIONS: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../wiretap-capture/legacy");
+const OLD_MIGRATIONS: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../wiretap-capture-store/legacy");
 
 #[test]
 #[ignore]
@@ -1804,7 +1804,7 @@ async fn readers_under_writer(big: &'static str, readers: usize, kind: &'static 
                 _ => capture_db::read_rows(
                     &Sql {
                         sql: "SELECT COUNT(*), SUM(length(payload) + timestamp_us % 7) FROM frames WHERE capture_id = ?".into(),
-                        values: vec![wiretap_capture::SqlValue::Text(big.into())],
+                        values: vec![wiretap_capture_store::SqlValue::Text(big.into())],
                     },
                     &Cancel::new(),
                     |r| sqlx::Row::try_get::<i64, _>(r, 0),

@@ -108,7 +108,7 @@ wiretap-decode = { git = "ssh://git@github.com/Wired-Square/wslib-wiretap-rs.git
 # The gateway's HTTP API: its serde types and, behind `client`, the client.
 wiretap-gateway = { git = "ssh://git@github.com/Wired-Square/wslib-wiretap-rs.git", tag = "v0.10.2", features = ["client"] }
 # The capture store: schema and migrations, frame and byte reads and writes, metadata and events.
-wiretap-capture = { path = "../wiretap-capture" }
+wiretap-capture-store = { path = "../wiretap-capture-store" }
 # The selection and inventory types the capture store takes and returns.
 wslib-wiretap-protocol = { version = "0.1", registry = "wired-square" }
 # Modbus TCP connection, poller and poll task, the serial port, the CAN transports, replay pacing, and device profiles.
@@ -174,7 +174,7 @@ nusb = { version = "0.2", features = ["tokio"] }
 tokio = { version = "1", features = ["test-util"] }
 ts-rs = "12"
 wiretap-analysis = { git = "ssh://git@github.com/Wired-Square/wslib-wiretap-rs.git", tag = "v0.10.2", features = ["ts", "testing"] }
-wiretap-capture = { path = "../wiretap-capture", features = ["ts"] }
+wiretap-capture-store = { path = "../wiretap-capture-store", features = ["ts"] }
 wiretap-catalog = { git = "ssh://git@github.com/Wired-Square/wslib-wiretap-rs.git", tag = "v0.10.2", features = ["ts"] }
 wiretap-decode = { git = "ssh://git@github.com/Wired-Square/wslib-wiretap-rs.git", tag = "v0.10.2", features = ["ts"] }
 wiretap-io = { git = "ssh://git@github.com/Wired-Square/wslib-wiretap-rs.git", tag = "v0.10.2", features = ["testing", "ts"] }

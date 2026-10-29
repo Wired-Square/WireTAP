@@ -10,7 +10,7 @@ use sqlx::sqlite::SqliteRow;
 use sqlx::Row;
 use wiretap_analysis::query::{self as kernel, QueryRow};
 use wiretap_gateway::QuerySpec;
-use wiretap_capture::{
+use wiretap_capture_store::{
     inventory_row, inventory_statement, Cancel, CaptureProtocol, FrameRowFilter, Sql, SqlValue,
 };
 

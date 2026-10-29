@@ -1,4 +1,4 @@
-# wiretap-capture
+# wiretap-capture-store
 
 WireTAP's capture store in one SQLite file: captures, each a run of frames or of raw
 serial bytes, with their metadata and events.
@@ -7,7 +7,7 @@ serial bytes, with their metadata and events.
 and `legacy/` the frozen steps for files written before it.
 
 ```rust
-use wiretap_capture::{Cancel, Store};
+use wiretap_capture_store::{Cancel, Store};
 
 let (store, applied) = Store::open(data_dir.join("captures.db")).await?;
 store.insert_frames(&capture_id, &batch).await?;

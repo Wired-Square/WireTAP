@@ -6,7 +6,7 @@ use std::time::{Duration, Instant};
 
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode};
 use sqlx::{ConnectOptions, Row, SqliteConnection};
-use wiretap_capture::{chain, Cancel, CaptureError, Sql, Store, StoredFrame};
+use wiretap_capture_store::{chain, Cancel, CaptureError, Sql, Store, StoredFrame};
 use wslib_db_sqlite::Database;
 
 /// The legacy layout before the ladder: `buffer_*`, unstamped.

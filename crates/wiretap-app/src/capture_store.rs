@@ -4,7 +4,7 @@
 // Metadata lives in RAM; bulk frame/byte data lives in SQLite (capture_db).
 // Supports multiple named captures, each typed as either Frames or Bytes.
 //
-// Schema changes to buffers.db MUST be recorded migrations in wiretap-capture —
+// Schema changes to buffers.db MUST be recorded migrations in wiretap-capture-store —
 // see that crate's README. Never issue ad-hoc DDL from this file.
 
 use once_cell::sync::Lazy;
@@ -19,7 +19,7 @@ use crate::capture_inventory::FrameInventory;
 use crate::io::FrameMessage;
 use wiretap_analysis::source::FrameSelection;
 
-pub use wiretap_capture::{CaptureFrameInfo, CaptureKind, CaptureMetadata, TimestampedByte};
+pub use wiretap_capture_store::{CaptureFrameInfo, CaptureKind, CaptureMetadata, TimestampedByte};
 
 // ============================================================================
 // Internal Types
@@ -1394,7 +1394,7 @@ mod tests {
 
     fn failing_database() -> crate::capture_db::OwnStore {
         let bare = wait(wslib_db_sqlite::Database::open_in_memory(&[])).unwrap();
-        crate::capture_db::use_own_store(wiretap_capture::Store::from_database(bare))
+        crate::capture_db::use_own_store(wiretap_capture_store::Store::from_database(bare))
     }
 
     /// A failed insert counts nothing, and a failed query is an error, not an empty page.
@@ -1491,13 +1491,13 @@ mod tests {
             .collect()
     }
 
-    async fn execute(store: &wiretap_capture::Store, sql: &str) {
+    async fn execute(store: &wiretap_capture_store::Store, sql: &str) {
         sqlx::raw_sql(sql).execute(store.database().pool()).await.unwrap();
     }
 
     /// Another writer holding the lock, with the store's writer giving up on it in 20 ms
     /// rather than SQLite's 5 s.
-    async fn hold_write_lock(store: &wiretap_capture::Store) -> sqlx::SqliteConnection {
+    async fn hold_write_lock(store: &wiretap_capture_store::Store) -> sqlx::SqliteConnection {
         use sqlx::{ConnectOptions, Executor};
         store.database().writer().execute("PRAGMA busy_timeout = 20").await.unwrap();
         let path: String = sqlx::query_scalar("SELECT file FROM pragma_database_list WHERE name = 'main'")
@@ -1547,7 +1547,7 @@ mod tests {
     /// Five windows of rows, so a whole-capture operation commits part-way at least four times.
     const WINDOWED: u64 = 25_000;
 
-    async fn windowed_capture(name: &str) -> (wiretap_capture::Store, crate::capture_db::OwnStore, String) {
+    async fn windowed_capture(name: &str) -> (wiretap_capture_store::Store, crate::capture_db::OwnStore, String) {
         let store = crate::capture_db::scratch_store().await;
         let db = crate::capture_db::use_own_store(store.clone());
         let id = create_standalone_capture(CaptureKind::Frames, name.into());
@@ -1557,7 +1557,7 @@ mod tests {
 
     /// Reads the capture's tail from when `op`, on another thread, has zeroed its count
     /// until it returns; every frame read back must be one `op` left, at or after `kept_from_us`.
-    async fn tail_while(store: &wiretap_capture::Store, id: &str, kept_from_us: u64, op: impl FnOnce() + Send + 'static) {
+    async fn tail_while(store: &wiretap_capture_store::Store, id: &str, kept_from_us: u64, op: impl FnOnce() + Send + 'static) {
         let lent = store.clone();
         let running = std::thread::spawn(move || {
             let _db = crate::capture_db::use_own_store(lent);

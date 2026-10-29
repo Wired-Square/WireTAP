@@ -2,7 +2,7 @@
 //! capture, selects exactly the rows the filter describes.
 
 use sqlx::Row;
-use wiretap_capture::{chain, Cancel, CaptureProtocol, FrameRowFilter, Sql, Store, StoredFrame};
+use wiretap_capture_store::{chain, Cancel, CaptureProtocol, FrameRowFilter, Sql, Store, StoredFrame};
 use wslib_db_sqlite::Database;
 use wslib_wiretap_protocol::Protocol;
 

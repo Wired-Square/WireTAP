@@ -13,8 +13,8 @@ renamed in a future cleanup.
 launch (setting: *Clear captures on start*). Pinned (persistent) captures
 always survive restart. See [capture-flow.md § Persistence](capture-flow.md#7-persistence).
 
-**Schema migrations:** The store is the `wiretap-capture` crate
-(`crates/wiretap-capture`), on sqlx through `wslib-db-sqlite`. Schema changes
+**Schema migrations:** The store is the `wiretap-capture-store` crate
+(`crates/wiretap-capture-store`), on sqlx through `wslib-db-sqlite`. Schema changes
 are migrations in its `capture` chain (`migrations/`), recorded in
 `_capture_migrations`; a file written before the chain is first taken through
 the frozen ladder in `legacy/` (audited in `schema_migrations`), which also
@@ -162,7 +162,7 @@ timeline. A WireTAP Backend profile's events live on the gateway instead
 
 | Module | File | Role |
 |--------|------|------|
-| `wiretap_capture` | `crates/wiretap-capture` | All SQLite operations: schema, reads, writes, events. |
+| `wiretap_capture_store` | `crates/wiretap-capture-store` | All SQLite operations: schema, reads, writes, events. |
 | `capture_db` | `crates/wiretap-app/src/capture_db.rs` | Holds the app's `Store`: `FrameMessage` rows, the analysis sources, retries of an insert refused by a lock. |
 | `capture_store` | `crates/wiretap-app/src/capture_store.rs` | Public API. Metadata in RAM (`RwLock<CaptureRegistry>`), delegates data ops to `capture_db`. |
 | `CaptureSource` | `crates/wiretap-app/src/io/recorded/capture.rs` | Playback engine. Reads chunks from `capture_db` for streaming. |

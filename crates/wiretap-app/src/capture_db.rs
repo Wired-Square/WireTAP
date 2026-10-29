@@ -1,9 +1,9 @@
 // ui/crates/wiretap-app/src/capture_db.rs
 //
-// The app's capture database, `buffers.db`, as a `wiretap_capture::Store`.
+// The app's capture database, `buffers.db`, as a `wiretap_capture_store::Store`.
 // Metadata lives in RAM in capture_store.rs; this is the storage behind it.
 //
-// Schema changes MUST be recorded migrations in wiretap-capture — see that
+// Schema changes MUST be recorded migrations in wiretap-capture-store — see that
 // crate's README. Never issue ad-hoc DDL from feature code.
 
 use std::future::Future;
@@ -17,7 +17,7 @@ use wiretap_analysis::source::{
     FrameSelection, FrameSource, InventoryRow, PayloadQuery, PayloadSource, Sampling, Source, SourceFrame,
 };
 use wiretap_analysis::FrameKey;
-use wiretap_capture::{
+use wiretap_capture_store::{
     Cancel, CaptureError, Direction, FrameRecord, NewCaptureEvent, Sql, Store, StoredFrame,
 };
 use wslib_wiretap_protocol::ProtocolFrames;
@@ -128,8 +128,8 @@ impl From<StoredFrame> for FrameMessage {
     }
 }
 
-impl From<wiretap_capture::CaptureEvent> for CaptureEvent {
-    fn from(e: wiretap_capture::CaptureEvent) -> Self {
+impl From<wiretap_capture_store::CaptureEvent> for CaptureEvent {
+    fn from(e: wiretap_capture_store::CaptureEvent) -> Self {
         CaptureEvent {
             id: e.id.to_string(),
             timestamp_us: e.ts_us,
@@ -216,7 +216,7 @@ pub fn initialise(app_data_dir: &Path, clear_on_start: bool) -> Result<(), Strin
 #[cfg(test)]
 pub(crate) async fn scratch_store() -> Store {
     static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
-    let dir = std::env::temp_dir().join(format!("wiretap-capture-tests-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("wiretap-capture-store-tests-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let n = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     Store::open(dir.join(format!("{n}.db"))).await.unwrap().0

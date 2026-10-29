@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use sqlx::Row;
-use wiretap_capture::{Cancel, CaptureError, Sql, Store, StoredFrame};
+use wiretap_capture_store::{Cancel, CaptureError, Sql, Store, StoredFrame};
 
 const POOL: usize = 5;
 const BIG: i64 = 100_000;
@@ -140,9 +140,9 @@ async fn a_sweep_lets_a_live_appender_in_and_removes_everything_unkept() {
     let f = fixture().await;
     capture(&f.store, "big", BIG).await;
     f.store
-        .save_capture_metadata(&wiretap_capture::CaptureMetadata {
+        .save_capture_metadata(&wiretap_capture_store::CaptureMetadata {
             id: "live".into(),
-            kind: wiretap_capture::CaptureKind::Frames,
+            kind: wiretap_capture_store::CaptureKind::Frames,
             name: "live".into(),
             count: 0,
             start_time_us: None,
