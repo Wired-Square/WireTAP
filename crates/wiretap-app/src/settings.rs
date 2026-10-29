@@ -6,7 +6,7 @@ use tauri::{AppHandle, Emitter, Manager};
 /// `WINDOW_EVENTS.SETTINGS_CHANGED` in `src/events/registry.ts`.
 const SETTINGS_CHANGED_EVENT: &str = "settings:changed";
 
-pub use wiretap_io::profile::IOProfile;
+pub use crate::io::profile::IOProfile;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AppSettings {
@@ -638,7 +638,7 @@ fn fill_empty_strings(settings: &mut AppSettings) {
 /// write profile naming a merged-away interface follows it to the device.
 fn merge_framelink_interfaces(settings: &mut AppSettings) {
     use serde_json::Value;
-    use wiretap_io::profile::ConnValue;
+    use crate::io::profile::ConnValue;
     type Connection = HashMap<String, ConnValue>;
 
     fn present<'a>(c: &'a Connection, key: &str) -> Option<&'a ConnValue> {
@@ -854,7 +854,7 @@ pub(crate) fn load_settings_at(config_dir: &Path, documents: Option<&Path>) -> R
 /// refused to transmit on it.
 fn canonicalise_kinds(profiles: &mut [IOProfile]) {
     for p in profiles.iter_mut() {
-        let canonical = wiretap_io::profile::canonical_kind(&p.kind);
+        let canonical = crate::io::profile::canonical_kind(&p.kind);
         if canonical != p.kind {
             p.kind = canonical.to_string();
         }

@@ -48,7 +48,7 @@ impl SerialFraming {
     pub(crate) fn frame(&self, payload: &[u8]) -> Vec<u8> {
         match self {
             Self::Raw => payload.to_vec(),
-            Self::Slip => wiretap_protocol::slip::encode(payload),
+            Self::Slip => wslib_serial::slip::encode(payload),
             Self::Delimiter { delimiter } => [payload, delimiter].concat(),
         }
     }
@@ -152,7 +152,7 @@ pub async fn io_set_framing(
     source_address_bytes: Option<u8>,
     source_address_big_endian: Option<bool>,
     min_frame_length: Option<usize>,
-    modbus: Option<wiretap_catalog::RtuSettings>,
+    modbus: Option<wslib_wiretap_catalogue::RtuSettings>,
 ) -> Result<IOCapabilities, String> {
     let req = crate::io::types::SetFramingRequest {
         encoding,
@@ -301,7 +301,7 @@ mod tests {
 
     #[test]
     fn every_kind_whose_bus_transmits_is_offered_to_transmit() {
-        for kind in wiretap_io::profile::kinds() {
+        for kind in crate::io::profile::kinds() {
             let spec = crate::io::device_kinds::traits(kind).unwrap();
             let profile = crate::settings::IOProfile {
                 kind: kind.to_string(),

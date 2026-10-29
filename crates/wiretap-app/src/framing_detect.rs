@@ -2,7 +2,7 @@
 
 //! Which framing a raw serial byte stream is using.
 //!
-//! The scoring is `wiretap_catalog::framing_detect`'s, framing RTU with the
+//! The scoring is `wslib_wiretap_catalogue::framing_detect`'s, framing RTU with the
 //! session's catalogue as live does; this module reads the bytes straight from
 //! the capture store and words the library's evidence for the frontend.
 
@@ -35,11 +35,12 @@ pub use ios_stub::*;
 #[cfg(not(target_os = "ios"))]
 mod desktop {
     use serde::Serialize;
-    use wiretap_catalog::framing_detect::{self, Candidate, Evidence, Framing};
+    use wslib_wiretap_catalogue::framing_detect::{self, Candidate, Evidence, Framing};
 
     use crate::capture_store;
     use crate::io::FramingMode;
-    use wiretap_catalog::{ModbusRtuOptions, RtuSettings};
+    use wslib_modbus::ModbusRtuOptions;
+    use wslib_wiretap_catalogue::RtuSettings;
 
     /// How much of the tail to analyse. Matches what the frontend used to fetch.
     const DEFAULT_SAMPLE_BYTES: usize = 100_000;
@@ -216,7 +217,7 @@ mod desktop {
             .as_deref()
             .and_then(crate::ws::dispatch::attached_catalog);
         let options =
-            ModbusRtuOptions::from_settings(&modbus.unwrap_or_default(), catalog.as_deref());
+            modbus.unwrap_or_default().options(catalog.as_deref());
         let sample = sample_bytes.unwrap_or(DEFAULT_SAMPLE_BYTES);
 
         // The tail spans every bus, so read a few windows' worth to leave the
@@ -252,8 +253,8 @@ pub use desktop::*;
 mod tests {
     use super::desktop::detect;
     use crate::io::FramingMode;
-    use wiretap_catalog::ModbusRtuOptions;
-    use wiretap_checksum::algorithms::crc16_modbus_checksum;
+    use wslib_modbus::ModbusRtuOptions;
+    use wslib_checksum::algorithms::crc16_modbus_checksum;
 
     #[test]
     fn a_crlf_line_reads_as_its_delimiter_in_hex() {
@@ -270,7 +271,7 @@ mod tests {
     fn crc_coverage_reads_as_a_percentage() {
         let mut bytes = Vec::new();
         for body in ["01044DE20002", "010404CAFEF00D"].repeat(8) {
-            let mut msg = wiretap_decode::hex::parse_bytes(body).unwrap();
+            let mut msg = wslib_bits::hex::parse_bytes(body).unwrap();
             msg.extend(crc16_modbus_checksum(&msg).to_le_bytes());
             bytes.extend(msg);
         }

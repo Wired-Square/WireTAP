@@ -1,20 +1,20 @@
 // crates/wiretap-app/src/report/catalog.rs
 //
 // The catalogue report: every protocol's frames as the catalogue authors them,
-// over `wiretap_catalog::summary`.
+// over `wslib_wiretap_catalogue::summary`.
 
-use wiretap_catalog::model::{Confidence, Endianness, Protocol, Signal};
-use wiretap_catalog::summary::{CatalogSummary, FrameRow, MuxRow, SignalRow};
+use wslib_wiretap_catalogue::model::{Confidence, Endianness, Protocol, Signal};
+use wslib_wiretap_catalogue::summary::{CatalogueSummary, FrameRow, MuxRow, SignalRow};
 
 use super::{count, grouped, Block, Cell, Doc, ReportFormat};
 
 /// The report on a catalogue's text, a legacy `[id]` table read as CAN.
 pub fn render(text: &str, format: ReportFormat) -> Result<String, String> {
-    let summary = CatalogSummary::from_text(text).map_err(|e| e.to_string())?;
+    let summary = CatalogueSummary::from_text(text).map_err(|e| e.to_string())?;
     Ok(report(&summary).render(format))
 }
 
-pub fn report(summary: &CatalogSummary) -> Doc {
+pub fn report(summary: &CatalogueSummary) -> Doc {
     let name = summary.name.trim();
     let title = format!("Catalogue Report — {}", if name.is_empty() { "Untitled" } else { name });
     let mut blocks = vec![Block::Section("Summary".into(), vec![Block::Fields(overview(summary))])];
@@ -47,7 +47,7 @@ fn order_name(order: Endianness) -> &'static str {
     }
 }
 
-fn overview(summary: &CatalogSummary) -> Vec<(&'static str, String)> {
+fn overview(summary: &CatalogueSummary) -> Vec<(&'static str, String)> {
     let c = &summary.counts;
     let present: Vec<(Protocol, usize)> = [
         (Protocol::Can, c.frames.can),
@@ -229,7 +229,7 @@ mod tests {
     use super::*;
 
     fn render(toml: &str, format: ReportFormat) -> String {
-        report(&CatalogSummary::from_text(toml).unwrap()).render(format)
+        report(&CatalogueSummary::from_text(toml).unwrap()).render(format)
     }
 
     #[test]

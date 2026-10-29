@@ -9,7 +9,7 @@ use std::collections::BTreeSet;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 use crate::settings::SettingsSource;
-use wiretap_gateway::{
+use wslib_wiretap_gateway::{
     ByteChangeQueryResult, DistributionQueryResult, FirstLastQueryResult, FrameChangeQueryResult,
     FrequencyQueryResult, GapAnalysisQueryResult, GatewayRequest, MirrorValidationQueryResult,
     MuxStatisticsQueryResult, PatternSearchQueryResult, Protocol, QuerySpec,
@@ -128,18 +128,18 @@ pub async fn preview(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use wiretap_gateway::{MirrorValidationResult, QueryStats};
+    use wslib_wiretap_gateway::{MirrorValidationResult, QueryStats};
 
     #[test]
     fn a_backend_profile_refuses_another_protocols_window() {
         let spec = |protocol| QuerySpec::FrameInventory {
-            window: wiretap_gateway::RowWindow { protocol, start_us: None, end_us: None },
+            window: wslib_wiretap_gateway::RowWindow { protocol, start_us: None, end_us: None },
             limit: Some(5),
         };
-        assert!(request(Protocol::Modbus, &spec(Some(Protocol::Can)), None, false).is_err());
-        for protocol in [None, Some(Protocol::Modbus)] {
+        assert!(request(Protocol::ModbusRtu, &spec(Some(Protocol::Can)), None, false).is_err());
+        for protocol in [None, Some(Protocol::ModbusRtu)] {
             assert_eq!(
-                text(&request(Protocol::Modbus, &spec(protocol), None, false).unwrap()),
+                text(&request(Protocol::ModbusRtu, &spec(protocol), None, false).unwrap()),
                 "GET /inventory?protocol=modbus&limit=5"
             );
         }

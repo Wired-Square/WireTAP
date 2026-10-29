@@ -3,7 +3,7 @@
 // Shared control state for recorded sources (Capture, the WireTAP backend):
 // their start/stop state machine and where their playback position goes.
 
-use wiretap_io::replay::{PlaybackControl, Timestamped};
+use crate::io::replay::{PlaybackControl, Timestamped};
 
 use crate::io::{
     signal_playback_position, store_playback_position, FrameMessage, IOState, PlaybackPosition,

@@ -8,7 +8,7 @@ use serde::Serialize;
 
 use super::bus_mapping::BusMapping;
 use super::device_kinds;
-use wiretap_io::profile::canonical_kind;
+use crate::io::profile::canonical_kind;
 use super::{InterfaceTraits, Protocol, TemporalMode};
 use crate::settings::IOProfile;
 
@@ -138,10 +138,10 @@ pub fn traits_for_protocol(protocol: Protocol) -> InterfaceTraits {
 }
 
 /// Every profile kind, plus the capture pseudo-kind the kind table has no entry
-/// for. Derived from `wiretap_io::profile::kinds` rather than restated, so a kind added
+/// for. Derived from `crate::io::profile::kinds` rather than restated, so a kind added
 /// there cannot quietly go missing from the picker's protocol options.
 pub fn profile_kinds() -> impl Iterator<Item = &'static str> {
-    wiretap_io::profile::kinds().chain(std::iter::once("capture"))
+    crate::io::profile::kinds().chain(std::iter::once("capture"))
 }
 
 /// What a bus of this kind may be set to, for the source picker to offer.
@@ -156,7 +156,7 @@ pub fn profile_kinds() -> impl Iterator<Item = &'static str> {
 /// it here would be a third way to say the same thing, free to disagree with the
 /// other two.
 pub fn supported_protocols_for_kind(kind: &str) -> &'static [Protocol] {
-    match wiretap_io::profile::canonical_kind(kind) {
+    match crate::io::profile::canonical_kind(kind) {
         "framelink" | "slcan" | "gs_usb" | "socketcan" => &[Protocol::Can, Protocol::CanFd],
         "modbus_tcp" => &[Protocol::Modbus],
         "serial" => &[Protocol::Serial],
@@ -189,7 +189,7 @@ pub fn supported_protocols_for_kind(kind: &str) -> &'static [Protocol] {
 /// talked into CAN) keeps it.
 pub fn normalise_bus_traits(mappings: &mut [BusMapping], profile_kind: &str) {
     let supported = supported_protocols_for_kind(profile_kind);
-    let gvret = matches!(wiretap_io::profile::canonical_kind(profile_kind), "gvret_tcp" | "gvret_usb");
+    let gvret = matches!(crate::io::profile::canonical_kind(profile_kind), "gvret_tcp" | "gvret_usb");
     for m in mappings.iter_mut() {
         if gvret && m.protocol == Protocol::CanFd {
             m.protocol = Protocol::Can;
@@ -276,7 +276,7 @@ pub fn profile_traits(profile: &IOProfile) -> ProfileTraits {
 }
 
 fn kind_traits() -> Vec<KindTraits> {
-    wiretap_io::profile::kinds()
+    crate::io::profile::kinds()
         .map(|kind| KindTraits {
             kind: kind.to_string(),
             available: device_kinds::traits(kind).is_some_and(|s| s.available),

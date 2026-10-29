@@ -74,7 +74,7 @@ pub async fn open(
     // every protocol needs it to decode.
     let catalog_toml = match &profile.preferred_catalog {
         Some(name) => {
-            let name = wiretap_catalog::text::sanitise_filename(name).map_err(|e| e.to_string())?;
+            let name = wslib_wiretap_catalogue::text::sanitise_filename(name).map_err(|e| e.to_string())?;
             let path = std::path::PathBuf::from(&settings.decoder_dir).join(&name);
             let toml = std::fs::read_to_string(&path)
                 .map_err(|e| format!("Failed to read catalog '{name}': {e}"))?;
@@ -144,7 +144,7 @@ pub async fn open(
     // arrives decoded instead of as a raw stream.
     let mut catalog_path = None;
     if let Some((path, toml)) = catalog_toml {
-        match wiretap_catalog::Catalog::parse(&toml) {
+        match wslib_wiretap_catalogue::Catalogue::parse(&toml) {
             Ok(cat) => {
                 crate::ws::dispatch::attach_catalog(&sid, Some(path.clone()), cat);
                 catalog_path = Some(path);

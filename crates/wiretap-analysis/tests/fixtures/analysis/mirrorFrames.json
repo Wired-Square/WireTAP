@@ -1,0 +1,485 @@
+{
+  "cases": [
+    {
+      "name": "single id",
+      "input": {
+        "framePayloads": [
+          {
+            "frameId": 512,
+            "payloads": [
+              { "timestamp": 1727000000000000, "payload": [0, 0, 170] },
+              { "timestamp": 1727000000100000, "payload": [1, 2, 170] },
+              { "timestamp": 1727000000200000, "payload": [2, 4, 170] },
+              { "timestamp": 1727000000300000, "payload": [3, 6, 170] },
+              { "timestamp": 1727000000400000, "payload": [4, 8, 170] },
+              { "timestamp": 1727000000500000, "payload": [5, 10, 170] },
+              { "timestamp": 1727000000600000, "payload": [6, 12, 170] },
+              { "timestamp": 1727000000700000, "payload": [7, 14, 170] },
+              { "timestamp": 1727000000800000, "payload": [8, 16, 170] },
+              { "timestamp": 1727000000900000, "payload": [9, 18, 170] }
+            ]
+          }
+        ],
+        "toleranceUs": null
+      },
+      "expected": []
+    },
+    {
+      "name": "a pair offset 2 ms, beside an unrelated id",
+      "input": {
+        "framePayloads": [
+          {
+            "frameId": 512,
+            "payloads": [
+              { "timestamp": 1727000000000000, "payload": [0, 0, 170] },
+              { "timestamp": 1727000000100000, "payload": [1, 2, 170] },
+              { "timestamp": 1727000000200000, "payload": [2, 4, 170] },
+              { "timestamp": 1727000000300000, "payload": [3, 6, 170] },
+              { "timestamp": 1727000000400000, "payload": [4, 8, 170] },
+              { "timestamp": 1727000000500000, "payload": [5, 10, 170] },
+              { "timestamp": 1727000000600000, "payload": [6, 12, 170] },
+              { "timestamp": 1727000000700000, "payload": [7, 14, 170] },
+              { "timestamp": 1727000000800000, "payload": [8, 16, 170] },
+              { "timestamp": 1727000000900000, "payload": [9, 18, 170] }
+            ]
+          },
+          {
+            "frameId": 768,
+            "payloads": [
+              { "timestamp": 1727000000002000, "payload": [0, 0, 170] },
+              { "timestamp": 1727000000102000, "payload": [1, 2, 170] },
+              { "timestamp": 1727000000202000, "payload": [2, 4, 170] },
+              { "timestamp": 1727000000302000, "payload": [3, 6, 170] },
+              { "timestamp": 1727000000402000, "payload": [4, 8, 170] },
+              { "timestamp": 1727000000502000, "payload": [5, 10, 170] },
+              { "timestamp": 1727000000602000, "payload": [6, 12, 170] },
+              { "timestamp": 1727000000702000, "payload": [7, 14, 170] },
+              { "timestamp": 1727000000802000, "payload": [8, 16, 170] },
+              { "timestamp": 1727000000902000, "payload": [9, 18, 170] }
+            ]
+          },
+          {
+            "frameId": 1024,
+            "payloads": [
+              { "timestamp": 1727000000001000, "payload": [255, 7, 170] },
+              { "timestamp": 1727000000101000, "payload": [254, 7, 170] },
+              { "timestamp": 1727000000201000, "payload": [253, 7, 170] },
+              { "timestamp": 1727000000301000, "payload": [252, 7, 170] },
+              { "timestamp": 1727000000401000, "payload": [251, 7, 170] },
+              { "timestamp": 1727000000501000, "payload": [250, 7, 170] },
+              { "timestamp": 1727000000601000, "payload": [249, 7, 170] },
+              { "timestamp": 1727000000701000, "payload": [248, 7, 170] },
+              { "timestamp": 1727000000801000, "payload": [247, 7, 170] },
+              { "timestamp": 1727000000901000, "payload": [246, 7, 170] }
+            ]
+          }
+        ],
+        "toleranceUs": null
+      },
+      "expected": [{ "frameIds": [512, 768], "sampleCount": 10, "matchPercentage": 100, "samplePayload": [0, 0, 170] }]
+    },
+    {
+      "name": "a chain whose ends are too far apart to compare",
+      "input": {
+        "framePayloads": [
+          {
+            "frameId": 16,
+            "payloads": [
+              { "timestamp": 1727000000000000, "payload": [0, 0, 170] },
+              { "timestamp": 1727000000200000, "payload": [1, 2, 170] },
+              { "timestamp": 1727000000400000, "payload": [2, 4, 170] },
+              { "timestamp": 1727000000600000, "payload": [3, 6, 170] },
+              { "timestamp": 1727000000800000, "payload": [4, 8, 170] },
+              { "timestamp": 1727000001000000, "payload": [5, 10, 170] }
+            ]
+          },
+          {
+            "frameId": 17,
+            "payloads": [
+              { "timestamp": 1727000000030000, "payload": [0, 0, 170] },
+              { "timestamp": 1727000000230000, "payload": [1, 2, 170] },
+              { "timestamp": 1727000000430000, "payload": [2, 4, 170] },
+              { "timestamp": 1727000000630000, "payload": [3, 6, 170] },
+              { "timestamp": 1727000000830000, "payload": [4, 8, 170] },
+              { "timestamp": 1727000001030000, "payload": [5, 10, 170] }
+            ]
+          },
+          {
+            "frameId": 18,
+            "payloads": [
+              { "timestamp": 1727000000060000, "payload": [0, 0, 170] },
+              { "timestamp": 1727000000260000, "payload": [1, 2, 170] },
+              { "timestamp": 1727000000460000, "payload": [2, 4, 170] },
+              { "timestamp": 1727000000660000, "payload": [3, 6, 170] },
+              { "timestamp": 1727000000860000, "payload": [4, 8, 170] },
+              { "timestamp": 1727000001060000, "payload": [5, 10, 170] }
+            ]
+          }
+        ],
+        "toleranceUs": null
+      },
+      "expected": [{ "frameIds": [16, 17, 18], "sampleCount": 12, "matchPercentage": 100, "samplePayload": [0, 0, 170] }]
+    },
+    {
+      "name": "70 % is not a mirror, 80 % is",
+      "input": {
+        "framePayloads": [
+          {
+            "frameId": 32,
+            "payloads": [
+              { "timestamp": 1727000000000000, "payload": [0, 0, 170] },
+              { "timestamp": 1727000000100000, "payload": [1, 2, 170] },
+              { "timestamp": 1727000000200000, "payload": [2, 4, 170] },
+              { "timestamp": 1727000000300000, "payload": [3, 6, 170] },
+              { "timestamp": 1727000000400000, "payload": [4, 8, 170] },
+              { "timestamp": 1727000000500000, "payload": [5, 10, 170] },
+              { "timestamp": 1727000000600000, "payload": [6, 12, 170] },
+              { "timestamp": 1727000000700000, "payload": [7, 14, 170] },
+              { "timestamp": 1727000000800000, "payload": [8, 16, 170] },
+              { "timestamp": 1727000000900000, "payload": [9, 18, 170] }
+            ]
+          },
+          {
+            "frameId": 33,
+            "payloads": [
+              { "timestamp": 1727000000001000, "payload": [0, 0, 170] },
+              { "timestamp": 1727000000101000, "payload": [1, 2, 170] },
+              { "timestamp": 1727000000201000, "payload": [2, 4, 170] },
+              { "timestamp": 1727000000301000, "payload": [3, 6, 170] },
+              { "timestamp": 1727000000401000, "payload": [4, 8, 170] },
+              { "timestamp": 1727000000501000, "payload": [5, 10, 170] },
+              { "timestamp": 1727000000601000, "payload": [6, 12, 170] },
+              { "timestamp": 1727000000701000, "payload": [9, 9, 9] },
+              { "timestamp": 1727000000801000, "payload": [9, 9, 9] },
+              { "timestamp": 1727000000901000, "payload": [9, 9, 9] }
+            ]
+          },
+          {
+            "frameId": 48,
+            "payloads": [
+              { "timestamp": 1727000000000000, "payload": [48, 0] },
+              { "timestamp": 1727000000100000, "payload": [48, 1] },
+              { "timestamp": 1727000000200000, "payload": [48, 2] },
+              { "timestamp": 1727000000300000, "payload": [48, 3] },
+              { "timestamp": 1727000000400000, "payload": [48, 4] },
+              { "timestamp": 1727000000500000, "payload": [48, 5] },
+              { "timestamp": 1727000000600000, "payload": [48, 6] },
+              { "timestamp": 1727000000700000, "payload": [48, 7] },
+              { "timestamp": 1727000000800000, "payload": [48, 8] },
+              { "timestamp": 1727000000900000, "payload": [48, 9] }
+            ]
+          },
+          {
+            "frameId": 49,
+            "payloads": [
+              { "timestamp": 1727000000001000, "payload": [48, 0] },
+              { "timestamp": 1727000000101000, "payload": [48, 1] },
+              { "timestamp": 1727000000201000, "payload": [48, 2] },
+              { "timestamp": 1727000000301000, "payload": [48, 3] },
+              { "timestamp": 1727000000401000, "payload": [48, 4] },
+              { "timestamp": 1727000000501000, "payload": [48, 5] },
+              { "timestamp": 1727000000601000, "payload": [48, 6] },
+              { "timestamp": 1727000000701000, "payload": [48, 7] },
+              { "timestamp": 1727000000801000, "payload": [0, 0] },
+              { "timestamp": 1727000000901000, "payload": [0, 0] }
+            ]
+          }
+        ],
+        "toleranceUs": null
+      },
+      "expected": [{ "frameIds": [48, 49], "sampleCount": 8, "matchPercentage": 80, "samplePayload": [48, 0] }]
+    },
+    {
+      "name": "too few samples",
+      "input": {
+        "framePayloads": [
+          { "frameId": 64, "payloads": [{ "timestamp": 1727000000000000, "payload": [0, 0, 170] }, { "timestamp": 1727000000100000, "payload": [1, 2, 170] }] },
+          { "frameId": 65, "payloads": [{ "timestamp": 1727000000001000, "payload": [0, 0, 170] }, { "timestamp": 1727000000101000, "payload": [1, 2, 170] }] },
+          { "frameId": 66, "payloads": [{ "timestamp": 1727000000001000, "payload": [0, 0, 170] }, { "timestamp": 1727000000101000, "payload": [1, 2, 170] }, { "timestamp": 1727000000201000, "payload": [2, 4, 170] }] }
+        ],
+        "toleranceUs": null
+      },
+      "expected": []
+    },
+    {
+      "name": "different lengths never match",
+      "input": {
+        "framePayloads": [
+          {
+            "frameId": 80,
+            "payloads": [
+              { "timestamp": 1727000000000000, "payload": [0, 0, 170] },
+              { "timestamp": 1727000000100000, "payload": [1, 2, 170] },
+              { "timestamp": 1727000000200000, "payload": [2, 4, 170] },
+              { "timestamp": 1727000000300000, "payload": [3, 6, 170] },
+              { "timestamp": 1727000000400000, "payload": [4, 8, 170] }
+            ]
+          },
+          {
+            "frameId": 81,
+            "payloads": [
+              { "timestamp": 1727000000001000, "payload": [0, 0, 170, 0] },
+              { "timestamp": 1727000000101000, "payload": [1, 2, 170, 0] },
+              { "timestamp": 1727000000201000, "payload": [2, 4, 170, 0] },
+              { "timestamp": 1727000000301000, "payload": [3, 6, 170, 0] },
+              { "timestamp": 1727000000401000, "payload": [4, 8, 170, 0] }
+            ]
+          }
+        ],
+        "toleranceUs": null
+      },
+      "expected": []
+    },
+    {
+      "name": "a fast mirror of a slow frame, default window",
+      "input": {
+        "framePayloads": [
+          {
+            "frameId": 96,
+            "payloads": [
+              { "timestamp": 1727000000000000, "payload": [0] },
+              { "timestamp": 1727000000100000, "payload": [1] },
+              { "timestamp": 1727000000200000, "payload": [2] },
+              { "timestamp": 1727000000300000, "payload": [3] },
+              { "timestamp": 1727000000400000, "payload": [4] }
+            ]
+          },
+          {
+            "frameId": 97,
+            "payloads": [
+              { "timestamp": 1727000000000000, "payload": [0] },
+              { "timestamp": 1727000000010000, "payload": [0] },
+              { "timestamp": 1727000000020000, "payload": [0] },
+              { "timestamp": 1727000000030000, "payload": [0] },
+              { "timestamp": 1727000000040000, "payload": [0] },
+              { "timestamp": 1727000000050000, "payload": [0] },
+              { "timestamp": 1727000000060000, "payload": [0] },
+              { "timestamp": 1727000000070000, "payload": [0] },
+              { "timestamp": 1727000000080000, "payload": [0] },
+              { "timestamp": 1727000000090000, "payload": [0] },
+              { "timestamp": 1727000000100000, "payload": [1] },
+              { "timestamp": 1727000000110000, "payload": [1] },
+              { "timestamp": 1727000000120000, "payload": [1] },
+              { "timestamp": 1727000000130000, "payload": [1] },
+              { "timestamp": 1727000000140000, "payload": [1] },
+              { "timestamp": 1727000000150000, "payload": [1] },
+              { "timestamp": 1727000000160000, "payload": [1] },
+              { "timestamp": 1727000000170000, "payload": [1] },
+              { "timestamp": 1727000000180000, "payload": [1] },
+              { "timestamp": 1727000000190000, "payload": [1] },
+              { "timestamp": 1727000000200000, "payload": [2] },
+              { "timestamp": 1727000000210000, "payload": [2] },
+              { "timestamp": 1727000000220000, "payload": [2] },
+              { "timestamp": 1727000000230000, "payload": [2] },
+              { "timestamp": 1727000000240000, "payload": [2] },
+              { "timestamp": 1727000000250000, "payload": [2] },
+              { "timestamp": 1727000000260000, "payload": [2] },
+              { "timestamp": 1727000000270000, "payload": [2] },
+              { "timestamp": 1727000000280000, "payload": [2] },
+              { "timestamp": 1727000000290000, "payload": [2] },
+              { "timestamp": 1727000000300000, "payload": [3] },
+              { "timestamp": 1727000000310000, "payload": [3] },
+              { "timestamp": 1727000000320000, "payload": [3] },
+              { "timestamp": 1727000000330000, "payload": [3] },
+              { "timestamp": 1727000000340000, "payload": [3] },
+              { "timestamp": 1727000000350000, "payload": [3] },
+              { "timestamp": 1727000000360000, "payload": [3] },
+              { "timestamp": 1727000000370000, "payload": [3] },
+              { "timestamp": 1727000000380000, "payload": [3] },
+              { "timestamp": 1727000000390000, "payload": [3] },
+              { "timestamp": 1727000000400000, "payload": [4] },
+              { "timestamp": 1727000000410000, "payload": [4] },
+              { "timestamp": 1727000000420000, "payload": [4] },
+              { "timestamp": 1727000000430000, "payload": [4] },
+              { "timestamp": 1727000000440000, "payload": [4] },
+              { "timestamp": 1727000000450000, "payload": [4] },
+              { "timestamp": 1727000000460000, "payload": [4] },
+              { "timestamp": 1727000000470000, "payload": [4] },
+              { "timestamp": 1727000000480000, "payload": [4] },
+              { "timestamp": 1727000000490000, "payload": [4] }
+            ]
+          }
+        ],
+        "toleranceUs": null
+      },
+      "expected": []
+    },
+    {
+      "name": "a fast mirror of a slow frame, 5 ms window",
+      "input": {
+        "framePayloads": [
+          {
+            "frameId": 96,
+            "payloads": [
+              { "timestamp": 1727000000000000, "payload": [0] },
+              { "timestamp": 1727000000100000, "payload": [1] },
+              { "timestamp": 1727000000200000, "payload": [2] },
+              { "timestamp": 1727000000300000, "payload": [3] },
+              { "timestamp": 1727000000400000, "payload": [4] }
+            ]
+          },
+          {
+            "frameId": 97,
+            "payloads": [
+              { "timestamp": 1727000000000000, "payload": [0] },
+              { "timestamp": 1727000000010000, "payload": [0] },
+              { "timestamp": 1727000000020000, "payload": [0] },
+              { "timestamp": 1727000000030000, "payload": [0] },
+              { "timestamp": 1727000000040000, "payload": [0] },
+              { "timestamp": 1727000000050000, "payload": [0] },
+              { "timestamp": 1727000000060000, "payload": [0] },
+              { "timestamp": 1727000000070000, "payload": [0] },
+              { "timestamp": 1727000000080000, "payload": [0] },
+              { "timestamp": 1727000000090000, "payload": [0] },
+              { "timestamp": 1727000000100000, "payload": [1] },
+              { "timestamp": 1727000000110000, "payload": [1] },
+              { "timestamp": 1727000000120000, "payload": [1] },
+              { "timestamp": 1727000000130000, "payload": [1] },
+              { "timestamp": 1727000000140000, "payload": [1] },
+              { "timestamp": 1727000000150000, "payload": [1] },
+              { "timestamp": 1727000000160000, "payload": [1] },
+              { "timestamp": 1727000000170000, "payload": [1] },
+              { "timestamp": 1727000000180000, "payload": [1] },
+              { "timestamp": 1727000000190000, "payload": [1] },
+              { "timestamp": 1727000000200000, "payload": [2] },
+              { "timestamp": 1727000000210000, "payload": [2] },
+              { "timestamp": 1727000000220000, "payload": [2] },
+              { "timestamp": 1727000000230000, "payload": [2] },
+              { "timestamp": 1727000000240000, "payload": [2] },
+              { "timestamp": 1727000000250000, "payload": [2] },
+              { "timestamp": 1727000000260000, "payload": [2] },
+              { "timestamp": 1727000000270000, "payload": [2] },
+              { "timestamp": 1727000000280000, "payload": [2] },
+              { "timestamp": 1727000000290000, "payload": [2] },
+              { "timestamp": 1727000000300000, "payload": [3] },
+              { "timestamp": 1727000000310000, "payload": [3] },
+              { "timestamp": 1727000000320000, "payload": [3] },
+              { "timestamp": 1727000000330000, "payload": [3] },
+              { "timestamp": 1727000000340000, "payload": [3] },
+              { "timestamp": 1727000000350000, "payload": [3] },
+              { "timestamp": 1727000000360000, "payload": [3] },
+              { "timestamp": 1727000000370000, "payload": [3] },
+              { "timestamp": 1727000000380000, "payload": [3] },
+              { "timestamp": 1727000000390000, "payload": [3] },
+              { "timestamp": 1727000000400000, "payload": [4] },
+              { "timestamp": 1727000000410000, "payload": [4] },
+              { "timestamp": 1727000000420000, "payload": [4] },
+              { "timestamp": 1727000000430000, "payload": [4] },
+              { "timestamp": 1727000000440000, "payload": [4] },
+              { "timestamp": 1727000000450000, "payload": [4] },
+              { "timestamp": 1727000000460000, "payload": [4] },
+              { "timestamp": 1727000000470000, "payload": [4] },
+              { "timestamp": 1727000000480000, "payload": [4] },
+              { "timestamp": 1727000000490000, "payload": [4] }
+            ]
+          }
+        ],
+        "toleranceUs": 5000
+      },
+      "expected": [{ "frameIds": [96, 97], "sampleCount": 5, "matchPercentage": 100, "samplePayload": [0] }]
+    },
+    {
+      "name": "constant payloads pair every sample in the window",
+      "input": {
+        "framePayloads": [
+          {
+            "frameId": 144,
+            "payloads": [
+              { "timestamp": 1727000000000000, "payload": [0, 0, 0, 0] },
+              { "timestamp": 1727000000100000, "payload": [0, 0, 0, 0] },
+              { "timestamp": 1727000000200000, "payload": [0, 0, 0, 0] },
+              { "timestamp": 1727000000300000, "payload": [0, 0, 0, 0] },
+              { "timestamp": 1727000000400000, "payload": [0, 0, 0, 0] }
+            ]
+          },
+          {
+            "frameId": 145,
+            "payloads": [
+              { "timestamp": 1727000000003000, "payload": [0, 0, 0, 0] },
+              { "timestamp": 1727000000013000, "payload": [0, 0, 0, 0] },
+              { "timestamp": 1727000000023000, "payload": [0, 0, 0, 0] },
+              { "timestamp": 1727000000033000, "payload": [0, 0, 0, 0] },
+              { "timestamp": 1727000000043000, "payload": [0, 0, 0, 0] },
+              { "timestamp": 1727000000053000, "payload": [0, 0, 0, 0] },
+              { "timestamp": 1727000000063000, "payload": [0, 0, 0, 0] },
+              { "timestamp": 1727000000073000, "payload": [0, 0, 0, 0] },
+              { "timestamp": 1727000000083000, "payload": [0, 0, 0, 0] },
+              { "timestamp": 1727000000093000, "payload": [0, 0, 0, 0] },
+              { "timestamp": 1727000000103000, "payload": [0, 0, 0, 0] },
+              { "timestamp": 1727000000113000, "payload": [0, 0, 0, 0] },
+              { "timestamp": 1727000000123000, "payload": [0, 0, 0, 0] },
+              { "timestamp": 1727000000133000, "payload": [0, 0, 0, 0] },
+              { "timestamp": 1727000000143000, "payload": [0, 0, 0, 0] },
+              { "timestamp": 1727000000153000, "payload": [0, 0, 0, 0] },
+              { "timestamp": 1727000000163000, "payload": [0, 0, 0, 0] },
+              { "timestamp": 1727000000173000, "payload": [0, 0, 0, 0] },
+              { "timestamp": 1727000000183000, "payload": [0, 0, 0, 0] },
+              { "timestamp": 1727000000193000, "payload": [0, 0, 0, 0] },
+              { "timestamp": 1727000000203000, "payload": [0, 0, 0, 0] },
+              { "timestamp": 1727000000213000, "payload": [0, 0, 0, 0] },
+              { "timestamp": 1727000000223000, "payload": [0, 0, 0, 0] },
+              { "timestamp": 1727000000233000, "payload": [0, 0, 0, 0] },
+              { "timestamp": 1727000000243000, "payload": [0, 0, 0, 0] },
+              { "timestamp": 1727000000253000, "payload": [0, 0, 0, 0] },
+              { "timestamp": 1727000000263000, "payload": [0, 0, 0, 0] },
+              { "timestamp": 1727000000273000, "payload": [0, 0, 0, 0] },
+              { "timestamp": 1727000000283000, "payload": [0, 0, 0, 0] },
+              { "timestamp": 1727000000293000, "payload": [0, 0, 0, 0] },
+              { "timestamp": 1727000000303000, "payload": [0, 0, 0, 0] },
+              { "timestamp": 1727000000313000, "payload": [0, 0, 0, 0] },
+              { "timestamp": 1727000000323000, "payload": [0, 0, 0, 0] },
+              { "timestamp": 1727000000333000, "payload": [0, 0, 0, 0] },
+              { "timestamp": 1727000000343000, "payload": [0, 0, 0, 0] },
+              { "timestamp": 1727000000353000, "payload": [0, 0, 0, 0] },
+              { "timestamp": 1727000000363000, "payload": [0, 0, 0, 0] },
+              { "timestamp": 1727000000373000, "payload": [0, 0, 0, 0] },
+              { "timestamp": 1727000000383000, "payload": [0, 0, 0, 0] },
+              { "timestamp": 1727000000393000, "payload": [0, 0, 0, 0] },
+              { "timestamp": 1727000000403000, "payload": [0, 0, 0, 0] },
+              { "timestamp": 1727000000413000, "payload": [0, 0, 0, 0] },
+              { "timestamp": 1727000000423000, "payload": [0, 0, 0, 0] },
+              { "timestamp": 1727000000433000, "payload": [0, 0, 0, 0] },
+              { "timestamp": 1727000000443000, "payload": [0, 0, 0, 0] },
+              { "timestamp": 1727000000453000, "payload": [0, 0, 0, 0] },
+              { "timestamp": 1727000000463000, "payload": [0, 0, 0, 0] },
+              { "timestamp": 1727000000473000, "payload": [0, 0, 0, 0] },
+              { "timestamp": 1727000000483000, "payload": [0, 0, 0, 0] },
+              { "timestamp": 1727000000493000, "payload": [0, 0, 0, 0] }
+            ]
+          }
+        ],
+        "toleranceUs": null
+      },
+      "expected": [{ "frameIds": [144, 145], "sampleCount": 45, "matchPercentage": 100, "samplePayload": [0, 0, 0, 0] }]
+    },
+    {
+      "name": "two groups, the larger first",
+      "input": {
+        "framePayloads": [
+          {
+            "frameId": 112,
+            "payloads": [{ "timestamp": 1727000000000000, "payload": [112, 0] }, { "timestamp": 1727000000100000, "payload": [112, 1] }, { "timestamp": 1727000000200000, "payload": [112, 2] }, { "timestamp": 1727000000300000, "payload": [112, 3] }]
+          },
+          {
+            "frameId": 113,
+            "payloads": [{ "timestamp": 1727000000001000, "payload": [112, 0] }, { "timestamp": 1727000000101000, "payload": [112, 1] }, { "timestamp": 1727000000201000, "payload": [112, 2] }, { "timestamp": 1727000000301000, "payload": [112, 3] }]
+          },
+          {
+            "frameId": 128,
+            "payloads": [{ "timestamp": 1727000000000000, "payload": [128, 0] }, { "timestamp": 1727000000100000, "payload": [128, 1] }, { "timestamp": 1727000000200000, "payload": [128, 2] }, { "timestamp": 1727000000300000, "payload": [128, 3] }]
+          },
+          {
+            "frameId": 129,
+            "payloads": [{ "timestamp": 1727000000001000, "payload": [128, 0] }, { "timestamp": 1727000000101000, "payload": [128, 1] }, { "timestamp": 1727000000201000, "payload": [128, 2] }, { "timestamp": 1727000000301000, "payload": [128, 3] }]
+          },
+          {
+            "frameId": 130,
+            "payloads": [{ "timestamp": 1727000000002000, "payload": [128, 0] }, { "timestamp": 1727000000102000, "payload": [128, 1] }, { "timestamp": 1727000000202000, "payload": [128, 2] }, { "timestamp": 1727000000302000, "payload": [128, 3] }]
+          }
+        ],
+        "toleranceUs": null
+      },
+      "expected": [{ "frameIds": [128, 129, 130], "sampleCount": 12, "matchPercentage": 100, "samplePayload": [128, 0] }, { "frameIds": [112, 113], "sampleCount": 4, "matchPercentage": 100, "samplePayload": [112, 0] }]
+    }
+  ]
+}

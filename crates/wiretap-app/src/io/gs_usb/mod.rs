@@ -9,7 +9,7 @@
 // Platform strategy:
 // - Linux: Devices appear as SocketCAN interfaces via kernel gs_usb driver.
 //          We enumerate devices and help users configure the interface.
-// - Windows/macOS: Direct USB access through wiretap-io (no kernel driver available).
+// - Windows/macOS: Direct USB access through wslib-can-gsusb (no kernel driver available).
 //
 // Supported devices:
 // - CANable (candleLight firmware)
@@ -33,11 +33,11 @@ pub use nusb_driver::run_source;
 // Protocol
 // ============================================================================
 //
-// The identity and the layouts are `wiretap_protocol::gs_usb`, re-exported so
+// The identity and the layouts are `wslib_can_gsusb`, re-exported so
 // the diagnostic CLI reaches them through this module rather than importing the
 // crate.
 
-pub use wiretap_protocol::gs_usb::{can_feature, Breq, BtConst, DeviceConfig, DEVICES};
+pub use wslib_can_gsusb::{can_feature, Breq, BtConst, DeviceConfig, DEVICES};
 
 // ============================================================================
 // Configuration Types
@@ -61,8 +61,8 @@ pub struct GsUsbDeviceInfo {
 }
 
 #[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
-impl From<wiretap_io::can::gsusb::GsUsbDevice> for GsUsbDeviceInfo {
-    fn from(dev: wiretap_io::can::gsusb::GsUsbDevice) -> Self {
+impl From<wslib_can_gsusb::GsUsbDevice> for GsUsbDeviceInfo {
+    fn from(dev: wslib_can_gsusb::GsUsbDevice) -> Self {
         Self {
             bus: dev.bus,
             address: dev.address,
@@ -102,7 +102,7 @@ pub struct GsUsbProbeResult {
 pub fn list_gs_usb_devices() -> Result<Vec<GsUsbDeviceInfo>, String> {
     #[cfg(target_os = "linux")]
     {
-        let devices = wiretap_io::can::gsusb::devices()
+        let devices = wslib_can_gsusb::devices()
             .map_err(|e| format!("Failed to list gs_usb devices: {e}"))?;
         Ok(devices
             .into_iter()

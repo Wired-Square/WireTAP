@@ -4,6 +4,8 @@ import type { ChecksumNote } from "./ChecksumNote";
 import type { DiscoveredChecksum } from "./DiscoveredChecksum";
 
 /**
+ * Which frame a payload belongs to.
+ *
  * What the scan found for one frame id — including when it found nothing, so
  * the reason is visible rather than the id simply vanishing from the results.
  */

@@ -20,7 +20,7 @@ use serde::Serialize;
 use tauri::{AppHandle, Emitter};
 
 use serialport::{DataBits, SerialPort, StopBits};
-use wiretap_io::serial::{LineSettings, Parity};
+use wslib_serial::{LineSettings, Parity};
 
 use crate::blocking::off_runtime;
 
@@ -60,7 +60,7 @@ fn new_terminal_id() -> String {
     format!("term_{:x}", nanos as u64)
 }
 
-/// The terminal keeps its own serialport handle rather than `wiretap_io::serial::open`,
+/// The terminal keeps its own serialport handle rather than `wslib_serial::open`,
 /// because the reset pulse needs RTS and DTR, which the library's task does not expose.
 fn open_port(port: &str, line: LineSettings) -> serialport::Result<Box<dyn SerialPort>> {
     serialport::new(port, line.baud)

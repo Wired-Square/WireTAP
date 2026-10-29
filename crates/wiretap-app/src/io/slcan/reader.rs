@@ -14,9 +14,9 @@ use serde::{Deserialize, Serialize};
 
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
-use wiretap_io::can::slcan::{check_rates, open as open_slcan, probe, SlcanOptions};
-use wiretap_io::can::{CanError, CanEvent, DeviceInfo};
-use wiretap_io::serial::LineSettings;
+use wslib_can_slcan::{check_rates, open as open_slcan, probe, SlcanOptions};
+use wslib_can::{CanError, CanEvent, DeviceInfo};
+use wslib_serial::LineSettings;
 
 use crate::io::bus_mapping::BusMapping;
 use crate::io::can_task::{
@@ -233,8 +233,8 @@ mod tests {
     use crate::io::can_task::{lost, reopen_failed};
     use crate::io::error::DevicePresence;
     use std::time::{Duration, UNIX_EPOCH};
-    use wiretap_io::can::{CanFrame, CanRead, Direction};
-    use wiretap_io::serial::Parity;
+    use wslib_can::{CanFrame, CanRead, Direction};
+    use wslib_serial::Parity;
 
     fn mapping(enabled: bool, output_bus: u8) -> BusMapping {
         BusMapping {

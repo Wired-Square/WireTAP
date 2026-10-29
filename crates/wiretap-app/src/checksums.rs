@@ -1,6 +1,6 @@
 // ui/crates/wiretap-app/src/checksums.rs
 //
-// The frontend's door to `wiretap-checksum`. The algorithms, the candidate
+// The frontend's door to `wslib-checksum`. The algorithms, the candidate
 // sweep, the scoring and the notes all live in the crate — a catalogue's
 // checksum config is a catalogue concern, and keeping one implementation is
 // what stopped the serial dialog and the Serial Payload tool disagreeing about
@@ -10,7 +10,7 @@
 use serde::Serialize;
 use std::str::FromStr;
 
-use wiretap_checksum::{
+use wslib_checksum::{
     calculate_checksum, detect_checksum, resolve_byte_index, sweep_specs, validate_checksum,
     ChecksumAlgorithm, ChecksumDetectionOptions, ChecksumDetectionResult, ChecksumSpec,
     ChecksumSpecResult, ChecksumValidationResult,
@@ -65,7 +65,7 @@ pub fn validate_checksum_cmd(
 /// Check a frame against its serial catalogue's `[meta.serial.checksum]`.
 /// `None` when the catalogue names an algorithm this build does not know.
 pub fn validate_serial_checksum(
-    config: &wiretap_catalog::ChecksumConfig,
+    config: &wslib_wiretap_catalogue::ChecksumConfig,
     data: &[u8],
 ) -> Option<ChecksumValidationResult> {
     let algo = ChecksumAlgorithm::from_str(&config.algorithm).ok()?;
@@ -118,7 +118,7 @@ pub fn sweep_checksum_specs_cmd(
 mod tests {
     use super::*;
     use std::collections::BTreeSet;
-    use wiretap_checksum::ALL_NOTES;
+    use wslib_checksum::ALL_NOTES;
 
     /// The TypeScript copy this replaced clamped the same way: past the start lands on byte 0.
     #[test]
@@ -219,7 +219,7 @@ mod tests {
         .expect("table");
         let rows = table["algorithms"].as_array().expect("algorithms");
         let ids: Vec<&str> = rows.iter().map(|row| row["id"].as_str().expect("id")).collect();
-        assert_eq!(ids, wiretap_checksum::all_algorithm_ids());
+        assert_eq!(ids, wslib_checksum::all_algorithm_ids());
         for (id, row) in ids.iter().zip(rows) {
             let width = ChecksumAlgorithm::from_str(id).ok().map(|a| a.output_bytes() as u64);
             assert_eq!(width, row["bytes"].as_u64(), "{id}");

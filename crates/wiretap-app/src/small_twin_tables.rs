@@ -3,8 +3,8 @@
 
 use framelink::protocol::{frame_def, types::interface_name};
 use serde_json::Value;
-use wiretap_decode::{extract_field, BitOrder, Endianness};
-use wiretap_protocol::dlc::{dlc_to_len, len_to_dlc};
+use wslib_bits::{extract_field, BitOrder, Endianness};
+use wslib_can::{dlc_to_len, len_to_dlc};
 
 const FIXTURES: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../frontend/wiretap-ui/src/tests/fixtures/data");
 

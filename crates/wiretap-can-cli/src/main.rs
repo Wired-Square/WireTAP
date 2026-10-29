@@ -14,7 +14,7 @@ use std::{
 
 use clap::{Parser, Subcommand};
 use tokio::time::{sleep, Instant};
-use wiretap_io::can::{CanEvent, CanWriter};
+use wslib_can::{CanEvent, CanWriter};
 
 use crate::iface::{BusOptions, Interface, Probed};
 
@@ -309,7 +309,7 @@ async fn probe(interface: &Interface) -> Result<(), String> {
 fn list() -> Result<(), String> {
     println!("gs_usb");
     #[cfg(any(target_os = "macos", target_os = "windows"))]
-    for device in wiretap_io::can::gsusb::devices().map_err(|e| format!("USB: {e}"))? {
+    for device in wslib_can_gsusb::devices().map_err(|e| format!("USB: {e}"))? {
         let selector = device
             .serial
             .clone()
@@ -317,7 +317,7 @@ fn list() -> Result<(), String> {
         println!("  gsusb:{selector:<30} {}", device.product);
     }
     #[cfg(target_os = "linux")]
-    for found in wiretap_io::can::gsusb::devices().map_err(|e| format!("sysfs: {e}"))? {
+    for found in wslib_can_gsusb::devices().map_err(|e| format!("sysfs: {e}"))? {
         let device = &found.device;
         let interface = found
             .interface
@@ -341,7 +341,7 @@ fn list() -> Result<(), String> {
     #[cfg(any(target_os = "macos", target_os = "windows"))]
     {
         println!("PEAK");
-        for device in wiretap_io::can::pcan::devices().map_err(|e| format!("USB: {e}"))? {
+        for device in wslib_can_pcan::devices().map_err(|e| format!("USB: {e}"))? {
             let selector = device
                 .serial
                 .clone()
@@ -351,9 +351,9 @@ fn list() -> Result<(), String> {
     }
 
     println!("serial ports");
-    for port in wiretap_io::serial::ports().map_err(|e| format!("serial ports: {e}"))? {
+    for port in wslib_serial::ports().map_err(|e| format!("serial ports: {e}"))? {
         let usb = match &port.kind {
-            wiretap_io::serial::PortKind::Usb(usb) => format!(
+            wslib_serial::PortKind::Usb(usb) => format!(
                 "{:04x}:{:04x} {}",
                 usb.vid,
                 usb.pid,

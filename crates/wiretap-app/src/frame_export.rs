@@ -1,12 +1,12 @@
-// Discovery's exports: frames as CSV and candump through `wiretap_protocol`'s
+// Discovery's exports: frames as CSV and candump through `wslib_can`'s
 // writers, and as JSON; a byte capture as a hex dump, a CSV or raw binary.
 
 use std::fmt::Write;
 
 use serde::{Deserialize, Serialize};
-use wiretap_decode::frame_id::format_frame_id;
-use wiretap_protocol::can::{CanFrame, Direction};
-use wiretap_protocol::{candump, savvycan};
+use wslib_wiretap_protocol::format_frame_id;
+use wslib_can::{CanFrame, Direction};
+use wslib_can::{candump, savvycan};
 
 use crate::capture_store::{self, TimestampedByte};
 use crate::io::FrameMessage;

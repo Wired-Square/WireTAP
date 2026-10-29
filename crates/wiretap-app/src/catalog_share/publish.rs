@@ -28,7 +28,7 @@ use tauri::{AppHandle, Emitter, Manager};
 
 use super::error::{ShareError, ShareErrorKind};
 use super::github::{self, GitHubClient, NewRepo, RepoInfo};
-use wiretap_catalog::DiffKind;
+use wslib_wiretap_catalogue::DiffKind;
 use super::registry::{CatalogEntry, CatalogSourceRegistry, ForkRef, GitIdentity, PublishState};
 use super::secrets::{self, SecretFinding};
 use super::{auth, git, url::CatalogSource};
@@ -180,7 +180,7 @@ pub struct PublishDiffRequest {
 /// What a push would change upstream, ready to render.
 ///
 /// Carries the rendered diff rather than the two texts. Both are already in hand here,
-/// and the diff is `wiretap_catalog::text::diff_lines` — returning the texts instead
+/// and the diff is `wslib_wiretap_catalogue::text::diff_lines` — returning the texts instead
 /// would ship them to the frontend and straight back over the WebSocket to be diffed by
 /// the function that was one call away.
 #[derive(Debug, Clone, Serialize)]
@@ -195,7 +195,7 @@ pub struct PublishDiff {
     /// Unified diff rows, upstream → local, so an `add` is what this push would add.
     /// Empty when `identical`, which the tab renders as a banner rather than a page of
     /// unchanged lines.
-    pub lines: Vec<wiretap_catalog::DiffRow>,
+    pub lines: Vec<wslib_wiretap_catalogue::DiffRow>,
     pub added: usize,
     pub removed: usize,
     /// False when this push would add the file rather than change it.
@@ -505,7 +505,7 @@ pub async fn publish_diff(
         Vec::new()
     } else {
         let remote_toml = upstream.blob.as_ref().map(|b| b.text.as_str()).unwrap_or("");
-        wiretap_catalog::text::diff_lines(remote_toml, &local_toml)
+        wslib_wiretap_catalogue::text::diff_lines(remote_toml, &local_toml)
     };
     // One pass: asking twice walks the rows twice for two numbers read side by side.
     let (added, removed) = lines.iter().fold((0, 0), |(add, rm), row| match row.kind {
@@ -640,7 +640,7 @@ async fn publish(
     // and silently skipped when the file cannot carry one. A bump is a convenience; it
     // must never fail the push it is decorating.
     let bump = bump_applies(req.bump_version, &saved_sha, parent_sha.as_deref())
-        .then(|| match wiretap_catalog::edit::bump_meta_version(&content) {
+        .then(|| match wslib_wiretap_catalogue::edit::bump_meta_version(&content) {
             Ok(bumped) => Some(bumped),
             Err(e) => {
                 tlog!("[catalog_share] no version bump for {}: {}", req.filename, e);
@@ -923,7 +923,7 @@ async fn resolve(app: &AppHandle, req: &PublishRequest) -> Result<Resolved, Shar
 /// One owner for the read and the write both, so the bytes a bump was derived from and
 /// the file it is written back to can never resolve differently.
 fn local_catalogue_path(app: &AppHandle, filename: &str) -> Result<PathBuf, ShareError> {
-    let name = wiretap_catalog::text::sanitise_filename(filename)?;
+    let name = wslib_wiretap_catalogue::text::sanitise_filename(filename)?;
     let dir = crate::catalog::decoder_dir(app)
         .ok_or_else(|| ShareError::invalid("The decoder directory is not available"))?;
     Ok(dir.join(name))

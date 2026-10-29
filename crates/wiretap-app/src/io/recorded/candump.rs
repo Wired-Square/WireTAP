@@ -1,11 +1,11 @@
-// A `candump -L` log imported through `wiretap_protocol::candump`, keeping its
+// A `candump -L` log imported through `wslib_can::candump`, keeping its
 // absolute times.
 
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 
-use wiretap_protocol::can::Direction;
-use wiretap_protocol::candump::{self, Line};
+use wslib_can::Direction;
+use wslib_can::candump::{self, Line};
 
 use crate::io::can_task::received_frame;
 use crate::io::FrameMessage;

@@ -12,7 +12,8 @@ use std::sync::{Arc, Mutex, RwLock};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use wiretap_analysis::hypothesis::{rank_fields, Candidate, CandidateReason, Sweep};
-use wiretap_decode::{parse_byte_name, Endianness, PayloadField, ScaledField};
+use wslib_bits::{Endianness, PayloadField, ScaledField};
+use wslib_wiretap_catalogue::parse_byte_name;
 
 use crate::dashboard_history::{self, HeatmapCounts, History};
 use crate::io::FrameMessage;
@@ -326,7 +327,7 @@ pub async fn rank_hypotheses(
     let capture_id = crate::capture_store::get_session_frame_capture_id(&session_id)
         .ok_or_else(|| format!("session '{session_id}' has no frame capture"))?;
     let mask = crate::ws::dispatch::attached_catalog(&session_id)
-        .and_then(|c| wiretap_catalog::decode::frame_id_mask(&c));
+        .and_then(|c| wslib_wiretap_catalogue::decode::frame_id_mask(&c));
     let src = crate::payload_source::AppSource::Capture(&capture_id);
     let inventory = src.inventory(None, None).await?;
     let mut per_frame = Vec::new();

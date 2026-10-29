@@ -9,11 +9,11 @@ use std::time::{Duration, UNIX_EPOCH};
 
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
-use wiretap_io::can::{
+use wslib_can::{
     BusState, CanError, CanEvent, CanFrame, CanOptions, CanRead, CanTask, CanWriter, DeviceInfo,
     Direction, SendRefused,
 };
-use wiretap_protocol::dlc_to_len;
+use wslib_can::dlc_to_len;
 
 use crate::io::bus_mapping::{apply_bus_mappings_batch, output_bus, BusMapping};
 use crate::io::bus_status::BusStatus;
@@ -360,7 +360,7 @@ mod tests {
     use super::*;
     use crate::io::IoErrorKind;
     use crate::io::types::{PendingTransmit, TransmitSender};
-    use wiretap_io::can::Unsupported;
+    use wslib_can::Unsupported;
 
     fn read(frame: CanFrame, direction: Direction, at_us: u64) -> CanRead {
         let mut read = CanRead::new(frame, direction, UNIX_EPOCH + Duration::from_micros(at_us));

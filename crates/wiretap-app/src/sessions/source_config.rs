@@ -10,7 +10,7 @@ use crate::{
 };
 #[cfg(not(target_os = "ios"))]
 use crate::io::device_kinds;
-use wiretap_io::profile::ConnValue;
+use crate::io::profile::ConnValue;
 use crate::io::traits::supported_protocols_for_kind;
 
 use crate::io::probe::get_cached_probe;
@@ -34,7 +34,7 @@ fn apply_serial_overrides(
     if config.profile_kind != "serial" {
         return;
     }
-    let (framing, emit_raw_bytes) = wiretap_io::profile::resolve_serial_framing(
+    let (framing, emit_raw_bytes) = crate::io::profile::resolve_serial_framing(
         profile,
         config.serial.framing_encoding,
         config.serial.emit_raw_bytes,
@@ -731,7 +731,7 @@ mod bus_mapping_tests {
         let slcan = |connection| profile("slcan", connection);
         let error = refuse_at_start(&slcan(json!({ "port": "/dev/x", "bitrate": 33_333 })))
             .expect_err("SLCAN has no command for 33 333 bit/s");
-        let refusal = wiretap_io::can::slcan::check_rates(33_333, None).unwrap_err();
+        let refusal = wslib_can_slcan::check_rates(33_333, None).unwrap_err();
         assert_eq!(error, format!("{}: {refusal}", slcan(json!({})).name));
         assert!(refuse_at_start(&slcan(json!({ "port": "/dev/x", "bitrate": 500_000 }))).is_ok());
         let fd = json!({ "port": "/dev/x", "bitrate": 500_000, "enable_fd": true, "data_bitrate": 3_000_000 });

@@ -78,8 +78,8 @@ impl From<reqwest::Error> for ShareError {
     }
 }
 
-impl From<wiretap_catalog::UnsafeFilename> for ShareError {
-    fn from(e: wiretap_catalog::UnsafeFilename) -> Self {
+impl From<wslib_wiretap_catalogue::UnsafeFilename> for ShareError {
+    fn from(e: wslib_wiretap_catalogue::UnsafeFilename) -> Self {
         Self::invalid(e.to_string())
     }
 }

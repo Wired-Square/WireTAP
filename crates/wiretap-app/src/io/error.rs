@@ -6,10 +6,10 @@
 use std::fmt;
 
 use serde::Serialize;
-use wiretap_io::can::{CanError, TransportError};
-use wiretap_io::net::ResolveError;
+use wslib_can::CanError;
+use wslib_tcp::{ResolveError, TransportError};
 #[cfg(not(target_os = "ios"))]
-use wiretap_io::serial::SerialError;
+use wslib_serial::SerialError;
 
 /// Structured IO error with device context.
 ///

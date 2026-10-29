@@ -2,7 +2,7 @@
 //
 // Test Pattern — drives round-trip I/O tests through existing sessions.
 //
-// The wire contract is `wiretap_protocol::testpattern`, documented at that
+// The wire contract is `wslib_wiretap_protocol::testpattern`, documented at that
 // crate's `docs/test-pattern.md`. Both ends of it live there, so this app and
 // the capture server cannot disagree about what a run means. What stays here is
 // everything the crate deliberately cannot see: tokio, `FrameMessage`, session
@@ -19,8 +19,8 @@ use std::sync::Mutex as StdMutex;
 use std::time::{Duration, Instant};
 use tokio::sync::mpsc;
 
-use wiretap_protocol::testpattern as tp;
-use wiretap_protocol::testpattern::{Command, Message, Reply, Responder, SequenceTracker};
+use wslib_wiretap_protocol::testpattern as tp;
+use wslib_wiretap_protocol::testpattern::{Command, Message, Reply, Responder, SequenceTracker};
 
 use crate::io::{self, now_us, CanTransmitFrame, FrameMessage, TransmitPayload};
 
@@ -888,7 +888,7 @@ impl<'a> Run<'a> {
             if self.cancelled() {
                 break;
             }
-            let expected_len = wiretap_protocol::dlc_to_len(code, fd) as u32;
+            let expected_len = wslib_can::dlc_to_len(code, fd) as u32;
             let mut row = SweepRow { code, expected_len, received_len: None, passed: false };
 
             let request = self.config.sweep_request(code);

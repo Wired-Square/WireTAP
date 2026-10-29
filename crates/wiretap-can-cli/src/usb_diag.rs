@@ -1,7 +1,7 @@
 use nusb::descriptors::TransferType;
 use nusb::transfer::{ControlIn, ControlType, Direction, Recipient};
 use nusb::{DeviceInfo, Interface, MaybeFuture};
-use wiretap_protocol::gs_usb::{can_feature, Breq, BtConst, DeviceConfig, DEVICES};
+use wslib_can_gsusb::{can_feature, Breq, BtConst, DeviceConfig, DEVICES};
 
 use crate::iface::UsbSelector;
 

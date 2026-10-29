@@ -11,7 +11,7 @@ use std::sync::{
 };
 use std::time::Duration;
 
-use wiretap_io::replay::{Pacer, PlaybackControl, Playout, Unlimited};
+use crate::io::replay::{Pacer, PlaybackControl, Playout, Unlimited};
 
 use super::base::{publish_position, publish_position_now, RecordedSourceState};
 use crate::io::{emit_session_error, post_session, signal_frames_ready, FrameMessage, IOCapabilities, IOSource, IOState, PlaybackPosition, SignalThrottle, StreamEndReason, TemporalMode};

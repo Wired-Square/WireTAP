@@ -7,7 +7,7 @@ use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 
 use serde::Serialize;
-use wiretap_io::can::ErrorState;
+use wslib_can::ErrorState;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[cfg_attr(test, derive(ts_rs::TS))]
@@ -47,7 +47,7 @@ impl BusStatus {
     }
 }
 
-/// Sends a transmit timeout lost; a floor, as `wiretap_io::can::BusState::tx_dropped`.
+/// Sends a transmit timeout lost; a floor, as `wslib_can::BusState::tx_dropped`.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[cfg_attr(test, derive(ts_rs::TS))]
 pub struct SendsLost {

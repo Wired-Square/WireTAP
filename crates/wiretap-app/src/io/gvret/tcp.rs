@@ -1,13 +1,13 @@
 // ui/crates/wiretap-app/src/io/gvret/tcp.rs
 //
 // GVRET over TCP: the desktop's probe, and the session's source on
-// `wiretap_io::can::gvret`.
+// `wslib_can_gvret`.
 
 use std::time::Duration;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
-use wiretap_io::can::gvret::{open as open_gvret, probe, GvretOptions, Link};
-use wiretap_io::can::tcp_endpoint;
+use wslib_can_gvret::{open as open_gvret, probe, GvretOptions, Link};
+use wslib_tcp::tcp_endpoint;
 
 use super::common::{handshake_failed, probed_bus_count, GvretDeviceInfo, Stream};
 use crate::io::bus_mapping::BusMapping;
@@ -84,15 +84,16 @@ pub async fn run_source(
 pub(crate) mod tests {
     use super::*;
     use crate::io::{IoError, IoErrorKind, IoFailure};
-    use wiretap_io::can::{CanError, ResolveError, TransportError};
+    use wslib_can::CanError;
+    use wslib_tcp::{ResolveError, TransportError};
     use crate::io::can_task::PortOutage;
     use crate::io::types::{EndReason, TransmitRequest};
     use std::sync::mpsc as std_mpsc;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::net::TcpListener;
     use tokio::time::timeout;
-    use wiretap_io::can::CanFrame;
-    use wiretap_protocol::gvret::{self, ClientCommand};
+    use wslib_can::CanFrame;
+    use wslib_can_gvret::{self as gvret, ClientCommand};
 
     const DEVICE: &str = "gvret_tcp(10.0.0.9:23)";
 

@@ -1,5 +1,5 @@
-use wiretap_io::can::CanFrame;
-use wiretap_protocol::{candump, dlc_to_len, len_to_dlc};
+use wslib_can::CanFrame;
+use wslib_can::{candump, dlc_to_len, len_to_dlc};
 
 /// A `cansend` frame on `bus`, as `candump::parse_frame` reads it, with an FD
 /// payload zero-padded to its length code as the kernel sends it.

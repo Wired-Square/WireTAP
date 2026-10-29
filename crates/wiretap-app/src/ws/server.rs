@@ -964,7 +964,7 @@ mod tests {
             subscribed_channels: HashSet::from([channel]),
             last_activity: Instant::now(),
         });
-        let catalog = wiretap_catalog::Catalog::parse("[meta]\nname = \"kept\"\n").unwrap();
+        let catalog = wslib_wiretap_catalogue::Catalogue::parse("[meta]\nname = \"kept\"\n").unwrap();
         crate::ws::dispatch::attach_catalog(session, Some("kept.toml".into()), catalog);
 
         conns.close(conn_id, "outbound queue full");

@@ -8,8 +8,8 @@
 
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
-use wiretap_io::can::socketcan::{open as open_socketcan, SocketCanOptions};
-use wiretap_io::can::{CanError, CanEvent};
+use wslib_can_socketcan::{open as open_socketcan, SocketCanOptions};
+use wslib_can::{CanError, CanEvent};
 
 use crate::io::bus_mapping::BusMapping;
 use crate::io::can_task::{
@@ -181,7 +181,7 @@ pub async fn run_source(
 mod tests {
     use super::*;
     use std::time::{Duration, UNIX_EPOCH};
-    use wiretap_io::can::{CanFrame, CanRead, DeviceInfo, Direction};
+    use wslib_can::{CanFrame, CanRead, DeviceInfo, Direction};
 
     use crate::io::can_task::can_frame;
     use crate::io::types::EndReason;

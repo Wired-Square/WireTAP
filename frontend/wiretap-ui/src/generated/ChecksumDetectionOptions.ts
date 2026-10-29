@@ -10,9 +10,8 @@ positions?: Array<number>,
  */
 lengths?: Array<number>, 
 /**
- * Byte offsets just past a declared header field, from the view's ID/Source
- * chips. These widen the calculation-range candidates and earn a small
- * confidence bonus; they never narrow the search.
+ * Byte offsets just past a declared header field; they widen the range
+ * candidates and earn a small bonus, never narrowing the search.
  */
 headerBoundaries?: Array<number>, 
 /**

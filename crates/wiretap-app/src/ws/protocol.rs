@@ -1,7 +1,7 @@
 // Copyright 2026 Wired Square Pty Ltd
 
-use wiretap_protocol::can::{CanFlags, CanFrame};
-use wiretap_protocol::ingest::{ID_ARB_MASK, ID_EXTENDED, ID_TX};
+use wslib_can::{CanFlags, CanFrame};
+use wslib_wiretap_protocol::ingest::{ID_ARB_MASK, ID_EXTENDED, ID_TX};
 
 pub const PROTOCOL_VERSION: u8 = 3;
 pub const HEADER_SIZE: usize = 4;

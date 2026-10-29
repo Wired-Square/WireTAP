@@ -1,13 +1,14 @@
 // Copyright 2026 Wired Square Pty Ltd
 
 //! Turn a reassembled tunnel message into the shapes the Decoder already renders:
-//! its signals, decoded by `wiretap_catalog`, and a **transaction** record for
+//! its signals, decoded by `wslib_wiretap_catalogue`, and a **transaction** record for
 //! the Decoder's Modbus tab carrying the raw bytes and how many frames they took.
 
 use serde::Serialize;
-use wiretap_catalog::decode::Decoded;
-use wiretap_catalog::modbus::{decode_rtu_message, exception_label, function_label};
-use wiretap_catalog::{Catalog, Direction, DirectionBasis, ModbusRtuMessage, Payload, TunnelProtocol};
+use wslib_wiretap_catalogue::decode::Decoded;
+use wslib_wiretap_catalogue::{decode_rtu_message, exception_label, function_label};
+use wslib_modbus::{Direction, DirectionBasis, ModbusRtuMessage, Payload};
+use wslib_wiretap_catalogue::{Catalogue, TunnelProtocol};
 
 /// One decoded tunnel message: the signals to merge into the frame's entry, and
 /// the transaction record for the Modbus tab.
@@ -89,7 +90,7 @@ pub enum TunnelDirectionBasis {
 }
 
 /// Render one reassembled message for the WS payload.
-pub fn decode_message<'a>(msg: &'a ModbusRtuMessage, catalog: &'a Catalog) -> TunnelDecode<'a> {
+pub fn decode_message<'a>(msg: &'a ModbusRtuMessage, catalog: &'a Catalogue) -> TunnelDecode<'a> {
     let d = decode_rtu_message(catalog, msg);
     let transaction = DecodedTunnelMessage {
         coils: msg.coils(),
@@ -133,7 +134,7 @@ pub fn decode_message<'a>(msg: &'a ModbusRtuMessage, catalog: &'a Catalog) -> Tu
 #[cfg(test)]
 mod tests {
     use super::*;
-    use wiretap_catalog::ModbusRtuStream;
+    use wslib_modbus::ModbusRtuStream;
 
     const CATALOG: &str = r#"
 [meta]
@@ -157,13 +158,13 @@ factor = 0.1
 unit = "A"
 "#;
 
-    fn catalog() -> Catalog {
-        Catalog::parse(CATALOG).unwrap()
+    fn catalog() -> Catalogue {
+        Catalogue::parse(CATALOG).unwrap()
     }
 
     /// One tunnel for the whole exchange, chunked into 8-byte CAN payloads: a
     /// response inherits its register address from the request before it.
-    fn exchange(catalog: &Catalog, messages: &[&str]) -> Vec<ModbusRtuMessage> {
+    fn exchange(catalog: &Catalogue, messages: &[&str]) -> Vec<ModbusRtuMessage> {
         let declared = catalog.frame(0x1E0).unwrap().tunnel.as_ref().unwrap();
         let mut t = catalog.tunnel_stream(declared);
         let mut out = Vec::new();
@@ -184,7 +185,7 @@ unit = "A"
 
     fn framed(hex: &str) -> Vec<u8> {
         let mut out = hex_bytes(hex);
-        out.extend(wiretap_checksum::algorithms::crc16_modbus_checksum(&out).to_le_bytes());
+        out.extend(wslib_checksum::algorithms::crc16_modbus_checksum(&out).to_le_bytes());
         out
     }
 
@@ -196,7 +197,7 @@ unit = "A"
             .collect()
     }
 
-    fn transaction(msg: &ModbusRtuMessage, catalog: &Catalog) -> serde_json::Value {
+    fn transaction(msg: &ModbusRtuMessage, catalog: &Catalogue) -> serde_json::Value {
         serde_json::to_value(decode_message(msg, catalog).transaction).unwrap()
     }
 

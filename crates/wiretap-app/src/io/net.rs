@@ -40,7 +40,7 @@ pub const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 /// connect future, which is what makes a DNS failure and an unreachable host
 /// indistinguishable.
 pub async fn resolve_host_port(host: &str, port: u16) -> Result<SocketAddr, IoError> {
-    wiretap_io::net::resolve(host, port, DNS_TIMEOUT)
+    wslib_tcp::resolve(host, port, DNS_TIMEOUT)
         .await
         .map(|addrs| addrs[0])
         .map_err(|reason| IoError::from_resolve(host, &reason))

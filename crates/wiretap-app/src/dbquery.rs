@@ -7,7 +7,7 @@ use tauri::AppHandle;
 
 use wiretap_analysis::source::InventoryRow;
 use crate::settings::{IOProfile, SettingsSource};
-use wiretap_gateway::DatabaseActivityResult;
+use wslib_wiretap_gateway::DatabaseActivityResult;
 
 /// Resolve a profile id to a WireTAP backend profile.
 ///

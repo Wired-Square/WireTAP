@@ -8,7 +8,7 @@ use std::sync::mpsc as std_mpsc;
 use tokio::sync::mpsc::{self, error::TrySendError};
 use tokio_util::sync::CancellationToken;
 
-use wiretap_catalog::FramingMode;
+use wslib_wiretap_catalogue::FramingMode;
 
 use super::{FrameMessage, TransmitResult};
 
@@ -106,7 +106,7 @@ pub struct TransmitRequest {
     /// Encoded frame bytes ready to send
     pub data: Vec<u8>,
     /// Set in place of `data` for a source whose device library encodes the frame.
-    pub frame: Option<wiretap_io::can::CanFrame>,
+    pub frame: Option<wslib_can::CanFrame>,
     /// Sync oneshot channel to send the result back
     pub result_tx: std_mpsc::SyncSender<Result<(), String>>,
     /// Wait for room in the device's send queue instead of being refused by a full one.
@@ -146,7 +146,7 @@ pub(crate) fn channel_refusal<T>(e: &TrySendError<T>) -> &'static str {
 pub struct PendingTransmit {
     pub tx: TransmitSender,
     pub data: Vec<u8>,
-    pub frame: Option<wiretap_io::can::CanFrame>,
+    pub frame: Option<wslib_can::CanFrame>,
 }
 
 impl PendingTransmit {
@@ -224,7 +224,7 @@ pub struct SetFramingRequest {
     pub emit_raw_bytes: bool,
     /// Modbus RTU settings, when `encoding` names that framer. `None` keeps the
     /// stock defaults.
-    pub modbus: Option<wiretap_catalog::RtuSettings>,
+    pub modbus: Option<wslib_wiretap_catalogue::RtuSettings>,
 }
 
 /// Sender type for control requests (sync-safe).

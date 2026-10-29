@@ -94,7 +94,7 @@ pub struct RemoteCatalog {
     pub transmit_frame_count: usize,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[cfg_attr(test, ts(optional, as = "Option<String>"))]
-    pub protocol: Option<wiretap_catalog::Protocol>,
+    pub protocol: Option<wslib_wiretap_catalogue::Protocol>,
 }
 
 /// Parse a shared URL without touching the network, so the paste field can give
@@ -456,7 +456,7 @@ fn write_import(
         )
     })?;
 
-    let desired = wiretap_catalog::text::sanitise_filename(basename(&blob.path)).map_err(|e| {
+    let desired = wslib_wiretap_catalogue::text::sanitise_filename(basename(&blob.path)).map_err(|e| {
         ImportResult::refused(&blob.path, ImportOutcome::Failed, None, e.to_string())
     })?;
     let taken = decoder_dir.join(&desired).exists();
@@ -1013,7 +1013,7 @@ pub async fn apply_catalog_update(
         ));
     };
 
-    let target = decoder_dir.join(wiretap_catalog::text::sanitise_filename(&filename)?);
+    let target = decoder_dir.join(wslib_wiretap_catalogue::text::sanitise_filename(&filename)?);
     // Unconditional: `None` legitimately means "there was no local file when I
     // reviewed", so it must still be compared rather than waved through.
     if registry::git_blob_sha_of_file(&target) != expected_local_sha {
@@ -1047,7 +1047,7 @@ fn install_update(
         ));
     }
 
-    let target = decoder_dir.join(wiretap_catalog::text::sanitise_filename(filename)?);
+    let target = decoder_dir.join(wslib_wiretap_catalogue::text::sanitise_filename(filename)?);
     // Derived rather than taken from the caller, so the stored hash is always the
     // hash of the bytes actually written.
     let blob_sha = registry::git_blob_sha(toml.as_bytes());
@@ -1688,13 +1688,13 @@ fn repo_entry(source: &CatalogSource, repo: &RepoInfo) -> RepoEntry {
 /// Parse and validate a catalogue, extracting what the UI needs to decide whether to
 /// import it.
 fn describe_catalog(path: &str, blob_sha: &str, text: &str) -> RemoteCatalog {
-    let findings = wiretap_catalog::validate::validate(text);
+    let findings = wslib_wiretap_catalogue::validate::validate(text);
     let errors: Vec<String> = findings
         .iter()
         .map(|f| format!("{}: {}", f.field, f.message))
         .collect();
 
-    let parsed = wiretap_catalog::Catalog::parse(text).ok();
+    let parsed = wslib_wiretap_catalogue::Catalogue::parse(text).ok();
     let (name, frame_count, transmit_frame_count, protocol, meta_version) = match &parsed {
         Some(cat) => (
             // `Meta` defaults `name` to an empty string, so a non-catalogue TOML
@@ -1887,14 +1887,14 @@ bit_length = 16
             described.transmit_frame_count, 1,
             "only 0x100 declares an interval"
         );
-        assert_eq!(described.protocol, Some(wiretap_catalog::Protocol::Can));
+        assert_eq!(described.protocol, Some(wslib_wiretap_catalogue::Protocol::Can));
     }
 
     /// The protocol goes over the wire through the crate's serde contract, not a
     /// Debug rendering that would drift if a variant became multi-word.
     #[test]
     fn protocol_serialises_as_the_crate_defines_it() {
-        let json = serde_json::to_string(&wiretap_catalog::Protocol::Can).expect("serialises");
+        let json = serde_json::to_string(&wslib_wiretap_catalogue::Protocol::Can).expect("serialises");
         assert_eq!(json, "\"can\"");
     }
 

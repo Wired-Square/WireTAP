@@ -6,7 +6,7 @@
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 
-use wiretap_protocol::candump;
+use wslib_can::candump;
 
 use super::candump::interface_bus;
 use crate::io::{FrameMessage, Protocol};
@@ -503,7 +503,7 @@ pub fn parse_csv_with_mapping(
         } else if let Some(db_col) = data_bytes_col {
             parts
                 .get(db_col)
-                .map(|s| wiretap_decode::hex::parse_bytes_lenient(s))
+                .map(|s| wslib_bits::hex::parse_bytes_lenient(s))
                 .unwrap_or_default()
         } else if !data_byte_cols.is_empty() {
             data_byte_cols

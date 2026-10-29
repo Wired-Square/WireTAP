@@ -9,10 +9,10 @@ use std::path::Path;
 
 use serde::Serialize;
 use tauri::{AppHandle, Manager};
-use wiretap_gateway::client::{AssignOutcome, GatewayClient};
-use wiretap_gateway::{
-    ActiveCatalog, AssignCatalog, CatalogFinding, Daemon, DaemonDevice, DaemonList, Provenance,
-    ProvenanceBase, StoredCatalog, UnassignParams,
+use wslib_wiretap_gateway::client::{AssignOutcome, GatewayClient};
+use wslib_wiretap_gateway::{
+    self as gateway, AssignCatalogue, Daemon, DaemonDevice, DaemonList, Provenance, ProvenanceBase, StoredCatalogue,
+    UnassignParams,
 };
 
 use crate::apiclient::{resolve_by_id, text};
@@ -87,13 +87,13 @@ pub struct CatalogueFinding {
     pub message: String,
 }
 
-impl From<CatalogFinding> for CatalogueFinding {
-    fn from(f: CatalogFinding) -> Self {
+impl From<gateway::CatalogueFinding> for CatalogueFinding {
+    fn from(f: gateway::CatalogueFinding) -> Self {
         Self { field: f.field, message: f.message }
     }
 }
 
-fn findings(list: Vec<CatalogFinding>) -> Vec<CatalogueFinding> {
+fn findings(list: Vec<gateway::CatalogueFinding>) -> Vec<CatalogueFinding> {
     list.into_iter().map(Into::into).collect()
 }
 
@@ -129,7 +129,7 @@ fn catalogue_ref(blob_sha: &str, gateway_name: Option<String>, library: &Library
     }
 }
 
-fn status(assigned: Option<&str>, active: Option<&ActiveCatalog>) -> AssignmentStatus {
+fn status(assigned: Option<&str>, active: Option<&gateway::ActiveCatalogue>) -> AssignmentStatus {
     let running_assigned = active
         .filter(|a| a.source == "assigned")
         .and_then(|a| a.blob_sha.as_deref());
@@ -199,11 +199,11 @@ fn assign_request(
     bytes: Vec<u8>,
     tracked: &[(&CatalogEntry, String)],
     expected: Option<String>,
-) -> Result<AssignCatalog, String> {
+) -> Result<AssignCatalogue, String> {
     let blob_sha = git_blob_sha(&bytes);
     let content =
         String::from_utf8(bytes).map_err(|_| "the catalogue is not UTF-8 text".to_string())?;
-    Ok(AssignCatalog {
+    Ok(AssignCatalogue {
         daemon_id,
         interface,
         content,
@@ -228,7 +228,7 @@ async fn read_library(app: &AppHandle) -> Library {
 }
 
 fn library_file(app: &AppHandle, filename: &str) -> Result<(String, Vec<u8>), String> {
-    let filename = wiretap_catalog::text::reject_unsafe_filename(filename)
+    let filename = wslib_wiretap_catalogue::text::reject_unsafe_filename(filename)
         .map_err(|e| e.to_string())?
         .to_string();
     let dir = crate::catalog::decoder_dir(app).ok_or("No decoder directory is set")?;
@@ -314,7 +314,7 @@ pub async fn gateway_copy_catalogue(
     crate::catalog::import_catalog(app, filename, stored.content).await
 }
 
-fn copy_filename(stored: &StoredCatalog, gateway_name: Option<&str>) -> String {
+fn copy_filename(stored: &StoredCatalogue, gateway_name: Option<&str>) -> String {
     let safe = |n: &&str| !n.is_empty() && !n.contains(['/', '\\']) && !n.starts_with('.');
     stored
         .provenance
@@ -333,7 +333,7 @@ mod tests {
     use serde_json::{json, Value};
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::net::TcpListener;
-    use wiretap_gateway::RefusedCatalog;
+    use wslib_wiretap_gateway::RefusedCatalogue;
 
     const A: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     const B: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
@@ -398,13 +398,13 @@ mod tests {
         serde_json::from_slice(&request.body).unwrap()
     }
 
-    fn active(source: &str, sha: Option<&str>, refused: Option<(&str, &str)>) -> ActiveCatalog {
-        ActiveCatalog {
+    fn active(source: &str, sha: Option<&str>, refused: Option<(&str, &str)>) -> gateway::ActiveCatalogue {
+        gateway::ActiveCatalogue {
             source: source.into(),
             blob_sha: sha.map(String::from),
             name: None,
             since_us: 0,
-            refused: refused.map(|(blob_sha, reason)| RefusedCatalog { blob_sha: blob_sha.into(), reason: reason.into() }),
+            refused: refused.map(|(blob_sha, reason)| RefusedCatalogue { blob_sha: blob_sha.into(), reason: reason.into() }),
         }
     }
 
@@ -588,7 +588,7 @@ mod tests {
 
     #[test]
     fn a_copied_catalogue_is_named_by_its_path_then_its_name_then_its_hash() {
-        let stored = |path: Option<&str>| StoredCatalog {
+        let stored = |path: Option<&str>| StoredCatalogue {
             blob_sha: A.into(),
             content: String::new(),
             provenance: Provenance { path: path.map(String::from), ..Default::default() },

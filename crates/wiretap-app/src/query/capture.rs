@@ -1,7 +1,7 @@
 // crates/wiretap-app/src/query/capture.rs
 //
 // A query against a SQLite capture: the statements a spec reads, composed from
-// the lib's `FrameRowFilter`, and the lib's kernels over the rows they return.
+// the capture store's `FrameRowFilter`, and the analysis kernels over the rows they return.
 
 use std::collections::BTreeSet;
 use std::time::Instant;
@@ -9,7 +9,7 @@ use std::time::Instant;
 use sqlx::sqlite::SqliteRow;
 use sqlx::Row;
 use wiretap_analysis::query::{self as kernel, QueryRow};
-use wiretap_gateway::QuerySpec;
+use wslib_wiretap_gateway::QuerySpec;
 use wiretap_capture_store::{
     inventory_row, inventory_statement, Cancel, CaptureProtocol, FrameRowFilter, Sql, SqlValue,
 };
@@ -42,18 +42,31 @@ pub fn statements(capture_id: &str, spec: &QuerySpec) -> Vec<Sql> {
     statements_paged(capture_id, spec, PAGE)
 }
 
-/// A spec's filters as the capture store reads them; the gateway's carry the same fields.
+/// The row sets a spec reads, in order: the mirror's then the source's for a
+/// mirror validation, otherwise one.
 fn row_filters(spec: &QuerySpec) -> Vec<FrameRowFilter> {
-    spec.row_filters()
-        .into_iter()
-        .map(|f| FrameRowFilter {
-            frame_id: f.frame_id,
-            is_extended: f.is_extended,
-            protocols: f.protocols.iter().filter_map(|p| CaptureProtocol::from_stored(p.as_str())).collect(),
-            start_us: f.start_us,
-            end_us: f.end_us,
-        })
-        .collect()
+    let window = spec.window();
+    let filter = |frame_id, is_extended| FrameRowFilter {
+        frame_id,
+        is_extended,
+        protocols: window.protocol.map(CaptureProtocol::of).unwrap_or_default().to_vec(),
+        start_us: window.start_us,
+        end_us: window.end_us,
+    };
+    match spec {
+        QuerySpec::ByteChanges { frame_id, is_extended, .. }
+        | QuerySpec::FrameChanges { frame_id, is_extended, .. }
+        | QuerySpec::MuxStatistics { frame_id, is_extended, .. }
+        | QuerySpec::FirstLast { frame_id, is_extended, .. }
+        | QuerySpec::Frequency { frame_id, is_extended, .. }
+        | QuerySpec::Distribution { frame_id, is_extended, .. }
+        | QuerySpec::GapAnalysis { frame_id, is_extended, .. } => vec![filter(Some(*frame_id), *is_extended)],
+        QuerySpec::MirrorValidation { mirror_frame_id, source_frame_id, is_extended, .. } => vec![
+            filter(Some(*mirror_frame_id), *is_extended),
+            filter(Some(*source_frame_id), *is_extended),
+        ],
+        QuerySpec::PatternSearch { .. } | QuerySpec::FrameInventory { .. } => vec![filter(None, None)],
+    }
 }
 
 fn statements_paged(capture_id: &str, spec: &QuerySpec, page: usize) -> Vec<Sql> {
@@ -192,7 +205,7 @@ async fn run_paged(
             counted(QueryResults::PatternSearch(found), read)
         }
         QuerySpec::FrameInventory { limit, .. } => {
-            let rows = capture_db::read_rows(&statements[0], cancel, |row| inventory_row(row).map(capture_db::analysis_row)).await?;
+            let rows = capture_db::read_rows(&statements[0], cancel, inventory_row).await?;
             let read = rows.iter().map(|r| r.count as usize).sum();
             let truncated = limit.is_some_and(|n| rows.len() >= n as usize);
             QueryOutcome { truncated, ..counted(QueryResults::FrameInventory(rows), read) }

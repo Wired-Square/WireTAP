@@ -10,10 +10,11 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
-use wiretap_catalog::serial_framing::{FrameIdConfig, FramingEncoding, SerialFrame, SerialFramer};
-use wiretap_catalog::{Catalog, ModbusRtuOptions, RtuSettings, RtuTap, TappedMessage};
-use wiretap_io::serial::{
-    self, ports, Access, LineSettings, PortInfo, PortKind, SerialEvent,
+use wslib_wiretap_catalogue::serial_framing::{FrameIdConfig, FramingEncoding, SerialFrame, SerialFramer};
+use wslib_modbus::{RtuTap, TappedMessage};
+use wslib_wiretap_catalogue::{Catalogue, RtuSettings};
+use wslib_serial::{
+    self as serial, ports, Access, LineSettings, PortInfo, PortKind, SerialEvent,
     SerialOptions, SerialWriter, WriteRefused,
 };
 
@@ -26,7 +27,7 @@ use crate::io::types::{
 use crate::io::FrameMessage;
 
 use super::utils::{framed_serial, probe_serial_presence};
-use wiretap_io::profile::SerialSourceConfig;
+use crate::io::profile::SerialSourceConfig;
 
 /// How often the read loop looks for a framing or catalogue change.
 const POLL: Duration = Duration::from_millis(50);
@@ -83,10 +84,10 @@ enum Framer {
 }
 
 impl Framer {
-    fn new(encoding: FramingEncoding, line: LineSettings, catalog: Option<&Catalog>) -> Self {
+    fn new(encoding: FramingEncoding, line: LineSettings, catalog: Option<&Catalogue>) -> Self {
         match encoding {
             FramingEncoding::ModbusRtu(options) => Self::Rtu(
-                RtuTap::new(&ModbusRtuOptions::from_settings(&options, catalog), line),
+                RtuTap::new(&options.options(catalog), line.baud, line.bits_per_char()),
                 options,
             ),
             encoding => SerialFramer::new(encoding)
@@ -174,7 +175,7 @@ struct LiveLine {
     bus_mappings: Vec<BusMapping>,
     framer: Framer,
     /// The session's attached catalogue, whose function codes RTU framing takes.
-    catalog: Option<Arc<Catalog>>,
+    catalog: Option<Arc<Catalogue>>,
     frame_id_config: Option<FrameIdConfig>,
     source_address_config: Option<FrameIdConfig>,
     min_frame_length: usize,
@@ -362,7 +363,7 @@ impl LiveLine {
 
     /// Rebuilds RTU framing when the session's catalogue is attached, swapped
     /// or detached, dropping any partial message as a framing change does.
-    fn follow_catalog(&mut self, catalog: Option<Arc<Catalog>>) {
+    fn follow_catalog(&mut self, catalog: Option<Arc<Catalogue>>) {
         if catalog.as_ref().map(Arc::as_ptr) == self.catalog.as_ref().map(Arc::as_ptr) {
             return;
         }
@@ -408,7 +409,7 @@ pub async fn run_source(
     source_idx: usize,
     config: SerialSourceConfig,
     bus_mappings: Vec<BusMapping>,
-    attached_catalog: impl Fn() -> Option<Arc<Catalog>>,
+    attached_catalog: impl Fn() -> Option<Arc<Catalogue>>,
     stop: CancellationToken,
     tx: mpsc::Sender<SourceMessage>,
 ) {
@@ -535,9 +536,9 @@ fn serial_port_info(port: PortInfo) -> SerialPortInfo {
 mod tests {
     use super::*;
     use crate::io::IoErrorKind;
-    use wiretap_io::serial::SerialError;
-    use wiretap_catalog::serial_framing::DelimiterOptions;
-    use wiretap_io::serial::Parity as LineParity;
+    use wslib_serial::SerialError;
+    use wslib_wiretap_catalogue::serial_framing::DelimiterOptions;
+    use wslib_serial::Parity as LineParity;
 
     const LINE_9600_8N1: LineSettings = LineSettings {
         baud: 9600,
@@ -565,7 +566,7 @@ mod tests {
 
     fn rtu(body: &[u8]) -> Vec<u8> {
         let mut out = body.to_vec();
-        out.extend(wiretap_checksum::algorithms::crc16_modbus_checksum(body).to_le_bytes());
+        out.extend(wslib_checksum::algorithms::crc16_modbus_checksum(body).to_le_bytes());
         out
     }
 
@@ -852,7 +853,7 @@ mod tests {
             allow_broadcast: true,
             ..Default::default()
         };
-        let catalog = Catalog::parse(
+        let catalog = Catalogue::parse(
             r#"
 [meta]
 name = "line"

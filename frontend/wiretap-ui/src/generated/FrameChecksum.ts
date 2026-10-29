@@ -2,14 +2,14 @@
 import type { Endianness } from "./Endianness";
 
 /**
- * A per-frame checksum definition (`[[frame.<proto>.<key>.checksum]]`).
+ * A per-frame checksum definition, one of a frame's `checksum` tables.
  * Distinct from [`ChecksumConfig`] (the serial-level default); a frame may
  * declare several.
  */
 export type FrameChecksum = { name?: string | null, 
 /**
  * A named algorithm, or one of the parameterised ids
- * ([`wiretap_checksum::CRC_CUSTOM`], [`wiretap_checksum::SUM8_NEGATED`]).
+ * ([`wslib_checksum::CRC_CUSTOM`], [`wslib_checksum::SUM8_NEGATED`]).
  */
 algorithm: string, 
 /**

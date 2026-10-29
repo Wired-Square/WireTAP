@@ -11,7 +11,7 @@
 use serde::Deserialize;
 use std::str::FromStr;
 use std::time::Duration;
-use wiretap_catalog::modbus::PollItem;
+use wslib_modbus::PollItem;
 
 // ============================================================================
 // Configuration
@@ -35,19 +35,19 @@ impl RegisterType {
     /// IO profile and the MCP API, and the catalogue's is part of a published
     /// crate. The numbers behind them should not be duplicated as well, so
     /// everything that needs a Modbus fact crosses over here to ask for it.
-    pub fn catalog(&self) -> wiretap_catalog::RegisterType {
+    pub fn catalog(&self) -> wslib_wiretap_catalogue::RegisterType {
         match self {
-            RegisterType::Holding => wiretap_catalog::RegisterType::Holding,
-            RegisterType::Input => wiretap_catalog::RegisterType::Input,
-            RegisterType::Coil => wiretap_catalog::RegisterType::Coil,
-            RegisterType::Discrete => wiretap_catalog::RegisterType::Discrete,
+            RegisterType::Holding => wslib_wiretap_catalogue::RegisterType::Holding,
+            RegisterType::Input => wslib_wiretap_catalogue::RegisterType::Input,
+            RegisterType::Coil => wslib_wiretap_catalogue::RegisterType::Coil,
+            RegisterType::Discrete => wslib_wiretap_catalogue::RegisterType::Discrete,
         }
     }
 }
 
-impl From<wiretap_catalog::RegisterType> for RegisterType {
-    fn from(rt: wiretap_catalog::RegisterType) -> Self {
-        use wiretap_catalog::RegisterType as Cat;
+impl From<wslib_wiretap_catalogue::RegisterType> for RegisterType {
+    fn from(rt: wslib_wiretap_catalogue::RegisterType) -> Self {
+        use wslib_wiretap_catalogue::RegisterType as Cat;
         match rt {
             Cat::Input => RegisterType::Input,
             Cat::Holding => RegisterType::Holding,
@@ -58,10 +58,10 @@ impl From<wiretap_catalog::RegisterType> for RegisterType {
 }
 
 impl FromStr for RegisterType {
-    type Err = wiretap_catalog::UnknownRegisterType;
+    type Err = wslib_wiretap_catalogue::UnknownRegisterType;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        s.parse::<wiretap_catalog::RegisterType>().map(Self::from)
+        s.parse::<wslib_wiretap_catalogue::RegisterType>().map(Self::from)
     }
 }
 

@@ -6,7 +6,7 @@ import type { FileCommit } from "./FileCommit";
  * What a push would change upstream, ready to render.
  *
  * Carries the rendered diff rather than the two texts. Both are already in hand here,
- * and the diff is `wiretap_catalog::text::diff_lines` — returning the texts instead
+ * and the diff is `wslib_wiretap_catalogue::text::diff_lines` — returning the texts instead
  * would ship them to the frontend and straight back over the WebSocket to be diffed by
  * the function that was one call away.
  */

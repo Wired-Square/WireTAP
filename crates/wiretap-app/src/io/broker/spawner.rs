@@ -23,7 +23,7 @@ use crate::io::virtual_device::{traffic, VirtualTrafficType};
 use crate::io::{now_us, FrameMessage};
 #[cfg(not(target_os = "ios"))]
 use crate::io::serial::run_source as run_serial_source;
-use wiretap_io::profile::SerialSourceConfig;
+use crate::io::profile::SerialSourceConfig;
 #[cfg(not(target_os = "ios"))]
 #[cfg(not(target_os = "ios"))]
 use crate::io::slcan::{reader::slcan_rates, run_slcan_source};
@@ -271,7 +271,7 @@ async fn run_serial_reader(
 
     // The WS decode path frames these messages a second time, and has to be told
     // the same vendor codes or it discards what the port framed.
-    if let wiretap_catalog::FramingEncoding::ModbusRtu(opts) = &config.framing_encoding {
+    if let wslib_wiretap_catalogue::FramingEncoding::ModbusRtu(opts) = &config.framing_encoding {
         crate::ws::dispatch::set_serial_rtu_options(session_id, opts.clone());
     }
 
@@ -362,11 +362,11 @@ async fn run_virtual_reader(
                     let signal_generator = item
                         .get("signal_generator")
                         .and_then(|v| v.as_bool().or_else(|| v.as_str().map(|s| s != "false")))
-                        .unwrap_or(wiretap_io::profile::VIRTUAL_SIGNAL_GENERATOR);
+                        .unwrap_or(crate::io::profile::VIRTUAL_SIGNAL_GENERATOR);
                     let frame_rate_hz = item
                         .get("frame_rate_hz")
                         .and_then(|v| v.as_f64().or_else(|| v.as_str().and_then(|s| s.parse().ok())))
-                        .unwrap_or(wiretap_io::profile::VIRTUAL_FRAME_RATE_HZ)
+                        .unwrap_or(crate::io::profile::VIRTUAL_FRAME_RATE_HZ)
                         .clamp(rate_min, rate_max);
                     IfaceConfig { bus, signal_generator, frame_rate_hz }
                 })
@@ -376,10 +376,10 @@ async fn run_virtual_reader(
             // Legacy fallback: one interface per bus, from the top-level fields,
             // which the table declares.
             let frame_rate_hz = profile.conn_f64("frame_rate_hz")
-                .unwrap_or(wiretap_io::profile::VIRTUAL_FRAME_RATE_HZ)
+                .unwrap_or(crate::io::profile::VIRTUAL_FRAME_RATE_HZ)
                 .clamp(rate_min, rate_max);
             let signal_generator = profile.conn_bool("signal_generator")
-                .unwrap_or(wiretap_io::profile::VIRTUAL_SIGNAL_GENERATOR);
+                .unwrap_or(crate::io::profile::VIRTUAL_SIGNAL_GENERATOR);
             let bus_count = profile.conn_i64("bus_count")
                 .unwrap_or(1)
                 .clamp(bus_min as i64, bus_max as i64) as u8;
@@ -711,12 +711,12 @@ mod tests {
     use super::*;
     use crate::io::types::TransmitRequest;
     use crate::io::Protocol;
-    use wiretap_io::can::CanFrame;
+    use wslib_can::CanFrame;
     use std::sync::mpsc as std_mpsc;
     use std::sync::atomic::AtomicUsize;
     use std::sync::Mutex;
 
-    fn interfaces(list: serde_json::Value) -> wiretap_io::profile::ConnValue {
+    fn interfaces(list: serde_json::Value) -> crate::io::profile::ConnValue {
         serde_json::from_value(list).unwrap()
     }
 

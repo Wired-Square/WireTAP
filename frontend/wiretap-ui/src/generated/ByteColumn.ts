@@ -25,7 +25,6 @@ changes: number,
  */
 transitions: number, 
 /**
- * Shannon entropy of the observed values, in bits. 8.0 is the most a byte
- * can carry; a counter over 16 values reaches 4.0.
+ * Shannon entropy of the observed values, in bits; at most 8.
  */
 entropyBits: number, sampleCount: number, } & ({ "role": "static", value: number, } | { "role": "counter", direction: Direction, step: number, rollover: boolean, looping: Loop | null, } | { "role": "sensor", trend: Trend, strength: number, rollover: boolean, } | { "role": "value" } | { "role": "unknown" });

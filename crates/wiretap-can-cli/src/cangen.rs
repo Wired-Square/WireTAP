@@ -1,6 +1,6 @@
 use clap::Args;
-use wiretap_io::can::CanFrame;
-use wiretap_protocol::{dlc_to_len, len_to_dlc, ARB_MASK_EXT, ARB_MASK_STD};
+use wslib_can::CanFrame;
+use wslib_can::{dlc_to_len, len_to_dlc, ARB_MASK_EXT, ARB_MASK_STD};
 
 /// cangen's deterministic modes: each of -I, -L and -D is `i` (increment) or
 /// fixed. Where cangen would pick at random, the id and length increment and

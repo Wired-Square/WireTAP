@@ -2,7 +2,6 @@
 import type { Endianness } from "./Endianness";
 
 /**
- * A [`PayloadField`] scaled `raw × factor + offset`; its JSON is the desktop's
- * `HypothesisParams`.
+ * A [`PayloadField`] scaled `raw × factor + offset`.
  */
 export type ScaledField = { factor: number, offset: number, startBit: number, bitLength: number, endianness: Endianness, signed: boolean, };

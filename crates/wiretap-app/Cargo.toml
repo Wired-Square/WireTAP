@@ -36,6 +36,7 @@ tauri-plugin-clipboard-manager = "2"
 keyring = { version = "3" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+thiserror = "2"
 dirs = "5"
 tokio = { version = "1", features = ["net", "io-util", "macros", "sync", "time", "process", "rt-multi-thread"] }
 tokio-util = "0.7"
@@ -86,32 +87,28 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 # — and tracking a branch made the resolved revision arbitrary, so crate/firmware
 # drift was invisible. Move this and the sibling checkout together.
 framelink = { git = "ssh://git@github.com/Wired-Square/framelink-rs.git", tag = "v0.2.1+p3.r2.b1", features = ["discovery", "ble", "wifi-prov", "smp"] }
-# Canonical WireTAP catalogue library — parse/validate/decode/encode + DBC for
-# CAN, Serial and Modbus; shared with the ESS add-on. Pinned by tag; a local
-# `.cargo/config.toml` paths override points at a sibling checkout for the dev
-# loop (same pattern as framelink).
-wiretap-catalog = { git = "ssh://git@github.com/Wired-Square/wslib-wiretap-rs.git", tag = "v0.10.2" }
-# Checksum algorithms plus the detection engine and the solvers. Same workspace,
-# same tag — one release covers every crate in it.
-wiretap-checksum = { git = "ssh://git@github.com/Wired-Square/wslib-wiretap-rs.git", tag = "v0.10.2" }
+# The catalogue: parse, validate, decode, encode and DBC for CAN, Serial and Modbus.
+wslib-wiretap-catalogue = { version = "0.1", registry = "wired-square" }
+wslib-checksum = { version = "0.1", registry = "wired-square" }
+wslib-bits = { version = "0.1", registry = "wired-square" }
 # Decides which bytes are worth solving before the solver is asked, so a bus
 # with no checksums costs milliseconds instead of a full sweep per frame id.
-wiretap-analysis = { git = "ssh://git@github.com/Wired-Square/wslib-wiretap-rs.git", tag = "v0.10.2" }
-# The wire formats themselves — GVRET, SLCAN, gs_usb, the SocketCAN layouts, the
-# CAN length code table and the ingest id flags. Scalars in, scalars out; the
-# adapters to `FrameMessage` stay here. Shared with WireTAP-Server, which speaks
-# the other end of GVRET and of the ingest protocol.
-wiretap-protocol = { git = "ssh://git@github.com/Wired-Square/wslib-wiretap-rs.git", tag = "v0.10.2" }
-# Frame id extraction for framed serial messages, and frame id formatting.
-wiretap-decode = { git = "ssh://git@github.com/Wired-Square/wslib-wiretap-rs.git", tag = "v0.10.2" }
+wiretap-analysis = { path = "../wiretap-analysis" }
+# The capture vocabulary, the ingest protocol and Test Pattern.
+wslib-wiretap-protocol = { version = "0.2.1", registry = "wired-square" }
 # The gateway's HTTP API: its serde types and, behind `client`, the client.
-wiretap-gateway = { git = "ssh://git@github.com/Wired-Square/wslib-wiretap-rs.git", tag = "v0.10.2", features = ["client"] }
+wslib-wiretap-gateway = { version = "0.2.0", registry = "wired-square", features = ["client"] }
 # The capture store: schema and migrations, frame and byte reads and writes, metadata and events.
 wiretap-capture-store = { path = "../wiretap-capture-store" }
-# The selection and inventory types the capture store takes and returns.
-wslib-wiretap-protocol = { version = "0.1", registry = "wired-square" }
-# Modbus TCP connection, poller and poll task, the serial port, the CAN transports, replay pacing, and device profiles.
-wiretap-io = { git = "ssh://git@github.com/Wired-Square/wslib-wiretap-rs.git", tag = "v0.10.2", features = ["profile", "replay", "modbus-tcp", "modbus-task", "modbus-write", "serial-write", "can-gvret", "can-gvret-serial", "can-slcan", "can-gsusb", "can-socketcan"] }
+# The transports: Modbus TCP, the serial port and the CAN adapters.
+wslib-tcp = { version = "0.1", registry = "wired-square" }
+wslib-modbus = { version = "0.2.1", registry = "wired-square", features = ["task", "write"] }
+wslib-can = { version = "0.1.1", registry = "wired-square", features = ["task"] }
+wslib-can-gvret = { version = "0.1", registry = "wired-square", features = ["serial"] }
+wslib-can-slcan = { version = "0.1.0", registry = "wired-square", features = ["transport"] }
+wslib-can-gsusb = { version = "0.1.0", registry = "wired-square", features = ["transport"] }
+wslib-can-socketcan = { version = "0.1", registry = "wired-square", features = ["transport"] }
+wslib-serial = { version = "0.1.1", registry = "wired-square", features = ["write"] }
 # Desktop-only dependencies (serial/USB/keepawake not available on iOS)
 [target.'cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))'.dependencies]
 serialport = "4.3"
@@ -172,8 +169,6 @@ nusb = { version = "0.2", features = ["tokio"] }
 [dev-dependencies]
 tokio = { version = "1", features = ["test-util"] }
 ts-rs = "12"
-wiretap-analysis = { git = "ssh://git@github.com/Wired-Square/wslib-wiretap-rs.git", tag = "v0.10.2", features = ["ts", "testing"] }
+wiretap-analysis = { path = "../wiretap-analysis", features = ["ts", "testing"] }
 wiretap-capture-store = { path = "../wiretap-capture-store", features = ["ts"] }
-wiretap-catalog = { git = "ssh://git@github.com/Wired-Square/wslib-wiretap-rs.git", tag = "v0.10.2", features = ["ts"] }
-wiretap-decode = { git = "ssh://git@github.com/Wired-Square/wslib-wiretap-rs.git", tag = "v0.10.2", features = ["ts"] }
-wiretap-io = { git = "ssh://git@github.com/Wired-Square/wslib-wiretap-rs.git", tag = "v0.10.2", features = ["testing", "ts"] }
+wslib-modbus = { version = "0.2.1", registry = "wired-square", features = ["testing"] }

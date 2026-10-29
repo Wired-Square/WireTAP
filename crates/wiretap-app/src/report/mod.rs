@@ -2,7 +2,7 @@
 //
 // The export reports, worded in en-AU: each report builds one `Doc`, written as
 // plain text, Markdown, or an HTML body the frontend wraps in its theme. The
-// structure is the lib's (`CatalogSummary`, `changes_counts`, `order_totals`).
+// structure is the lib's (`CatalogueSummary`, `changes_counts`, `order_totals`).
 
 pub mod catalog;
 pub mod changes;
@@ -14,7 +14,7 @@ pub mod order;
 
 use serde::Deserialize;
 use wiretap_analysis::FrameKey;
-use wiretap_decode::frame_id::format_frame_id;
+use wslib_wiretap_protocol::format_frame_id;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase")]

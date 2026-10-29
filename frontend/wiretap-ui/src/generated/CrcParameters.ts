@@ -2,8 +2,8 @@
 import type { CrcAlternative } from "./CrcAlternative";
 
 /**
- * A recovered CRC. `init`/`xor_out` are the canonical pair — always exact, and
- * always one of several that fit; see [`alternatives`](Self::alternatives).
+ * A recovered CRC: `init` and `xor_out` are exact but one pair of several that
+ * fit; see [`alternatives`](Self::alternatives).
  */
 export type CrcParameters = { 
 /**
@@ -11,7 +11,7 @@ export type CrcParameters = {
  */
 width: number, polynomial: number, reflectIn: boolean, reflectOut: boolean, 
 /**
- * Canonically 0. Retained so a caller can write a complete CRC definition.
+ * Canonically 0.
  */
 init: number, 
 /**
@@ -23,7 +23,7 @@ xorOut: number,
  */
 wellKnown: boolean, 
 /**
- * Other `(init, xorOut)` pairs that reproduce the samples identically.
- * Non-empty means `init` is not determined by this data.
+ * Other `(init, xorOut)` pairs that fit; non-empty means `init` is not
+ * determined by this data.
  */
 alternatives: Array<CrcAlternative>, };

@@ -1,10 +1,10 @@
 //! What each device kind is, beside what its connection map holds: the
 //! connection table itself (defaults, required fields, validation) is
-//! `wiretap_io::profile`'s, and this one is keyed by the same kinds.
+//! `crate::io::profile`'s, and this one is keyed by the same kinds.
 
 use std::collections::HashMap;
 
-use wiretap_io::profile::{canonical_kind, default_connection, ConnValue};
+use crate::io::profile::{canonical_kind, default_connection, ConnValue};
 
 use crate::io::Protocol;
 
@@ -36,7 +36,7 @@ const LIVE_CAN: KindTraits = KindTraits {
 pub const VIRTUAL_FRAME_RATE_RANGE: (f64, f64) = (0.1, 1000.0);
 pub const VIRTUAL_BUS_COUNT_RANGE: (u8, u8) = (1, 8);
 
-/// One row per `wiretap_io::profile::kinds()`, in its order.
+/// One row per `crate::io::profile::kinds()`, in its order.
 static TRAITS: &[(&str, KindTraits)] = &[
     ("framelink", LIVE_CAN),
     (
@@ -131,7 +131,7 @@ pub fn default_connection_for_kind(kind: String) -> HashMap<String, ConnValue> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use wiretap_io::profile::{default_value, kinds, validate_profile, DefaultValue};
+    use crate::io::profile::{default_value, kinds, validate_profile, DefaultValue};
 
     use crate::settings::IOProfile;
 

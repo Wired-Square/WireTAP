@@ -22,7 +22,6 @@ changes: number,
  */
 transitions: number, 
 /**
- * Shannon entropy of the observed values, in bits. 8.0 is the most a byte
- * can carry; a counter over 16 values reaches 4.0.
+ * Shannon entropy of the observed values, in bits; at most 8.
  */
 entropyBits: number, sampleCount: number, };
