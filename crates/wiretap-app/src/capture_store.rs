@@ -54,6 +54,8 @@ struct NamedCapture {
     generation: u64,
     /// Clears in flight: until they end, the old rows may still be read back.
     clearing: u32,
+    /// The owning session has been told saves are failing; a successful save re-arms it.
+    save_failure_reported: bool,
 }
 
 impl NamedCapture {
@@ -65,6 +67,7 @@ impl NamedCapture {
             inventory,
             generation: 0,
             clearing: 0,
+            save_failure_reported: false,
         }
     }
 
@@ -960,18 +963,28 @@ fn append_target(id: &str, kind: CaptureKind) -> Option<AppendTarget<'_>> {
 }
 
 impl AppendTarget<'_> {
-    /// Counts what the insert stored, unless a clear began meanwhile; a failure is the
-    /// owning session's error.
+    fn first_failure(&self) -> bool {
+        registry_mut()
+            .captures
+            .get_mut(self.id)
+            .is_some_and(|cap| !std::mem::replace(&mut cap.save_failure_reported, true))
+    }
+
+    /// Counts what the insert stored, unless a clear began meanwhile; the first failure
+    /// since the last success is the owning session's error.
     fn record(self, stored: Result<(), String>, len: usize, what: &str, count: impl FnOnce(&mut NamedCapture)) {
         if let Err(e) = stored {
             tlog!("[CaptureStore] Failed to insert {} {} to capture '{}': {}", len, what, self.id, e);
-            if let Some(session_id) = &self.owner {
-                crate::io::emit_session_error(session_id, format!("{e} ({len} {what} not saved)"));
+            if let Some(session_id) = self.owner.as_deref().filter(|_| self.first_failure()) {
+                crate::io::emit_session_error(session_id, format!("Capture saves failing: {e} ({len} {what} not saved)"));
             }
             return;
         }
-        if let Some(cap) = registry_mut().captures.get_mut(self.id).filter(|cap| cap.generation == self.generation) {
-            count(cap);
+        if let Some(cap) = registry_mut().captures.get_mut(self.id) {
+            cap.save_failure_reported = false;
+            if cap.generation == self.generation {
+                count(cap);
+            }
         }
         if self.owner.is_none() {
             capture_list_changed();
@@ -1542,6 +1555,50 @@ mod tests {
         assert_eq!(capture_db::get_frame_count(&id).await, Ok(0));
         let error = crate::io::post_session::get_error(session).expect("the session is told");
         assert!(error.contains("3 frames not saved"), "{error}");
+    }
+
+    fn session_errors(session: &str) -> usize {
+        use crate::io::session_log::{read, SessionLogEvent};
+        read(None, None)
+            .iter()
+            .filter(|e| e.session_id.as_deref() == Some(session) && matches!(e.event, SessionLogEvent::Error { .. }))
+            .count()
+    }
+
+    fn bytes(timestamps: std::ops::Range<u64>) -> Vec<TimestampedByte> {
+        timestamps.map(|timestamp_us| TimestampedByte { byte: 0xAA, timestamp_us, bus: 0 }).collect()
+    }
+
+    #[test]
+    fn repeated_refused_appends_tell_the_session_once() {
+        let _db = failing_database();
+        let session = "b_append_refused_repeatedly";
+        let id = create_session_capture(session, CaptureKind::Bytes, "refused".into());
+
+        for _ in 0..3 {
+            wait(append_raw_bytes_to_capture(&id, bytes(0..2)));
+        }
+
+        assert_eq!(session_errors(session), 1);
+    }
+
+    #[test]
+    fn a_saved_append_lets_the_next_refusal_tell_the_session_again() {
+        let session = "f_append_refused_after_a_save";
+        let failing = failing_database();
+        let id = create_session_capture(session, CaptureKind::Frames, "refused".into());
+        wait(append_frames_to_capture(&id, frames(0..2)));
+        wait(append_frames_to_capture(&id, frames(2..4)));
+        drop(failing);
+
+        let working = crate::capture_db::use_own_database();
+        wait(append_frames_to_capture(&id, frames(4..6)));
+        assert_eq!(get_capture_count(&id), 2);
+        drop(working);
+
+        let _failing = failing_database();
+        wait(append_frames_to_capture(&id, frames(6..8)));
+        assert_eq!(session_errors(session), 2);
     }
 
     /// Five windows of rows, so a whole-capture operation commits part-way at least four times.
