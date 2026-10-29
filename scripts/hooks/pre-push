@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Nothing is pushed that scripts/ci.sh has not passed. ci.sh checks the working
+# tree, so the tree must match what is being pushed. A tag alone is exempt: the
+# release that made it ran ci.sh --tag.
+set -euo pipefail
+cd "$(git rev-parse --show-toplevel)"
+only_tags=true
+while read -r _ _ remote_ref _; do
+  [[ $remote_ref == refs/tags/* ]] || only_tags=false
+done
+! $only_tags || exit 0
+[[ -z $(git status --porcelain) ]] || { echo "pre-push: commit or stash first" >&2; exit 1; }
+exec scripts/ci.sh

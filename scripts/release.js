@@ -253,6 +253,8 @@ async function main() {
       console.log('\nNo uncommitted changes — moving tag only.');
     }
 
+    run('scripts/ci.sh --tag');
+
     // Delete the old tag locally and remotely, then recreate
     console.log(`\nMoving tag ${tag} to current commit...`);
     run(`git tag -d ${tag}`);
@@ -260,6 +262,8 @@ async function main() {
     run(`git tag ${tag}`);
   } else {
     // Normal release: bump version, commit, create tag
+    run('scripts/ci.sh --tag');
+
     console.log(`\nBumping ${bumpType} version...`);
     run(`node scripts/bump-version.js ${bumpType}`);
 
