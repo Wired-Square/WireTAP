@@ -19,7 +19,7 @@ use wiretap_io::replay::{Pacer, PlaybackControl, Playout, Unlimited};
 
 use super::base::{publish_position, RecordedSourceState};
 use crate::apiclient::{frame_tag, gateway};
-use crate::capture_store::{self, CaptureKind};
+use crate::capture_store::{self, CaptureKind, SessionAppender};
 use crate::io::{
     emit_capture_changed, emit_session_error, emit_stream_ended, signal_frames_ready,
     FrameMessage, IOCapabilities, IOSource, IOState, PlaybackPosition, Protocol, SignalThrottle,
@@ -230,14 +230,12 @@ fn frame_message(protocol: ArchiveProtocol, f: ArchiveFrame) -> FrameMessage {
 struct IntoCapture<'a> {
     session_id: &'a str,
     throttle: SignalThrottle,
+    appender: SessionAppender,
 }
 
 impl Playout<FrameMessage> for IntoCapture<'_> {
     fn frames(&mut self, frames: Vec<FrameMessage>) {
-        capture_store::append_frames_to_session(self.session_id, frames);
-        if self.throttle.should_signal("frames-ready") {
-            signal_frames_ready(self.session_id);
-        }
+        self.appender.append(frames);
     }
 
     fn position(&mut self, timestamp_us: i64, emitted: i64) {
@@ -298,7 +296,13 @@ async fn run_api_stream(
     let stream_start_secs =
         frame_queue.front().map(|f| f.timestamp_us as f64 / 1_000_000.0).unwrap_or(0.0);
     let mut pacer = Pacer::new(stream_start_secs, &control, UNLIMITED);
-    let mut out = IntoCapture { session_id: &session_id, throttle: SignalThrottle::new() };
+    let mut frames_ready = SignalThrottle::new();
+    let appender = SessionAppender::spawn(session_id.clone(), move |session_id| {
+        if frames_ready.should_signal("frames-ready") {
+            signal_frames_ready(session_id);
+        }
+    });
+    let mut out = IntoCapture { session_id: &session_id, throttle: SignalThrottle::new(), appender };
 
     tlog!("[BackendAPI:{}] Streaming (speed: {}x)", session_id, options.speed);
 
@@ -334,8 +338,10 @@ async fn run_api_stream(
     }
 
     let rest = pacer.take_batch();
-    if !rest.is_empty() {
-        capture_store::append_frames_to_session(&session_id, rest);
+    let flush = !rest.is_empty();
+    out.appender.append(rest);
+    out.appender.finish().await;
+    if flush {
         out.throttle.flush();
         signal_frames_ready(&session_id);
     }
@@ -441,7 +447,7 @@ mod tests {
         let elapsed = started.elapsed();
         let position = crate::io::get_playback_position(session_id);
         let capture = capture_store::get_session_frame_capture_id(session_id).unwrap();
-        let frames = capture_store::get_capture_frames(&capture).unwrap().unwrap_or_default();
+        let frames = capture_store::get_capture_frames(&capture).await.unwrap().unwrap_or_default();
         crate::io::destroy_session(session_id, false).await.ok();
         ended.expect("the stream ended");
         let requests = requests.lock().unwrap().clone();

@@ -33,7 +33,7 @@ const CHANGED_EVENT: &str = "capture-events-changed";
 #[tauri::command]
 pub async fn capture_events_list(app: AppHandle, owner: EventOwner) -> Result<Vec<CaptureEvent>, String> {
     match &owner {
-        EventOwner::Capture { capture_id } => capture_db::list_capture_events(capture_id),
+        EventOwner::Capture { capture_id } => capture_db::list_capture_events(capture_id).await,
         EventOwner::Backend { profile_id } => apiclient::events_list(&app, profile_id).await,
     }
 }
@@ -48,7 +48,7 @@ pub async fn capture_events_add(
 ) -> Result<CaptureEvent, String> {
     let event = match &owner {
         EventOwner::Capture { capture_id } => {
-            capture_db::insert_capture_event(capture_id, timestamp_us, duration_us, &note)
+            capture_db::insert_capture_event(capture_id, timestamp_us, duration_us, &note).await
         }
         EventOwner::Backend { profile_id } => {
             apiclient::events_add(&app, profile_id, timestamp_us, duration_us, &note).await
@@ -69,7 +69,7 @@ pub async fn capture_events_update(
 ) -> Result<CaptureEvent, String> {
     let event = match &owner {
         EventOwner::Capture { capture_id } => {
-            capture_db::update_capture_event(capture_id, &id, timestamp_us, duration_us, &note)
+            capture_db::update_capture_event(capture_id, &id, timestamp_us, duration_us, &note).await
         }
         EventOwner::Backend { profile_id } => {
             apiclient::events_update(&app, profile_id, &id, timestamp_us, duration_us, &note).await
@@ -82,7 +82,7 @@ pub async fn capture_events_update(
 #[tauri::command]
 pub async fn capture_events_delete(app: AppHandle, owner: EventOwner, id: String) -> Result<(), String> {
     match &owner {
-        EventOwner::Capture { capture_id } => capture_db::delete_capture_event(capture_id, &id),
+        EventOwner::Capture { capture_id } => capture_db::delete_capture_event(capture_id, &id).await,
         EventOwner::Backend { profile_id } => apiclient::events_delete(&app, profile_id, &id).await,
     }?;
     let _ = app.emit(CHANGED_EVENT, &owner);

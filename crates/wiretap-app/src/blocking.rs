@@ -1,4 +1,43 @@
-//! Sync work called from async code: SQLite, whole-file reads, serial port IO.
+//! Sync work called from async code: whole-file reads, serial port IO; and async
+//! database work called from sync code.
+
+use std::future::Future;
+use std::sync::LazyLock;
+
+/// Where a sync caller's database work runs: its own runtime, so the tasks an sqlx pool
+/// spawns never wait on a worker the caller is blocking.
+static RUNTIME: LazyLock<tokio::runtime::Runtime> = LazyLock::new(|| {
+    tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(1)
+        .thread_name("db-wait")
+        .enable_all()
+        .build()
+        .expect("the database runtime starts")
+});
+
+/// Runs `work` to completion for a sync caller, on a scoped thread so a caller already
+/// inside a runtime never nests one.
+pub fn wait<F: Future + Send>(work: F) -> F::Output
+where
+    F::Output: Send,
+{
+    #[cfg(test)]
+    let lent = crate::capture_db::LENT.with_borrow(Clone::clone);
+    // A pooled connection returns on a task of the runtime that dropped it; hand this
+    // worker's queue to the rest of the runtime so that task is not stuck behind us.
+    in_place(|| {
+        std::thread::scope(|scope| {
+            scope
+                .spawn(|| {
+                    #[cfg(test)]
+                    crate::capture_db::LENT.set(lent);
+                    RUNTIME.block_on(work)
+                })
+                .join()
+        })
+    })
+    .unwrap_or_else(|panic| std::panic::resume_unwind(panic))
+}
 
 /// Runs `work` on the blocking pool so a long query or file read never stalls the
 /// async workers. A panic in `work` resumes in the caller, as it would inline.

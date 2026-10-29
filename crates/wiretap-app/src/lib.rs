@@ -11,7 +11,6 @@ mod capture_db;
 mod capture_events;
 mod capture_inventory;
 mod capture_store;
-mod connection_slot;
 mod captures;
 mod catalog;
 mod catalog_share;
@@ -50,6 +49,8 @@ mod transmit_queue;
 mod replay;
 mod report;
 mod io_test;
+#[cfg(all(test, unix))]
+mod sqlite_soak;
 mod mcp;
 mod menu;
 pub mod ws;

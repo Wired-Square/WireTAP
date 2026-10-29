@@ -182,19 +182,19 @@ pub(crate) async fn send_and_record(session_id: &str, out: &Outgoing) -> Result<
     match out {
         Outgoing::Can(frame) => {
             let result = io::transmit_frame(session_id, frame).await;
-            record_can(session_id, frame, &result);
+            record_can(session_id, frame, &result).await;
             result
         }
         Outgoing::Serial(bytes) => {
             let result = io::transmit_serial(session_id, bytes).await;
             let (success, error) = outcome(&result);
-            crate::transmit_history::write_entry(session_id, "serial", None, None, bytes, 0, false, false, success, error);
+            crate::transmit_history::write_entry(session_id, "serial", None, None, bytes, 0, false, false, success, error).await;
             result
         }
     }
 }
 
-pub(crate) fn record_can(session_id: &str, frame: &CanTransmitFrame, result: &Result<TransmitResult, String>) {
+pub(crate) async fn record_can(session_id: &str, frame: &CanTransmitFrame, result: &Result<TransmitResult, String>) {
     let (success, error) = outcome(result);
     crate::transmit_history::write_entry(
         session_id,
@@ -207,7 +207,8 @@ pub(crate) fn record_can(session_id: &str, frame: &CanTransmitFrame, result: &Re
         frame.is_fd,
         success,
         error,
-    );
+    )
+    .await;
 }
 
 fn outcome(result: &Result<TransmitResult, String>) -> (bool, Option<&str>) {

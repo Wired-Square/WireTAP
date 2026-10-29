@@ -110,7 +110,7 @@ fn finish(id: &str, outcome: Result<QueryOutcome, String>) {
 
 async fn work(app: AppHandle) {
     while let Some((id, request, cancel)) = start_next() {
-        let outcome = super::run(&app, &request, &id, &cancel).await;
+        let outcome = super::run(&app, &request, &id, &cancel.into()).await;
         finish(&id, outcome);
     }
 }

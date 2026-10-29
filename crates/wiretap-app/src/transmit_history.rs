@@ -5,35 +5,20 @@
 // single-shot transmits so the frontend can display a scrollable, paginated
 // history without unbounded Zustand array growth.
 
-use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
+use sqlx::{Row, SqlitePool};
 use std::path::Path;
 use std::sync::atomic::{AtomicI64, Ordering};
+use std::sync::OnceLock;
+use wslib_db_sqlite::{Chain, Database};
 
-use crate::connection_slot::ConnectionSlot;
+static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("./migrations/transmit_history");
 
-static DB: ConnectionSlot = ConnectionSlot::new();
+static DB: OnceLock<Database> = OnceLock::new();
 
-const SCHEMA_SQL: &str = "
-CREATE TABLE IF NOT EXISTS transmit_history (
-    id           INTEGER PRIMARY KEY AUTOINCREMENT,
-    session_id   TEXT    NOT NULL,
-    timestamp_us INTEGER NOT NULL,
-    kind         TEXT    NOT NULL,
-    frame_id     INTEGER,
-    dlc          INTEGER,
-    bytes        BLOB    NOT NULL,
-    bus          INTEGER NOT NULL DEFAULT 0,
-    is_extended  INTEGER NOT NULL DEFAULT 0,
-    is_fd        INTEGER NOT NULL DEFAULT 0,
-    success      INTEGER NOT NULL DEFAULT 1,
-    error_msg    TEXT
-);
-
-CREATE INDEX IF NOT EXISTS idx_transmit_history_id ON transmit_history(id DESC);
-CREATE INDEX IF NOT EXISTS idx_transmit_history_ts ON transmit_history(timestamp_us);
-CREATE INDEX IF NOT EXISTS idx_transmit_history_session ON transmit_history(session_id, id DESC);
-";
+fn chain() -> Chain {
+    Chain::new("transmit_history", &MIGRATOR)
+}
 
 // ============================================================================
 // Public row type
@@ -61,23 +46,18 @@ pub struct TransmitHistoryRow {
 
 /// Initialise the transmit history database. Must be called once at app startup.
 pub fn initialise(data_dir: &Path) -> Result<(), String> {
-    DB.open(&data_dir.join("transmit_history.db"), "transmit history database", |conn| {
-        conn.execute_batch(SCHEMA_SQL)
-            .map_err(|e| format!("Failed to create schema: {}", e))?;
-        conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;")
-            .map_err(|e| format!("Failed to set pragmas: {}", e))
-    })
+    std::fs::create_dir_all(data_dir).map_err(|e| format!("Failed to create data dir: {e}"))?;
+    let db = crate::blocking::wait(Database::open(data_dir.join("transmit_history.db"), &[chain()]))
+        .map_err(|e| format!("Failed to open transmit history database: {e}"))?;
+    DB.set(db).map_err(|_| "Transmit history database already initialised".to_string())
 }
 
 // ============================================================================
 // Write / Query / Clear
 // ============================================================================
 
-/// Insert a single transmit history entry. Returns the new row ID (0 on error).
-///
-/// Called from both async repeat loops and single-shot transmit commands.
-/// The mutex lock is held only for the duration of the INSERT (~microseconds).
-pub fn write_entry(
+/// Insert a single transmit history entry; a failure is logged, not returned.
+pub async fn write_entry(
     session_id: &str,
     kind: &str,
     frame_id: Option<i64>,
@@ -88,52 +68,50 @@ pub fn write_entry(
     is_fd: bool,
     success: bool,
     error_msg: Option<&str>,
-) -> i64 {
+) {
+    let Some(db) = DB.get() else { return };
     let timestamp_us = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
         .as_micros() as i64;
-
-    with_db(0, |conn| {
-        let result = conn.execute(
-            "INSERT INTO transmit_history \
-             (session_id, timestamp_us, kind, frame_id, dlc, bytes, bus, is_extended, is_fd, success, error_msg) \
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
-            params![
-                session_id,
-                timestamp_us,
-                kind,
-                frame_id,
-                dlc,
-                bytes,
-                bus,
-                is_extended as i64,
-                is_fd as i64,
-                success as i64,
-                error_msg,
-            ],
-        );
-
-        match result {
-            Ok(_) => conn.last_insert_rowid(),
-            Err(e) => {
-                tlog!("[transmit_history] INSERT failed: {}", e);
-                0
-            }
-        }
-    })
+    let result = sqlx::query(
+        "INSERT INTO transmit_history \
+         (session_id, timestamp_us, kind, frame_id, dlc, bytes, bus, is_extended, is_fd, success, error_msg) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+    )
+    .bind(session_id)
+    .bind(timestamp_us)
+    .bind(kind)
+    .bind(frame_id)
+    .bind(dlc)
+    .bind(bytes)
+    .bind(bus)
+    .bind(is_extended)
+    .bind(is_fd)
+    .bind(success)
+    .bind(error_msg)
+    .execute(db.pool())
+    .await;
+    if let Err(e) = result {
+        tlog!("[transmit_history] INSERT failed: {}", e);
+    }
 }
 
 #[cfg(test)]
-fn in_memory() -> Connection {
-    let conn = Connection::open_in_memory().unwrap();
-    conn.execute_batch(SCHEMA_SQL).unwrap();
-    conn
+async fn scratch_database() -> Database {
+    static NEXT: AtomicI64 = AtomicI64::new(0);
+    let dir = std::env::temp_dir().join(format!("wiretap-transmit-tests-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let n = NEXT.fetch_add(1, Ordering::Relaxed);
+    Database::open(dir.join(format!("{n}.db")), &[chain()]).await.unwrap()
 }
 
 #[cfg(test)]
 pub(crate) fn use_in_memory_database() {
-    DB.install_once(in_memory);
+    static INSTALL: std::sync::Once = std::sync::Once::new();
+    INSTALL.call_once(|| {
+        let _ = DB.set(crate::blocking::wait(scratch_database()));
+    });
 }
 
 static REVISION: AtomicI64 = AtomicI64::new(0);
@@ -143,117 +121,107 @@ pub fn next_revision() -> i64 {
     REVISION.fetch_add(1, Ordering::Relaxed) + 1
 }
 
-fn with_db<T>(fallback: T, read: impl FnOnce(&Connection) -> T) -> T {
-    DB.with(|conn| Ok(read(conn))).unwrap_or(fallback)
+/// Logs a failed read and answers `fallback`, as a missing database does.
+async fn read<T>(fallback: T, query: impl AsyncFnOnce(&SqlitePool) -> sqlx::Result<T>) -> T {
+    let Some(db) = DB.get() else { return fallback };
+    query(db.pool()).await.unwrap_or_else(|e| {
+        tlog!("[transmit_history] query failed: {}", e);
+        fallback
+    })
 }
 
-fn clear_session(conn: &Connection, session_id: &str) {
-    let _ = conn.execute("DELETE FROM transmit_history WHERE session_id = ?1", params![session_id]);
+async fn clear_session(pool: &SqlitePool, session_id: &str) -> sqlx::Result<()> {
+    sqlx::query("DELETE FROM transmit_history WHERE session_id = ?1")
+        .bind(session_id)
+        .execute(pool)
+        .await
+        .map(drop)
 }
 
-fn session_count(conn: &Connection, session_id: &str) -> i64 {
-    conn.query_row(
-        "SELECT COUNT(*) FROM transmit_history WHERE session_id = ?1",
-        params![session_id],
-        |r| r.get(0),
-    )
-    .unwrap_or(0)
+async fn session_count(pool: &SqlitePool, session_id: &str) -> sqlx::Result<i64> {
+    sqlx::query_scalar("SELECT COUNT(*) FROM transmit_history WHERE session_id = ?1")
+        .bind(session_id)
+        .fetch_one(pool)
+        .await
 }
 
 /// Return up to `limit` of the session's rows, newest first, starting at `offset`.
 ///
 /// Unsigned deliberately, matching the capture readers: SQLite reads a negative `LIMIT`
 /// as *no limit*, so a bad value would quietly return the whole table instead of erroring.
-fn session_rows(conn: &Connection, session_id: &str, offset: usize, limit: usize) -> Vec<TransmitHistoryRow> {
-    let mut stmt = match conn.prepare(
+async fn session_rows(
+    pool: &SqlitePool,
+    session_id: &str,
+    offset: usize,
+    limit: usize,
+) -> sqlx::Result<Vec<TransmitHistoryRow>> {
+    sqlx::query(
         "SELECT id, session_id, timestamp_us, kind, frame_id, dlc, bytes, \
          bus, is_extended, is_fd, success, error_msg \
          FROM transmit_history WHERE session_id = ?1 ORDER BY id DESC LIMIT ?2 OFFSET ?3",
-    ) {
-        Ok(s) => s,
-        Err(e) => {
-            tlog!("[transmit_history] prepare failed: {}", e);
-            return vec![];
-        }
-    };
-
-    let rows = stmt.query_map(params![session_id, limit, offset], |row| {
+    )
+    .bind(session_id)
+    .bind(limit as i64)
+    .bind(offset as i64)
+    .try_map(|row: sqlx::sqlite::SqliteRow| {
         Ok(TransmitHistoryRow {
-            id: row.get(0)?,
-            session_id: row.get(1)?,
-            timestamp_us: row.get(2)?,
-            kind: row.get(3)?,
-            frame_id: row.get(4)?,
-            dlc: row.get(5)?,
-            bytes: row.get(6)?,
-            bus: row.get(7)?,
-            is_extended: row.get::<_, i64>(8)? != 0,
-            is_fd: row.get::<_, i64>(9)? != 0,
-            success: row.get::<_, i64>(10)? != 0,
-            error_msg: row.get(11)?,
+            id: row.try_get(0)?,
+            session_id: row.try_get(1)?,
+            timestamp_us: row.try_get(2)?,
+            kind: row.try_get(3)?,
+            frame_id: row.try_get(4)?,
+            dlc: row.try_get(5)?,
+            bytes: row.try_get(6)?,
+            bus: row.try_get(7)?,
+            is_extended: row.try_get(8)?,
+            is_fd: row.try_get(9)?,
+            success: row.try_get(10)?,
+            error_msg: row.try_get(11)?,
         })
-    });
-
-    match rows {
-        Ok(iter) => iter.filter_map(|r| r.ok()).collect(),
-        Err(e) => {
-            tlog!("[transmit_history] query failed: {}", e);
-            vec![]
-        }
-    }
+    })
+    .fetch_all(pool)
+    .await
 }
 
-fn session_time_range(conn: &Connection, session_id: &str) -> Option<(i64, i64)> {
-    conn.query_row(
-        "SELECT MIN(timestamp_us), MAX(timestamp_us) FROM transmit_history WHERE session_id = ?1",
-        params![session_id],
-        |r| {
-            let min: Option<i64> = r.get(0)?;
-            let max: Option<i64> = r.get(1)?;
-            Ok(min.zip(max))
-        },
-    )
-    .unwrap_or(None)
+async fn session_time_range(pool: &SqlitePool, session_id: &str) -> sqlx::Result<Option<(i64, i64)>> {
+    let (min, max): (Option<i64>, Option<i64>) =
+        sqlx::query_as("SELECT MIN(timestamp_us), MAX(timestamp_us) FROM transmit_history WHERE session_id = ?1")
+            .bind(session_id)
+            .fetch_one(pool)
+            .await?;
+    Ok(min.zip(max))
 }
 
 /// The row offset of `timestamp_us` in `session_rows`' newest-first order.
-fn session_offset_after(conn: &Connection, session_id: &str, timestamp_us: i64) -> i64 {
-    conn.query_row(
-        "SELECT COUNT(*) FROM transmit_history WHERE session_id = ?1 AND timestamp_us > ?2",
-        params![session_id, timestamp_us],
-        |r| r.get(0),
-    )
-    .unwrap_or(0)
+async fn session_offset_after(pool: &SqlitePool, session_id: &str, timestamp_us: i64) -> sqlx::Result<i64> {
+    sqlx::query_scalar("SELECT COUNT(*) FROM transmit_history WHERE session_id = ?1 AND timestamp_us > ?2")
+        .bind(session_id)
+        .bind(timestamp_us)
+        .fetch_one(pool)
+        .await
 }
 
 // ============================================================================
 // Tauri Commands
 // ============================================================================
 
-async fn with_db_off_runtime<T: Send + 'static>(
-    fallback: T,
-    read: impl FnOnce(&Connection) -> T + Send + 'static,
-) -> T {
-    crate::blocking::off_runtime(move || with_db(fallback, read)).await
-}
-
 #[tauri::command]
 pub async fn transmit_history_query(session_id: String, offset: usize, limit: usize) -> Result<Vec<TransmitHistoryRow>, String> {
-    Ok(with_db_off_runtime(vec![], move |conn| session_rows(conn, &session_id, offset, limit)).await)
+    Ok(read(vec![], async |pool| session_rows(pool, &session_id, offset, limit).await).await)
 }
 
 #[tauri::command]
 pub async fn transmit_history_count(session_id: String) -> Result<i64, String> {
-    Ok(with_db_off_runtime(0, move |conn| session_count(conn, &session_id)).await)
+    Ok(read(0, async |pool| session_count(pool, &session_id).await).await)
 }
 
 #[tauri::command]
 pub async fn transmit_history_clear(session_id: String) -> Result<i64, String> {
-    Ok(crate::blocking::off_runtime(move || clear_and_announce(&session_id)).await)
+    Ok(clear_and_announce(&session_id).await)
 }
 
-fn clear_and_announce(session_id: &str) -> i64 {
-    with_db((), |conn| clear_session(conn, session_id));
+async fn clear_and_announce(session_id: &str) -> i64 {
+    read((), async |pool| clear_session(pool, session_id).await).await;
     let revision = next_revision();
     crate::ws::dispatch::send_transmit_updated(revision);
     revision
@@ -261,62 +229,64 @@ fn clear_and_announce(session_id: &str) -> i64 {
 
 #[tauri::command]
 pub async fn transmit_history_time_range(session_id: String) -> Result<Option<(i64, i64)>, String> {
-    Ok(with_db_off_runtime(None, move |conn| session_time_range(conn, &session_id)).await)
+    Ok(read(None, async |pool| session_time_range(pool, &session_id).await).await)
 }
 
 #[tauri::command]
 pub async fn transmit_history_find_offset(session_id: String, timestamp_us: i64) -> Result<i64, String> {
-    Ok(with_db_off_runtime(0, move |conn| session_offset_after(conn, &session_id, timestamp_us)).await)
+    Ok(read(0, async |pool| session_offset_after(pool, &session_id, timestamp_us).await).await)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn history_with(rows: &[(&str, i64)]) -> Connection {
-        let conn = in_memory();
+    async fn history_with(rows: &[(&str, i64)]) -> Database {
+        let db = scratch_database().await;
         for (session_id, timestamp_us) in rows {
-            conn.execute(
-                "INSERT INTO transmit_history (session_id, timestamp_us, kind, bytes) VALUES (?1, ?2, 'can', x'00')",
-                params![session_id, timestamp_us],
-            )
-            .unwrap();
+            sqlx::query("INSERT INTO transmit_history (session_id, timestamp_us, kind, bytes) VALUES (?1, ?2, 'can', x'00')")
+                .bind(session_id)
+                .bind(timestamp_us)
+                .execute(db.pool())
+                .await
+                .unwrap();
         }
-        conn
+        db
     }
 
-    #[test]
-    fn a_session_reads_only_its_own_history() {
-        let conn = history_with(&[("mine", 10), ("agent", 20), ("mine", 30), ("agent", 40)]);
-        assert_eq!(session_count(&conn, "mine"), 2);
-        let stamps: Vec<i64> = session_rows(&conn, "mine", 0, 10).iter().map(|r| r.timestamp_us).collect();
+    #[tokio::test]
+    async fn a_session_reads_only_its_own_history() {
+        let db = history_with(&[("mine", 10), ("agent", 20), ("mine", 30), ("agent", 40)]).await;
+        let pool = db.pool();
+        assert_eq!(session_count(pool, "mine").await.unwrap(), 2);
+        let stamps: Vec<i64> = session_rows(pool, "mine", 0, 10).await.unwrap().iter().map(|r| r.timestamp_us).collect();
         assert_eq!(stamps, vec![30, 10]);
-        assert_eq!(session_time_range(&conn, "mine"), Some((10, 30)));
-        assert_eq!(session_offset_after(&conn, "mine", 10), 1);
-        assert_eq!(session_count(&conn, "none"), 0);
-        assert_eq!(session_time_range(&conn, "none"), None);
+        assert_eq!(session_time_range(pool, "mine").await.unwrap(), Some((10, 30)));
+        assert_eq!(session_offset_after(pool, "mine", 10).await.unwrap(), 1);
+        assert_eq!(session_count(pool, "none").await.unwrap(), 0);
+        assert_eq!(session_time_range(pool, "none").await.unwrap(), None);
     }
 
-    #[test]
-    fn a_clear_then_a_write_never_repeats_a_history_signal() {
-        let _db = DB.lend_to_this_thread(in_memory());
-        let write = |session_id| {
-            write_entry(session_id, "can", Some(0x100), Some(1), &[1], 0, false, false, true, None);
+    #[tokio::test]
+    async fn a_clear_then_a_write_never_repeats_a_history_signal() {
+        use_in_memory_database();
+        async fn write(session_id: &str) -> i64 {
+            write_entry(session_id, "can", Some(0x100), Some(1), &[1], 0, false, false, true, None).await;
             next_revision()
-        };
+        }
         let signals = [
-            write("signal_mine"),
-            clear_and_announce("signal_mine"),
-            write("signal_agent"),
+            write("signal_mine").await,
+            clear_and_announce("signal_mine").await,
+            write("signal_agent").await,
         ];
         assert!(signals[0] < signals[1] && signals[1] < signals[2], "signals repeated: {signals:?}");
     }
 
-    #[test]
-    fn clearing_a_session_leaves_the_others_history() {
-        let conn = history_with(&[("mine", 10), ("agent", 20)]);
-        clear_session(&conn, "mine");
-        assert_eq!(session_count(&conn, "mine"), 0);
-        assert_eq!(session_count(&conn, "agent"), 1);
+    #[tokio::test]
+    async fn clearing_a_session_leaves_the_others_history() {
+        let db = history_with(&[("mine", 10), ("agent", 20)]).await;
+        clear_session(db.pool(), "mine").await.unwrap();
+        assert_eq!(session_count(db.pool(), "mine").await.unwrap(), 0);
+        assert_eq!(session_count(db.pool(), "agent").await.unwrap(), 1);
     }
 }

@@ -50,7 +50,7 @@ impl Rollup {
     }
 }
 
-/// The length the capture store reads a frame back under: see `wiretap_capture::STORED_LENGTH`.
+/// The length the capture store reads a frame back under: see `wiretap_capture_store::STORED_LENGTH`.
 fn stored_length(frame: &FrameMessage) -> u16 {
     frame.dlc.max(frame.bytes.len() as u16)
 }
@@ -193,14 +193,14 @@ mod tests {
             crate::capture_store::CaptureKind::Frames,
             "golden".into(),
         );
-        crate::capture_store::append_frames_to_capture(&id, golden.frames.clone());
+        crate::capture_db::wait(crate::capture_store::append_frames_to_capture(&id, golden.frames.clone()));
 
         assert_eq!(
-            sorted(crate::capture_store::get_capture_frame_info(&id).unwrap()),
+            sorted(crate::capture_db::wait(crate::capture_store::get_capture_frame_info(&id)).unwrap()),
             sorted(golden.rollup)
         );
         let latest =
-            crate::capture_store::get_capture_latest_frames(&id).unwrap().expect("a frames capture");
+            crate::capture_db::wait(crate::capture_store::get_capture_latest_frames(&id)).unwrap().expect("a frames capture");
         assert_eq!(latest.len(), golden.latest.len());
         for want in &golden.latest {
             let got = latest

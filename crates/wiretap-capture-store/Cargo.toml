@@ -1,0 +1,24 @@
+[package]
+name = "wiretap-capture-store"
+version.workspace = true
+description = "WireTAP's capture store in one SQLite file: frames and raw bytes per capture, their metadata and events, paged, filtered and searched reads, and statements run with a cancel."
+authors = ["Alex Ferrara"]
+edition = "2021"
+publish = false
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sqlx = { version = "0.8.5", default-features = false, features = ["macros", "migrate", "runtime-tokio", "sqlite"] }
+thiserror = "2"
+tokio = { version = "1", default-features = false, features = ["fs"] }
+ts-rs = { version = "12", optional = true, features = ["no-serde-warnings"] }
+wslib-db-sqlite = { version = "0.2.4", registry = "wired-square" }
+wslib-wiretap-protocol = { version = "0.1", registry = "wired-square" }
+
+[features]
+ts = ["dep:ts-rs"]
+
+[dev-dependencies]
+tempfile = "3"
+tokio = { version = "1", features = ["macros", "rt", "time"] }

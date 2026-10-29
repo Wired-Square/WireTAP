@@ -1,42 +1,55 @@
 // ui/crates/wiretap-app/src/capture_db.rs
 //
-// The app's one connection to the capture database, `buffers.db`, and the
-// `wiretap_capture` store read and written through it. Metadata lives in RAM in
-// capture_store.rs; this is the storage behind it.
+// The app's capture database, `buffers.db`, as a `wiretap_capture_store::Store`.
+// Metadata lives in RAM in capture_store.rs; this is the storage behind it.
 //
-// Schema changes MUST be recorded migrations in wiretap-capture — see that
+// Schema changes MUST be recorded migrations in wiretap-capture-store — see that
 // crate's README. Never issue ad-hoc DDL from feature code.
 
-use rusqlite::Connection;
+use std::future::Future;
 use std::path::Path;
-use std::sync::atomic::AtomicBool;
-use std::sync::{Arc, Mutex};
-use wiretap_analysis::source::FrameSelection;
-use wiretap_capture::{CaptureError, CaptureSource, Direction, FrameRecord, StoredFrame};
-use wiretap_gateway::{NewEvent, Sql};
+use std::sync::OnceLock;
+use std::time::Duration;
 
-use crate::blocking::off_runtime;
+use sqlx::sqlite::SqliteRow;
+use wiretap_analysis::order::TimedFrame;
+use wiretap_analysis::source::{
+    FrameSelection, FrameSource, InventoryRow, PayloadQuery, PayloadSource, Sampling, Source, SourceFrame,
+};
+use wiretap_analysis::FrameKey;
+use wiretap_capture_store::{
+    Cancel, CaptureError, Direction, FrameRecord, NewCaptureEvent, Sql, Store, StoredFrame,
+};
+use wslib_wiretap_protocol::ProtocolFrames;
+
 use crate::capture_events::CaptureEvent;
 use crate::capture_store::{CaptureFrameInfo, CaptureKind, CaptureMetadata, TimestampedByte};
-use crate::connection_slot::ConnectionSlot;
 use crate::io::FrameMessage;
 
-static DB: ConnectionSlot = ConnectionSlot::new();
+static STORE: OnceLock<Store> = OnceLock::new();
+
+#[cfg(test)]
+thread_local! {
+    pub(crate) static LENT: std::cell::RefCell<Option<Store>> = const { std::cell::RefCell::new(None) };
+}
+
+fn store() -> Result<Store, String> {
+    #[cfg(test)]
+    if let Some(lent) = LENT.with_borrow(Clone::clone) {
+        return Ok(lent);
+    }
+    STORE.get().cloned().ok_or_else(|| "Database not initialised".to_string())
+}
 
 /// The store's own messages stand alone; a SQLite error says what was being done.
 fn failed_to(action: &str) -> impl FnOnce(CaptureError) -> String + '_ {
     move |e| match e {
-        CaptureError::Sqlite(_) => format!("Failed to {action}: {e}"),
+        CaptureError::Sqlite(_) | CaptureError::Database(_) => format!("Failed to {action}: {e}"),
         e => e.to_string(),
     }
 }
 
-fn with<T>(
-    action: &str,
-    f: impl FnOnce(&mut Connection) -> Result<T, CaptureError>,
-) -> Result<T, String> {
-    DB.with(|conn| f(conn).map_err(failed_to(action)))
-}
+pub use crate::blocking::wait;
 
 impl FrameRecord for FrameMessage {
     fn protocol(&self) -> &str {
@@ -115,6 +128,19 @@ impl From<StoredFrame> for FrameMessage {
     }
 }
 
+impl From<wiretap_capture_store::CaptureEvent> for CaptureEvent {
+    fn from(e: wiretap_capture_store::CaptureEvent) -> Self {
+        CaptureEvent {
+            id: e.id.to_string(),
+            timestamp_us: e.ts_us,
+            duration_us: e.duration_us,
+            note: e.note,
+            created_at_us: e.created_at_us,
+            updated_at_us: e.updated_at_us,
+        }
+    }
+}
+
 fn messages(frames: Vec<StoredFrame>) -> Vec<FrameMessage> {
     frames.into_iter().map(FrameMessage::from).collect()
 }
@@ -125,6 +151,30 @@ fn messages_with_rowids(rows: Vec<(i64, StoredFrame)>) -> Vec<(i64, FrameMessage
         .collect()
 }
 
+/// The analysis crate's selection as the store reads it, until both come from one crate.
+fn selection_of(selection: &FrameSelection) -> wslib_wiretap_protocol::FrameSelection {
+    let whole = selection.protocols().into_iter().map(ProtocolFrames::whole);
+    let ids = selection
+        .pairs()
+        .into_iter()
+        .map(|(frame_id, protocol)| ProtocolFrames::ids(protocol, vec![frame_id]));
+    wslib_wiretap_protocol::FrameSelection::from_groups(whole.chain(ids).collect())
+}
+
+/// The analysis crate's payload query as the store reads it, until both come from one crate.
+fn payload_query(q: PayloadQuery<'_>) -> wslib_wiretap_protocol::PayloadQuery<'_> {
+    wslib_wiretap_protocol::PayloadQuery {
+        protocol: q.protocol,
+        frame_id: q.frame_id,
+        is_extended: q.is_extended,
+        limit: q.limit,
+        sampling: match q.sampling {
+            Sampling::Spread => wslib_wiretap_protocol::Sampling::Spread,
+            Sampling::Recent => wslib_wiretap_protocol::Sampling::Recent,
+        },
+    }
+}
+
 // ============================================================================
 // Initialisation
 // ============================================================================
@@ -133,77 +183,102 @@ fn messages_with_rowids(rows: Vec<(i64, StoredFrame)>) -> Vec<(i64, FrameMessage
 /// When `clear_on_start` is true, leftover data from previous sessions is deleted.
 pub fn initialise(app_data_dir: &Path, clear_on_start: bool) -> Result<(), String> {
     let db_path = app_data_dir.join("buffers.db");
-    DB.open(&db_path, "capture database", |conn| {
-        for m in
-            wiretap_capture::migrate(conn).map_err(failed_to("migrate the capture database"))?
-        {
+    std::fs::create_dir_all(app_data_dir).map_err(|e| format!("Failed to create data dir: {e}"))?;
+    let store = wait(async {
+        let (store, applied) = Store::open(&db_path).await.map_err(|e| match e {
+            CaptureError::NewerFile { found, known } => format!(
+                "it was written by a newer WireTAP (file version {found}; this one reads up to {known}) \
+                 and has been left untouched. Update WireTAP to open it"
+            ),
+            e => failed_to("open the capture database")(e),
+        })?;
+        for m in applied {
             tlog!("[capture_db] Applied migration {} ({})", m.version, m.name);
         }
         if clear_on_start {
-            wiretap_capture::sweep_non_persistent(conn)
+            store
+                .sweep_non_persistent()
+                .await
                 .map_err(failed_to("clear non-persistent captures"))?;
-            tlog!(
-                "[capture_db] Initialised at {:?} (cleared non-persistent and vacuumed)",
-                db_path
-            );
-        } else {
-            tlog!(
-                "[capture_db] Initialised at {:?} (preserving previous data)",
-                db_path
-            );
         }
-        wiretap_capture::tune(conn).map_err(failed_to("tune the capture database"))
-    })
+        Ok::<_, String>(store)
+    })?;
+    tlog!(
+        "[capture_db] Initialised at {:?} ({})",
+        db_path,
+        if clear_on_start { "cleared non-persistent and vacuumed" } else { "preserving previous data" }
+    );
+    STORE.set(store).map_err(|_| "Capture database already initialised".to_string())
 }
 
+/// A file, not memory: a pooled connection returns on a task of the runtime that dropped
+/// it, so tests on many runtimes can lose one, and an in-memory database dies with it.
 #[cfg(test)]
-pub(crate) fn in_memory() -> Connection {
-    let mut conn = Connection::open_in_memory().unwrap();
-    wiretap_capture::migrate(&mut conn).unwrap();
-    conn
+pub(crate) async fn scratch_store() -> Store {
+    static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+    let dir = std::env::temp_dir().join(format!("wiretap-capture-store-tests-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let n = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    Store::open(dir.join(format!("{n}.db"))).await.unwrap().0
 }
 
 /// The one database every test shares; for a test whose work leaves its thread.
 #[cfg(test)]
 pub(crate) fn use_in_memory_database() {
-    DB.install_once(in_memory);
+    static INSTALL: std::sync::Once = std::sync::Once::new();
+    INSTALL.call_once(|| {
+        let _ = STORE.set(wait(scratch_store()));
+    });
 }
 
-/// `conn` stands in for the database on this test's thread until the guard drops;
+/// While held, this thread's store calls, and the `wait`s it makes, use its own store.
+#[cfg(test)]
+#[must_use]
+pub(crate) struct OwnStore;
+
+#[cfg(test)]
+impl Drop for OwnStore {
+    fn drop(&mut self) {
+        LENT.set(None);
+    }
+}
+
+/// `store` stands in for the database on this test's thread until the guard drops;
 /// any other thread still reaches the shared one.
 #[cfg(test)]
-pub(crate) fn use_own_connection(conn: Connection) -> crate::connection_slot::ThreadConnection {
-    DB.lend_to_this_thread(conn)
+pub(crate) fn use_own_store(store: Store) -> OwnStore {
+    LENT.set(Some(store));
+    OwnStore
 }
 
 #[cfg(test)]
-pub(crate) fn use_own_database() -> crate::connection_slot::ThreadConnection {
-    use_own_connection(in_memory())
+pub(crate) fn use_own_database() -> OwnStore {
+    use_own_store(wait(scratch_store()))
 }
 
 #[cfg(test)]
-pub(crate) fn trace_statements(trace: Option<fn(rusqlite::trace::TraceEvent<'_>)>) {
-    DB.with(|conn| {
-        conn.trace_v2(rusqlite::trace::TraceEventCodes::SQLITE_TRACE_STMT, trace);
-        Ok(())
-    })
-    .expect("database");
+pub(crate) fn current() -> Store {
+    store().expect("a test database")
 }
 
 /// A capture as the analysis levers read it.
-pub type Capture = CaptureSource<Arc<Mutex<Connection>>>;
+pub struct Capture {
+    store: Store,
+    id: String,
+}
 
-/// Runs `read` over capture `id` on the blocking pool: a capture's reads block
-/// under their async signatures.
-pub async fn analyse<T: Send + 'static>(
-    id: &str,
-    read: impl AsyncFnOnce(&Capture) -> T + Send + 'static,
-) -> Result<T, String> {
+/// An inventory row as the analysis crate declares it, until both come from one crate.
+pub fn analysis_row(r: wslib_wiretap_protocol::InventoryRow) -> InventoryRow {
+    InventoryRow::new(&r.protocol, r.frame_id, r.is_extended, r.count, r.first_us, r.last_us, r.max_dlc)
+}
+
+/// Runs `read` over capture `id`.
+pub async fn analyse<T>(id: &str, read: impl AsyncFnOnce(&Capture) -> T) -> Result<T, String> {
     let capture = Capture {
-        conn: DB.shared()?,
+        store: store()?,
         id: id.to_owned(),
     };
-    Ok(off_runtime(move || futures::executor::block_on(read(&capture))).await)
+    Ok(read(&capture).await)
 }
 
 /// What a capture source's error reads as.
@@ -211,39 +286,125 @@ pub fn source_error(e: CaptureError) -> String {
     failed_to("read the capture")(e)
 }
 
+/// Frames read a page at a time, so a whole capture is never one query.
+const FRAME_PAGE: usize = 50_000;
+
+impl Capture {
+    async fn selected(&self, selection: &FrameSelection, newest: Option<usize>) -> Result<Vec<StoredFrame>, CaptureError> {
+        let (store, id) = (&self.store, self.id.as_str());
+        if selection.is_empty() {
+            if let Some(n) = newest {
+                return Ok(store.get_frames_tail_rows(id, n).await?.0);
+            }
+        }
+        let selection = selection_of(selection);
+        if let Some(n) = newest {
+            return Ok(store.get_frames_tail_filtered(id, n, &selection).await?.0);
+        }
+        let mut frames = Vec::new();
+        loop {
+            let (page, _, total) = store.get_frames_paginated_filtered(id, frames.len(), FRAME_PAGE, &selection).await?;
+            let done = page.is_empty() || frames.len() + page.len() >= total;
+            frames.extend(page);
+            if done {
+                return Ok(frames);
+            }
+        }
+    }
+}
+
+impl Source for Capture {
+    type Error = CaptureError;
+}
+
+impl PayloadSource for Capture {
+    async fn inventory(&self, start_us: Option<i64>, end_us: Option<i64>) -> Result<Vec<InventoryRow>, CaptureError> {
+        let rows = self.store.frame_inventory(&self.id, start_us, end_us).await?;
+        Ok(rows.into_iter().map(analysis_row).collect())
+    }
+
+    async fn payloads(&self, q: PayloadQuery<'_>) -> Result<Vec<Vec<u8>>, CaptureError> {
+        self.store.payloads(&self.id, &payload_query(q)).await
+    }
+}
+
+impl FrameSource for Capture {
+    async fn frames(&self, selection: &FrameSelection, newest: Option<usize>) -> Result<Vec<SourceFrame>, CaptureError> {
+        Ok(self
+            .selected(selection, newest)
+            .await?
+            .into_iter()
+            .map(|f| SourceFrame {
+                frame: TimedFrame {
+                    bus: f.bus,
+                    key: FrameKey::new(f.frame_id, f.extended),
+                    timestamp_us: f.timestamp_us,
+                    payload: f.payload,
+                },
+                protocol: f.protocol,
+            })
+            .collect())
+    }
+}
+
 // ============================================================================
 // Writes
 // ============================================================================
 
-pub fn insert_frames(capture_id: &str, frames: &[FrameMessage]) -> Result<(), String> {
-    with("insert frames", |c| {
-        wiretap_capture::insert_frames(c, capture_id, frames)
-    })
+/// The waits between attempts at an insert refused by another writer's lock or a full pool.
+const INSERT_RETRY_BACKOFF: [Duration; 3] = [Duration::from_millis(50), Duration::from_millis(200), Duration::from_millis(800)];
+
+fn is_contention(e: &CaptureError) -> bool {
+    const SQLITE_BUSY: i32 = 5;
+    const SQLITE_LOCKED: i32 = 6;
+    match e {
+        CaptureError::Sqlite(sqlx::Error::PoolTimedOut) => true,
+        CaptureError::Sqlite(sqlx::Error::Database(db)) => db
+            .code()
+            .and_then(|code| code.parse::<i32>().ok())
+            .is_some_and(|code| matches!(code & 0xFF, SQLITE_BUSY | SQLITE_LOCKED)),
+        _ => false,
+    }
 }
 
-pub fn insert_bytes(capture_id: &str, bytes: &[TimestampedByte]) -> Result<(), String> {
-    with("insert bytes", |c| {
-        wiretap_capture::insert_bytes(c, capture_id, bytes)
-    })
+/// An insert is one transaction, so a refused one stored nothing and can run again.
+async fn insert_retrying<F: Future<Output = Result<(), CaptureError>>>(
+    action: &str,
+    insert: impl Fn() -> F,
+) -> Result<(), String> {
+    for backoff in INSERT_RETRY_BACKOFF {
+        match insert().await {
+            Err(e) if is_contention(&e) => {
+                tlog!("[capture_db] Retrying a refused insert in {backoff:?}: {e}");
+                tokio::time::sleep(backoff).await;
+            }
+            done => return done.map_err(failed_to(action)),
+        }
+    }
+    insert().await.map_err(failed_to(action))
+}
+
+pub async fn insert_frames(capture_id: &str, frames: &[FrameMessage]) -> Result<(), String> {
+    let store = &store()?;
+    insert_retrying("insert frames", || store.insert_frames(capture_id, frames)).await
+}
+
+pub async fn insert_bytes(capture_id: &str, bytes: &[TimestampedByte]) -> Result<(), String> {
+    let store = &store()?;
+    insert_retrying("insert bytes", || store.insert_bytes(capture_id, bytes)).await
 }
 
 /// Clear and refill a capture with new frames (used by framing to reuse capture IDs).
-pub fn clear_and_refill(capture_id: &str, frames: &[FrameMessage]) -> Result<(), String> {
-    with("refill the capture", |c| {
-        wiretap_capture::clear_and_refill(c, capture_id, frames)
-    })
+pub async fn clear_and_refill(capture_id: &str, frames: &[FrameMessage]) -> Result<(), String> {
+    store()?.clear_and_refill(capture_id, frames).await.map_err(failed_to("refill the capture"))
 }
 
-pub fn copy_capture_data(source_id: &str, dest_id: &str) -> Result<usize, String> {
-    with("copy the capture", |c| {
-        wiretap_capture::copy_capture_data(c, source_id, dest_id)
-    })
+pub async fn copy_capture_data(source_id: &str, dest_id: &str) -> Result<usize, String> {
+    store()?.copy_capture_data(source_id, dest_id).await.map_err(failed_to("copy the capture"))
 }
 
-pub fn delete_capture_data(capture_id: &str) -> Result<(), String> {
-    with("delete capture data", |c| {
-        wiretap_capture::delete_capture_data(c, capture_id)
-    })
+pub async fn delete_capture_data(capture_id: &str) -> Result<(), String> {
+    store()?.delete_capture_data(capture_id).await.map_err(failed_to("delete capture data"))
 }
 
 // ============================================================================
@@ -251,172 +412,154 @@ pub fn delete_capture_data(capture_id: &str) -> Result<(), String> {
 // ============================================================================
 
 /// Returns (frames, rowids).
-pub fn get_frames_paginated(
+pub async fn get_frames_paginated(
     capture_id: &str,
     offset: usize,
     limit: usize,
 ) -> Result<(Vec<FrameMessage>, Vec<i64>), String> {
-    let (frames, rowids) = with("read frames", |c| {
-        wiretap_capture::get_frames_paginated(c, capture_id, offset, limit)
-    })?;
+    let (frames, rowids) = store()?
+        .get_frames_paginated(capture_id, offset, limit)
+        .await
+        .map_err(failed_to("read frames"))?;
     Ok((messages(frames), rowids))
 }
 
 /// Returns (frames, rowids, total_filtered_count).
-pub fn get_frames_paginated_filtered(
+pub async fn get_frames_paginated_filtered(
     capture_id: &str,
     offset: usize,
     limit: usize,
     selection: &FrameSelection,
 ) -> Result<(Vec<FrameMessage>, Vec<i64>, usize), String> {
-    let (frames, rowids, total) = with("read frames", |c| {
-        wiretap_capture::get_frames_paginated_filtered(c, capture_id, offset, limit, selection)
-    })?;
+    let (frames, rowids, total) = store()?
+        .get_frames_paginated_filtered(capture_id, offset, limit, &selection_of(selection))
+        .await
+        .map_err(failed_to("read frames"))?;
     Ok((messages(frames), rowids, total))
 }
 
 /// The last `limit` frames, oldest first, with their rowids; the caller has the total.
-pub fn get_frames_tail_rows(
-    capture_id: &str,
-    limit: usize,
-) -> Result<(Vec<FrameMessage>, Vec<i64>), String> {
-    let (frames, rowids) = with("read frames", |c| {
-        wiretap_capture::get_frames_tail_rows(c, capture_id, limit)
-    })?;
+pub async fn get_frames_tail_rows(capture_id: &str, limit: usize) -> Result<(Vec<FrameMessage>, Vec<i64>), String> {
+    let (frames, rowids) = store()?
+        .get_frames_tail_rows(capture_id, limit)
+        .await
+        .map_err(failed_to("read frames"))?;
     Ok((messages(frames), rowids))
 }
 
 /// The last `limit` selected frames, oldest first; returns (frames, rowids, total_matching).
-pub fn get_frames_tail_filtered(
+pub async fn get_frames_tail_filtered(
     capture_id: &str,
     limit: usize,
     selection: &FrameSelection,
 ) -> Result<(Vec<FrameMessage>, Vec<i64>, usize), String> {
-    let (frames, rowids, total) = with("read frames", |c| {
-        wiretap_capture::get_frames_tail_filtered(c, capture_id, limit, selection)
-    })?;
+    let (frames, rowids, total) = store()?
+        .get_frames_tail_filtered(capture_id, limit, &selection_of(selection))
+        .await
+        .map_err(failed_to("read frames"))?;
     Ok((messages(frames), rowids, total))
 }
 
-pub fn get_frame_count(capture_id: &str) -> Result<usize, String> {
-    with("count frames", |c| {
-        wiretap_capture::get_frame_count(c, capture_id)
-    })
+pub async fn get_frame_count(capture_id: &str) -> Result<usize, String> {
+    store()?.get_frame_count(capture_id).await.map_err(failed_to("count frames"))
 }
 
-pub fn non_can_protocols(capture_id: &str) -> Result<Vec<String>, String> {
-    with("read capture protocols", |c| {
-        wiretap_capture::non_can_protocols(c, capture_id)
-    })
+pub async fn non_can_protocols(capture_id: &str) -> Result<Vec<String>, String> {
+    store()?.non_can_protocols(capture_id).await.map_err(failed_to("read capture protocols"))
 }
 
-pub fn get_frame_info(capture_id: &str) -> Result<Vec<CaptureFrameInfo>, String> {
-    with("read frame info", |c| {
-        wiretap_capture::get_frame_info(c, capture_id)
-    })
+pub async fn get_frame_info(capture_id: &str) -> Result<Vec<CaptureFrameInfo>, String> {
+    store()?.get_frame_info(capture_id).await.map_err(failed_to("read frame info"))
 }
 
-pub fn find_offset_for_timestamp(
+pub async fn find_offset_for_timestamp(
     capture_id: &str,
     target_us: u64,
     selection: &FrameSelection,
 ) -> Result<usize, String> {
-    with("find a frame by time", |c| {
-        wiretap_capture::find_offset_for_timestamp(c, capture_id, target_us, selection)
-    })
+    store()?
+        .find_offset_for_timestamp(capture_id, target_us, &selection_of(selection))
+        .await
+        .map_err(failed_to("find a frame by time"))
 }
 
 /// Offsets of the matching frames among the selected ones; `query` arrives stripped of whitespace.
-pub fn search_frames(
+pub async fn search_frames(
     capture_id: &str,
     query: &str,
     search_id: bool,
     search_data: bool,
     selection: &FrameSelection,
 ) -> Result<Vec<usize>, String> {
-    with("search frames", |c| {
-        wiretap_capture::search_frames(c, capture_id, query, search_id, search_data, selection)
-    })
+    store()?
+        .search_frames(capture_id, query, search_id, search_data, &selection_of(selection))
+        .await
+        .map_err(failed_to("search frames"))
 }
 
-pub fn get_all_frames(capture_id: &str) -> Result<Vec<FrameMessage>, String> {
-    with("read frames", |c| {
-        wiretap_capture::get_all_frames(c, capture_id)
-    })
-    .map(messages)
+pub async fn get_all_frames(capture_id: &str) -> Result<Vec<FrameMessage>, String> {
+    store()?.get_all_frames(capture_id).await.map(messages).map_err(failed_to("read frames"))
 }
 
-pub fn get_latest_frames(capture_id: &str) -> Result<Vec<FrameMessage>, String> {
-    with("read frames", |c| {
-        wiretap_capture::get_latest_frames(c, capture_id)
-    })
-    .map(messages)
+pub async fn get_latest_frames(capture_id: &str) -> Result<Vec<FrameMessage>, String> {
+    store()?.get_latest_frames(capture_id).await.map(messages).map_err(failed_to("read frames"))
 }
 
-pub fn read_frame_chunk(
-    capture_id: &str,
-    after_rowid: i64,
-    limit: usize,
-) -> Result<Vec<(i64, FrameMessage)>, String> {
-    with("read frames", |c| {
-        wiretap_capture::read_frame_chunk(c, capture_id, after_rowid, limit)
-    })
-    .map(messages_with_rowids)
+pub async fn read_frame_chunk(capture_id: &str, after_rowid: i64, limit: usize) -> Result<Vec<(i64, FrameMessage)>, String> {
+    store()?
+        .read_frame_chunk(capture_id, after_rowid, limit)
+        .await
+        .map(messages_with_rowids)
+        .map_err(failed_to("read frames"))
 }
 
-pub fn read_frame_chunk_reverse(
+pub async fn read_frame_chunk_reverse(
     capture_id: &str,
     before_rowid: i64,
     limit: usize,
 ) -> Result<Vec<(i64, FrameMessage)>, String> {
-    with("read frames", |c| {
-        wiretap_capture::read_frame_chunk_reverse(c, capture_id, before_rowid, limit)
-    })
-    .map(messages_with_rowids)
+    store()?
+        .read_frame_chunk_reverse(capture_id, before_rowid, limit)
+        .await
+        .map(messages_with_rowids)
+        .map_err(failed_to("read frames"))
 }
 
-pub fn get_rowid_range(capture_id: &str) -> Result<Option<(i64, i64)>, String> {
-    with("read frames", |c| {
-        wiretap_capture::get_rowid_range(c, capture_id)
-    })
+pub async fn get_rowid_range(capture_id: &str) -> Result<Option<(i64, i64)>, String> {
+    store()?.get_rowid_range(capture_id).await.map_err(failed_to("read frames"))
 }
 
-pub fn find_rowid_for_timestamp(
-    capture_id: &str,
-    timestamp_us: u64,
-) -> Result<Option<i64>, String> {
-    with("find a frame by time", |c| {
-        wiretap_capture::find_rowid_for_timestamp(c, capture_id, timestamp_us)
-    })
+pub async fn find_rowid_for_timestamp(capture_id: &str, timestamp_us: u64) -> Result<Option<i64>, String> {
+    store()?
+        .find_rowid_for_timestamp(capture_id, timestamp_us)
+        .await
+        .map_err(failed_to("find a frame by time"))
 }
 
-pub fn get_frame_at_index(
-    capture_id: &str,
-    index: usize,
-) -> Result<Option<(i64, FrameMessage)>, String> {
-    with("read frames", |c| {
-        wiretap_capture::get_frame_at_index(c, capture_id, index)
-    })
-    .map(|row| row.map(|(rowid, f)| (rowid, f.into())))
+pub async fn get_frame_at_index(capture_id: &str, index: usize) -> Result<Option<(i64, FrameMessage)>, String> {
+    store()?
+        .get_frame_at_index(capture_id, index)
+        .await
+        .map(|row| row.map(|(rowid, f)| (rowid, f.into())))
+        .map_err(failed_to("read frames"))
 }
 
 /// Returns (rowid, frame_index, frame).
-pub fn get_next_filtered_frame(
+pub async fn get_next_filtered_frame(
     capture_id: &str,
     current_rowid: i64,
     selection: &FrameSelection,
     backward: bool,
 ) -> Result<Option<(i64, usize, FrameMessage)>, String> {
-    with("read frames", |c| {
-        wiretap_capture::get_next_filtered_frame(c, capture_id, current_rowid, selection, backward)
-    })
-    .map(|row| row.map(|(rowid, index, f)| (rowid, index, f.into())))
+    store()?
+        .get_next_filtered_frame(capture_id, current_rowid, &selection_of(selection), backward)
+        .await
+        .map(|row| row.map(|(rowid, index, f)| (rowid, index, f.into())))
+        .map_err(failed_to("read frames"))
 }
 
-pub fn count_frames_before_rowid(capture_id: &str, rowid: i64) -> Result<usize, String> {
-    with("count frames", |c| {
-        wiretap_capture::count_frames_before_rowid(c, capture_id, rowid)
-    })
+pub async fn count_frames_before_rowid(capture_id: &str, rowid: i64) -> Result<usize, String> {
+    store()?.count_frames_before_rowid(capture_id, rowid).await.map_err(failed_to("count frames"))
 }
 
 // ============================================================================
@@ -424,86 +567,70 @@ pub fn count_frames_before_rowid(capture_id: &str, rowid: i64) -> Result<usize, 
 // ============================================================================
 
 /// Returns (bytes, total_count).
-pub fn get_bytes_paginated(
+pub async fn get_bytes_paginated(
     capture_id: &str,
     offset: usize,
     limit: usize,
 ) -> Result<(Vec<TimestampedByte>, usize), String> {
-    with("read bytes", |c| {
-        wiretap_capture::get_bytes_paginated(c, capture_id, offset, limit)
-    })
+    store()?.get_bytes_paginated(capture_id, offset, limit).await.map_err(failed_to("read bytes"))
 }
 
 /// The last `limit` bytes, oldest first; the caller has the total.
-pub fn get_bytes_tail_rows(capture_id: &str, limit: usize) -> Result<Vec<TimestampedByte>, String> {
-    with("read bytes", |c| {
-        wiretap_capture::get_bytes_tail_rows(c, capture_id, limit)
-    })
+pub async fn get_bytes_tail_rows(capture_id: &str, limit: usize) -> Result<Vec<TimestampedByte>, String> {
+    store()?.get_bytes_tail_rows(capture_id, limit).await.map_err(failed_to("read bytes"))
 }
 
-pub fn get_all_bytes(capture_id: &str) -> Result<Vec<TimestampedByte>, String> {
-    with("read bytes", |c| {
-        wiretap_capture::get_all_bytes(c, capture_id)
-    })
+pub async fn get_all_bytes(capture_id: &str) -> Result<Vec<TimestampedByte>, String> {
+    store()?.get_all_bytes(capture_id).await.map_err(failed_to("read bytes"))
 }
 
-pub fn find_bytes_offset_for_timestamp(capture_id: &str, target_us: u64) -> Result<usize, String> {
-    with("find a byte by time", |c| {
-        wiretap_capture::find_bytes_offset_for_timestamp(c, capture_id, target_us)
-    })
+pub async fn find_bytes_offset_for_timestamp(capture_id: &str, target_us: u64) -> Result<usize, String> {
+    store()?
+        .find_bytes_offset_for_timestamp(capture_id, target_us)
+        .await
+        .map_err(failed_to("find a byte by time"))
 }
 
 /// Run a read-only `statement`, one `T` per row. Setting `cancel` aborts it
 /// between SQLite VM steps.
-pub fn read_rows<T>(
+pub async fn read_rows<T: Send + Unpin>(
     statement: &Sql,
-    cancel: &Arc<AtomicBool>,
-    map: impl FnMut(&rusqlite::Row) -> rusqlite::Result<T>,
+    cancel: &Cancel,
+    map: impl FnMut(&SqliteRow) -> sqlx::Result<T> + Send,
 ) -> Result<Vec<T>, String> {
-    with("run the query", |c| {
-        wiretap_capture::read_rows(c, statement, cancel, map)
-    })
+    store()?.read_rows(statement, cancel, map).await.map_err(failed_to("run the query"))
 }
 
 // ============================================================================
 // Capture metadata
 // ============================================================================
 
-pub fn save_capture_metadata(meta: &CaptureMetadata) -> Result<(), String> {
-    with("save capture metadata", |c| {
-        wiretap_capture::save_capture_metadata(c, meta)
-    })
+pub async fn save_capture_metadata(meta: &CaptureMetadata) -> Result<(), String> {
+    store()?.save_capture_metadata(meta).await.map_err(failed_to("save capture metadata"))
 }
 
-pub fn load_all_capture_metadata() -> Result<Vec<CaptureMetadata>, String> {
-    with("load capture metadata", |c| {
-        wiretap_capture::load_all_capture_metadata(c)
-    })
+pub async fn load_all_capture_metadata() -> Result<Vec<CaptureMetadata>, String> {
+    store()?.load_all_capture_metadata().await.map_err(failed_to("load capture metadata"))
 }
 
-pub fn update_capture_name(capture_id: &str, new_name: &str) -> Result<(), String> {
-    with("update capture name", |c| {
-        wiretap_capture::update_capture_name(c, capture_id, new_name)
-    })
+pub async fn update_capture_name(capture_id: &str, new_name: &str) -> Result<(), String> {
+    store()?.update_capture_name(capture_id, new_name).await.map_err(failed_to("update capture name"))
 }
 
-pub fn update_capture_persistent(capture_id: &str, persistent: bool) -> Result<(), String> {
-    with("update capture persistent flag", |c| {
-        wiretap_capture::update_capture_persistent(c, capture_id, persistent)
-    })
+pub async fn update_capture_persistent(capture_id: &str, persistent: bool) -> Result<(), String> {
+    store()?
+        .update_capture_persistent(capture_id, persistent)
+        .await
+        .map_err(failed_to("update capture persistent flag"))
 }
 
 /// Backfills the buses of a capture stored before they were tracked.
-pub fn get_distinct_buses(capture_id: &str, kind: CaptureKind) -> Result<Vec<u8>, String> {
-    with("read capture buses", |c| {
-        wiretap_capture::get_distinct_buses(c, capture_id, kind)
-    })
+pub async fn get_distinct_buses(capture_id: &str, kind: CaptureKind) -> Result<Vec<u8>, String> {
+    store()?.get_distinct_buses(capture_id, kind).await.map_err(failed_to("read capture buses"))
 }
 
-pub fn delete_capture_metadata(capture_id: &str) -> Result<(), String> {
-    with("delete capture metadata", |c| {
-        wiretap_capture::delete_capture_metadata(c, capture_id)
-    })
+pub async fn delete_capture_metadata(capture_id: &str) -> Result<(), String> {
+    store()?.delete_capture_metadata(capture_id).await.map_err(failed_to("delete capture metadata"))
 }
 
 // ============================================================================
@@ -514,56 +641,53 @@ fn parse_event_id(id: &str) -> Result<i64, String> {
     id.parse().map_err(|_| format!("Invalid event id '{id}'"))
 }
 
-fn new_event(timestamp_us: i64, duration_us: i64, note: &str) -> NewEvent {
-    NewEvent {
+fn new_event(timestamp_us: i64, duration_us: i64, note: &str) -> NewCaptureEvent {
+    NewCaptureEvent {
         ts_us: timestamp_us,
         duration_us,
         note: note.into(),
     }
 }
 
-pub fn list_capture_events(capture_id: &str) -> Result<Vec<CaptureEvent>, String> {
-    with("read events", |c| {
-        wiretap_capture::list_capture_events(c, capture_id)
-    })
-    .map(|events| events.into_iter().map(CaptureEvent::from).collect())
+pub async fn list_capture_events(capture_id: &str) -> Result<Vec<CaptureEvent>, String> {
+    store()?
+        .list_capture_events(capture_id)
+        .await
+        .map(|events| events.into_iter().map(CaptureEvent::from).collect())
+        .map_err(failed_to("read events"))
 }
 
-pub fn insert_capture_event(
+pub async fn insert_capture_event(
     capture_id: &str,
     timestamp_us: i64,
     duration_us: i64,
     note: &str,
 ) -> Result<CaptureEvent, String> {
-    let event = new_event(timestamp_us, duration_us, note);
-    with("insert event", |c| {
-        wiretap_capture::insert_capture_event(c, capture_id, &event)
-    })
-    .map(CaptureEvent::from)
+    store()?
+        .insert_capture_event(capture_id, &new_event(timestamp_us, duration_us, note))
+        .await
+        .map(CaptureEvent::from)
+        .map_err(failed_to("insert event"))
 }
 
-pub fn update_capture_event(
+pub async fn update_capture_event(
     capture_id: &str,
     id: &str,
     timestamp_us: i64,
     duration_us: i64,
     note: &str,
 ) -> Result<CaptureEvent, String> {
-    let (id, event) = (
-        parse_event_id(id)?,
-        new_event(timestamp_us, duration_us, note),
-    );
-    with("update event", |c| {
-        wiretap_capture::update_capture_event(c, capture_id, id, &event)
-    })
-    .map(CaptureEvent::from)
+    let id = parse_event_id(id)?;
+    store()?
+        .update_capture_event(capture_id, id, &new_event(timestamp_us, duration_us, note))
+        .await
+        .map(CaptureEvent::from)
+        .map_err(failed_to("update event"))
 }
 
-pub fn delete_capture_event(capture_id: &str, id: &str) -> Result<(), String> {
+pub async fn delete_capture_event(capture_id: &str, id: &str) -> Result<(), String> {
     let id = parse_event_id(id)?;
-    with("delete event", |c| {
-        wiretap_capture::delete_capture_event(c, capture_id, id)
-    })
+    store()?.delete_capture_event(capture_id, id).await.map_err(failed_to("delete event"))
 }
 
 #[cfg(test)]
@@ -571,8 +695,33 @@ mod tests {
     use super::*;
 
     #[test]
-    fn a_frame_message_round_trips_through_the_store() {
-        let _db = use_own_database();
+    fn a_capture_database_from_a_newer_wiretap_is_refused_and_left_as_it_is() {
+        use sqlx::{ConnectOptions, Connection, Executor};
+        let dir = std::env::temp_dir().join(format!("wiretap-newer-capture-db-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let db_path = dir.join("buffers.db");
+        wait(async {
+            let mut conn = sqlx::sqlite::SqliteConnectOptions::new()
+                .filename(&db_path)
+                .create_if_missing(true)
+                .connect()
+                .await
+                .unwrap();
+            conn.execute("CREATE TABLE frames (capture_id TEXT); PRAGMA user_version = 99").await.unwrap();
+            conn.close().await.unwrap();
+        });
+        let before = std::fs::read(&db_path).unwrap();
+
+        let error = initialise(&dir, true).unwrap_err();
+
+        assert!(error.contains("written by a newer WireTAP (file version 99"), "{error}");
+        assert_eq!(std::fs::read(&db_path).unwrap(), before);
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[tokio::test]
+    async fn a_frame_message_round_trips_through_the_store() {
+        let _db = use_own_store(scratch_store().await);
         let can = |frame_id, dlc, bytes: Vec<u8>, direction: Option<&str>| FrameMessage {
             protocol: "can".into(),
             timestamp_us: frame_id as u64,
@@ -606,37 +755,44 @@ mod tests {
                 ..can(0x0103, 4, vec![1, 3, 0xAA, 0xBB], None)
             },
         ];
-        insert_frames("c1", &frames).unwrap();
+        insert_frames("c1", &frames).await.unwrap();
 
         let json = |frames: &[FrameMessage]| serde_json::to_value(frames).unwrap();
-        assert_eq!(json(&get_all_frames("c1").unwrap()), json(&frames));
+        assert_eq!(json(&get_all_frames("c1").await.unwrap()), json(&frames));
+    }
+
+    #[tokio::test]
+    async fn a_store_error_says_what_failed_and_its_own_messages_stand_alone() {
+        let bare = wslib_db_sqlite::Database::open_in_memory(&[]).await.unwrap();
+        let db = use_own_store(Store::from_database(bare));
+        let error = get_frame_count("c1").await.unwrap_err();
+        assert_eq!(error, "Failed to count frames: no such table: frames");
+        drop(db);
+        let _db = use_own_store(scratch_store().await);
+        assert_eq!(delete_capture_event("c1", "7").await, Err("Event not found".into()));
+        assert_eq!(delete_capture_event("c1", "x").await, Err("Invalid event id 'x'".into()));
     }
 
     #[test]
-    fn a_store_error_says_what_failed_and_its_own_messages_stand_alone() {
-        let _db = use_own_connection(Connection::open_in_memory().unwrap());
-        assert!(get_frame_count("c1")
-            .unwrap_err()
-            .starts_with("Failed to count frames: no such table: frames"));
+    fn a_sync_caller_waits_on_its_own_store() {
         let _db = use_own_database();
-        assert_eq!(
-            delete_capture_event("c1", "7"),
-            Err("Event not found".into())
-        );
-        assert_eq!(
-            delete_capture_event("c1", "x"),
-            Err("Invalid event id 'x'".into())
-        );
+        wait(insert_frames("c1", &[FrameMessage { protocol: "can".into(), ..Default::default() }])).unwrap();
+        assert_eq!(wait(get_frame_count("c1")), Ok(1));
+    }
+
+    #[tokio::test]
+    async fn a_sync_caller_inside_a_runtime_waits_without_nesting_it() {
+        let _db = use_own_store(scratch_store().await);
+        assert_eq!(wait(get_frame_count("c1")), Ok(0));
     }
 
     /// Opens only a copy: never a file named like the app's database, nor anything under
     /// the data directory every app identifier's database lives in.
     /// `WIRETAP_CAPTURE_DB_COPY=<copy> cargo test -p wiretap --lib a_copied_capture_db -- --ignored --nocapture`.
-    #[test]
+    #[tokio::test]
     #[ignore]
-    fn a_copied_capture_db_migrates_and_reads_unchanged() {
-        let path =
-            std::env::var("WIRETAP_CAPTURE_DB_COPY").expect("WIRETAP_CAPTURE_DB_COPY names a copy");
+    async fn a_copied_capture_db_migrates_and_reads_unchanged() {
+        let path = std::env::var("WIRETAP_CAPTURE_DB_COPY").expect("WIRETAP_CAPTURE_DB_COPY names a copy");
         let path = std::fs::canonicalize(path).expect("the copy exists");
         let data = dirs::data_dir()
             .and_then(|d| std::fs::canonicalize(d).ok())
@@ -645,53 +801,30 @@ mod tests {
             !path.starts_with(&data),
             "refusing {path:?}: it is under {data:?}, where the app's databases live"
         );
-        assert_ne!(
-            path.file_name(),
-            Some("buffers.db".as_ref()),
-            "refusing {path:?}: copy it to another name"
-        );
+        assert_ne!(path.file_name(), Some("buffers.db".as_ref()), "refusing {path:?}: copy it to another name");
 
-        let mut conn = Connection::open(&path).unwrap();
-        let before: i64 = conn
-            .query_row("PRAGMA user_version", [], |r| r.get(0))
-            .unwrap();
-        let applied = wiretap_capture::migrate(&mut conn).unwrap();
-        println!(
-            "version {before}, applied {:?}",
-            applied.iter().map(|m| m.version).collect::<Vec<_>>()
-        );
-        if before == wiretap_capture::SCHEMA_VERSION {
-            assert!(
-                applied.is_empty(),
-                "a database at the current version applies nothing"
-            );
+        let (store, applied) = Store::open(&path).await.unwrap();
+        for m in applied {
+            println!("applied migration {} ({})", m.version, m.name);
         }
-        let captures = wiretap_capture::load_all_capture_metadata(&conn).unwrap();
+        let captures = store.load_all_capture_metadata().await.unwrap();
         println!("captures: {}", captures.len());
         for meta in &captures {
             match meta.kind {
                 CaptureKind::Frames => {
-                    let inventory =
-                        wiretap_capture::frame_inventory(&conn, &meta.id, None, None).unwrap();
-                    let (page, _) =
-                        wiretap_capture::get_frames_paginated(&conn, &meta.id, 0, 50).unwrap();
-                    let count = wiretap_capture::get_frame_count(&conn, &meta.id).unwrap();
-                    println!(
-                        "frames: {count} rows, {} identities, first page {}",
-                        inventory.len(),
-                        page.len()
-                    );
+                    let inventory = store.frame_inventory(&meta.id, None, None).await.unwrap();
+                    let (page, _) = store.get_frames_paginated(&meta.id, 0, 50).await.unwrap();
+                    let count = store.get_frame_count(&meta.id).await.unwrap();
+                    println!("frames: {count} rows, {} identities, first page {}", inventory.len(), page.len());
                 }
                 CaptureKind::Bytes => {
-                    let (page, count) =
-                        wiretap_capture::get_bytes_paginated(&conn, &meta.id, 0, 50).unwrap();
+                    let (page, count) = store.get_bytes_paginated(&meta.id, 0, 50).await.unwrap();
                     println!("bytes: {count} rows, first page {}", page.len());
                 }
             }
         }
-        assert!(
-            wiretap_capture::migrate(&mut conn).unwrap().is_empty(),
-            "a second migrate applies nothing"
-        );
+        store.close().await;
+        let (_, applied) = Store::open(&path).await.expect("a second open succeeds");
+        assert!(applied.is_empty(), "a second open applies nothing");
     }
 }

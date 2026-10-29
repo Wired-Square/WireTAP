@@ -442,7 +442,7 @@ pub(super) async fn run_merge_task(
         if should_emit {
             if !pending_frames.is_empty() {
                 pending_frames.sort_by_key(|f| f.timestamp_us);
-                capture_store::append_frames_to_session(&session_id, pending_frames);
+                capture_store::append_frames_to_session(&session_id, pending_frames).await;
                 pending_frames = Vec::new();
                 if throttle.should_signal("frames-ready") {
                     signal_frames_ready(&session_id);
@@ -451,7 +451,7 @@ pub(super) async fn run_merge_task(
 
             if !pending_bytes.is_empty() {
                 pending_bytes.sort_by_key(|b| b.timestamp_us);
-                capture_store::append_raw_bytes_to_session(&session_id, pending_bytes);
+                capture_store::append_raw_bytes_to_session(&session_id, pending_bytes).await;
                 pending_bytes = Vec::new();
                 if throttle.should_signal("bytes-ready") {
                     signal_bytes_ready(&session_id);
@@ -465,7 +465,7 @@ pub(super) async fn run_merge_task(
     // Store and signal any remaining frames
     if !pending_frames.is_empty() {
         pending_frames.sort_by_key(|f| f.timestamp_us);
-        capture_store::append_frames_to_session(&session_id, pending_frames);
+        capture_store::append_frames_to_session(&session_id, pending_frames).await;
         throttle.flush();
         signal_frames_ready(&session_id);
     }
@@ -473,7 +473,7 @@ pub(super) async fn run_merge_task(
     // Store and signal any remaining bytes
     if !pending_bytes.is_empty() {
         pending_bytes.sort_by_key(|b| b.timestamp_us);
-        capture_store::append_raw_bytes_to_session(&session_id, pending_bytes);
+        capture_store::append_raw_bytes_to_session(&session_id, pending_bytes).await;
         throttle.flush();
         signal_bytes_ready(&session_id);
     }

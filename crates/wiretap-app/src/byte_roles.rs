@@ -233,7 +233,8 @@ mod tests {
 
     #[tokio::test]
     async fn a_failed_capture_read_says_it_was_reading_the_capture() {
-        let _db = capture_db::use_own_connection(rusqlite::Connection::open_in_memory().unwrap());
+        let bare = wslib_db_sqlite::Database::open_in_memory(&[]).await.unwrap();
+        let _db = capture_db::use_own_store(wiretap_capture_store::Store::from_database(bare));
 
         let error = payload_changes_cmd("c1".into(), vec![], None, None).await.unwrap_err();
 

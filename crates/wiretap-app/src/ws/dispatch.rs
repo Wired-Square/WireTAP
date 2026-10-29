@@ -654,7 +654,7 @@ pub fn send_new_frames(session_id: &str) {
         return;
     }
 
-    let frames = match crate::capture_store::get_capture_frames_paginated(&capture_id, offset, new_count) {
+    let frames = match crate::capture_db::wait(crate::capture_store::get_capture_frames_paginated(&capture_id, offset, new_count)) {
         Ok((frames, _, _)) if !frames.is_empty() => frames,
         Ok(_) => return,
         Err(e) => {
@@ -882,7 +882,7 @@ fn delivered_pages(
         if left == 0 {
             return None;
         }
-        match crate::capture_db::read_frame_chunk(capture_id, after_rowid, page.min(left)) {
+        match crate::capture_db::wait(crate::capture_db::read_frame_chunk(capture_id, after_rowid, page.min(left))) {
             Ok(rows) => {
                 after_rowid = rows.last()?.0;
                 left -= rows.len();
@@ -1904,7 +1904,7 @@ bit_length = 8
         ] {
             frames.extend(rtu(&body).chunks(8).map(|c| can(0x1E0, t, c.to_vec())));
         }
-        crate::capture_store::append_frames_to_session(session, frames);
+        crate::capture_db::wait(crate::capture_store::append_frames_to_session(session, frames));
         outbox::subscribe(session, CHANNEL);
         send_new_frames(session);
 
@@ -1937,7 +1937,7 @@ bit_length = 8
         let watch = json!({ "session_id": session, "signals": [{ "frameId": 0x100, "name": "byte[1]" }], "heatmaps": [0x100] });
         crate::adhoc::dispatch_adhoc_command("adhoc.set", watch, WINDOW).unwrap();
         let on_bus_1 = FrameMessage { bus: 1, ..can(0x1A5, 1_000, vec![1, 10, 0, 0, 0, 0, 0, 0]) };
-        crate::capture_store::append_frames_to_session(session, vec![can(0x100, 3_000, vec![3, 30, 0, 0, 0, 0, 0, 0]), on_bus_1]);
+        crate::capture_db::wait(crate::capture_store::append_frames_to_session(session, vec![can(0x100, 3_000, vec![3, 30, 0, 0, 0, 0, 0, 0]), on_bus_1]));
         outbox::subscribe(session, CHANNEL);
         let values = |name: &str| {
             let series = crate::dashboard_history::dispatch(
@@ -1984,7 +1984,7 @@ bit_length = 8
         crate::capture_db::use_in_memory_database();
         crate::capture_store::create_session_capture(session, CaptureKind::Frames, session.to_string());
         let level = |t| can(0x100, t, vec![t as u8; 8]);
-        crate::capture_store::append_frames_to_session(session, (1..=7).map(level).collect());
+        crate::capture_db::wait(crate::capture_store::append_frames_to_session(session, (1..=7).map(level).collect()));
         attach_catalog(session, None, wiretap_catalog::Catalog::parse(ROUTED).expect("catalogue parses"));
         outbox::subscribe(session, CHANNEL);
         send_new_frames(session);
@@ -1996,7 +1996,7 @@ bit_length = 8
             newer.get_or_insert_with(|| {
                 let delivered = delivered.clone();
                 std::thread::spawn(move || {
-                    crate::capture_store::append_frames_to_session(session, vec![level(8)]);
+                    crate::capture_db::wait(crate::capture_store::append_frames_to_session(session, vec![level(8)]));
                     send_new_frames(session);
                     delivered.lock().unwrap().push("newer");
                 })
@@ -2018,7 +2018,7 @@ bit_length = 8
         let session = "empty-backlog";
         let _db = crate::capture_db::use_own_database();
         crate::capture_store::create_session_capture(session, CaptureKind::Frames, session.to_string());
-        crate::capture_store::append_frames_to_session(session, (1..=5).map(|t| can(0x2A5, t, vec![0; 8])).collect());
+        crate::capture_db::wait(crate::capture_store::append_frames_to_session(session, (1..=5).map(|t| can(0x2A5, t, vec![0; 8])).collect()));
         attach_catalog(session, None, wiretap_catalog::Catalog::parse(ROUTED).expect("catalogue parses"));
         outbox::subscribe(session, 205);
         send_new_frames(session);
@@ -2036,7 +2036,7 @@ bit_length = 8
         let _db = crate::capture_db::use_own_database();
         crate::capture_store::create_session_capture(session, CaptureKind::Frames, session.to_string());
         let request = rtu(&[0x01, 0x04, 0x4D, 0xE2, 0x00, 0x02]);
-        crate::capture_store::append_frames_to_session(session, (1..=REQUESTS).map(|t| can(0x1E0, t, request.clone())).collect());
+        crate::capture_db::wait(crate::capture_store::append_frames_to_session(session, (1..=REQUESTS).map(|t| can(0x1E0, t, request.clone())).collect()));
         attach_catalog(session, None, tunnel_catalogue(""));
         outbox::subscribe(session, 206);
         send_new_frames(session);
@@ -2071,21 +2071,21 @@ bit_length = 8
         };
         let ids = |msg: &FrameInventoryMsg| msg.rows.iter().map(|r| r.frame_id).collect::<Vec<_>>();
 
-        crate::capture_store::append_frames_to_session(session, vec![can(0x100, 1, vec![0; 8]), can(0x101, 2, vec![0; 8])]);
+        crate::capture_db::wait(crate::capture_store::append_frames_to_session(session, vec![can(0x100, 1, vec![0; 8]), can(0x101, 2, vec![0; 8])]));
         outbox::subscribe(session, CHANNEL);
         reset_frame_offset(session);
         let [whole] = inventories().try_into().expect("one inventory on subscribe");
         assert!(whole.reset);
         assert_eq!(ids(&whole), [0x100, 0x101]);
 
-        crate::capture_store::append_frames_to_session(session, vec![can(0x100, 3, vec![0; 8]), can(0x101, 4, vec![0; 4])]);
+        crate::capture_db::wait(crate::capture_store::append_frames_to_session(session, vec![can(0x100, 3, vec![0; 8]), can(0x101, 4, vec![0; 4])]));
         send_new_frames(session);
         let [delta] = inventories().try_into().expect("one delta");
         assert!(!delta.reset);
         assert_eq!(ids(&delta), [0x101]);
         assert!(delta.rows[0].has_dlc_mismatch);
 
-        crate::capture_store::append_frames_to_session(session, vec![can(0x100, 5, vec![0; 8])]);
+        crate::capture_db::wait(crate::capture_store::append_frames_to_session(session, vec![can(0x100, 5, vec![0; 8])]));
         send_new_frames(session);
         assert!(inventories().is_empty(), "nothing changed, nothing sent");
 

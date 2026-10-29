@@ -143,7 +143,7 @@ impl FrameSink {
         }
         match self {
             FrameSink::SessionCapture { session_id } => {
-                capture_store::append_frames_to_session(session_id, frames);
+                capture_store::append_frames_to_session(session_id, frames).await;
                 if throttle.should_signal("frames-ready") {
                     signal_frames_ready(session_id);
                 }
