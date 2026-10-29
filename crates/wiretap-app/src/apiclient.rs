@@ -324,10 +324,10 @@ pub async fn events_delete(app: &tauri::AppHandle, profile_id: &str, id: &str) -
 }
 
 /// The import format carries CAN records only, so anything else would land in the archive as CAN.
-fn ensure_only_can(capture_id: &str) -> Result<(), String> {
+async fn ensure_only_can(capture_id: &str) -> Result<(), String> {
     use crate::capture_store::{get_capture_kind, CaptureKind};
     let others = match get_capture_kind(capture_id) {
-        Some(CaptureKind::Frames) => crate::capture_db::non_can_protocols(capture_id)?,
+        Some(CaptureKind::Frames) => crate::capture_db::non_can_protocols(capture_id).await?,
         Some(CaptureKind::Bytes) => vec!["raw bytes".into()],
         None => return Err(format!("Capture not found: {capture_id}")),
     };
@@ -403,7 +403,7 @@ async fn import_capture(
     if !wiretap_protocol::ingest::valid_database_name(database) {
         return Err(format!("invalid database name '{database}'"));
     }
-    ensure_only_can(capture_id)?;
+    ensure_only_can(capture_id).await?;
     if create {
         // The import's own `?create=true` stays the fallback for a key that may not create.
         let _ = api.client.create_database(database).await;
@@ -417,7 +417,7 @@ async fn import_capture(
 
     while offset < total {
         let (frames, _indices, count) =
-            crate::capture_store::get_capture_frames_paginated(capture_id, offset, IMPORT_PAGE)?;
+            crate::capture_store::get_capture_frames_paginated(capture_id, offset, IMPORT_PAGE).await?;
         total = count;
         if frames.is_empty() {
             break;
@@ -702,22 +702,22 @@ mod tests {
         );
     }
 
-    #[test]
-    fn only_a_capture_of_can_frames_can_be_uploaded() {
+    #[tokio::test]
+    async fn only_a_capture_of_can_frames_can_be_uploaded() {
         use crate::capture_store::{append_frames_to_capture, create_standalone_capture, CaptureKind};
         let _db = crate::capture_db::use_own_database();
         let frame = |protocol: &str| crate::io::FrameMessage { protocol: protocol.into(), timestamp_us: 1, ..Default::default() };
         let capture_of = |protocols: &[&str]| {
             let id = create_standalone_capture(CaptureKind::Frames, "upload".into());
-            append_frames_to_capture(&id, protocols.iter().map(|p| frame(p)).collect());
+            crate::capture_db::wait(append_frames_to_capture(&id, protocols.iter().map(|p| frame(p)).collect()));
             id
         };
 
-        assert_eq!(ensure_only_can(&capture_of(&["can", "can"])), Ok(()));
-        let mixed = ensure_only_can(&capture_of(&["can", "modbus", "serial"])).unwrap_err();
+        assert_eq!(ensure_only_can(&capture_of(&["can", "can"])).await, Ok(()));
+        let mixed = ensure_only_can(&capture_of(&["can", "modbus", "serial"])).await.unwrap_err();
         assert!(mixed.contains("modbus") && mixed.contains("serial"), "{mixed}");
-        assert!(ensure_only_can(&capture_of(&["modbus_rtu"])).is_err());
-        assert!(ensure_only_can(&create_standalone_capture(CaptureKind::Bytes, "bytes".into())).is_err());
+        assert!(ensure_only_can(&capture_of(&["modbus_rtu"])).await.is_err());
+        assert!(ensure_only_can(&create_standalone_capture(CaptureKind::Bytes, "bytes".into())).await.is_err());
     }
 
     /// A gateway on 127.0.0.1 that answers every request with success and records its request line.
@@ -806,7 +806,7 @@ mod tests {
         let capture_of = |protocol: &str| {
             let id = create_standalone_capture(CaptureKind::Frames, "upload".into());
             let frame = crate::io::FrameMessage { protocol: protocol.into(), timestamp_us: 1, ..Default::default() };
-            append_frames_to_capture(&id, vec![frame]);
+            crate::capture_db::wait(append_frames_to_capture(&id, vec![frame]));
             id
         };
         let (base_url, requests) = recording_gateway(|_| IMPORTED).await;
@@ -825,7 +825,7 @@ mod tests {
         crate::capture_db::use_in_memory_database();
         let capture_id = create_standalone_capture(CaptureKind::Frames, "upload".into());
         let frame = crate::io::FrameMessage { protocol: "can".into(), timestamp_us: 1, ..Default::default() };
-        append_frames_to_capture(&capture_id, vec![frame]);
+        append_frames_to_capture(&capture_id, vec![frame]).await;
         let (base_url, requests) = recording_gateway(|_| IMPORTED).await;
         let profile = |kind: &str| IOProfile {
             id: "upload-target".into(),

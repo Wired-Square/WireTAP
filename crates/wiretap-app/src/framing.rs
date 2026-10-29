@@ -127,7 +127,7 @@ mod desktop {
     /// Clear and refill `reuse` if it is a derived capture of this session,
     /// otherwise derive a fresh one. The session's *own* capture is never
     /// reusable — clearing it would destroy what it is still recording.
-    fn refill_or_derive(
+    async fn refill_or_derive(
         session_id: &str,
         reuse: Option<&str>,
         name: String,
@@ -139,7 +139,7 @@ mod desktop {
         });
         match reusable {
             Some(existing_id) => {
-                capture_store::clear_and_refill_capture(existing_id, frames);
+                capture_store::clear_and_refill_capture(existing_id, frames).await;
                 existing_id.to_string()
             }
             None => {
@@ -148,7 +148,7 @@ mod desktop {
                     capture_store::CaptureKind::Frames,
                     name,
                 );
-                capture_store::append_frames_to_capture(&new_id, frames);
+                capture_store::append_frames_to_capture(&new_id, frames).await;
                 new_id
             }
         }
@@ -185,7 +185,7 @@ mod desktop {
             .ok_or_else(|| "No byte capture found for session".to_string())?;
 
         let id = capture_id.clone();
-        let bytes = crate::blocking::off_runtime(move || capture_store::get_capture_bytes(&id))
+        let bytes = capture_store::get_capture_bytes(&id)
             .await?
             .ok_or_else(|| format!("Capture '{}' not found or is not a byte capture", capture_id))?;
 
@@ -209,7 +209,8 @@ mod desktop {
             reuse_capture_id.as_deref(),
             format!("Framed from {}", capture_id),
             frame_messages,
-        );
+        )
+        .await;
 
         // The filtered capture gets the same treatment. It used to be created
         // fresh every call and never reused or deleted, so with a min-length
@@ -224,7 +225,8 @@ mod desktop {
                 reuse_filtered_capture_id.as_deref(),
                 format!("Filtered from {}", capture_id),
                 filtered_messages,
-            ))
+            )
+            .await)
         };
 
         // Note: We don't finalize here - the bytes capture stays active for HexDump,

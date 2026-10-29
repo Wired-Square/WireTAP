@@ -50,6 +50,66 @@ struct NamedCapture {
     /// Each identity seen during streaming and its rollup. Populated on append only —
     /// empty for DB-hydrated captures (their live "unique" display uses a different path).
     inventory: FrameInventory,
+    /// Bumped by every clear, so an insert that straddles one is not counted on top of it.
+    generation: u64,
+    /// Clears in flight: until they end, the old rows may still be read back.
+    clearing: u32,
+}
+
+impl NamedCapture {
+    fn new(metadata: CaptureMetadata, owner_role: Option<CaptureRole>, inventory: FrameInventory) -> Self {
+        NamedCapture {
+            seen_buses: metadata.buses.iter().copied().collect(),
+            metadata,
+            owner_role,
+            inventory,
+            generation: 0,
+            clearing: 0,
+        }
+    }
+
+    fn readable_as(&self, kind: CaptureKind) -> bool {
+        self.metadata.kind == kind && self.clearing == 0
+    }
+
+    fn record_stored(&mut self, first_us: u64, last_us: u64, count: usize, buses: impl IntoIterator<Item = u8>) {
+        if self.metadata.start_time_us.is_none() {
+            self.metadata.start_time_us = Some(first_us);
+        }
+        self.metadata.end_time_us = Some(last_us);
+        self.metadata.count += count;
+        let prev_len = self.seen_buses.len();
+        self.seen_buses.extend(buses);
+        if self.seen_buses.len() != prev_len {
+            let mut sorted: Vec<u8> = self.seen_buses.iter().copied().collect();
+            sorted.sort();
+            self.metadata.buses = sorted;
+        }
+    }
+
+    fn record_frames(&mut self, frames: &[FrameMessage]) {
+        let (Some(first), Some(last)) = (frames.first(), frames.last()) else { return };
+        self.record_stored(first.timestamp_us, last.timestamp_us, frames.len(), frames.iter().map(|f| f.bus));
+        for f in frames {
+            self.inventory.record(f);
+        }
+    }
+
+    fn record_bytes(&mut self, bytes: &[TimestampedByte]) {
+        let (Some(first), Some(last)) = (bytes.first(), bytes.last()) else { return };
+        self.record_stored(first.timestamp_us, last.timestamp_us, bytes.len(), bytes.iter().map(|b| b.bus));
+    }
+
+    fn begin_clear(&mut self) {
+        self.metadata.count = 0;
+        self.metadata.start_time_us = None;
+        self.metadata.end_time_us = None;
+        self.metadata.buses = Vec::new();
+        self.seen_buses.clear();
+        self.inventory.clear();
+        self.generation += 1;
+        self.clearing += 1;
+    }
 }
 
 /// Capture registry holding multiple named captures
@@ -207,12 +267,7 @@ fn create_capture_internal(
         buses: Vec::new(),
     };
 
-    let capture = NamedCapture {
-        metadata: metadata.clone(),
-        owner_role: owner.map(|(_, role)| role),
-        seen_buses: HashSet::new(),
-        inventory: FrameInventory::default(),
-    };
+    let capture = NamedCapture::new(metadata.clone(), owner.map(|(_, role)| role), FrameInventory::default());
     registry.captures.insert(id.clone(), capture);
 
     if set_streaming {
@@ -223,7 +278,7 @@ fn create_capture_internal(
     drop(registry);
 
     // Persist initial metadata to SQLite
-    if let Err(e) = capture_db::save_capture_metadata(&metadata) {
+    if let Err(e) = capture_db::wait(capture_db::save_capture_metadata(&metadata)) {
         tlog!("[CaptureStore] Failed to persist capture metadata: {}", e);
     }
 
@@ -297,11 +352,14 @@ pub fn delete_capture(id: &str) -> Result<(), String> {
     if registry.captures.remove(id).is_some() {
         // Drop the registry lock before touching SQLite
         drop(registry);
-        if let Err(e) = capture_db::delete_capture_data(id) {
-            tlog!("[CaptureStore] Failed to delete capture data from SQLite: {}", e);
-        }
-        if let Err(e) = capture_db::delete_capture_metadata(id) {
-            tlog!("[CaptureStore] Failed to delete capture metadata from SQLite: {}", e);
+        match capture_db::wait(capture_db::delete_capture_data(id)) {
+            // The metadata stays, so the next load lists what is left to delete again.
+            Err(e) => tlog!("[CaptureStore] Failed to delete capture data from SQLite: {}", e),
+            Ok(()) => {
+                if let Err(e) = capture_db::wait(capture_db::delete_capture_metadata(id)) {
+                    tlog!("[CaptureStore] Failed to delete capture metadata from SQLite: {}", e);
+                }
+            }
         }
         tlog!("[CaptureStore] Deleted capture '{}'", id);
         capture_list_changed();
@@ -316,25 +374,18 @@ pub fn delete_capture(id: &str) -> Result<(), String> {
 /// writing new frames into the same capture.
 /// Also resets the WS frame delivery offset so new frames are sent to subscribers.
 pub fn clear_capture(id: &str) -> Result<(), String> {
-    let owning_session: Option<String>;
-    {
+    let (owning_session, kind) = {
         let mut registry = registry_mut();
-        if let Some(cap) = registry.captures.get_mut(id) {
-            owning_session = cap.metadata.owning_session_id.clone();
-            cap.metadata.count = 0;
-            cap.metadata.start_time_us = None;
-            cap.metadata.end_time_us = None;
-            cap.metadata.buses = Vec::new();
-            cap.seen_buses.clear();
-            cap.inventory.clear();
-        } else {
-            return Err(format!("Capture '{}' not found", id));
-        }
-    }
+        let cap = registry.captures.get_mut(id).ok_or_else(|| format!("Capture '{}' not found", id))?;
+        cap.begin_clear();
+        (cap.metadata.owning_session_id.clone(), cap.metadata.kind)
+    };
 
-    if let Err(e) = capture_db::delete_capture_data(id) {
+    let cleared = capture_db::wait(capture_db::delete_capture_data(id));
+    if let Err(e) = &cleared {
         tlog!("[CaptureStore] Failed to clear capture data from SQLite: {}", e);
     }
+    capture_db::wait(end_clear(id, kind, cleared.is_ok()));
 
     // Reset the WS frame delivery offset so new frames arriving into
     // this capture are delivered to subscribers from the beginning.
@@ -345,6 +396,24 @@ pub fn clear_capture(id: &str) -> Result<(), String> {
     tlog!("[CaptureStore] Cleared capture '{}'", id);
     capture_list_changed();
     Ok(())
+}
+
+/// Lets a cleared capture be read again; one that failed part-way counts what is left.
+async fn end_clear(id: &str, kind: CaptureKind, cleared: bool) {
+    let left = if cleared { None } else { stored_count(id, kind).await.ok() };
+    if let Some(cap) = registry_mut().captures.get_mut(id) {
+        cap.clearing -= 1;
+        if let Some(left) = left {
+            cap.metadata.count = left;
+        }
+    }
+}
+
+async fn stored_count(id: &str, kind: CaptureKind) -> Result<usize, String> {
+    match kind {
+        CaptureKind::Frames => capture_db::get_frame_count(id).await,
+        CaptureKind::Bytes => capture_db::get_bytes_paginated(id, 0, 1).await.map(|(_, total)| total),
+    }
 }
 
 /// Rename a capture.
@@ -360,7 +429,7 @@ pub fn rename_capture(id: &str, new_name: &str) -> Result<CaptureMetadata, Strin
     // Drop registry lock before touching SQLite
     drop(registry);
 
-    if let Err(e) = capture_db::update_capture_name(id, new_name) {
+    if let Err(e) = capture_db::wait(capture_db::update_capture_name(id, new_name)) {
         tlog!("[CaptureStore] Failed to persist capture rename: {}", e);
     }
 
@@ -382,7 +451,7 @@ pub fn set_capture_persistent(id: &str, persistent: bool) -> Result<CaptureMetad
     // Drop registry lock before touching SQLite
     drop(registry);
 
-    if let Err(e) = capture_db::update_capture_persistent(id, persistent) {
+    if let Err(e) = capture_db::wait(capture_db::update_capture_persistent(id, persistent)) {
         tlog!("[CaptureStore] Failed to persist capture persistent flag: {}", e);
     }
 
@@ -395,7 +464,7 @@ pub fn set_capture_persistent(id: &str, persistent: bool) -> Result<CaptureMetad
 /// Called on startup when `clear_captures_on_start` is false.
 /// Verifies that data actually exists in SQLite for each metadata entry.
 pub fn hydrate_from_db() {
-    let metadata_rows = match capture_db::load_all_capture_metadata() {
+    let metadata_rows = match capture_db::wait(capture_db::load_all_capture_metadata()) {
         Ok(rows) => rows,
         Err(e) => {
             tlog!("[CaptureStore] Failed to load capture metadata from DB: {}", e);
@@ -412,23 +481,18 @@ pub fn hydrate_from_db() {
     let mut hydrated = 0u32;
 
     for meta in metadata_rows {
-        let stored_count = match meta.kind {
-            CaptureKind::Frames => capture_db::get_frame_count(&meta.id),
-            CaptureKind::Bytes => capture_db::get_bytes_paginated(&meta.id, 0, 1).map(|(_, total)| total),
-        };
-
-        match stored_count {
+        let count = match capture_db::wait(stored_count(&meta.id, meta.kind)) {
             Err(e) => {
                 tlog!("[CaptureStore] Skipping capture '{}' this run — its count failed: {}", meta.id, e);
                 continue;
             }
             Ok(0) => {
                 tlog!("[CaptureStore] Skipping metadata for '{}' — no data in SQLite", meta.id);
-                let _ = capture_db::delete_capture_metadata(&meta.id);
+                let _ = capture_db::wait(capture_db::delete_capture_metadata(&meta.id));
                 continue;
             }
-            Ok(_) => {}
-        }
+            Ok(count) => count,
+        };
 
         // Auto-orphan captures whose owning session no longer exists.
         // On app restart, sessions are gone from memory but the DB still
@@ -439,7 +503,7 @@ pub fn hydrate_from_db() {
         // Backfill buses from DB if not already populated
         let mut buses = meta.buses.clone();
         if buses.is_empty() {
-            if let Ok(db_buses) = capture_db::get_distinct_buses(&meta.id, meta.kind) {
+            if let Ok(db_buses) = capture_db::wait(capture_db::get_distinct_buses(&meta.id, meta.kind)) {
                 buses = db_buses;
             }
         }
@@ -453,25 +517,24 @@ pub fn hydrate_from_db() {
 
         tlog!(
             "[CaptureStore] Hydrating capture '{}' ({:?}, '{}', {} items, buses: {:?})",
-            meta.id, meta.kind, meta.name, meta.count, buses
+            meta.id, meta.kind, meta.name, count, buses
         );
 
-        let seen_buses: HashSet<u8> = buses.iter().copied().collect();
-        let capture = NamedCapture {
-            metadata: CaptureMetadata {
+        let capture = NamedCapture::new(
+            CaptureMetadata {
+                count,
                 is_streaming: false,
                 owning_session_id: None, // always orphan on startup
                 buses: buses.clone(),
                 ..meta
             },
-            owner_role: None, // no owner, so no role
-            seen_buses,
-            inventory: FrameInventory::default(),
-        };
+            None, // no owner, so no role
+            FrameInventory::default(),
+        );
 
         // Persist if we changed anything (backfilled buses or orphaned)
         if !buses.is_empty() || had_stale_owner {
-            let _ = capture_db::save_capture_metadata(&capture.metadata);
+            let _ = capture_db::wait(capture_db::save_capture_metadata(&capture.metadata));
         }
 
         registry.captures.insert(capture.metadata.id.clone(), capture);
@@ -511,7 +574,7 @@ pub fn set_capture_owner(
 
     match meta {
         Some(m) => {
-            if let Err(e) = capture_db::save_capture_metadata(&m) {
+            if let Err(e) = capture_db::wait(capture_db::save_capture_metadata(&m)) {
                 tlog!("[CaptureStore] Failed to persist capture owner: {}", e);
             }
             capture_list_changed();
@@ -558,7 +621,7 @@ pub fn orphan_captures_for_session(session_id: &str) -> Vec<OrphanedCaptureInfo>
 
     // Persist ownership changes outside the registry lock
     for meta in &metas_to_persist {
-        if let Err(e) = capture_db::save_capture_metadata(meta) {
+        if let Err(e) = capture_db::wait(capture_db::save_capture_metadata(meta)) {
             tlog!("[CaptureStore] Failed to persist orphan for '{}': {}", meta.id, e);
         }
     }
@@ -660,13 +723,13 @@ pub fn get_session_capture(session_id: &str) -> Option<(String, CaptureKind)> {
 /// Append frames to this session's frame capture.
 /// Resolves the capture by finding the capture owned by session_id with
 /// capture kind == Frames. No-op if session has no frame capture.
-pub fn append_frames_to_session(session_id: &str, new_frames: Vec<FrameMessage>) {
+pub async fn append_frames_to_session(session_id: &str, new_frames: Vec<FrameMessage>) {
     if new_frames.is_empty() { return; }
     // Tap test pattern frames for active io_test runners
     crate::io_test::tap_test_frames(session_id, &new_frames);
     let capture_id = get_session_frame_capture_id(session_id);
     if let Some(id) = capture_id {
-        append_frames_to_capture(&id, new_frames);
+        append_frames_to_capture(&id, new_frames).await;
     } else {
         tlog!("[CaptureStore] WARN: append_frames_to_session('{}') — no frame capture found for session (dropped {} frames)", session_id, new_frames.len());
     }
@@ -675,10 +738,44 @@ pub fn append_frames_to_session(session_id: &str, new_frames: Vec<FrameMessage>)
 /// Append raw bytes to this session's byte capture.
 /// Resolves the capture by finding the capture owned by session_id with
 /// capture kind == Bytes. No-op if session has no byte capture.
-pub fn append_raw_bytes_to_session(session_id: &str, new_bytes: Vec<TimestampedByte>) {
+pub async fn append_raw_bytes_to_session(session_id: &str, new_bytes: Vec<TimestampedByte>) {
     if new_bytes.is_empty() { return; }
     if let Some(id) = get_session_bytes_capture_id(session_id) {
-        append_raw_bytes_to_capture(&id, new_bytes);
+        append_raw_bytes_to_capture(&id, new_bytes).await;
+    }
+}
+
+/// Appends to a session's frame capture in the order frames are handed over, batching
+/// what queues meanwhile, for a sync caller that must not wait on the database.
+pub struct SessionAppender {
+    frames: tokio::sync::mpsc::UnboundedSender<Vec<FrameMessage>>,
+    task: tokio::task::JoinHandle<()>,
+}
+
+impl SessionAppender {
+    /// `stored` runs after each append.
+    pub fn spawn(session_id: String, mut stored: impl FnMut(&str) + Send + 'static) -> Self {
+        let (frames, mut queued) = tokio::sync::mpsc::unbounded_channel::<Vec<FrameMessage>>();
+        let task = tokio::spawn(async move {
+            while let Some(mut batch) = queued.recv().await {
+                while let Ok(more) = queued.try_recv() {
+                    batch.extend(more);
+                }
+                append_frames_to_session(&session_id, batch).await;
+                stored(&session_id);
+            }
+        });
+        Self { frames, task }
+    }
+
+    pub fn append(&self, frames: Vec<FrameMessage>) {
+        let _ = self.frames.send(frames);
+    }
+
+    /// Returns once everything handed over is stored.
+    pub async fn finish(self) {
+        drop(self.frames);
+        let _ = self.task.await;
     }
 }
 
@@ -709,7 +806,7 @@ pub fn finalize_session_captures(session_id: &str) -> Vec<CaptureMetadata> {
     drop(registry);
 
     for meta in &finalized {
-        if let Err(e) = capture_db::save_capture_metadata(meta) {
+        if let Err(e) = capture_db::wait(capture_db::save_capture_metadata(meta)) {
             tlog!("[CaptureStore] Failed to persist finalized capture metadata: {}", e);
         }
     }
@@ -753,59 +850,49 @@ pub fn list_orphaned_captures() -> Vec<CaptureMetadata> {
 /// The copy is orphaned (no owning session) and available for standalone use.
 /// Returns the new capture ID.
 pub fn copy_capture(source_capture_id: &str, new_name: String) -> Result<String, String> {
-    let (source_metadata, inventory) = {
+    let (source_metadata, inventory, id) = {
         let registry = registry();
         let source = registry
             .captures
             .get(source_capture_id)
             .ok_or_else(|| format!("Capture '{}' not found", source_capture_id))?;
-        (source.metadata.clone(), source.inventory.clone())
+        (source.metadata.clone(), source.inventory.clone(), generate_capture_id(&registry))
     };
 
-    // Create new capture entry in registry
-    let (id, metadata) = {
-        let mut registry = registry_mut();
-
-        let id = generate_capture_id(&registry);
-
-        let created_at = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_secs())
-            .unwrap_or(0);
-
-        let metadata = CaptureMetadata {
-            id: id.clone(),
-            kind: source_metadata.kind,
-            name: new_name.clone(),
-            count: source_metadata.count,
-            start_time_us: source_metadata.start_time_us,
-            end_time_us: source_metadata.end_time_us,
-            created_at,
-            is_streaming: false,
-            owning_session_id: None,
-            persistent: false,
-            buses: source_metadata.buses.clone(),
-        };
-
-        let seen_buses: HashSet<u8> = source_metadata.buses.iter().copied().collect();
-        // A snapshot belongs to nobody — it is handed to a detaching app to review.
-        let entry = NamedCapture {
-            metadata: metadata.clone(),
-            owner_role: None,
-            seen_buses,
-            inventory,
-        };
-        registry.captures.insert(id.clone(), entry);
-        (id, metadata)
+    // Listed only once the copy is whole; a crash part-way leaves rows with no
+    // metadata, which the next sweep removes.
+    let count = match capture_db::wait(capture_db::copy_capture_data(source_capture_id, &id)) {
+        Ok(count) => count,
+        Err(e) => {
+            if let Err(e) = capture_db::wait(capture_db::delete_capture_data(&id)) {
+                tlog!("[CaptureStore] Failed to remove a failed copy's rows: {}", e);
+            }
+            return Err(e);
+        }
     };
 
-    // Copy data in SQLite (INSERT INTO ... SELECT — no memory spike)
-    let count = capture_db::copy_capture_data(source_capture_id, &id)?;
-
-    // Persist metadata for the new capture
-    if let Err(e) = capture_db::save_capture_metadata(&metadata) {
+    let created_at = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let metadata = CaptureMetadata {
+        id: id.clone(),
+        kind: source_metadata.kind,
+        name: new_name.clone(),
+        count,
+        start_time_us: source_metadata.start_time_us,
+        end_time_us: source_metadata.end_time_us,
+        created_at,
+        is_streaming: false,
+        owning_session_id: None,
+        persistent: false,
+        buses: source_metadata.buses,
+    };
+    if let Err(e) = capture_db::wait(capture_db::save_capture_metadata(&metadata)) {
         tlog!("[CaptureStore] Failed to persist copied capture metadata: {}", e);
     }
+    // A snapshot belongs to nobody — it is handed to a detaching app to review.
+    registry_mut().captures.insert(id.clone(), NamedCapture::new(metadata, None, inventory));
 
     tlog!(
         "[CaptureStore] Copied capture '{}' -> '{}' ('{}', {} items)",
@@ -824,48 +911,13 @@ pub fn copy_capture(source_capture_id: &str, new_name: String) -> Result<String,
 /// Silently returns if capture doesn't exist or is not a frame capture.
 /// Only used by framing.rs which is desktop-only.
 #[cfg(not(target_os = "ios"))]
-pub fn append_frames_to_capture(capture_id: &str, new_frames: Vec<FrameMessage>) {
+pub async fn append_frames_to_capture(capture_id: &str, new_frames: Vec<FrameMessage>) {
     if new_frames.is_empty() {
         return;
     }
-
-    let unowned;
-    {
-        let mut registry = registry_mut();
-
-        if let Some(cap) = registry.captures.get_mut(capture_id) {
-            if cap.metadata.kind != CaptureKind::Frames {
-                return;
-            }
-            unowned = cap.metadata.owning_session_id.is_none();
-            if cap.metadata.start_time_us.is_none() {
-                cap.metadata.start_time_us = new_frames.first().map(|f| f.timestamp_us);
-            }
-            cap.metadata.end_time_us = new_frames.last().map(|f| f.timestamp_us);
-            cap.metadata.count += new_frames.len();
-
-            let prev_len = cap.seen_buses.len();
-            for f in &new_frames {
-                cap.seen_buses.insert(f.bus);
-                cap.inventory.record(f);
-            }
-            if cap.seen_buses.len() != prev_len {
-                let mut sorted: Vec<u8> = cap.seen_buses.iter().copied().collect();
-                sorted.sort();
-                cap.metadata.buses = sorted;
-            }
-        } else {
-            return;
-        }
-        // Registry lock dropped here
-    }
-
-    if let Err(e) = capture_db::insert_frames(capture_id, &new_frames) {
-        tlog!("[CaptureStore] Failed to insert frames to capture '{}': {}", capture_id, e);
-    }
-    if unowned {
-        capture_list_changed();
-    }
+    let Some(target) = append_target(capture_id, CaptureKind::Frames) else { return };
+    let stored = capture_db::insert_frames(capture_id, &new_frames).await;
+    target.record(stored, new_frames.len(), "frames", |cap| cap.record_frames(&new_frames));
 }
 
 /// Clear a frame capture and refill it with new frames.
@@ -873,67 +925,84 @@ pub fn append_frames_to_capture(capture_id: &str, new_frames: Vec<FrameMessage>)
 /// Silently returns if capture doesn't exist or is not a frame capture.
 /// Only used by framing.rs which is desktop-only.
 #[cfg(not(target_os = "ios"))]
-pub fn clear_and_refill_capture(capture_id: &str, new_frames: Vec<FrameMessage>) {
-    {
-        let mut registry = registry_mut();
-
-        if let Some(cap) = registry.captures.get_mut(capture_id) {
-            if cap.metadata.kind != CaptureKind::Frames {
-                return;
+pub async fn clear_and_refill_capture(capture_id: &str, new_frames: Vec<FrameMessage>) {
+    match registry_mut().captures.get_mut(capture_id) {
+        Some(cap) if cap.metadata.kind == CaptureKind::Frames => cap.begin_clear(),
+        _ => return,
+    }
+    let refilled = capture_db::clear_and_refill(capture_id, &new_frames).await;
+    match &refilled {
+        Ok(()) => {
+            if let Some(cap) = registry_mut().captures.get_mut(capture_id) {
+                cap.record_frames(&new_frames);
             }
-            cap.metadata.start_time_us = new_frames.first().map(|f| f.timestamp_us);
-            cap.metadata.end_time_us = new_frames.last().map(|f| f.timestamp_us);
-            cap.metadata.count = new_frames.len();
+            tlog!(
+                "[CaptureStore] Refilled capture '{}' with {} frames",
+                capture_id, new_frames.len()
+            );
+        }
+        Err(e) => tlog!("[CaptureStore] Failed to clear and refill capture '{}': {}", capture_id, e),
+    }
+    end_clear(capture_id, CaptureKind::Frames, refilled.is_ok()).await;
+}
 
-            cap.seen_buses.clear();
-            cap.inventory.clear();
-            for f in &new_frames {
-                cap.seen_buses.insert(f.bus);
-                cap.inventory.record(f);
+/// The capture an append is for, as it was before the insert.
+struct AppendTarget<'a> {
+    id: &'a str,
+    generation: u64,
+    owner: Option<String>,
+}
+
+fn append_target(id: &str, kind: CaptureKind) -> Option<AppendTarget<'_>> {
+    let registry = registry();
+    let cap = registry.captures.get(id).filter(|cap| cap.metadata.kind == kind)?;
+    Some(AppendTarget { id, generation: cap.generation, owner: cap.metadata.owning_session_id.clone() })
+}
+
+impl AppendTarget<'_> {
+    /// Counts what the insert stored, unless a clear began meanwhile; a failure is the
+    /// owning session's error.
+    fn record(self, stored: Result<(), String>, len: usize, what: &str, count: impl FnOnce(&mut NamedCapture)) {
+        if let Err(e) = stored {
+            tlog!("[CaptureStore] Failed to insert {} {} to capture '{}': {}", len, what, self.id, e);
+            if let Some(session_id) = &self.owner {
+                crate::io::emit_session_error(session_id, format!("{e} ({len} {what} not saved)"));
             }
-            let mut sorted: Vec<u8> = cap.seen_buses.iter().copied().collect();
-            sorted.sort();
-            cap.metadata.buses = sorted;
-        } else {
             return;
         }
-    }
-
-    if let Err(e) = capture_db::clear_and_refill(capture_id, &new_frames) {
-        tlog!("[CaptureStore] Failed to clear and refill capture '{}': {}", capture_id, e);
-    } else {
-        tlog!(
-            "[CaptureStore] Refilled capture '{}' with {} frames",
-            capture_id, new_frames.len()
-        );
+        if let Some(cap) = registry_mut().captures.get_mut(self.id).filter(|cap| cap.generation == self.generation) {
+            count(cap);
+        }
+        if self.owner.is_none() {
+            capture_list_changed();
+        }
     }
 }
 
 /// Get frames from a specific capture.
 /// Returns None if capture doesn't exist or is not a frame capture.
-pub fn get_capture_frames(id: &str) -> Result<Option<Vec<FrameMessage>>, String> {
+pub async fn get_capture_frames(id: &str) -> Result<Option<Vec<FrameMessage>>, String> {
     if !is_frame_capture(id) {
         return Ok(None);
     }
-    capture_db::get_all_frames(id).map(Some)
+    capture_db::get_all_frames(id).await.map(Some)
 }
 
 /// The newest frame per identity in a frame capture. See `capture_db::get_latest_frames`.
-pub fn get_capture_latest_frames(id: &str) -> Result<Option<Vec<FrameMessage>>, String> {
+pub async fn get_capture_latest_frames(id: &str) -> Result<Option<Vec<FrameMessage>>, String> {
     if !is_frame_capture(id) {
         return Ok(None);
     }
-    capture_db::get_latest_frames(id).map(Some)
+    capture_db::get_latest_frames(id).await.map(Some)
 }
 
 fn is_frame_capture(id: &str) -> bool {
-    let registry = registry();
-    matches!(registry.captures.get(id), Some(b) if b.metadata.kind == CaptureKind::Frames)
+    registry().captures.get(id).is_some_and(|b| b.readable_as(CaptureKind::Frames))
 }
 
 /// Get a page of frames from a specific capture.
 /// Returns (frames, buffer_indices, total_count).
-pub fn get_capture_frames_paginated(
+pub async fn get_capture_frames_paginated(
     id: &str,
     offset: usize,
     limit: usize,
@@ -941,7 +1010,7 @@ pub fn get_capture_frames_paginated(
     let total = {
         let registry = registry();
         match registry.captures.get(id) {
-            Some(b) if b.metadata.kind == CaptureKind::Frames => b.metadata.count,
+            Some(b) if b.readable_as(CaptureKind::Frames) => b.metadata.count,
             _ => return Ok((Vec::new(), Vec::new(), 0)),
         }
     };
@@ -950,13 +1019,13 @@ pub fn get_capture_frames_paginated(
         return Ok((Vec::new(), Vec::new(), total));
     }
 
-    let (frames, rowids) = capture_db::get_frames_paginated(id, offset, limit)?;
+    let (frames, rowids) = capture_db::get_frames_paginated(id, offset, limit).await?;
     Ok((frames, rowids.into_iter().map(|r| r as usize).collect(), total))
 }
 
 /// Get a page of frames filtered by selected IDs.
 /// Returns (frames, buffer_indices, total_filtered_count).
-pub fn get_capture_frames_paginated_filtered(
+pub async fn get_capture_frames_paginated_filtered(
     id: &str,
     offset: usize,
     limit: usize,
@@ -967,10 +1036,10 @@ pub fn get_capture_frames_paginated_filtered(
     }
 
     if selection.is_empty() {
-        return get_capture_frames_paginated(id, offset, limit);
+        return get_capture_frames_paginated(id, offset, limit).await;
     }
 
-    let (frames, rowids, total) = capture_db::get_frames_paginated_filtered(id, offset, limit, selection)?;
+    let (frames, rowids, total) = capture_db::get_frames_paginated_filtered(id, offset, limit, selection).await?;
     Ok((frames, rowids.into_iter().map(|r| r as usize).collect(), total))
 }
 
@@ -998,14 +1067,14 @@ impl TailResponse {
 
 /// Get the most recent N frames from a capture, optionally filtered by frame IDs.
 /// Returns the frames in chronological order (oldest first) for display.
-pub fn get_capture_frames_tail(id: &str, limit: usize, selection: &FrameSelection) -> Result<TailResponse, String> {
+pub async fn get_capture_frames_tail(id: &str, limit: usize, selection: &FrameSelection) -> Result<TailResponse, String> {
     // The registry tracks the count, the end time and the distinct frame ids for every
     // capture. The live view refetches this on each frame-count signal, so answering from
     // RAM keeps a COUNT(*) and a MAX() scan of the whole capture off that path.
     let (total, end_time_us, covers_everything) = {
         let registry = registry();
         match registry.captures.get(id) {
-            Some(b) if b.metadata.kind == CaptureKind::Frames => {
+            Some(b) if b.readable_as(CaptureKind::Frames) => {
                 // Discovery auto-selects every id it discovers, so the common case is a
                 // selection that excludes nothing. Recognising that takes the cheap path
                 // instead of filtering by every id in the capture.
@@ -1017,9 +1086,9 @@ pub fn get_capture_frames_tail(id: &str, limit: usize, selection: &FrameSelectio
     };
 
     let (frames, rowids, total_filtered_count) = if selection.is_empty() || covers_everything {
-        capture_db::get_frames_tail_rows(id, limit).map(|(frames, rowids)| (frames, rowids, total))?
+        capture_db::get_frames_tail_rows(id, limit).await.map(|(frames, rowids)| (frames, rowids, total))?
     } else {
-        capture_db::get_frames_tail_filtered(id, limit, selection)?
+        capture_db::get_frames_tail_filtered(id, limit, selection).await?
     };
     Ok(TailResponse {
         frames,
@@ -1030,15 +1099,15 @@ pub fn get_capture_frames_tail(id: &str, limit: usize, selection: &FrameSelectio
 }
 
 /// Get unique frame IDs and their metadata from a capture.
-pub fn get_capture_frame_info(id: &str) -> Result<Vec<CaptureFrameInfo>, String> {
+pub async fn get_capture_frame_info(id: &str) -> Result<Vec<CaptureFrameInfo>, String> {
     if !is_frame_capture(id) {
         return Ok(Vec::new());
     }
-    capture_db::get_frame_info(id)
+    capture_db::get_frame_info(id).await
 }
 
 /// Find the offset for a given timestamp in a capture.
-pub fn find_capture_offset_for_timestamp(
+pub async fn find_capture_offset_for_timestamp(
     id: &str,
     target_time_us: u64,
     selection: &FrameSelection,
@@ -1046,7 +1115,7 @@ pub fn find_capture_offset_for_timestamp(
     if !is_frame_capture(id) {
         return Ok(0);
     }
-    capture_db::find_offset_for_timestamp(id, target_time_us, selection)
+    capture_db::find_offset_for_timestamp(id, target_time_us, selection).await
 }
 
 // ============================================================================
@@ -1055,89 +1124,54 @@ pub fn find_capture_offset_for_timestamp(
 
 /// Append raw bytes to a specific capture by ID.
 /// Silently returns if capture doesn't exist or is not a byte capture.
-pub fn append_raw_bytes_to_capture(capture_id: &str, new_bytes: Vec<TimestampedByte>) {
+pub async fn append_raw_bytes_to_capture(capture_id: &str, new_bytes: Vec<TimestampedByte>) {
     if new_bytes.is_empty() {
         return;
     }
-
-    let unowned;
-    {
-        let mut registry = registry_mut();
-
-        if let Some(cap) = registry.captures.get_mut(capture_id) {
-            if cap.metadata.kind != CaptureKind::Bytes {
-                return;
-            }
-            unowned = cap.metadata.owning_session_id.is_none();
-            if cap.metadata.start_time_us.is_none() {
-                cap.metadata.start_time_us = new_bytes.first().map(|b| b.timestamp_us);
-            }
-            cap.metadata.end_time_us = new_bytes.last().map(|b| b.timestamp_us);
-            cap.metadata.count += new_bytes.len();
-
-            // Track distinct buses
-            let prev_len = cap.seen_buses.len();
-            for b in &new_bytes {
-                cap.seen_buses.insert(b.bus);
-            }
-            if cap.seen_buses.len() != prev_len {
-                let mut sorted: Vec<u8> = cap.seen_buses.iter().copied().collect();
-                sorted.sort();
-                cap.metadata.buses = sorted;
-            }
-        } else {
-            return;
-        }
-    }
-
-    if let Err(e) = capture_db::insert_bytes(capture_id, &new_bytes) {
-        tlog!("[CaptureStore] Failed to insert bytes to capture '{}': {}", capture_id, e);
-    }
-    if unowned {
-        capture_list_changed();
-    }
+    let Some(target) = append_target(capture_id, CaptureKind::Bytes) else { return };
+    let stored = capture_db::insert_bytes(capture_id, &new_bytes).await;
+    target.record(stored, new_bytes.len(), "bytes", |cap| cap.record_bytes(&new_bytes));
 }
 
 /// Get raw bytes from a specific capture.
 /// Returns None if capture doesn't exist or is not a byte capture.
-pub fn get_capture_bytes(id: &str) -> Result<Option<Vec<TimestampedByte>>, String> {
+pub async fn get_capture_bytes(id: &str) -> Result<Option<Vec<TimestampedByte>>, String> {
     if !is_byte_capture(id) {
         return Ok(None);
     }
-    capture_db::get_all_bytes(id).map(Some)
+    capture_db::get_all_bytes(id).await.map(Some)
 }
 
 /// Whether `id` names a capture that holds bytes. Byte queries return empty rather
 /// than erroring for a frames capture, so every one of them checks first.
 fn is_byte_capture(id: &str) -> bool {
-    let registry = registry();
-    matches!(registry.captures.get(id), Some(b) if b.metadata.kind == CaptureKind::Bytes)
+    registry().captures.get(id).is_some_and(|b| b.readable_as(CaptureKind::Bytes))
 }
 
 /// Get a page of bytes from a specific capture.
 /// Returns (bytes, total_count).
-pub fn get_capture_bytes_paginated(id: &str, offset: usize, limit: usize) -> Result<(Vec<TimestampedByte>, usize), String> {
+pub async fn get_capture_bytes_paginated(id: &str, offset: usize, limit: usize) -> Result<(Vec<TimestampedByte>, usize), String> {
     if !is_byte_capture(id) {
         return Ok((Vec::new(), 0));
     }
-    capture_db::get_bytes_paginated(id, offset, limit)
+    capture_db::get_bytes_paginated(id, offset, limit).await
 }
 
 /// Get the last `limit` bytes from a specific capture, oldest first.
 /// The caller takes the total from `get_capture_count`, which is O(1).
-pub fn get_capture_bytes_tail(id: &str, limit: usize) -> Result<Vec<TimestampedByte>, String> {
+pub async fn get_capture_bytes_tail(id: &str, limit: usize) -> Result<Vec<TimestampedByte>, String> {
     if !is_byte_capture(id) {
         return Ok(Vec::new());
     }
-    capture_db::get_bytes_tail_rows(id, limit)
+    capture_db::get_bytes_tail_rows(id, limit).await
 }
 
 /// Find the byte offset for a given timestamp in a specific byte capture.
-pub fn find_capture_bytes_offset_for_timestamp_by_id(capture_id: &str, target_time_us: u64) -> Result<usize, String> {
+pub async fn find_capture_bytes_offset_for_timestamp_by_id(capture_id: &str, target_time_us: u64) -> Result<usize, String> {
     if !is_byte_capture(capture_id) {
         return Ok(0);
     }
-    capture_db::find_bytes_offset_for_timestamp(capture_id, target_time_us)
+    capture_db::find_bytes_offset_for_timestamp(capture_id, target_time_us).await
 }
 
 // ============================================================================
@@ -1187,6 +1221,7 @@ pub fn get_capture_kind(id: &str) -> Option<CaptureKind> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::capture_db::wait;
     use wiretap_analysis::source::ProtocolFrames;
 
     fn groups(entries: &[(&str, &[u32])]) -> Vec<ProtocolFrames> {
@@ -1224,19 +1259,20 @@ mod tests {
             direction: None,
             ..Default::default()
         };
-        append_frames_to_capture(&source, vec![frame(0x100), frame(0x101), frame(0x100)]);
+        wait(append_frames_to_capture(&source, vec![frame(0x100), frame(0x101), frame(0x100)]));
 
         let copy = copy_capture(&source, "copy".to_string()).unwrap();
         assert_eq!(get_capture_unique_count(&copy), 2);
     }
 
-    #[test]
-    fn every_change_to_the_list_is_pushed_but_a_session_append() {
-        let _db = crate::capture_db::use_own_database();
+    #[tokio::test(flavor = "multi_thread")]
+    async fn every_change_to_the_list_is_pushed_but_a_session_append() {
+        let _db = crate::capture_db::use_own_store(crate::capture_db::scratch_store().await);
+        let pushed = || CAPTURE_LIST_CHANGES.with(std::cell::Cell::get);
         let pushes = |change: &mut dyn FnMut()| {
-            let before = CAPTURE_LIST_CHANGES.with(std::cell::Cell::get);
+            let before = pushed();
             change();
-            CAPTURE_LIST_CHANGES.with(std::cell::Cell::get) - before
+            pushed() - before
         };
         let frame = FrameMessage {
             protocol: "can".into(),
@@ -1258,14 +1294,18 @@ mod tests {
         assert_eq!(pushes(&mut || id = create_standalone_capture(CaptureKind::Frames, "pushed".into())), 1);
         assert_eq!(pushes(&mut || { rename_capture(&id, "renamed").unwrap(); }), 1);
         assert_eq!(pushes(&mut || { set_capture_persistent(&id, true).unwrap(); }), 1);
-        assert_eq!(pushes(&mut || append_frames_to_capture(&id, vec![frame.clone()])), 1);
+        let before = pushed();
+        append_frames_to_capture(&id, vec![frame.clone()]).await;
+        assert_eq!(pushed() - before, 1);
         let mut copy = String::new();
         assert_eq!(pushes(&mut || copy = copy_capture(&id, "copy".into()).unwrap()), 1);
         assert_eq!(pushes(&mut || clear_capture(&id).unwrap()), 1);
 
         let mut streamed = String::new();
         assert_eq!(pushes(&mut || streamed = create_session_capture(session, CaptureKind::Frames, "s".into())), 1);
-        assert_eq!(pushes(&mut || append_frames_to_session(session, vec![frame.clone()])), 0);
+        let before = pushed();
+        append_frames_to_session(session, vec![frame.clone()]).await;
+        assert_eq!(pushed() - before, 0);
         assert_eq!(pushes(&mut || { finalize_session_captures(session); }), 1);
         assert_eq!(pushes(&mut || { orphan_captures_for_session(session); }), 1);
         assert_eq!(pushes(&mut || set_capture_owner(&streamed, session, CaptureRole::Stream).unwrap()), 1);
@@ -1352,42 +1392,46 @@ mod tests {
         assert_eq!(delete_capture(&id), Ok(()));
     }
 
-    fn failing_database() -> crate::connection_slot::ThreadConnection {
-        crate::capture_db::use_own_connection(rusqlite::Connection::open_in_memory().unwrap())
+    fn failing_database() -> crate::capture_db::OwnStore {
+        let bare = wait(wslib_db_sqlite::Database::open_in_memory(&[])).unwrap();
+        crate::capture_db::use_own_store(wiretap_capture::Store::from_database(bare))
     }
 
-    /// A failed query is an error, not an empty page, while the registry keeps counting
-    /// what the database never stored.
+    /// A failed insert counts nothing, and a failed query is an error, not an empty page.
     #[test]
     fn a_failed_frame_query_is_an_error() {
         let _db = failing_database();
         let id = create_standalone_capture(CaptureKind::Frames, "failing frames".into());
         let frame = FrameMessage { protocol: "can".into(), frame_id: 0x100, timestamp_us: 1, ..Default::default() };
-        append_frames_to_capture(&id, vec![frame.clone(), frame.clone(), frame]);
+        let frames = vec![frame.clone(), frame.clone(), frame];
+        wait(append_frames_to_capture(&id, frames.clone()));
         let everything = FrameSelection::from_groups(Vec::new());
         let one = FrameSelection::from_groups(groups(&[("can", &[0x100])]));
 
-        assert_eq!(get_capture_count(&id), 3);
-        assert!(get_capture_frames_paginated(&id, 0, 10).is_err());
-        assert!(get_capture_frames_paginated_filtered(&id, 0, 10, &one).is_err());
-        assert!(get_capture_frames_tail(&id, 10, &everything).is_err());
-        assert!(get_capture_frame_info(&id).is_err());
-        assert!(find_capture_offset_for_timestamp(&id, 1, &one).is_err());
-        assert!(get_capture_frames(&id).is_err());
-        assert!(get_capture_latest_frames(&id).is_err());
+        assert_eq!(get_capture_count(&id), 0);
+        registry_mut().captures.get_mut(&id).unwrap().record_frames(&frames);
+        assert!(wait(get_capture_frames_paginated(&id, 0, 10)).is_err());
+        assert!(wait(get_capture_frames_paginated_filtered(&id, 0, 10, &one)).is_err());
+        assert!(wait(get_capture_frames_tail(&id, 10, &everything)).is_err());
+        assert!(wait(get_capture_frame_info(&id)).is_err());
+        assert!(wait(find_capture_offset_for_timestamp(&id, 1, &one)).is_err());
+        assert!(wait(get_capture_frames(&id)).is_err());
+        assert!(wait(get_capture_latest_frames(&id)).is_err());
     }
 
     #[test]
     fn a_failed_byte_query_is_an_error() {
         let _db = failing_database();
         let id = create_standalone_capture(CaptureKind::Bytes, "failing bytes".into());
-        append_raw_bytes_to_capture(&id, vec![TimestampedByte { byte: 0xAA, timestamp_us: 1, bus: 0 }]);
+        let bytes = vec![TimestampedByte { byte: 0xAA, timestamp_us: 1, bus: 0 }];
+        wait(append_raw_bytes_to_capture(&id, bytes.clone()));
 
-        assert_eq!(get_capture_count(&id), 1);
-        assert!(get_capture_bytes_paginated(&id, 0, 10).is_err());
-        assert!(get_capture_bytes_tail(&id, 10).is_err());
-        assert!(find_capture_bytes_offset_for_timestamp_by_id(&id, 1).is_err());
-        assert!(get_capture_bytes(&id).is_err());
+        assert_eq!(get_capture_count(&id), 0);
+        registry_mut().captures.get_mut(&id).unwrap().record_bytes(&bytes);
+        assert!(wait(get_capture_bytes_paginated(&id, 0, 10)).is_err());
+        assert!(wait(get_capture_bytes_tail(&id, 10)).is_err());
+        assert!(wait(find_capture_bytes_offset_for_timestamp_by_id(&id, 1)).is_err());
+        assert!(wait(get_capture_bytes(&id)).is_err());
     }
 
     /// A capture that is not there, or holds the other kind, is still an empty answer.
@@ -1395,27 +1439,27 @@ mod tests {
     fn a_query_of_no_such_capture_answers_empty() {
         let _db = failing_database();
         let one = FrameSelection::from_groups(groups(&[("can", &[0x100])]));
-        assert!(matches!(get_capture_frames_paginated("absent", 0, 10), Ok((f, _, 0)) if f.is_empty()));
-        assert!(matches!(get_capture_frames_paginated_filtered("absent", 0, 10, &one), Ok((f, _, 0)) if f.is_empty()));
-        assert_eq!(get_capture_frame_info("absent"), Ok(Vec::new()));
-        assert_eq!(find_capture_offset_for_timestamp("absent", 1, &one), Ok(0));
-        assert!(matches!(get_capture_frames("absent"), Ok(None)));
-        assert!(matches!(get_capture_bytes("absent"), Ok(None)));
-        assert!(matches!(get_capture_bytes_tail("absent", 10), Ok(b) if b.is_empty()));
+        assert!(matches!(wait(get_capture_frames_paginated("absent", 0, 10)), Ok((f, _, 0)) if f.is_empty()));
+        assert!(matches!(wait(get_capture_frames_paginated_filtered("absent", 0, 10, &one)), Ok((f, _, 0)) if f.is_empty()));
+        assert_eq!(wait(get_capture_frame_info("absent")), Ok(Vec::new()));
+        assert_eq!(wait(find_capture_offset_for_timestamp("absent", 1, &one)), Ok(0));
+        assert!(matches!(wait(get_capture_frames("absent")), Ok(None)));
+        assert!(matches!(wait(get_capture_bytes("absent")), Ok(None)));
+        assert!(matches!(wait(get_capture_bytes_tail("absent", 10)), Ok(b) if b.is_empty()));
     }
 
     fn hydrate_one_metadata_row(id: &str, then: &str, metadata_kept: bool) {
-        let conn = crate::capture_db::in_memory();
-        conn.execute_batch(&format!(
+        let _db = crate::capture_db::use_own_database();
+        let sql = format!(
             "INSERT INTO capture_metadata (capture_id, capture_kind, name, count, created_at)
              VALUES ('{id}', 'frames', 'kept', 3, 0);
              {then}"
-        ))
-        .unwrap();
-        let _db = crate::capture_db::use_own_connection(conn);
+        );
+        let store = crate::capture_db::current();
+        wait(sqlx::raw_sql(&sql).execute(store.database().pool())).unwrap();
         hydrate_from_db();
         assert!(get_capture_metadata(id).is_none());
-        let remaining = crate::capture_db::load_all_capture_metadata().unwrap();
+        let remaining = wait(crate::capture_db::load_all_capture_metadata()).unwrap();
         assert_eq!(remaining.iter().any(|m| m.id == id), metadata_kept);
     }
 
@@ -1439,5 +1483,171 @@ mod tests {
 
         assert_eq!(get_session_capture(session), Some((frames, CaptureKind::Frames)));
         assert_eq!(get_session_bytes_capture_id(session), Some(bytes));
+    }
+
+    fn frames(timestamps: std::ops::Range<u64>) -> Vec<FrameMessage> {
+        timestamps
+            .map(|timestamp_us| FrameMessage { protocol: "can".into(), frame_id: 0x100, timestamp_us, ..Default::default() })
+            .collect()
+    }
+
+    async fn execute(store: &wiretap_capture::Store, sql: &str) {
+        sqlx::raw_sql(sql).execute(store.database().pool()).await.unwrap();
+    }
+
+    /// Another writer holding the lock, with the store's writer giving up on it in 20 ms
+    /// rather than SQLite's 5 s.
+    async fn hold_write_lock(store: &wiretap_capture::Store) -> sqlx::SqliteConnection {
+        use sqlx::{ConnectOptions, Executor};
+        store.database().writer().execute("PRAGMA busy_timeout = 20").await.unwrap();
+        let path: String = sqlx::query_scalar("SELECT file FROM pragma_database_list WHERE name = 'main'")
+            .fetch_one(store.database().pool())
+            .await
+            .unwrap();
+        let mut lock = sqlx::sqlite::SqliteConnectOptions::new().filename(path).connect().await.unwrap();
+        lock.execute("BEGIN IMMEDIATE").await.unwrap();
+        lock
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn an_append_refused_by_a_passing_lock_is_retried_and_counted() {
+        let store = crate::capture_db::scratch_store().await;
+        let _db = crate::capture_db::use_own_store(store.clone());
+        let id = create_standalone_capture(CaptureKind::Frames, "retried".into());
+        let mut lock = hold_write_lock(&store).await;
+        let released = tokio::spawn(async move {
+            tokio::time::sleep(std::time::Duration::from_millis(150)).await;
+            sqlx::Executor::execute(&mut lock, "COMMIT").await.unwrap();
+        });
+
+        append_frames_to_capture(&id, frames(0..3)).await;
+        released.await.unwrap();
+
+        assert_eq!(get_capture_count(&id), 3);
+        assert_eq!(capture_db::get_frame_count(&id).await, Ok(3));
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn an_append_refused_past_its_retries_counts_nothing_and_tells_the_session() {
+        let store = crate::capture_db::scratch_store().await;
+        let _db = crate::capture_db::use_own_store(store.clone());
+        let session = "f_append_refused";
+        let id = create_session_capture(session, CaptureKind::Frames, "refused".into());
+        let lock = hold_write_lock(&store).await;
+
+        append_frames_to_capture(&id, frames(0..3)).await;
+        drop(lock);
+
+        assert_eq!(get_capture_count(&id), 0);
+        assert_eq!(capture_db::get_frame_count(&id).await, Ok(0));
+        let error = crate::io::post_session::get_error(session).expect("the session is told");
+        assert!(error.contains("3 frames not saved"), "{error}");
+    }
+
+    /// Five windows of rows, so a whole-capture operation commits part-way at least four times.
+    const WINDOWED: u64 = 25_000;
+
+    async fn windowed_capture(name: &str) -> (wiretap_capture::Store, crate::capture_db::OwnStore, String) {
+        let store = crate::capture_db::scratch_store().await;
+        let db = crate::capture_db::use_own_store(store.clone());
+        let id = create_standalone_capture(CaptureKind::Frames, name.into());
+        append_frames_to_capture(&id, frames(0..WINDOWED)).await;
+        (store, db, id)
+    }
+
+    /// Reads the capture's tail from when `op`, on another thread, has zeroed its count
+    /// until it returns; every frame read back must be one `op` left, at or after `kept_from_us`.
+    async fn tail_while(store: &wiretap_capture::Store, id: &str, kept_from_us: u64, op: impl FnOnce() + Send + 'static) {
+        let lent = store.clone();
+        let running = std::thread::spawn(move || {
+            let _db = crate::capture_db::use_own_store(lent);
+            op();
+        });
+        while get_capture_count(id) != 0 && !running.is_finished() {
+            std::thread::yield_now();
+        }
+        let everything = FrameSelection::from_groups(Vec::new());
+        while !running.is_finished() {
+            let tail = get_capture_frames_tail(id, 50, &everything).await.unwrap();
+            assert!(tail.frames.iter().all(|f| f.timestamp_us >= kept_from_us), "an old row was read back");
+            assert!(tail.total_filtered_count <= capture_db::get_frame_count(id).await.unwrap());
+        }
+        running.join().unwrap();
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn a_capture_being_cleared_never_reads_back_its_old_rows() {
+        let (store, _db, id) = windowed_capture("cleared").await;
+        let cleared = id.clone();
+        tail_while(&store, &id, WINDOWED, move || clear_capture(&cleared).unwrap()).await;
+        assert_eq!(get_capture_count(&id), 0);
+        assert_eq!(capture_db::get_frame_count(&id).await, Ok(0));
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn a_capture_being_refilled_never_reads_back_its_old_rows() {
+        let (store, _db, id) = windowed_capture("refilled").await;
+        let refilled = id.clone();
+        tail_while(&store, &id, WINDOWED, move || {
+            wait(clear_and_refill_capture(&refilled, frames(WINDOWED..2 * WINDOWED)));
+        })
+        .await;
+        assert_eq!(get_capture_count(&id), WINDOWED as usize);
+        assert_eq!(capture_db::get_frame_count(&id).await, Ok(WINDOWED as usize));
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn a_failed_clear_counts_the_rows_it_left() {
+        let (store, _db, id) = windowed_capture("clear fails").await;
+        execute(&store, "CREATE TRIGGER interrupt BEFORE DELETE ON frames WHEN OLD.timestamp_us >= 6000 BEGIN SELECT RAISE(ABORT, 'interrupted'); END").await;
+
+        clear_capture(&id).unwrap();
+
+        let left = capture_db::get_frame_count(&id).await.unwrap();
+        assert!(left > 0 && left < WINDOWED as usize);
+        assert_eq!(get_capture_count(&id), left);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn a_copy_that_fails_part_way_is_never_listed_and_leaves_no_rows() {
+        let (store, _db, source) = windowed_capture("copied").await;
+        execute(
+            &store,
+            &format!("CREATE TRIGGER interrupt BEFORE INSERT ON frames WHEN NEW.capture_id != '{source}' AND NEW.timestamp_us >= 6000 BEGIN SELECT RAISE(ABORT, 'interrupted'); END"),
+        )
+        .await;
+        assert!(copy_capture(&source, "failed copy".into()).is_err());
+
+        assert!(list_captures().iter().all(|c| c.name != "failed copy"));
+        let saved = capture_db::load_all_capture_metadata().await.unwrap();
+        assert_eq!(saved.iter().map(|m| m.id.as_str()).collect::<Vec<_>>(), [source.as_str()]);
+        let strays: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM frames WHERE capture_id != ?1")
+            .bind(&source)
+            .fetch_one(store.database().pool())
+            .await
+            .unwrap();
+        assert_eq!(strays, 0);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn a_copy_counts_the_rows_it_copied() {
+        let (_store, _db, source) = windowed_capture("copied whole").await;
+        let copy = copy_capture(&source, "copy".into()).unwrap();
+        assert_eq!(get_capture_count(&copy), WINDOWED as usize);
+        assert_eq!(capture_db::get_frame_count(&copy).await, Ok(WINDOWED as usize));
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn a_delete_cut_short_loads_again_with_only_the_rows_left() {
+        let (store, _db, id) = windowed_capture("deleted").await;
+        execute(&store, "CREATE TRIGGER interrupt BEFORE DELETE ON frames WHEN OLD.timestamp_us >= 6000 BEGIN SELECT RAISE(ABORT, 'interrupted'); END").await;
+
+        delete_capture(&id).unwrap();
+        assert!(!is_known_capture(&id));
+        hydrate_from_db();
+
+        let left = capture_db::get_frame_count(&id).await.unwrap();
+        assert!(left > 0 && left < WINDOWED as usize);
+        assert_eq!(get_capture_count(&id), left);
     }
 }

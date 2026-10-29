@@ -64,8 +64,8 @@ fn chunk_starts(bytes: &[TimestampedByte], gap_us: Option<u64>) -> Vec<usize> {
         .collect()
 }
 
-fn bytes_page(capture_id: &str, offset: usize, limit: usize, chunk_gap_us: Option<u64>) -> Result<PaginatedBytesResponse, String> {
-    let (bytes, total_count) = capture_store::get_capture_bytes_paginated(capture_id, offset, limit)?;
+async fn bytes_page(capture_id: &str, offset: usize, limit: usize, chunk_gap_us: Option<u64>) -> Result<PaginatedBytesResponse, String> {
+    let (bytes, total_count) = capture_store::get_capture_bytes_paginated(capture_id, offset, limit).await?;
     Ok(PaginatedBytesResponse {
         chunk_starts: chunk_starts(&bytes, chunk_gap_us),
         bytes,
@@ -111,7 +111,7 @@ fn import_candump_files(session_id: &str, file_paths: &[String]) -> Result<Candu
         paths => build_batch_name(paths),
     };
     capture_store::create_session_capture(session_id, capture_store::CaptureKind::Frames, name);
-    capture_store::append_frames_to_session(session_id, import.frames);
+    crate::capture_db::wait(capture_store::append_frames_to_session(session_id, import.frames));
     let metadata = capture_store::finalize_session_captures(session_id)
         .into_iter()
         .next()
@@ -174,7 +174,7 @@ pub async fn import_csv_with_mapping(
         let wrap_points = detect_wrap_points(&sequence_gaps);
 
         capture_store::create_session_capture(&session_id, capture_store::CaptureKind::Frames, filename);
-        capture_store::append_frames_to_session(&session_id, result.frames);
+        crate::capture_db::wait(capture_store::append_frames_to_session(&session_id, result.frames));
         let finalized = capture_store::finalize_session_captures(&session_id);
         let metadata = finalized.into_iter().next()
             .ok_or_else(|| "Failed to store frames in capture".to_string())?;
@@ -309,7 +309,7 @@ pub fn import_csv_batch(
             prev_file_name = Some(fname);
         }
 
-        capture_store::append_frames_to_session(session_id, result.frames);
+        crate::capture_db::wait(capture_store::append_frames_to_session(session_id, result.frames));
     }
 
     if total_frames == 0 {
@@ -414,11 +414,9 @@ pub async fn get_capture_frames(capture_id: String) -> Result<Vec<FrameMessage>,
 }
 
 async fn all_frames(capture_id: String) -> Result<Vec<FrameMessage>, String> {
-    off_runtime(move || {
-        capture_store::get_capture_frames(&capture_id)?
-            .ok_or_else(|| format!("Capture '{}' not found or is not a frame capture", capture_id))
-    })
-    .await
+    capture_store::get_capture_frames(&capture_id)
+        .await?
+        .ok_or_else(|| format!("Capture '{}' not found or is not a frame capture", capture_id))
 }
 
 /// Get a page of frames from a capture (for large datasets)
@@ -428,7 +426,7 @@ pub async fn get_capture_frames_paginated(
     offset: usize,
     limit: usize,
 ) -> Result<PaginatedFramesResponse, String> {
-    let (frames, capture_indices, total_count) = capture_store::get_capture_frames_paginated(&capture_id, offset, limit)?;
+    let (frames, capture_indices, total_count) = capture_store::get_capture_frames_paginated(&capture_id, offset, limit).await?;
     Ok(PaginatedFramesResponse {
         frames,
         total_count,
@@ -447,7 +445,7 @@ pub async fn get_capture_frames_paginated_filtered(
     selection: Vec<ProtocolFrames>,
 ) -> Result<PaginatedFramesResponse, String> {
     let selection = FrameSelection::from_groups(selection);
-    let (frames, capture_indices, total_count) = capture_store::get_capture_frames_paginated_filtered(&capture_id, offset, limit, &selection)?;
+    let (frames, capture_indices, total_count) = capture_store::get_capture_frames_paginated_filtered(&capture_id, offset, limit, &selection).await?;
     Ok(PaginatedFramesResponse {
         frames,
         total_count,
@@ -466,13 +464,13 @@ pub async fn get_capture_frames_tail(
     selection: Vec<ProtocolFrames>,
 ) -> Result<TailResponse, String> {
     let selection = FrameSelection::from_groups(selection);
-    capture_store::get_capture_frames_tail(&capture_id, limit, &selection)
+    capture_store::get_capture_frames_tail(&capture_id, limit, &selection).await
 }
 
 /// Get unique frame IDs and their metadata from a capture
 #[tauri::command(rename_all = "snake_case")]
 pub async fn get_capture_frame_info(capture_id: String) -> Result<Vec<CaptureFrameInfo>, String> {
-    capture_store::get_capture_frame_info(&capture_id)
+    capture_store::get_capture_frame_info(&capture_id).await
 }
 
 /// Find the offset in the filtered capture for a given timestamp
@@ -483,7 +481,7 @@ pub async fn find_capture_offset_for_timestamp(
     selection: Vec<ProtocolFrames>,
 ) -> Result<usize, String> {
     let selection = FrameSelection::from_groups(selection);
-    capture_store::find_capture_offset_for_timestamp(&capture_id, timestamp_us, &selection)
+    capture_store::find_capture_offset_for_timestamp(&capture_id, timestamp_us, &selection).await
 }
 
 // ============================================================================
@@ -524,18 +522,17 @@ pub async fn get_capture_frames_by_id(capture_id: String) -> Result<Vec<FrameMes
 /// Get the newest frame per identity from a specific capture by ID
 #[tauri::command(rename_all = "snake_case")]
 pub async fn get_capture_latest_frames(capture_id: String) -> Result<Vec<FrameMessage>, String> {
-    capture_store::get_capture_latest_frames(&capture_id)?
+    capture_store::get_capture_latest_frames(&capture_id)
+        .await?
         .ok_or_else(|| format!("Capture '{}' not found or is not a frame capture", capture_id))
 }
 
 /// Get raw bytes from a specific capture by ID
 #[tauri::command(rename_all = "snake_case")]
 pub async fn get_capture_bytes_by_id(capture_id: String) -> Result<Vec<TimestampedByte>, String> {
-    off_runtime(move || {
-        capture_store::get_capture_bytes(&capture_id)?
-            .ok_or_else(|| format!("Capture '{}' not found or is not a byte capture", capture_id))
-    })
-    .await
+    capture_store::get_capture_bytes(&capture_id)
+        .await?
+        .ok_or_else(|| format!("Capture '{}' not found or is not a byte capture", capture_id))
 }
 
 /// Mark a capture as active (being rendered by a UI panel)
@@ -557,7 +554,7 @@ pub async fn create_frame_capture_from_frames(
     }
 
     let capture_id = capture_store::create_session_capture(&session_id, capture_store::CaptureKind::Frames, name);
-    capture_store::append_frames_to_session(&session_id, frames);
+    capture_store::append_frames_to_session(&session_id, frames).await;
     let finalized = capture_store::finalize_session_captures(&session_id);
     finalized.into_iter().next()
         .ok_or_else(|| format!("Failed to finalize capture '{}'", capture_id))
@@ -570,7 +567,7 @@ pub async fn get_capture_frames_paginated_by_id(
     offset: usize,
     limit: usize,
 ) -> Result<PaginatedFramesResponse, String> {
-    let (frames, capture_indices, total_count) = capture_store::get_capture_frames_paginated(&capture_id, offset, limit)?;
+    let (frames, capture_indices, total_count) = capture_store::get_capture_frames_paginated(&capture_id, offset, limit).await?;
     Ok(PaginatedFramesResponse {
         frames,
         total_count,
@@ -592,7 +589,7 @@ pub async fn get_capture_bytes_paginated(
     limit: usize,
     chunk_gap_us: Option<u64>,
 ) -> Result<PaginatedBytesResponse, String> {
-    bytes_page(&capture_id, offset, limit, chunk_gap_us)
+    bytes_page(&capture_id, offset, limit, chunk_gap_us).await
 }
 
 /// Get the total byte count from a capture
@@ -608,7 +605,7 @@ pub async fn get_capture_bytes_paginated_by_id(
     offset: usize,
     limit: usize,
 ) -> Result<PaginatedBytesResponse, String> {
-    bytes_page(&capture_id, offset, limit, None)
+    bytes_page(&capture_id, offset, limit, None).await
 }
 
 /// Find the byte offset at or after the given timestamp in a byte capture.
@@ -618,7 +615,7 @@ pub async fn find_capture_bytes_offset_for_timestamp(
     capture_id: String,
     target_time_us: u64,
 ) -> Result<usize, String> {
-    capture_store::find_capture_bytes_offset_for_timestamp_by_id(&capture_id, target_time_us)
+    capture_store::find_capture_bytes_offset_for_timestamp_by_id(&capture_id, target_time_us).await
 }
 
 /// Search a specific capture for frames matching a query string.
@@ -633,7 +630,7 @@ pub async fn search_capture_frames(
     selection: Vec<ProtocolFrames>,
 ) -> Result<Vec<usize>, String> {
     let selection = FrameSelection::from_groups(selection);
-    off_runtime(move || crate::capture_db::search_frames(&capture_id, &query, search_id, search_data, &selection)).await
+    crate::capture_db::search_frames(&capture_id, &query, search_id, search_data, &selection).await
 }
 
 /// Response for tail-mode byte capture queries
@@ -657,7 +654,7 @@ pub async fn get_capture_bytes_tail(
     tail_size: usize,
     chunk_gap_us: Option<u64>,
 ) -> Result<BytesTailResponse, String> {
-    let bytes = capture_store::get_capture_bytes_tail(&capture_id, tail_size)?;
+    let bytes = capture_store::get_capture_bytes_tail(&capture_id, tail_size).await?;
     Ok(BytesTailResponse {
         chunk_starts: chunk_starts(&bytes, chunk_gap_us),
         bytes,

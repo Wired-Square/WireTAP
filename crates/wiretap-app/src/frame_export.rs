@@ -51,7 +51,7 @@ pub async fn export_frame_dump(
 ) -> Result<usize, String> {
     crate::blocking::off_runtime(move || {
         let frames = match source {
-            FrameSource::Capture { capture_id } => capture_store::get_capture_frames(&capture_id)?
+            FrameSource::Capture { capture_id } => crate::capture_db::wait(capture_store::get_capture_frames(&capture_id))?
                 .ok_or_else(|| format!("'{capture_id}' is not a frame capture"))?,
             FrameSource::Frames { frames } => frames,
         };
@@ -70,7 +70,7 @@ pub async fn export_byte_dump(
     path: String,
 ) -> Result<usize, String> {
     crate::blocking::off_runtime(move || {
-        let bytes = capture_store::get_capture_bytes(&capture_id)?
+        let bytes = crate::capture_db::wait(capture_store::get_capture_bytes(&capture_id))?
             .ok_or_else(|| format!("'{capture_id}' is not a byte capture"))?;
         std::fs::write(&path, encode_bytes(&bytes, format))
             .map_err(|e| format!("Failed to write '{path}': {e}"))?;

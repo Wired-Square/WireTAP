@@ -1343,13 +1343,14 @@ pub(crate) mod tests {
 
     async fn open_wire(session_id: &str, wire: Wire) {
         let wire = StdMutex::new(wire);
-        let far_end = TestSource::new(session_id).transmitting(move |session_id, payload| {
+        let echoes = crate::capture_store::SessionAppender::spawn(session_id.into(), |_| {});
+        let far_end = TestSource::new(session_id).transmitting(move |_, payload| {
             let TransmitPayload::CanFrame(tx) = payload else {
                 return TransmitResult::error("Not a CAN frame".into());
             };
             match wire.lock().unwrap().answer(tx) {
                 Some(back) => {
-                    crate::capture_store::append_frames_to_session(session_id, back);
+                    echoes.append(back);
                     TransmitResult::success()
                 }
                 None => TransmitResult::error("Transmit refused: send queue full".into()),
@@ -1419,7 +1420,7 @@ pub(crate) mod tests {
     /// The test the protocol exists for: every length code round-trips at
     /// exactly the length its code names. A codec that confused a byte count
     /// for a length code fails here, at a nameable byte count, with no bus.
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn a_full_fd_sweep_round_trips_with_no_drops() {
         let peer = Wire::Peer(Responder::new(tp::capability::FD, 0));
         let state = run("test_sweep_fd", peer, &config(TestMode::Sweep, true)).await;
@@ -1447,7 +1448,7 @@ pub(crate) mod tests {
     /// A classic sweep stops at code 8: codes above it are legal on the wire
     /// and still mean 8 bytes, so sweeping them tests the same length nine
     /// times.
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn a_classic_sweep_covers_zero_through_eight() {
         let peer = Wire::Peer(Responder::new(0, 0));
         let state = run("test_sweep_classic", peer, &config(TestMode::Sweep, false)).await;
@@ -1462,7 +1463,7 @@ pub(crate) mod tests {
     /// so a peer that caps its payloads at eight answers all of them perfectly
     /// — and every length code above 8 wrong. The failure has to name the byte
     /// count that broke.
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn a_peer_that_truncates_past_eight_bytes_is_caught() {
         let peer = Wire::Truncating(Responder::new(tp::capability::FD, 0));
         let state = run("test_sweep_truncated", peer, &config(TestMode::Sweep, true)).await;
@@ -1496,7 +1497,7 @@ pub(crate) mod tests {
 
     /// A run that lost every frame has proved nothing, and must not report
     /// "completed" — the status it used to report, whatever the drop count.
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn a_run_that_lost_everything_reports_failed() {
         let mut config = config(TestMode::Echo, false);
         config.duration_sec = 1.0;
@@ -1509,7 +1510,7 @@ pub(crate) mod tests {
         assert_eq!(state.status, TestStatus::Failed);
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn throughput_waits_out_a_full_send_queue() {
         let mut config = config(TestMode::Throughput, false);
         config.duration_sec = 1.0;
@@ -1520,7 +1521,7 @@ pub(crate) mod tests {
         assert_eq!(state.status, TestStatus::Completed, "errors: {:?}", state.errors);
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn throughput_gives_up_on_a_send_queue_that_never_drains() {
         let mut config = config(TestMode::Throughput, false);
         config.duration_sec = 5.0;
@@ -1570,7 +1571,7 @@ pub(crate) mod tests {
 
     /// The TX gauge's scale is the run's own `expected_tx`, so an answered run
     /// fills it.
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn an_echo_run_reaches_its_expected_tx() {
         let mut config = config(TestMode::Echo, false);
         config.duration_sec = 1.0;
@@ -1665,7 +1666,7 @@ pub(crate) mod tests {
         assert_eq!(shut_down, Ok(true), "the runtime never shut down");
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn a_virtual_loopback_echo_keeps_the_id_bus_fd_and_brs() {
         const SESSION: &str = "test_virtual_codec";
         open_virtual_loopback(SESSION).await;
@@ -1682,7 +1683,7 @@ pub(crate) mod tests {
         let capture = crate::capture_store::get_session_frame_capture_id(SESSION).unwrap();
         let echo = tokio::time::timeout(Duration::from_secs(2), async {
             loop {
-                if let Some(frame) = crate::capture_store::get_capture_frames(&capture).unwrap().and_then(|f| f.into_iter().next()) {
+                if let Some(frame) = crate::capture_store::get_capture_frames(&capture).await.unwrap().and_then(|f| f.into_iter().next()) {
                     return frame;
                 }
                 tokio::time::sleep(Duration::from_millis(10)).await;

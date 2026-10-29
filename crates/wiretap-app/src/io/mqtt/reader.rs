@@ -326,7 +326,7 @@ fn spawn_mqtt_stream(
                                 };
 
                                 // Buffer frame for replay
-                                capture_store::append_frames_to_session(&session_id, vec![frame]);
+                                capture_store::append_frames_to_session(&session_id, vec![frame]).await;
 
                                 if throttle.should_signal("frames-ready") {
                                     signal_frames_ready(&session_id);

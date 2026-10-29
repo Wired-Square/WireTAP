@@ -89,16 +89,16 @@ impl CaptureSource {
     }
 }
 
-fn position_at_timestamp(capture_id: &str, timestamp_us: i64) -> Option<PlaybackPosition> {
-    let rowid = capture_db::find_rowid_for_timestamp(capture_id, timestamp_us as u64).ok()??;
-    let frame_index = capture_db::count_frames_before_rowid(capture_id, rowid).unwrap_or(0);
-    position_at_frame(capture_id, frame_index)
+async fn position_at_timestamp(capture_id: &str, timestamp_us: i64) -> Option<PlaybackPosition> {
+    let rowid = capture_db::find_rowid_for_timestamp(capture_id, timestamp_us as u64).await.ok()??;
+    let frame_index = capture_db::count_frames_before_rowid(capture_id, rowid).await.unwrap_or(0);
+    position_at_frame(capture_id, frame_index).await
 }
 
-fn position_at_frame(capture_id: &str, frame_index: usize) -> Option<PlaybackPosition> {
+async fn position_at_frame(capture_id: &str, frame_index: usize) -> Option<PlaybackPosition> {
     let total = capture_store::get_capture_count(capture_id);
     let frame_index = frame_index.min(total.saturating_sub(1));
-    let (_, frame) = capture_db::get_frame_at_index(capture_id, frame_index).ok()??;
+    let (_, frame) = capture_db::get_frame_at_index(capture_id, frame_index).await.ok()??;
     Some(PlaybackPosition {
         timestamp_us: frame.timestamp_us as i64,
         frame_index,
@@ -182,7 +182,7 @@ impl IOSource for CaptureSource {
             self.reader_state.session_id, timestamp_us
         );
         self.seek_target_us.store(timestamp_us, Ordering::Relaxed);
-        self.publish_while_stopped(self.capture_id.as_deref().and_then(|id| position_at_timestamp(id, timestamp_us)));
+        self.publish_while_stopped(self.capture_id.as_deref().and_then(|id| capture_db::wait(position_at_timestamp(id, timestamp_us))));
         Ok(())
     }
 
@@ -192,7 +192,7 @@ impl IOSource for CaptureSource {
             self.reader_state.session_id, frame_index
         );
         self.seek_target_frame.store(frame_index, Ordering::Relaxed);
-        self.publish_while_stopped(self.capture_id.as_deref().and_then(|id| position_at_frame(id, frame_index.max(0) as usize)));
+        self.publish_while_stopped(self.capture_id.as_deref().and_then(|id| capture_db::wait(position_at_frame(id, frame_index.max(0) as usize))));
         Ok(())
     }
 
@@ -234,7 +234,7 @@ pub struct StepResult {
     pub timestamp_us: i64,
 }
 
-pub fn step_frame(
+pub async fn step_frame(
     session_id: &str,
     capture_id: &str,
     current_frame_index: Option<usize>,
@@ -252,12 +252,12 @@ pub fn step_frame(
     // Determine current rowid from frame index or timestamp
     let current_rowid = if let Some(idx) = current_frame_index {
         let clamped = idx.min(total_frames.saturating_sub(1));
-        match capture_db::get_frame_at_index(&buf_id, clamped)? {
+        match capture_db::get_frame_at_index(buf_id, clamped).await? {
             Some((rowid, _)) => rowid,
             None => return Err("Frame index out of bounds".to_string()),
         }
     } else if let Some(ts) = current_timestamp_us {
-        match capture_db::find_rowid_for_timestamp(&buf_id, ts as u64)? {
+        match capture_db::find_rowid_for_timestamp(buf_id, ts as u64).await? {
             Some(rowid) => rowid,
             None if backward => i64::MAX,
             None => return Ok(None),
@@ -269,7 +269,7 @@ pub fn step_frame(
     };
 
     // Find next/prev frame using targeted SQLite query
-    match capture_db::get_next_filtered_frame(&buf_id, current_rowid, selection, backward)? {
+    match capture_db::get_next_filtered_frame(buf_id, current_rowid, selection, backward).await? {
         Some((_, new_idx, frame)) => {
             let new_timestamp_us = frame.timestamp_us as i64;
 
@@ -323,24 +323,64 @@ fn resolve_capture_id(capture_id: &Option<String>) -> Option<String> {
 }
 
 /// Load a chunk of frames from SQLite for the current playback direction.
-fn load_chunk(
+async fn load_chunk(
     buf_id: &str,
     boundary_rowid: i64,
     chunk_size: usize,
     reverse: bool,
 ) -> Vec<(i64, FrameMessage)> {
     let result = if reverse {
-        capture_db::read_frame_chunk_reverse(buf_id, boundary_rowid, chunk_size)
+        capture_db::read_frame_chunk_reverse(buf_id, boundary_rowid, chunk_size).await
     } else {
-        capture_db::read_frame_chunk(buf_id, boundary_rowid, chunk_size)
+        capture_db::read_frame_chunk(buf_id, boundary_rowid, chunk_size).await
     };
     result.unwrap_or_default()
+}
+
+/// The seek asked for, if any, and where it lands: a rowid, its frame index, and its
+/// time when already read; `Some(None)` when it lands nowhere.
+async fn seek_target(
+    session_id: &str,
+    buf_id: &str,
+    total_frames: usize,
+    seek_target_frame: &AtomicI64,
+    seek_target_us: &AtomicI64,
+    control: &PlaybackControl,
+) -> Option<Option<(i64, usize, Option<u64>)>> {
+    // Check for frame-based seek (takes priority)
+    let seek_frame = seek_target_frame.load(Ordering::Relaxed);
+    if seek_frame != NO_SEEK_FRAME {
+        seek_target_frame.store(NO_SEEK_FRAME, Ordering::Relaxed);
+        let target_idx = (seek_frame as usize).min(total_frames.saturating_sub(1));
+        tlog!(
+            "[Capture:{}] Seeking to frame {} (by index, paused={})",
+            session_id, target_idx, control.is_paused()
+        );
+        let found = capture_db::get_frame_at_index(buf_id, target_idx).await;
+        return Some(found.ok().flatten().map(|(rowid, frame)| (rowid, target_idx, Some(frame.timestamp_us))));
+    }
+
+    // Check for timestamp-based seek
+    let seek_target = seek_target_us.load(Ordering::Relaxed);
+    if seek_target == NO_SEEK {
+        return None;
+    }
+    seek_target_us.store(NO_SEEK, Ordering::Relaxed);
+    let Ok(Some(rowid)) = capture_db::find_rowid_for_timestamp(buf_id, seek_target as u64).await else {
+        return Some(None);
+    };
+    let target_idx = capture_db::count_frames_before_rowid(buf_id, rowid).await.unwrap_or(0);
+    tlog!(
+        "[Capture:{}] Seeking to frame {} (timestamp {}us, paused={})",
+        session_id, target_idx, seek_target, control.is_paused()
+    );
+    Some(Some((rowid, target_idx, None)))
 }
 
 /// Handle a seek operation (frame-based or timestamp-based).
 /// Returns true if a seek was handled.
 #[allow(clippy::too_many_arguments)]
-fn handle_seek(
+async fn handle_seek(
     session_id: &str,
     buf_id: &str,
     total_frames: usize,
@@ -353,62 +393,34 @@ fn handle_seek(
     last_consumed_rowid: &mut i64,
     pacer: &mut Pacer<FrameMessage>,
 ) -> bool {
+    let Some(target) = seek_target(session_id, buf_id, total_frames, seek_target_frame, seek_target_us, control).await
+    else {
+        return false;
+    };
     // Playback moves to `rowid`, frame `target_idx`, and is published there; the
     // frame's time is read from the reloaded chunk unless it is given.
-    let mut land = |rowid: i64, target_idx: usize, timestamp_us: Option<u64>| {
-        let is_reverse = control.is_reverse();
-        // In reverse mode, the main loop pre-decrements before capturing actual_index,
-        // so set frame_index one higher so pre-decrement yields target_idx.
-        *frame_index = if is_reverse { target_idx + 1 } else { target_idx };
-        *last_consumed_rowid = rowid;
-        *chunk = load_chunk(buf_id, if is_reverse { rowid + 1 } else { rowid - 1 }, CHUNK_SIZE, is_reverse);
-        *chunk_idx = 0;
-        pacer.clear_batch();
-        crate::ws::dispatch::reset_decode_state(session_id);
+    let Some((rowid, target_idx, timestamp_us)) = target else { return true };
+    let is_reverse = control.is_reverse();
+    // In reverse mode, the main loop pre-decrements before capturing actual_index,
+    // so set frame_index one higher so pre-decrement yields target_idx.
+    *frame_index = if is_reverse { target_idx + 1 } else { target_idx };
+    *last_consumed_rowid = rowid;
+    *chunk = load_chunk(buf_id, if is_reverse { rowid + 1 } else { rowid - 1 }, CHUNK_SIZE, is_reverse).await;
+    *chunk_idx = 0;
+    pacer.clear_batch();
+    crate::ws::dispatch::reset_decode_state(session_id);
 
-        if let Some(timestamp_us) = timestamp_us.or_else(|| chunk.first().map(|(_, f)| f.timestamp_us)) {
-            pacer.restart_at(timestamp_us as f64 / 1_000_000.0);
-            let position = PlaybackPosition {
-                timestamp_us: timestamp_us as i64,
-                frame_index: target_idx,
-                frame_count: Some(total_frames),
-            };
-            publish_position_now(session_id, position);
-        }
-        signal_frames_ready(session_id);
-    };
-
-    // Check for frame-based seek (takes priority)
-    let seek_frame = seek_target_frame.load(Ordering::Relaxed);
-    if seek_frame != NO_SEEK_FRAME {
-        seek_target_frame.store(NO_SEEK_FRAME, Ordering::Relaxed);
-        let target_idx = (seek_frame as usize).min(total_frames.saturating_sub(1));
-        tlog!(
-            "[Capture:{}] Seeking to frame {} (by index, paused={})",
-            session_id, target_idx, control.is_paused()
-        );
-        if let Ok(Some((rowid, frame))) = capture_db::get_frame_at_index(buf_id, target_idx) {
-            land(rowid, target_idx, Some(frame.timestamp_us));
-        }
-        return true;
+    if let Some(timestamp_us) = timestamp_us.or_else(|| chunk.first().map(|(_, f)| f.timestamp_us)) {
+        pacer.restart_at(timestamp_us as f64 / 1_000_000.0);
+        let position = PlaybackPosition {
+            timestamp_us: timestamp_us as i64,
+            frame_index: target_idx,
+            frame_count: Some(total_frames),
+        };
+        publish_position_now(session_id, position);
     }
-
-    // Check for timestamp-based seek
-    let seek_target = seek_target_us.load(Ordering::Relaxed);
-    if seek_target != NO_SEEK {
-        seek_target_us.store(NO_SEEK, Ordering::Relaxed);
-        if let Ok(Some(rowid)) = capture_db::find_rowid_for_timestamp(buf_id, seek_target as u64) {
-            let target_idx = capture_db::count_frames_before_rowid(buf_id, rowid).unwrap_or(0);
-            tlog!(
-                "[Capture:{}] Seeking to frame {} (timestamp {}us, paused={})",
-                session_id, target_idx, seek_target, control.is_paused()
-            );
-            land(rowid, target_idx, None);
-        }
-        return true;
-    }
-
-    false
+    signal_frames_ready(session_id);
+    true
 }
 
 /// Played frames go to the session's subscribers, at the capture's own index.
@@ -473,7 +485,7 @@ async fn run_capture_stream(
         return;
     }
 
-    let (min_rowid, max_rowid) = match capture_db::get_rowid_range(&buf_id) {
+    let (min_rowid, max_rowid) = match capture_db::get_rowid_range(&buf_id).await {
         Ok(Some(range)) => range,
         _ => {
             emit_session_error(&session_id, "Capture has no data".to_string());
@@ -499,7 +511,7 @@ async fn run_capture_stream(
     let mut frame_index = 0usize;
 
     // Chunk state - frames loaded from SQLite
-    let mut chunk: Vec<(i64, FrameMessage)> = load_chunk(&buf_id, min_rowid - 1, CHUNK_SIZE, false);
+    let mut chunk: Vec<(i64, FrameMessage)> = load_chunk(&buf_id, min_rowid - 1, CHUNK_SIZE, false).await;
     let mut chunk_idx: usize = 0;
     let mut last_consumed_rowid: i64 = min_rowid - 1;
     if chunk.is_empty() {
@@ -541,7 +553,9 @@ async fn run_capture_stream(
             &seek_target_frame, &seek_target_us, &control,
             &mut chunk, &mut chunk_idx, &mut frame_index, &mut last_consumed_rowid,
             &mut pacer,
-        ) {
+        )
+        .await
+        {
             continue;
         }
 
@@ -577,7 +591,7 @@ async fn run_capture_stream(
                 last_consumed_rowid,
                 CHUNK_SIZE,
                 is_reverse,
-            );
+            ).await;
             chunk_idx = 0;
 
             pacer.rebaseline_at_last();
@@ -594,7 +608,7 @@ async fn run_capture_stream(
                 // In forward, chunk is in ASC order — last element has the largest rowid
                 chunk.last().map(|(r, _)| *r).unwrap_or(max_rowid)
             };
-            chunk = load_chunk(&buf_id, boundary, CHUNK_SIZE, is_reverse);
+            chunk = load_chunk(&buf_id, boundary, CHUNK_SIZE, is_reverse).await;
             chunk_idx = 0;
 
             if chunk.is_empty() {
@@ -674,7 +688,9 @@ async fn run_capture_stream(
             &seek_target_frame, &seek_target_us, &control,
             &mut chunk, &mut chunk_idx, &mut frame_index, &mut last_consumed_rowid,
             &mut pacer,
-        ) {
+        )
+        .await
+        {
             seeked_during_pause = true;
             continue;
         }
@@ -698,7 +714,7 @@ async fn run_capture_stream(
 
         // Only reload chunk if no seek occurred — seek already loaded the correct chunk
         if !seeked_during_pause {
-            chunk = load_chunk(&buf_id, last_consumed_rowid, CHUNK_SIZE, is_reverse);
+            chunk = load_chunk(&buf_id, last_consumed_rowid, CHUNK_SIZE, is_reverse).await;
             chunk_idx = 0;
         }
 
@@ -741,12 +757,12 @@ mod tests {
                 ..Default::default()
             })
             .collect();
-        capture_store::append_frames_to_capture(&id, frames);
+        crate::capture_db::wait(capture_store::append_frames_to_capture(&id, frames));
         id
     }
 
     fn step(capture: &str, index: Option<usize>, timestamp: Option<i64>, backward: bool) -> Option<(usize, i64)> {
-        step_frame("f_step_test", capture, index, timestamp, backward, &FrameSelection::default())
+        crate::capture_db::wait(step_frame("f_step_test", capture, index, timestamp, backward, &FrameSelection::default()))
             .unwrap()
             .map(|r| (r.frame_index, r.timestamp_us))
     }
@@ -756,7 +772,7 @@ mod tests {
     #[test]
     fn an_empty_capture_cannot_be_stepped() {
         let id = capture_of("step-empty", &[]);
-        let err = step_frame("f_step_test", &id, None, None, false, &FrameSelection::default()).unwrap_err();
+        let err = crate::capture_db::wait(step_frame("f_step_test", &id, None, None, false, &FrameSelection::default())).unwrap_err();
         assert_eq!(err, "Capture is empty");
     }
 
@@ -809,7 +825,7 @@ mod tests {
             frame_ids: vec![0x100],
             all_ids: false,
         }]);
-        let result = step_frame("f_step_test", &id, Some(0), None, false, &only_0x100).unwrap().unwrap();
+        let result = crate::capture_db::wait(step_frame("f_step_test", &id, Some(0), None, false, &only_0x100)).unwrap().unwrap();
         assert_eq!((result.frame_index, result.timestamp_us), (2, 30));
     }
 

@@ -53,7 +53,7 @@ pub struct ReplaySource {
 
 impl ReplaySource {
     fn frames(&self) -> Result<Vec<ReplayFrame>, String> {
-        let (frames, _, _) = crate::capture_store::get_capture_frames_paginated(&self.capture_id, self.offset, self.count)?;
+        let (frames, _, _) = crate::capture_db::wait(crate::capture_store::get_capture_frames_paginated(&self.capture_id, self.offset, self.count))?;
         Ok(frames
             .iter()
             .filter(|f| f.protocol == "can" || f.protocol == "canfd")
@@ -210,7 +210,7 @@ impl Replay {
                     result = send => result,
                 };
 
-                crate::transmit::record_can(session_id, frame, &result);
+                crate::transmit::record_can(session_id, frame, &result).await;
                 if let Some(error) = crate::transmit::permanent_failure(session_id, &result).await {
                     tlog!("[replay] Stopping replay '{}' due to permanent error: {}", self.replay_id, error);
                     break 'outer ReplayEvent::Failed { error };
@@ -435,7 +435,7 @@ mod tests {
             .iter()
             .map(|&(protocol, timestamp_us)| io::FrameMessage { protocol: protocol.into(), timestamp_us, frame_id: 0x100, dlc: 1, bytes: vec![1], ..Default::default() })
             .collect();
-        crate::capture_store::append_frames_to_capture(&id, frames);
+        crate::capture_db::wait(crate::capture_store::append_frames_to_capture(&id, frames));
         id
     }
 
@@ -451,7 +451,7 @@ mod tests {
         assert!(source.frames().unwrap().iter().all(|f| f.frame.bus == 2));
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn a_restart_plays_what_the_replay_was_started_with() {
         let id = "f_replay_restart";
         crate::io_test::tests::open_virtual_loopback(id).await;
@@ -492,7 +492,7 @@ mod tests {
         states.iter().map(|s| (s.event.clone(), s.pass, s.frames_sent)).collect()
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn a_looping_replay_reports_each_pass_then_its_stop() {
         let id = "f_replay_loop";
         crate::io_test::tests::open_virtual_loopback(id).await;
@@ -511,7 +511,7 @@ mod tests {
         assert_eq!(last.pass, passes_seen.len());
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn a_stopped_replay_reports_its_start_then_its_stop() {
         let id = "f_replay_stop";
         crate::io_test::tests::open_virtual_loopback(id).await;
@@ -522,7 +522,7 @@ mod tests {
         assert_eq!(seen[1].pass_duration_us, MAX_SLEEP_US);
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn a_replay_that_runs_out_reports_it_finished() {
         let id = "f_replay_end";
         crate::io_test::tests::open_virtual_loopback(id).await;
@@ -531,7 +531,7 @@ mod tests {
         assert_eq!(kinds(&seen), [(ReplayEvent::Started, 1, 0), (ReplayEvent::Finished, 1, 2)]);
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn a_replay_to_a_missing_session_fails_with_the_reason() {
         let replay = Replay::new("f_replay_gone".into(), "r_gone".into(), frames(&[0]), 1.0, true);
         let seen = events("f_replay_gone", replay, |_| false).await;

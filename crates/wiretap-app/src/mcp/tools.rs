@@ -536,7 +536,7 @@ impl WireTapTools {
         Parameters(p): Parameters<GetFramesParams>,
     ) -> Result<CallToolResult, McpError> {
         let (frames, _idx, total) =
-            crate::capture_store::get_capture_frames_paginated(&p.capture_id, p.offset, p.count).map_err(err)?;
+            crate::capture_store::get_capture_frames_paginated(&p.capture_id, p.offset, p.count).await.map_err(err)?;
         ok_json(json!({ "total": total, "offset": p.offset, "frames": frames }))
     }
 
@@ -551,6 +551,7 @@ impl WireTapTools {
             (None, _) => Vec::new(),
             (Some(frame_id), Some(protocol)) => vec![ProtocolFrames::ids(protocol, vec![frame_id])],
             (Some(frame_id), None) => crate::capture_store::get_capture_frame_info(&p.capture_id)
+                .await
                 .map_err(err)?
                 .into_iter()
                 .filter(|info| info.frame_id == frame_id)
@@ -563,6 +564,7 @@ impl WireTapTools {
             p.count,
             &FrameSelection::from_groups(groups),
         )
+        .await
         .map_err(err)?;
         ok_json(json!({ "total": total, "offset": p.offset, "frames": frames }))
     }
@@ -812,6 +814,7 @@ impl WireTapTools {
             DECODED_TAIL_FRAMES,
             &FrameSelection::default(),
         )
+        .await
         .map_err(err)?;
         let frames = decode_tail(&catalog, &tail.frames, wanted);
         ok_json(json!({ "frameCount": frames.len(), "frames": frames }))
@@ -841,7 +844,7 @@ impl WireTapTools {
             .filter(|ids| !ids.is_empty())
             .map(|ids| ids.into_iter().collect());
         let frames =
-            crate::capture_store::get_capture_latest_frames(&capture_id).map_err(err)?.unwrap_or_default();
+            crate::capture_store::get_capture_latest_frames(&capture_id).await.map_err(err)?.unwrap_or_default();
         let frames = latest_by_key(frames, wanted.as_ref());
         ok_json(json!({ "frameCount": frames.len(), "frames": frames }))
     }
@@ -1321,7 +1324,7 @@ impl WireTapTools {
             .collect();
 
         let appended = entries.len();
-        crate::capture_store::append_raw_bytes_to_capture(&capture_id, entries);
+        crate::capture_store::append_raw_bytes_to_capture(&capture_id, entries).await;
         crate::ws::dispatch::send_capture_changed(&capture_id);
         // If a session is showing this capture right now, its byte total just
         // changed. `send_new_bytes` is keyed by session, so find the one holding
@@ -1840,7 +1843,7 @@ mod tests {
             crate::io::destroy_session("mcp_tp_loopback", false).await.unwrap();
         }
 
-        #[tokio::test]
+        #[tokio::test(flavor = "multi_thread")]
         async fn a_responder_listens_until_stopped() {
             let test_id = start_test_pattern(params(serde_json::json!({
                 "session_id": "mcp_tp_responder",
@@ -2118,7 +2121,7 @@ mod context_tests {
         std::fs::read_to_string(path).unwrap()
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn a_load_that_rewrites_the_file_is_announced_to_the_host() {
         let fixture = Fixture::new("rewrite");
         let first = fixture.tools.ctx.load().unwrap();
@@ -2130,7 +2133,7 @@ mod context_tests {
         assert_eq!(first.decoder_dir, fixture.decoder_dir().to_string_lossy());
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn io_profiles_are_listed_from_the_settings_file_with_their_connection_keys() {
         let meter = profile("mcp-list-meter", "modbus_tcp", json!({ "port": 502, "host": "10.0.0.9" }));
         let fixture = Fixture::with_profiles("list", vec![meter]);
@@ -2142,7 +2145,7 @@ mod context_tests {
         );
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn app_info_reports_the_crate_version() {
         let fixture = Fixture::new("info");
         assert_eq!(
@@ -2151,7 +2154,7 @@ mod context_tests {
         );
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn catalogues_are_listed_and_named_from_the_hosts_cache() {
         let fixture = Fixture::with_profiles("catalogs", vec![]);
         let cat = fixture.add_catalog("meter.toml");
@@ -2166,7 +2169,7 @@ mod context_tests {
         );
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn a_created_catalogue_lands_in_the_decoder_dir_and_refreshes_the_cache() {
         let fixture = Fixture::with_profiles("create", vec![]);
         let made = json_of(fixture.tools.create_catalog(params(json!({ "filename": "fresh", "content": CATALOG }))).await);
@@ -2182,7 +2185,7 @@ mod context_tests {
         assert_eq!(fixture.host.changed.load(Ordering::Relaxed), 1);
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn an_updated_catalogue_is_overwritten_where_the_cache_names_it() {
         let fixture = Fixture::with_profiles("update", vec![]);
         let cat = fixture.add_catalog("meter.toml");
@@ -2193,7 +2196,7 @@ mod context_tests {
         assert_eq!(fixture.host.changed.load(Ordering::Relaxed), 1);
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn binding_a_catalogue_saves_the_settings_and_announces_them() {
         let meter = profile("mcp-bind-meter", "modbus_tcp", json!({ "host": "10.0.0.9" }));
         let fixture = Fixture::with_profiles("bind", vec![meter]);
@@ -2217,7 +2220,7 @@ mod context_tests {
         );
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn a_dashboard_is_written_under_the_decoder_dir() {
         let fixture = Fixture::with_profiles("dashboard", vec![]);
         let content = json!({ "schema": "wiretap.dashboard/1", "panels": [], "layout": [] }).to_string();
@@ -2227,7 +2230,7 @@ mod context_tests {
         assert_eq!(read(&path), content);
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn tools_that_resolve_a_profile_name_what_is_missing() {
         let meter = profile("mcp-missing-meter", "modbus_tcp", json!({ "host": "10.0.0.9" }));
         let fixture = Fixture::with_profiles("missing", vec![meter]);
@@ -2256,7 +2259,7 @@ mod context_tests {
         );
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn an_opened_profile_reads_its_devices_through_the_mcps_settings() {
         let device = profile(
             "mcp-open-virtual",

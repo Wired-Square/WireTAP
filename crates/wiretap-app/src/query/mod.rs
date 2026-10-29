@@ -10,8 +10,6 @@ mod gateway;
 pub mod queue;
 
 use std::collections::BTreeSet;
-use std::sync::atomic::AtomicBool;
-use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 use wiretap_gateway::{
@@ -23,6 +21,7 @@ use wiretap_gateway::{
 };
 
 use wiretap_analysis::source::InventoryRow;
+use wiretap_capture::Cancel;
 use crate::payload_source::QuerySource;
 use crate::settings::SettingsSource;
 
@@ -150,19 +149,12 @@ pub async fn run(
     settings: &dyn SettingsSource,
     request: &QueryRequest,
     query_id: &str,
-    cancel: &Arc<AtomicBool>,
+    cancel: &Cancel,
 ) -> Result<QueryOutcome, String> {
     let spec = with_default_limit(request.spec.clone());
     let compare = mirror_compare(&spec, request.catalog_path.as_deref())?;
     match &request.source {
-        QuerySource::Capture(capture_id) => {
-            let (capture_id, cancel) = (capture_id.clone(), Arc::clone(cancel));
-            tauri::async_runtime::spawn_blocking(move || {
-                capture::run(&capture_id, &spec, compare.as_ref(), &cancel)
-            })
-            .await
-            .map_err(|e| e.to_string())?
-        }
+        QuerySource::Capture(capture_id) => capture::run(capture_id, &spec, compare.as_ref(), cancel).await,
         QuerySource::Backend(profile_id) => {
             gateway::run(settings, profile_id, &spec, query_id, compare.as_ref()).await
         }
@@ -186,12 +178,14 @@ pub async fn preview(settings: &dyn SettingsSource, request: &QueryRequest) -> R
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use std::sync::Mutex;
+    use std::sync::atomic::AtomicBool;
+    use std::sync::Arc;
 
     use serde_json::{json, Value};
     use wiretap_gateway::{Protocol, RowWindow};
 
     use super::*;
+    use crate::capture_db::wait;
     use crate::io::FrameMessage;
 
     const FIXTURES: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../frontend/wiretap-ui/src/tests/fixtures/data");
@@ -231,51 +225,47 @@ pub(crate) mod tests {
 
     fn capture_of(capture_id: &str, frames: &[FrameMessage]) {
         crate::capture_db::use_in_memory_database();
-        crate::capture_db::insert_frames(capture_id, frames).unwrap();
+        wait(crate::capture_db::insert_frames(capture_id, frames)).unwrap();
     }
 
     fn run_capture(capture_id: &str, spec: QuerySpec) -> Result<QueryOutcome, String> {
-        capture::run(capture_id, &with_default_limit(spec), None, &Arc::default())
+        wait(capture::run(capture_id, &with_default_limit(spec), None, &Cancel::new()))
     }
 
-    static EXECUTED: Mutex<Vec<String>> = Mutex::new(Vec::new());
-
-    fn record(event: rusqlite::trace::TraceEvent<'_>) {
-        let rusqlite::trace::TraceEvent::Stmt(stmt, _) = event else {
-            return;
-        };
-        let Some(sql) = stmt.expanded_sql() else {
-            return;
-        };
-        if sql.contains(SQL_CAPTURE) {
-            EXECUTED.lock().unwrap().push(sql.split_whitespace().collect::<Vec<_>>().join(" "));
-        }
+    /// The `detail` of each row of `sql`'s `EXPLAIN QUERY PLAN`, against the shared test database.
+    fn plan(sql: &str) -> Vec<String> {
+        let store = crate::capture_db::current();
+        let explain = format!("EXPLAIN QUERY PLAN {sql}");
+        wait(sqlx::query(&explain).fetch_all(store.database().pool()))
+            .unwrap_or_else(|e| panic!("{sql} does not plan: {e}"))
+            .iter()
+            .map(|row| sqlx::Row::get(row, "detail"))
+            .collect()
     }
 
-    /// Each form spec's capture statements as run (a rusqlite trace) and as
-    /// previewed, which must be the same text, beside the backend request.
-    /// `WRITE_DATA_FIXTURES=1` rewrites `querySql.json`.
+    /// Each form spec's capture statements as run and as previewed, which must be the
+    /// same text and each one SQLite plans without scanning the whole table, beside
+    /// the backend request. `WRITE_DATA_FIXTURES=1` rewrites `querySql.json`.
     #[test]
     fn a_query_runs_the_sql_it_previews() {
         let in_window = 1_772_319_700_000_000;
         let extended = |id, at, bytes: &[u8]| FrameMessage { is_extended: true, ..frame(id, at, bytes) };
         capture_of(SQL_CAPTURE, &[extended(0x100, in_window, &[0xAA, 0xBB, 0x01]), extended(0x101, in_window + 100, &[0xAA, 0xBB, 0x02])]);
-        crate::capture_db::trace_statements(Some(record));
         let mut cases = Vec::new();
         for (name, spec) in form_specs() {
-            EXECUTED.lock().unwrap().clear();
             let outcome = run_capture(SQL_CAPTURE, spec.clone()).unwrap();
-            let executed = std::mem::take(&mut *EXECUTED.lock().unwrap());
             let previewed: Vec<String> =
                 capture::statements(SQL_CAPTURE, &with_default_limit(spec.clone())).iter().map(|s| s.inlined()).collect();
-            assert_eq!(executed, outcome.sql, "{name}");
             assert_eq!(previewed, outcome.sql, "{name}");
+            for sql in &outcome.sql {
+                let plan = plan(sql);
+                assert!(!plan.iter().any(|step| step == "SCAN frames"), "{name}: {sql} scans the table: {plan:?}");
+            }
             let request = gateway::text(
                 &gateway::request(Protocol::Can, &with_default_limit(spec), None, false).unwrap(),
             );
             cases.push(json!({ "name": name, "capture": outcome.sql, "gateway": request.lines().collect::<Vec<_>>() }));
         }
-        crate::capture_db::trace_statements(None);
         golden("querySql.json", &json!({
             "note": "Each querySpec.json case: the SQLite a capture runs (traced, and equal to its preview), and the request a CAN backend profile is sent.",
             "cases": cases,
@@ -360,11 +350,11 @@ pub(crate) mod tests {
             QueryResults::ByteChanges(c) => (c.iter().map(|c| c.timestamp_us).collect::<Vec<_>>(), o.stats.unwrap().rows_scanned),
             _ => panic!(),
         };
-        let (whole, read) = changes(capture::run_in_pages("d5-paged", &spec(None), 1000).unwrap());
+        let (whole, read) = changes(wait(capture::run_in_pages("d5-paged", &spec(None), 1000)).unwrap());
         assert_eq!((whole.len(), read), (142, 1000));
-        let (all_paged, _) = changes(capture::run_in_pages("d5-paged", &spec(None), 10).unwrap());
+        let (all_paged, _) = changes(wait(capture::run_in_pages("d5-paged", &spec(None), 10)).unwrap());
         assert_eq!(all_paged, whole, "a change across a page edge is found once");
-        let (first, read) = changes(capture::run_in_pages("d5-paged", &spec(Some(20)), 10).unwrap());
+        let (first, read) = changes(wait(capture::run_in_pages("d5-paged", &spec(Some(20)), 10)).unwrap());
         assert_eq!(first, whole[..20]);
         assert_eq!(read, 150, "stops at the page holding the 20th change");
     }
@@ -401,8 +391,8 @@ pub(crate) mod tests {
         let frames: Vec<_> = (0..5000u64).map(|i| frame(0x400, i, &[i as u8])).collect();
         capture_of("d5-cancel", &frames);
         let spec = QuerySpec::Distribution { frame_id: 0x400, is_extended: None, window: RowWindow::default(), byte_index: 0 };
-        let cancel = Arc::new(AtomicBool::new(true));
-        assert_eq!(capture::run("d5-cancel", &spec, None, &cancel).unwrap_err(), "Query cancelled");
+        let cancel = Cancel::from(Arc::new(AtomicBool::new(true)));
+        assert_eq!(wait(capture::run("d5-cancel", &spec, None, &cancel)).unwrap_err(), "Query cancelled");
     }
 
     #[test]
