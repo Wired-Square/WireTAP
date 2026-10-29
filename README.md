@@ -103,6 +103,37 @@ npm run tauri:build:debug
 rm -rf node_modules/.vite frontend/wiretap-ui/dist target
 ```
 
+## Local CI
+
+CI runs locally. `scripts/ci.sh` is the one definition: text gates, clippy
+(natively and for Windows), and the Rust and frontend suites.
+
+```bash
+scripts/ci.sh          # everyday: a few minutes on a warm cache
+scripts/ci.sh --tag    # adds the release builds; scripts/release.js runs it
+```
+
+`--tag` builds the commit from a `git archive` outside the checkout, so a local
+`.cargo/config.toml` override never reaches it: both macOS targets as an `.app`
+and an unsigned `.pkg`, and Linux for Docker's own architecture in a container
+(`scripts/ci/linux.Dockerfile`). Linux on the other architecture and Windows are
+reported as skipped. The output is under `target/ci-tag/`, and a pass is
+recorded per clean commit, so a rerun there returns at once.
+
+It needs `node_modules` from `npm ci`, the `x86_64-pc-windows-msvc`,
+`aarch64-apple-darwin` and `x86_64-apple-darwin` targets (`rustup target add`),
+and for Linux, Docker running. The host fetches the private git and registry
+sources with its own SSH key and registry token; the container builds offline.
+
+Run it before every push, once per clone:
+
+```bash
+git config core.hooksPath scripts/hooks
+```
+
+The hook refuses a dirty tree and lets a tag-only push through: the release
+that made the tag ran `--tag`.
+
 ## License
 
 MIT
