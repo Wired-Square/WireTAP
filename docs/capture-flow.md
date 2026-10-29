@@ -143,7 +143,7 @@ user's view.
 
 | Function | Purpose |
 |----------|---------|
-| `append_frames_to_session(session_id, frames)` | Resolves the session's frame capture, then appends. No-op if the session has no frame capture (warns in log). |
+| `append_frames_to_session(session_id, frames)` | Resolves the session's frame capture, then appends. The count rises only by what the database stored: an insert refused by a lock is retried, and one that still fails is the session's error. No-op if the session has no frame capture (warns in log). |
 | `append_raw_bytes_to_session(session_id, bytes)` | Same, for byte captures. |
 
 Sources only need their `session_id` — they never carry a `capture_id`
@@ -155,7 +155,7 @@ through the streaming loop.
 |----------|---------|
 | `finalize_session_captures(session_id)` | Remove all streaming captures for the session from `streaming_ids`, persist final metadata, return the finalised `CaptureMetadata` list. Idempotent. |
 | `mark_capture_active(capture_id)` | Add to `active_ids` (UI viewing). |
-| `delete_capture(id)` / `clear_capture(id)` | Remove / reset a capture. Cleans both sets. |
+| `delete_capture(id)` / `clear_capture(id)` | Remove / reset a capture. Cleans both sets. A clear zeroes the count first, and reads of the capture answer empty until its old rows are gone; a delete whose rows could not all go keeps the metadata, so the capture loads again with what is left. |
 | `rename_capture(id, new_name)` | Rename (display name only). |
 | `set_capture_persistent(id, persistent)` | Pin or unpin. Pinned captures survive restart. |
 
@@ -171,7 +171,7 @@ through the streaming loop.
 | `get_capture_bytes(id)` / `_paginated` | Read byte data. |
 | `find_capture_offset_for_timestamp(...)` / `find_capture_bytes_offset_for_timestamp_by_id(...)` | Seek helpers. |
 | `get_capture_count(id)` / `get_capture_kind(id)` / `has_any_data()` | Misc. |
-| `copy_capture(source_id, new_name)` | Create an orphaned copy (used when an app detaches from a shared capture). |
+| `copy_capture(source_id, new_name)` | Create an orphaned copy (used when an app detaches from a shared capture). Listed only once its rows are copied. |
 | `is_known_capture(id)` | ID existence check. |
 
 ---
@@ -526,7 +526,7 @@ cannot go infinite even where a size is legitimately unresolved.
 | File | Role |
 |------|------|
 | [crates/wiretap-app/src/capture_store.rs](../crates/wiretap-app/src/capture_store.rs) | Registry, session-scoped API, streaming/active sets |
-| [crates/wiretap-app/src/capture_db.rs](../crates/wiretap-app/src/capture_db.rs) | The SQLite connection; the store itself is `wiretap-capture` |
+| [crates/wiretap-app/src/capture_db.rs](../crates/wiretap-app/src/capture_db.rs) | The app's `Store`; the store itself is [crates/wiretap-capture](../crates/wiretap-capture) |
 | [crates/wiretap-app/src/captures.rs](../crates/wiretap-app/src/captures.rs) | Tauri commands (list/read/import/delete) |
 | [crates/wiretap-app/src/capture_events.rs](../crates/wiretap-app/src/capture_events.rs) | Events — owner dispatch between `capture_db` and the gateway |
 | [crates/wiretap-app/src/framing.rs](../crates/wiretap-app/src/framing.rs) | `apply_framing_to_capture` — byte capture → frame capture |

@@ -13,12 +13,15 @@ renamed in a future cleanup.
 launch (setting: *Clear captures on start*). Pinned (persistent) captures
 always survive restart. See [capture-flow.md § Persistence](capture-flow.md#7-persistence).
 
-**Schema migrations:** The store is the `wiretap-capture` crate in
-`wslib-wiretap-rs`. All schema changes are recorded, run-once migrations
-gated by `PRAGMA user_version` and audited in the `schema_migrations` table —
-that crate's README has the rules and how to add one. Its v1 baseline
-(`baseline_capture_schema`) normalises unstamped pre-versioning databases,
-including the legacy `buffer_*` rename.
+**Schema migrations:** The store is the `wiretap-capture` crate
+(`crates/wiretap-capture`), on sqlx through `wslib-db-sqlite`. Schema changes
+are migrations in its `capture` chain (`migrations/`), recorded in
+`_capture_migrations`; a file written before the chain is first taken through
+the frozen ladder in `legacy/` (audited in `schema_migrations`), which also
+normalises unstamped pre-versioning databases and the legacy `buffer_*` rename.
+Opening stamps `PRAGMA user_version` as the chain's version plus 5, so 6
+today, and refuses a file stamped newer, leaving it untouched. That crate's
+README has the rules and how to add a migration.
 
 **PRAGMAs:**
 
@@ -26,8 +29,9 @@ including the legacy `buffer_*` rename.
 |--------|-------|--------|
 | `journal_mode` | WAL | Concurrent read/write during streaming |
 | `synchronous` | NORMAL | Safe with WAL, faster than FULL |
-| `cache_size` | -65536 | 64 MB page cache for read performance |
+| `cache_size` | -10240 | 10 MiB page cache per connection, about 64 MiB across the six |
 | `temp_store` | MEMORY | Temp tables/indexes in memory |
+| `journal_size_limit` | 16 MiB | Caps the `-wal` left after a checkpoint |
 
 ## Tables
 
@@ -147,8 +151,8 @@ timeline. A WireTAP Backend profile's events live on the gateway instead
 
 ### Capture management
 
-- **Copy capture:** `INSERT INTO frames (...) SELECT ... FROM frames WHERE capture_id = ? ORDER BY rowid` (no memory spike); bytes and `capture_events` follow in the same transaction.
-- **Delete capture:** `DELETE FROM frames WHERE capture_id = ?` (+ same for bytes and `capture_events`).
+- **Copy capture:** `INSERT INTO frames (...) SELECT ... FROM frames WHERE +capture_id = ? AND rowid > ? AND rowid <= ? ORDER BY rowid`, one transaction per window of 5,000 rowids, then bytes and `capture_events`. A reader sees the copy grow, so the registry lists it only once the copy returns; a crash part-way leaves rows with no metadata, which the next sweep removes.
+- **Delete capture:** `DELETE FROM frames WHERE +capture_id = ? AND rowid > ? AND rowid <= ?`, a window at a time (+ same for bytes, then `capture_events`), over the rows there when it began. Deleting again finishes one cut short.
 - **Clear all:** `DELETE FROM frames; DELETE FROM bytes;`
 - **Events:** `SELECT … FROM capture_events WHERE capture_id = ? ORDER BY timestamp_us, id`; insert/update/delete by `(capture_id, id)` so a stale id from another capture cannot touch a row.
 
@@ -158,8 +162,8 @@ timeline. A WireTAP Backend profile's events live on the gateway instead
 
 | Module | File | Role |
 |--------|------|------|
-| `wiretap_capture` | `wslib-wiretap-rs`: `crates/wiretap-capture` | All SQLite operations: schema, reads, writes, events. |
-| `capture_db` | `crates/wiretap-app/src/capture_db.rs` | Owns the `Mutex<Connection>` and lends it to `wiretap_capture`. |
+| `wiretap_capture` | `crates/wiretap-capture` | All SQLite operations: schema, reads, writes, events. |
+| `capture_db` | `crates/wiretap-app/src/capture_db.rs` | Holds the app's `Store`: `FrameMessage` rows, the analysis sources, retries of an insert refused by a lock. |
 | `capture_store` | `crates/wiretap-app/src/capture_store.rs` | Public API. Metadata in RAM (`RwLock<CaptureRegistry>`), delegates data ops to `capture_db`. |
 | `CaptureSource` | `crates/wiretap-app/src/io/recorded/capture.rs` | Playback engine. Reads chunks from `capture_db` for streaming. |
 
@@ -167,8 +171,8 @@ timeline. A WireTAP Backend profile's events live on the gateway instead
 
 ```
 Device/Import → capture_store::append_frames_to_session()
-                  ├─ Update metadata in RAM (count, timestamps)
-                  └─ capture_db::insert_frames() → SQLite
+                  ├─ capture_db::insert_frames() → SQLite
+                  └─ Update metadata in RAM (count, timestamps) for what was stored
 
 Frontend pagination → Tauri command → capture_store::get_capture_frames_paginated()
                                         └─ capture_db::get_frames_paginated() → SQLite
@@ -179,12 +183,10 @@ Playback → CaptureSource::run_buffer_stream()
 
 ### Lock ordering
 
-The system uses two locks:
-
 1. `CAPTURE_REGISTRY` (`RwLock`) — protects capture metadata in RAM
-2. `DB` (`Mutex`) — protects the SQLite connection
+2. The store's one writer connection — every write queues for it; reads share a pool of five
 
-**Rule:** Always acquire `CAPTURE_REGISTRY` first, release it, then call `capture_db` (which acquires `DB`). Never hold both simultaneously. This prevents deadlocks.
+**Rule:** Release `CAPTURE_REGISTRY` before awaiting the store. A sync caller reaches the store through `blocking::wait`, which runs the work on a runtime of its own.
 
 ### Why SQLite instead of in-memory storage
 
@@ -297,7 +299,7 @@ One row per transmitted frame or serial payload.
 
 | Module | File | Role |
 |--------|------|------|
-| `transmit_history` | `crates/wiretap-app/src/transmit_history.rs` | All SQLite operations. Owns the `Mutex<Connection>`. |
+| `transmit_history` | `crates/wiretap-app/src/transmit_history.rs` | All SQLite operations, on a `wslib_db_sqlite::Database` with its own migration chain (`crates/wiretap-app/migrations/transmit_history/`). |
 
 ### Data flow
 

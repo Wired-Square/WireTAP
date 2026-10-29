@@ -8,7 +8,13 @@ All notable changes to WireTAP will be documented in this file.
 
 - **MCP `console` reads the window's errors.** Agents driving the window can now read the errors and warnings it logged, including uncaught ones and those raised while it loaded, which a release build otherwise has no way to show.
 
+### Changed
+
+- **The capture database is upgraded in place the first time this version opens it.** Every capture is kept. Once it has been upgraded, don't go back to an older WireTAP with it; a capture database written by a newer WireTAP is left untouched and reported at startup rather than opened.
+
 ### Fixed
+
+- **A capture's count no longer runs ahead of what it holds.** Frames are counted once they are saved, a save refused while the database is busy is retried, and one that still fails is shown as the session's error instead of being dropped quietly. Clearing a large capture no longer shows its old frames while they are removed, and a copy appears only once it is complete.
 
 - **Firmware flashing in the Serial app.** STM32 UART read-back now handles full 256-byte chunks, and cancelling an ESP or DFU flash now stops esptool and dfu-util too. If a read-back fails or is cancelled, the existing output file is left untouched, and esptool progress no longer shows terminal control codes.
 
