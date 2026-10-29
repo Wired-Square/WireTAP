@@ -72,10 +72,9 @@ rumqttc = "0.24"
 # MCP server (opt-in via settings). rmcp comes through wslib-mcp's re-export.
 wslib-mcp = { version = "0.1", registry = "wired-square", features = ["http", "dom", "bridge"] }
 tokio-tungstenite = "0.26"
-# The transmit history database and the capture store's statements. wslib-db-sqlite
-# is a path until 0.2.4 is on the registry.
+# The transmit history database and the capture store's statements.
 sqlx = { version = "0.8.5", default-features = false, features = ["macros", "migrate", "runtime-tokio", "sqlite"] }
-wslib-db-sqlite = { path = "/Users/alex/src/wired/wslib-rs-wiretap-c3/crates/wslib-db-sqlite", version = "0.2.4", registry = "wired-square" }
+wslib-db-sqlite = { version = "0.2.4", registry = "wired-square" }
 futures = "0.3"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 # BLE scanning, mDNS discovery, the WiFi-prov GATT service, and the SMP
