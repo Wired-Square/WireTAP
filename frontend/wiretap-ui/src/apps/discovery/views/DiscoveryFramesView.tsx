@@ -409,10 +409,9 @@ function DiscoveryFramesView({
   }, [handleFrameScrub]);
 
 
-  // Close context menu when page or visible frames change
   useEffect(() => {
     setContextMenu(null);
-  }, [effectiveCurrentPage, visibleFrames]);
+  }, [effectiveCurrentPage]);
 
   const contextMenuItems: ContextMenuItem[] = useMemo(() => {
     if (!contextMenu) return [];
