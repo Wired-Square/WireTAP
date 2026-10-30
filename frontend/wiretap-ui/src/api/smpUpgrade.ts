@@ -29,7 +29,7 @@ export interface OtaStartParams {
 /**
  * Discriminated union mirroring wslib_framelink::OtaEvent plus the shim's
  * own `Cancelled`, `Complete`, and `Error` terminators. `Unknown` carries
- * a stage this build does not know, as Rust's debug text.
+ * a stage this build does not know, as the library serialises it.
  */
 export type OtaEvent =
   | { type: "SessionOpened" }
@@ -52,7 +52,7 @@ export type OtaEvent =
   | { type: "Cancelled" }
   | { type: "Complete" }
   | { type: "Error"; message: string }
-  | { type: "Unknown"; event: string };
+  | { type: "Unknown"; event: { kind?: string; [field: string]: unknown } };
 
 export async function listImages(
   deviceId: string,

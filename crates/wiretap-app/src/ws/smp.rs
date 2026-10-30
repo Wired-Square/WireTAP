@@ -17,7 +17,7 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 use tokio::sync::Notify;
-use wslib_framelink::{ImageSlot as FlImageSlot, OtaEvent, OtaOptions, OtaStream, Transport};
+use wslib_framelink::{ImageSlot as FlImageSlot, OtaEvent, OtaOptions, Transport};
 
 /// Set when an OTA is in flight; gates concurrent `ota_start` calls.
 static OTA_IN_FLIGHT: AtomicBool = AtomicBool::new(false);
@@ -114,16 +114,10 @@ async fn list_images(params: serde_json::Value) -> Result<serde_json::Value, Str
         .map_err(|e| format!("invalid list_images params: {e}"))?;
     let id = resolve_device_id(&p.device_id, p.transport.into()).await?;
     let discovery = discovery_handle().await?;
-    let session = match p.transport {
-        TransportArg::Ble => discovery
-            .open_smp_ble(&id)
-            .await
-            .map_err(|e| format!("open_smp_ble: {e}"))?,
-        TransportArg::Udp => discovery
-            .open_smp_udp(&id)
-            .await
-            .map_err(|e| format!("open_smp_udp: {e}"))?,
-    };
+    let session = discovery
+        .open_smp_on(&id, p.transport.into())
+        .await
+        .map_err(|e| format!("open_smp: {e}"))?;
     let images = session
         .list_images()
         .await
@@ -157,9 +151,9 @@ async fn ota_start(params: serde_json::Value) -> Result<serde_json::Value, Strin
     // (e.g. between list_images and start OTA).
     discovery.release_device(&id).await;
 
-    let mut stream: OtaStream = match p.transport {
-        TransportArg::Ble => Box::pin(discovery.ota_ble(&id, bytes, options)),
-        TransportArg::Udp => Box::pin(discovery.ota_udp(&id, bytes, options)),
+    let mut stream = match p.transport {
+        TransportArg::Ble => discovery.ota_ble(&id, bytes, options),
+        TransportArg::Udp => discovery.ota_udp(&id, bytes, options),
     };
     tokio::spawn(async move {
         let _guard = guard;
@@ -231,7 +225,10 @@ fn serialise_event(ev: &OtaEvent) -> serde_json::Value {
         OtaEvent::Confirmed => serde_json::json!({ "type": "Confirmed" }),
         other => {
             tlog!("[smp] unknown OTA event: {other:?}");
-            serde_json::json!({ "type": "Unknown", "event": format!("{other:?}") })
+            serde_json::json!({
+                "type": "Unknown",
+                "event": serde_json::to_value(other).unwrap_or_default(),
+            })
         }
     }
 }

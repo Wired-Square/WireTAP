@@ -54,7 +54,7 @@ function renderEvent(ev: OtaEvent, t: TFunction): string {
     case "Cancelled":       return t("firmware.ota.cancelled");
     case "Complete":        return t("firmware.ota.complete");
     case "Error":           return t("firmware.ota.error", { message: ev.message });
-    case "Unknown":         return t("firmware.ota.unknown", { event: ev.event });
+    case "Unknown":         return t("firmware.ota.unknown", { event: ev.event.kind ?? JSON.stringify(ev.event) });
   }
 }
 
