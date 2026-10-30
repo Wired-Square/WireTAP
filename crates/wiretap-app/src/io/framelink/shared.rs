@@ -14,13 +14,13 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use crate::io::error::{IoError, IoFailure};
-use framelink::protocol::capabilities::decode_capabilities;
-use framelink::protocol::types::{FLAG_ACK_REQ, MSG_CAPABILITIES_REQ};
-use framelink::session::FrameLinkSession;
+use wslib_framelink_protocol::capabilities::decode_capabilities;
+use wslib_framelink_protocol::types::{FLAG_ACK_REQ, MSG_CAPABILITIES_REQ};
+use wslib_framelink_protocol::PROTOCOL_VERSION;
+use wslib_framelink::{FrameLinkSession, Probe};
 use once_cell::sync::Lazy;
 use tokio::sync::Mutex;
 
-use super::version_probe;
 use super::{FrameLinkProbeResult, ProbeInterface};
 
 // ============================================================================
@@ -57,7 +57,7 @@ pub(crate) struct ManagedConnection {
     pub addr: SocketAddr,
     pub iface_types: HashMap<u8, u8>,
     pub probe_cache: FrameLinkProbeResult,
-    pub editable_board_def: std::sync::Mutex<Option<framelink::board::editable::EditableBoardDef>>,
+    pub editable_board_def: std::sync::Mutex<Option<wslib_framelink_board::editable::EditableBoardDef>>,
     /// Outstanding [`ConnectionLease`]s. At zero the connection is idle and the
     /// sweeper may evict it once the linger expires.
     leases: AtomicUsize,
@@ -343,17 +343,17 @@ fn embedded_board_def_fallback(
     board_name: &Option<String>,
     board_revision: &Option<String>,
 ) -> (
-    Option<framelink::board::BoardDef>,
-    Option<framelink::board::editable::EditableBoardDef>,
+    Option<wslib_framelink_board::BoardDef>,
+    Option<wslib_framelink_board::editable::EditableBoardDef>,
 ) {
     let bd = board_name.as_deref().and_then(|name| {
         board_revision
             .as_deref()
-            .and_then(|rev| framelink::board::load_board_def(name, rev))
+            .and_then(|rev| wslib_framelink_board::load_board_def(name, rev))
     });
     let ed = bd
         .as_ref()
-        .map(framelink::board::editable::EditableBoardDef::from_board_def);
+        .map(wslib_framelink_board::editable::EditableBoardDef::from_board_def);
     (bd, ed)
 }
 
@@ -371,40 +371,44 @@ async fn diagnose_failed_connect(addr: SocketAddr, display_key: &str, original: 
         return original;
     }
 
-    let verdict = version_probe::probe_version(addr).await;
+    let verdict = wslib_framelink::probe(addr).await;
     tlog!(
         "[framelink:{}] Capabilities failed ({}); version probe says {:?}",
         display_key,
         original,
         verdict
     );
+    explain_probe(verdict, display_key, original)
+}
 
-    use version_probe::VersionVerdict;
+fn explain_probe(
+    verdict: Result<Probe, wslib_framelink::Error>,
+    display_key: &str,
+    original: IoError,
+) -> IoError {
     match verdict {
         // The peer speaks our version, so the mismatch story would be a lie —
         // report what actually went wrong.
-        VersionVerdict::SameVersion => original,
-        VersionVerdict::Speaks(v) => IoError::protocol(
+        Ok(Probe::Answered(PROTOCOL_VERSION)) => original,
+        Ok(Probe::Answered(v)) => IoError::protocol(
             display_key,
             format!(
                 "device speaks FrameLink protocol v{v}, but this build speaks \
-                 v{}. The two cannot talk to each other — update the device \
-                 firmware, then try again.",
-                framelink::codec::frame::PROTOCOL_VERSION
+                 v{PROTOCOL_VERSION}. The two cannot talk to each other — update the device \
+                 firmware, then try again."
             ),
         ),
-        VersionVerdict::Unintelligible => IoError::protocol(
+        Ok(Probe::Unparseable) => IoError::protocol(
             display_key,
             "device replied in a FrameLink dialect this build cannot read — its \
              firmware predates a change to the frame format. Update the device \
-             firmware, then try again."
-                .to_string(),
+             firmware, then try again.",
         ),
         // Connected, pinged in every dialect, heard nothing. On a device that
         // serves exactly one client that is overwhelmingly "someone else has
         // it" — which is what DeviceBusy already says, including the close-the-
         // other-app instruction this used to reinvent without.
-        VersionVerdict::Silent => IoError::busy(display_key),
+        _ => IoError::busy(display_key),
     }
 }
 
@@ -424,7 +428,7 @@ async fn fetch_capabilities(
     (
         HashMap<u8, u8>,
         FrameLinkProbeResult,
-        Option<framelink::board::editable::EditableBoardDef>,
+        Option<wslib_framelink_board::editable::EditableBoardDef>,
     ),
     IoError,
 > {
@@ -458,7 +462,7 @@ async fn fetch_capabilities(
     let board_revision = caps.board_revision().map(|s| s.to_string());
 
     // Try downloading the device TOML first; fall back to embedded board def
-    let (board_def, editable) = match framelink::board::transfer::download_board_def(session)
+    let (board_def, editable) = match wslib_framelink::board::download_board_def(session)
         .await
     {
         Ok(Some(toml_str)) => {
@@ -467,8 +471,8 @@ async fn fetch_capabilities(
                 key,
                 toml_str.len()
             );
-            let ed = framelink::board::editable::EditableBoardDef::from_toml(&toml_str).ok();
-            let bd = framelink::board::parse_board_def(&toml_str).ok();
+            let ed = wslib_framelink_board::editable::EditableBoardDef::from_toml(&toml_str).ok();
+            let bd = wslib_framelink_board::parse_board_def(&toml_str).ok();
             if ed.is_none() && bd.is_none() {
                 // A poisoned/unparseable device TOML would otherwise leave no
                 // board def and no way to recover. Fall back to embedded so the
@@ -509,14 +513,14 @@ async fn fetch_capabilities(
                 .map(|s| s.to_string())
                 .unwrap_or_else(|| {
                     let type_name =
-                        framelink::protocol::types::interface_name(iface.iface_type);
+                        wslib_framelink_protocol::types::interface_name(iface.iface_type);
                     format!("{} {}", type_name, iface.index)
                 });
             ProbeInterface {
                 index: iface.index,
                 iface_type: iface.iface_type,
                 name,
-                type_name: framelink::protocol::types::interface_name(iface.iface_type).to_string(),
+                type_name: wslib_framelink_protocol::types::interface_name(iface.iface_type).to_string(),
             }
         })
         .collect();
@@ -559,11 +563,11 @@ pub(crate) async fn get_connection(
     let addr = match pooled {
         // Dead connection — reconnect using its last known address.
         Some(addr) => addr,
-        None => match framelink::target_for(
-            &framelink::DeviceId::from(device_id),
-            framelink::Transport::Tcp,
+        None => match wslib_framelink::registry::target_for(
+            &wslib_framelink::DeviceId::from(device_id),
+            wslib_framelink::Transport::Tcp,
         ) {
-            framelink::ConnectTarget::Direct(addr) => addr,
+            wslib_framelink::registry::ConnectTarget::Direct(addr) => addr,
             _ => discover_address(device_id, timeout_sec).await?,
         },
     };
@@ -622,7 +626,7 @@ pub(crate) async fn find_probe_by_address(addr: SocketAddr) -> Option<FrameLinkP
 
 /// The device's board definition: its downloaded TOML, which carries the
 /// user-signal labels, else the embedded def for its board and revision.
-pub(crate) async fn load_board_def(device_id: &str) -> Option<framelink::board::BoardDef> {
+pub(crate) async fn load_board_def(device_id: &str) -> Option<wslib_framelink_board::BoardDef> {
     let pool = POOL.lock().await;
     let conn = pool.get(device_id).filter(|c| c.session.is_alive())?;
     let from_device = conn
@@ -633,7 +637,7 @@ pub(crate) async fn load_board_def(device_id: &str) -> Option<framelink::board::
     from_device.or_else(|| {
         let name = conn.probe_cache.board_name.as_ref()?;
         let rev = conn.probe_cache.board_revision.as_ref()?;
-        framelink::board::load_board_def(name, rev)
+        wslib_framelink_board::load_board_def(name, rev)
     })
 }
 
@@ -652,7 +656,7 @@ pub(crate) async fn get_iface_type(device_id: &str, iface_index: u8) -> Option<u
 /// Clone the EditableBoardDef from a managed connection, if one exists.
 pub(crate) async fn clone_editable_board_def(
     device_id: &str,
-) -> Option<framelink::board::editable::EditableBoardDef> {
+) -> Option<wslib_framelink_board::editable::EditableBoardDef> {
     let pool = POOL.lock().await;
     let conn = pool.get(device_id).filter(|c| c.session.is_alive())?;
     let guard = conn.editable_board_def.lock().ok()?;
@@ -666,7 +670,7 @@ pub(crate) async fn with_editable_board_def<F, R>(
     f: F,
 ) -> Result<R, String>
 where
-    F: FnOnce(&mut framelink::board::editable::EditableBoardDef) -> R,
+    F: FnOnce(&mut wslib_framelink_board::editable::EditableBoardDef) -> R,
 {
     let conn = get_connection(device_id, timeout_sec).await?;
     let mut guard = conn
@@ -807,5 +811,26 @@ mod tests {
 
         drop(lease);
         POOL.lock().await.remove("sweep.revived");
+    }
+
+    #[test]
+    fn a_probe_names_what_the_device_answered() {
+        let explain = |verdict| explain_probe(verdict, "dev", IoError::timeout("dev", "capabilities"));
+        let other = PROTOCOL_VERSION + 1;
+
+        assert!(matches!(explain(Ok(Probe::Answered(PROTOCOL_VERSION))), IoError::Timeout { .. }));
+        assert!(matches!(
+            explain(Ok(Probe::Answered(other))),
+            IoError::Protocol { details, .. } if details.contains(&format!("speaks FrameLink protocol v{other}"))
+        ));
+        assert!(matches!(
+            explain(Ok(Probe::Unparseable)),
+            IoError::Protocol { details, .. } if details.contains("dialect this build cannot read")
+        ));
+        assert!(matches!(explain(Ok(Probe::Silent)), IoError::DeviceBusy { .. }));
+        assert!(matches!(
+            explain(Err(wslib_framelink::Error::from(std::io::Error::other("refused")))),
+            IoError::DeviceBusy { .. }
+        ));
     }
 }

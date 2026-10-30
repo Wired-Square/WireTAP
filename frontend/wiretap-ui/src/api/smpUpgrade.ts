@@ -1,5 +1,5 @@
 // SMP / OTA wrappers — thin layer over WS commands and the OtaEvent
-// push channel. All protocol logic lives in framelink-rs; this file
+// push channel. All protocol logic lives in wslib-framelink; this file
 // only translates between the WS wire format and the UI.
 
 import { wsTransport } from "../services/wsTransport";
@@ -27,8 +27,9 @@ export interface OtaStartParams {
 }
 
 /**
- * Discriminated union mirroring framelink::OtaEvent plus the shim's
- * own `Cancelled`, `Complete`, and `Error` terminators.
+ * Discriminated union mirroring wslib_framelink::OtaEvent plus the shim's
+ * own `Cancelled`, `Complete`, and `Error` terminators. `Unknown` carries
+ * a stage this build does not know, as the library serialises it.
  */
 export type OtaEvent =
   | { type: "SessionOpened" }
@@ -50,7 +51,8 @@ export type OtaEvent =
   | { type: "Confirmed" }
   | { type: "Cancelled" }
   | { type: "Complete" }
-  | { type: "Error"; message: string };
+  | { type: "Error"; message: string }
+  | { type: "Unknown"; event: { kind?: string; [field: string]: unknown } };
 
 export async function listImages(
   deviceId: string,

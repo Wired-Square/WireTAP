@@ -10,11 +10,13 @@ All notable changes to WireTAP will be documented in this file.
 
 ### Changed
 
+- **FrameLink devices need firmware that speaks protocol 4.** Devices on older firmware no longer connect; update them before moving to this version. A firmware upgrade can no longer be cancelled once the device has started activating the new image, because stopping it there could leave the device without working firmware.
 - **The capture database is upgraded in place the first time this version opens it.** Every capture is kept. Once it has been upgraded, don't go back to an older WireTAP with it; a capture database written by a newer WireTAP is left untouched and reported at startup rather than opened.
 - **A CAN or serial device that drops out is retried with a growing pause.** WireTAP waits 1 s before the first reopen and doubles the wait up to 30 s, so a missing adapter no longer gets hammered. A device plugged back in can take up to 30 s to resume.
 
 ### Fixed
 
+- **CAN FD and remote frames from a FrameLink device are marked correctly.** An FD frame had shown as a remote frame, and remote frames were not marked at all.
 - **A capture's count no longer runs ahead of what it holds.** Frames are counted once they are saved, a save refused while the database is busy is retried, and one that still fails is shown as the session's error instead of being dropped quietly. Clearing a large capture no longer shows its old frames while they are removed, and a copy appears only once it is complete.
 
 - **Firmware flashing in the Serial app.** STM32 UART read-back now handles full 256-byte chunks, and cancelling an ESP or DFU flash now stops esptool and dfu-util too. If a read-back fails or is cancelled, the existing output file is left untouched, and esptool progress no longer shows terminal control codes.

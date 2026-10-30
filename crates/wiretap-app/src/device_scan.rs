@@ -1,6 +1,6 @@
 // Unified device scan module
 //
-// Drives `framelink::Discovery` — one handle that scans BLE + mDNS in
+// Drives `wslib_framelink::Discovery` — one handle that scans BLE + mDNS in
 // parallel, decodes FrameLink manufacturer data, and emits `Seen /
 // Updated / Lost / Error` events. We translate those into the
 // `UnifiedDevice` payload that the frontend already consumes via
@@ -10,9 +10,9 @@
 // `smp_upgrade` to open WiFi-prov / SMP sessions — that's why it lives
 // here behind `discovery_handle()` rather than inside one of the
 // per-feature modules. Sessions opened on the same device share one
-// BLE link (refcounted inside framelink).
+// BLE link (refcounted inside wslib-framelink).
 
-use framelink::{
+use wslib_framelink::{
     Capability, Device, DeviceId, Discovery, DiscoveryEvent, Transport,
 };
 use once_cell::sync::Lazy;
@@ -75,7 +75,7 @@ struct DiscoveryState {
 }
 
 /// How long after `device_scan_start` to emit `device-scan-finished`.
-/// Long enough for the BLE poll cadence (500 ms inside framelink) to
+/// Long enough for the BLE poll cadence (500 ms inside wslib-framelink) to
 /// have surfaced any device in advertising range plus the mDNS resolver
 /// to have answered, short enough that the user sees the Rescan button
 /// light up well before they grow impatient.
@@ -100,14 +100,14 @@ pub async fn discovery_handle() -> Result<Discovery, String> {
     }
     let d = Discovery::start()
         .await
-        .map_err(|e| format!("framelink::Discovery::start failed: {e}"))?;
+        .map_err(|e| format!("wslib_framelink::Discovery::start failed: {e}"))?;
     state.discovery = Some(d.clone());
-    tlog!("[device_scan] framelink::Discovery started");
+    tlog!("[device_scan] wslib_framelink::Discovery started");
     Ok(d)
 }
 
 // ============================================================================
-// Mapping framelink::Device → UnifiedDevice
+// Mapping wslib_framelink::Device → UnifiedDevice
 // ============================================================================
 
 fn capability_strs(device: &Device) -> Vec<String> {
@@ -268,6 +268,7 @@ pub async fn device_scan_start(app: AppHandle) -> Result<(), String> {
                 DiscoveryEvent::Error { source, message } => {
                     tlog!("[device_scan] Discovery error ({:?}): {}", source, message);
                 }
+                _ => {}
             }
         }
         tlog!("[device_scan] event stream ended");
@@ -326,7 +327,7 @@ pub async fn device_scan_stop() -> Result<(), String> {
 }
 
 /// Single point of tear-down for a device. Drops every cached
-/// `Arc<Session>` framelink-rs is holding for the id; once any
+/// `Arc<Session>` wslib-framelink is holding for the id; once any
 /// in-flight operation drops its local clone, the lease's strong
 /// count falls to zero and `PeripheralLease::Drop` runs the BLE
 /// disconnect. UDP id (`mdns:udp:...`) is supported here too — the

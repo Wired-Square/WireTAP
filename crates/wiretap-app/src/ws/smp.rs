@@ -2,15 +2,14 @@
 
 //! WS dispatch surface for SMP/OTA. Two read-only RPCs (`list_images`,
 //! `ota_cancel`) and one fire-and-forget `ota_start` that drives
-//! `framelink::Discovery::ota_ble`/`ota_udp` and pumps each `OtaEvent`
-//! onto the global WS channel as `MsgType::OtaEvent`.
+//! `Discovery::ota_on` and pumps each `OtaEvent` onto the global
+//! WS channel as `MsgType::OtaEvent`.
 //!
 //! Single OTA at a time. A second `ota_start` while one is in flight
 //! returns an error.
 
 use crate::device_scan::{discovery_handle, resolve_device_id};
 use crate::ws::dispatch::send_ota_event;
-use framelink::{ImageSlot as FlImageSlot, OtaEvent, OtaOptions, Transport};
 use futures::StreamExt;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
@@ -18,23 +17,29 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 use tokio::sync::Notify;
+use wslib_framelink::{ImageSlot as FlImageSlot, OtaEvent, OtaOptions, Transport};
 
 /// Set when an OTA is in flight; gates concurrent `ota_start` calls.
 static OTA_IN_FLIGHT: AtomicBool = AtomicBool::new(false);
 
-/// Clears `OTA_IN_FLIGHT` on drop. Holds the in-flight slot for the lifetime
-/// of the spawned pump task — even if the task panics or is dropped before
-/// completing, the slot is released.
+/// Set once the in-flight update reaches `Activating`, after which dropping
+/// its stream no longer cancels it.
+static OTA_ACTIVATING: AtomicBool = AtomicBool::new(false);
+
+/// Clears `OTA_IN_FLIGHT` and `OTA_ACTIVATING` on drop. Holds the in-flight
+/// slot for the lifetime of the spawned pump task — even if the task panics
+/// or is dropped before completing, the slot is released.
 struct InFlightGuard;
 
 impl Drop for InFlightGuard {
     fn drop(&mut self) {
+        OTA_ACTIVATING.store(false, Ordering::Release);
         OTA_IN_FLIGHT.store(false, Ordering::Release);
     }
 }
 
 /// Cancel signal. `ota_cancel` notifies; the OTA pump task selects
-/// against it and bails on notify.
+/// against it and drops the stream, which ends the update.
 static OTA_CANCEL: Lazy<Notify> = Lazy::new(Notify::new);
 
 #[derive(Clone, Serialize)]
@@ -63,11 +68,11 @@ struct OtaStartParams {
     /// Path to the firmware .bin on the local filesystem.
     file_path: PathBuf,
     /// Failsafe seconds to wait for the device to reappear in
-    /// discovery after reset. Default 30.
+    /// discovery after reset. Defaults to `OtaOptions::default()`.
     reconnect_timeout_secs: Option<u32>,
 }
 
-#[derive(Deserialize)]
+#[derive(Clone, Copy, Deserialize)]
 #[serde(rename_all = "lowercase")]
 enum TransportArg {
     Ble,
@@ -93,7 +98,7 @@ fn map_image_slot(s: FlImageSlot) -> ImageSlotInfo {
         confirmed: s.confirmed,
         active: s.active,
         permanent: s.permanent,
-        image: s.image,
+        image: s.image.map(i32::from),
     }
 }
 
@@ -112,20 +117,12 @@ pub async fn dispatch(
 async fn list_images(params: serde_json::Value) -> Result<serde_json::Value, String> {
     let p: ListImagesParams = serde_json::from_value(params)
         .map_err(|e| format!("invalid list_images params: {e}"))?;
-    let transport = Transport::from(p.transport);
-    let id = resolve_device_id(&p.device_id, transport).await?;
+    let id = resolve_device_id(&p.device_id, p.transport.into()).await?;
     let discovery = discovery_handle().await?;
-    let session = match transport {
-        Transport::Ble => discovery
-            .open_smp_ble(&id)
-            .await
-            .map_err(|e| format!("open_smp_ble: {e}"))?,
-        Transport::Udp => discovery
-            .open_smp_udp(&id)
-            .await
-            .map_err(|e| format!("open_smp_udp: {e}"))?,
-        Transport::Tcp => return Err("SMP over Tcp transport is not supported".into()),
-    };
+    let session = discovery
+        .open_smp_on(&id, p.transport.into())
+        .await
+        .map_err(|e| format!("open_smp: {e}"))?;
     let images = session
         .list_images()
         .await
@@ -146,11 +143,11 @@ async fn ota_start(params: serde_json::Value) -> Result<serde_json::Value, Strin
     let bytes: std::sync::Arc<[u8]> = std::fs::read(&p.file_path)
         .map_err(|e| format!("read firmware: {e}"))?
         .into();
-    let transport = Transport::from(p.transport);
-    let id = resolve_device_id(&p.device_id, transport).await?;
-    let options = OtaOptions {
-        reconnect_timeout: Duration::from_secs(p.reconnect_timeout_secs.unwrap_or(30) as u64),
-    };
+    let id = resolve_device_id(&p.device_id, p.transport.into()).await?;
+    let options = p
+        .reconnect_timeout_secs
+        .map(|secs| OtaOptions::default().with_reconnect_timeout(Duration::from_secs(secs.into())))
+        .unwrap_or_default();
     let discovery = discovery_handle().await?;
 
     // Drop any cached session for this device so the OTA opens a fresh
@@ -159,21 +156,9 @@ async fn ota_start(params: serde_json::Value) -> Result<serde_json::Value, Strin
     // (e.g. between list_images and start OTA).
     discovery.release_device(&id).await;
 
+    let mut stream = discovery.ota_on(&id, bytes, options, p.transport.into());
     tokio::spawn(async move {
         let _guard = guard;
-        let mut stream: std::pin::Pin<
-            Box<dyn futures::Stream<Item = Result<OtaEvent, framelink::SmpError>> + Send>,
-        > = match transport {
-            Transport::Ble => Box::pin(discovery.ota_ble(&id, bytes, options)),
-            Transport::Udp => Box::pin(discovery.ota_udp(&id, bytes, options)),
-            Transport::Tcp => {
-                send_ota_event(&serde_json::json!({
-                    "type": "Error",
-                    "message": "SMP over Tcp transport is not supported",
-                }));
-                return;
-            }
-        };
         loop {
             tokio::select! {
                 biased;
@@ -182,7 +167,10 @@ async fn ota_start(params: serde_json::Value) -> Result<serde_json::Value, Strin
                     break;
                 }
                 next = stream.next() => match next {
-                    Some(Ok(ev)) => send_ota_event(&serialize_event(&ev)),
+                    Some(Ok(ev)) => {
+                        note_stage(&ev);
+                        send_ota_event(&serialise_event(&ev));
+                    }
                     Some(Err(e)) => {
                         send_ota_event(&serde_json::json!({
                             "type": "Error",
@@ -202,14 +190,25 @@ async fn ota_start(params: serde_json::Value) -> Result<serde_json::Value, Strin
     Ok(serde_json::json!({}))
 }
 
+fn note_stage(ev: &OtaEvent) {
+    if matches!(ev, OtaEvent::Activating) {
+        OTA_ACTIVATING.store(true, Ordering::Release);
+    }
+}
+
 async fn ota_cancel() -> Result<serde_json::Value, String> {
+    if OTA_ACTIVATING.load(Ordering::Acquire) {
+        return Err("activation has started: the device will finish the update \
+                    or revert to its previous image on its own"
+            .into());
+    }
     OTA_CANCEL.notify_waiters();
     Ok(serde_json::json!({}))
 }
 
-/// Map a `framelink::OtaEvent` to a JSON object the frontend can decode
-/// without needing to know the Rust enum's bincode shape.
-fn serialize_event(ev: &OtaEvent) -> serde_json::Value {
+/// Map an `OtaEvent` to a JSON object the frontend can decode without
+/// needing to know the Rust enum's shape.
+fn serialise_event(ev: &OtaEvent) -> serde_json::Value {
     match ev {
         OtaEvent::SessionOpened => serde_json::json!({ "type": "SessionOpened" }),
         OtaEvent::UploadProgress(p) => serde_json::json!({
@@ -240,5 +239,29 @@ fn serialize_event(ev: &OtaEvent) -> serde_json::Value {
         }),
         OtaEvent::Confirming => serde_json::json!({ "type": "Confirming" }),
         OtaEvent::Confirmed => serde_json::json!({ "type": "Confirmed" }),
+        other => {
+            tlog!("[smp] unknown OTA event: {other:?}");
+            serde_json::json!({
+                "type": "Unknown",
+                "event": serde_json::to_value(other).unwrap_or_default(),
+            })
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn cancel_is_refused_from_activating_until_the_update_ends() {
+        let guard = InFlightGuard;
+        assert!(ota_cancel().await.is_ok());
+
+        note_stage(&OtaEvent::Activating);
+        assert!(ota_cancel().await.unwrap_err().contains("activation has started"));
+
+        drop(guard);
+        assert!(ota_cancel().await.is_ok());
     }
 }

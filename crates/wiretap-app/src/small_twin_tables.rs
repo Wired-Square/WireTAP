@@ -1,7 +1,7 @@
 //! The `rust` column of P5's small-twin rule tables, which the TypeScript's
 //! `smallTwinsRuleTables.test.tsx` checks its own column of.
 
-use framelink::protocol::{frame_def, types::interface_name};
+use wslib_framelink_protocol::{frame_def, types::interface_name};
 use serde_json::Value;
 use wslib_bits::{extract_field, BitOrder, Endianness};
 use wslib_can::{dlc_to_len, len_to_dlc};

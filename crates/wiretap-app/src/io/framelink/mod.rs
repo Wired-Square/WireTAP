@@ -7,13 +7,13 @@ pub mod reader;
 pub mod registry;
 pub mod rules;
 mod shared;
-mod version_probe;
 
 use std::collections::HashMap;
 
-use framelink::protocol::dsig;
-use framelink::protocol::stream::{build_frame_tx, FrameMetadata, StreamFrame};
-use framelink::protocol::types::{
+use wslib_framelink_protocol::dsig;
+use wslib_framelink_protocol::frame_def::{CAN_FLAG_EXTENDED, CAN_FLAG_FD, CAN_FLAG_RTR};
+use wslib_framelink_protocol::stream::{build_frame_tx, FrameMetadata, StreamFrame};
+use wslib_framelink_protocol::types::{
     FLAG_ACK_REQ, IFACE_CANFD, MSG_DSIG_READ,
     MSG_DSIG_WRITE, MSG_PERSIST_SAVE,
 };
@@ -85,9 +85,9 @@ pub fn convert_stream_frame(
 
     match &sf.metadata {
         FrameMetadata::Can { can_id, dlc, flags } => {
-            let is_extended = (flags & 1) != 0;
-            let is_rtr = (flags & 2) != 0;
-            let is_fd = (flags & 4) != 0 || iface_type == IFACE_CANFD;
+            let is_extended = flags & CAN_FLAG_EXTENDED != 0;
+            let is_rtr = flags & CAN_FLAG_RTR != 0;
+            let is_fd = flags & CAN_FLAG_FD != 0 || iface_type == IFACE_CANFD;
 
             // Find bus mapping for this interface index
             let output_bus = bus_mappings
@@ -132,7 +132,7 @@ pub fn convert_stream_frame(
                 ..Default::default()
             })
         }
-        FrameMetadata::Unknown { .. } => {
+        _ => {
             tlog!(
                 "[framelink] Unknown frame metadata on interface {}",
                 sf.iface_index
@@ -147,7 +147,7 @@ pub fn encode_framelink_can_tx(frame: &CanTransmitFrame) -> Vec<u8> {
     let meta = FrameMetadata::Can {
         can_id: frame.frame_id,
         dlc: frame.data.len() as u8,
-        flags: if frame.is_extended { 1 } else { 0 },
+        flags: if frame.is_extended { CAN_FLAG_EXTENDED } else { 0 },
     };
     build_frame_tx(frame.bus, &meta, &frame.data)
 }
@@ -320,7 +320,7 @@ pub async fn framelink_write_signal(
         .map_err(|e| e.to_string())?;
 
     if persist {
-        let persist_payload = framelink::protocol::persist::build_persist_save();
+        let persist_payload = wslib_framelink_protocol::persist::build_persist_save();
         conn.session
             .request(MSG_PERSIST_SAVE, FLAG_ACK_REQ, &persist_payload)
             .await
@@ -363,16 +363,16 @@ fn default_signal_meta(
     (
         sig.semantic_name(Some(iface_type)),
         "Interface".to_string(),
-        framelink::protocol::types::quantity_unit(sig.quantity).to_string(),
+        wslib_framelink_protocol::types::quantity_unit(sig.quantity).to_string(),
         HashMap::new(),
-        framelink::board::display::format_iface_value(sig, value),
+        wslib_framelink_board::display::format_iface_value(sig, value),
     )
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use framelink::protocol::types;
+    use wslib_framelink_protocol::types;
 
     fn received_can(flags: u8, dlc: u8, data: Vec<u8>) -> FrameMessage {
         let sf = StreamFrame {
@@ -387,7 +387,7 @@ mod tests {
 
     #[test]
     fn a_received_rtr_keeps_its_flag_and_requested_length() {
-        let f = received_can(0x02, 4, vec![]);
+        let f = received_can(CAN_FLAG_RTR, 4, vec![]);
         assert!(f.is_rtr);
         assert_eq!(f.dlc, 4);
         assert!(f.bytes.is_empty());
@@ -396,13 +396,13 @@ mod tests {
 
     #[test]
     fn the_fd_flag_bit_marks_a_frame_fd() {
-        assert!(received_can(0x04, 12, vec![0; 12]).is_fd);
+        assert!(received_can(CAN_FLAG_FD, 12, vec![0; 12]).is_fd);
     }
 
     /// `src/api/framelinkAxes.ts` hand-mirrors identity-tuple codes so the
     /// frontend can pick a control from structured values rather than sniffing
     /// display strings. Nothing generates that file, so a value renumbered in
-    /// framelink-rs would silently mis-render a control with no compile error
+    /// wslib-framelink-protocol would silently mis-render a control with no compile error
     /// on either side — the frontend would just start choosing the wrong widget.
     /// Pin the mirror to the crate here, where the crate is always available
     /// (a vitest would have to find the Rust source, which CI has no path to).
@@ -438,7 +438,7 @@ mod tests {
             assert_eq!(
                 mirrored(name),
                 expected,
-                "framelinkAxes.ts {name} has drifted from framelink::protocol::types"
+                "framelinkAxes.ts {name} has drifted from wslib_framelink_protocol::types"
             );
         }
     }

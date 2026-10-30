@@ -12,8 +12,8 @@ export const VALUE_TYPE_FLOAT = 2;
 export const VALUE_TYPE_BOOL = 3;
 export const VALUE_TYPE_ARRAY = 4;
 
-export const VALUE_TYPES = VALUE_TYPE_NAMES.map((name, value) => ({
-  value,
+export const VALUE_TYPES = Object.entries(VALUE_TYPE_NAMES).map(([code, name]) => ({
+  value: Number(code),
   label: name.charAt(0).toUpperCase() + name.slice(1),
 }));
 

@@ -1,17 +1,17 @@
 // Copyright 2026 Wired Square Pty Ltd
 //
-// WS command surface for the framelink-rs device registry. The registry
+// WS command surface for the wslib-framelink device registry. The registry
 // (single source of truth, owned by the library at the platform config dir)
 // records which devices exist and how to reach them — `auto` (resolve via
 // mDNS) or `manual` (connect to a stored host, never discover). This module
-// is thin glue: it translates WS JSON to/from `framelink::DeviceRegistry`
+// is thin glue: it translates WS JSON to/from `wslib_framelink::registry::DeviceRegistry`
 // and never duplicates registry logic.
 
 use std::net::IpAddr;
 
 use serde_json::{json, Value};
 
-use framelink::{DeviceRecord, DeviceRegistry, Resolution};
+use wslib_framelink::registry::{DeviceRecord, DeviceRegistry};
 
 use super::shared::get_device_id;
 
@@ -19,10 +19,7 @@ use super::shared::get_device_id;
 fn record_json(rec: &DeviceRecord) -> Value {
     json!({
         "device_id": rec.name,
-        "resolution": match rec.resolution {
-            Resolution::Auto => "auto",
-            Resolution::Manual => "manual",
-        },
+        "resolution": rec.resolution,
         "host": rec.host.map(|h| h.to_string()),
         "framelink_port": rec.framelink_port,
         "smp_port": rec.smp_port,

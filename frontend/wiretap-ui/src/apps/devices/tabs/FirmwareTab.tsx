@@ -11,6 +11,7 @@ import { FolderOpen, HardDriveUpload, ListChecks, XCircle } from "lucide-react";
 import {
   labelSimple,
   textDanger,
+  textMuted,
   textPrimary,
   textSecondary,
   textSuccess,
@@ -54,6 +55,7 @@ function renderEvent(ev: OtaEvent, t: TFunction): string {
     case "Cancelled":       return t("firmware.ota.cancelled");
     case "Complete":        return t("firmware.ota.complete");
     case "Error":           return t("firmware.ota.error", { message: ev.message });
+    case "Unknown":         return t("firmware.ota.unknown", { event: ev.event.kind ?? JSON.stringify(ev.event) });
   }
 }
 
@@ -134,6 +136,7 @@ export default function FirmwareTab({ deviceId, availableTransports }: Props) {
     startedAt: number | null;
   }>({ latest: null, startedAt: null });
   const [running, setRunning] = useState(false);
+  const [activating, setActivating] = useState(false);
   const [listError, setListError] = useState<string | null>(null);
 
   const logRef = useRef<HTMLUListElement>(null);
@@ -153,6 +156,9 @@ export default function FirmwareTab({ deviceId, availableTransports }: Props) {
           const next = prev.length < EVENT_LOG_MAX ? [...prev, ev] : [...prev.slice(1), ev];
           return next;
         });
+        if (ev.type === "Activating") {
+          setActivating(true);
+        }
         if (TERMINATOR_TYPES.has(ev.type)) {
           setRunning(false);
         }
@@ -183,6 +189,7 @@ export default function FirmwareTab({ deviceId, availableTransports }: Props) {
     if (!filePath) return;
     setEvents([]);
     setProgressState({ latest: null, startedAt: null });
+    setActivating(false);
     setRunning(true);
     try {
       await otaStart({ deviceId, transport, filePath });
@@ -254,13 +261,19 @@ export default function FirmwareTab({ deviceId, availableTransports }: Props) {
         {/* Action buttons */}
         <div className="flex items-center gap-2 pt-1">
           {running ? (
-            <DangerButton
-              onClick={handleCancel}
-              className="min-w-40"
-            >
-              <XCircle className="w-4 h-4" />
-              {t("firmware.cancel")}
-            </DangerButton>
+            <>
+              <DangerButton
+                onClick={handleCancel}
+                disabled={activating}
+                className="min-w-40"
+              >
+                <XCircle className="w-4 h-4" />
+                {t("firmware.cancel")}
+              </DangerButton>
+              {activating && (
+                <span className={`text-xs ${textMuted}`}>{t("firmware.cancelPastActivation")}</span>
+              )}
+            </>
           ) : (
             <PrimaryButton
               onClick={handleStart}

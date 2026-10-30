@@ -78,15 +78,11 @@ sqlx = { version = "0.8.5", default-features = false, features = ["macros", "mig
 wslib-db-sqlite = { version = "0.2.4", registry = "wired-square" }
 futures = "0.3"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-# BLE scanning, mDNS discovery, the WiFi-prov GATT service, and the SMP
-# transports for firmware upgrade are all provided by framelink (which
-# vendors btleplug 0.12, mdns-sd, and mcumgr-smp internally — we don't
-# depend on any of them directly any more).
-# Pinned by tag, not `branch = "main"`: the tag names the wire contracts this
-# build speaks — p3 = protocol version, r2 = rule format, b1 = BLE advert schema
-# — and tracking a branch made the resolved revision arbitrary, so crate/firmware
-# drift was invisible. Move this and the sibling checkout together.
-framelink = { git = "ssh://git@github.com/Wired-Square/framelink-rs.git", tag = "v0.2.1+p3.r2.b1", features = ["discovery", "ble", "wifi-prov", "smp"] }
+# The FrameLink protocol, board definitions and session: BLE scanning, mDNS
+# discovery, the WiFi-prov GATT service and SMP firmware upgrade.
+wslib-framelink-protocol = { version = "0.1", registry = "wired-square", features = ["ts"] }
+wslib-framelink-board = { version = "0.1", registry = "wired-square" }
+wslib-framelink = { version = "0.1.1", registry = "wired-square", features = ["discovery", "ble", "wifi-prov", "smp"] }
 # The catalogue: parse, validate, decode, encode and DBC for CAN, Serial and Modbus.
 wslib-wiretap-catalogue = { version = "0.1", registry = "wired-square" }
 wslib-checksum = { version = "0.1", registry = "wired-square" }

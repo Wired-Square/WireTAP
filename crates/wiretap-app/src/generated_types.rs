@@ -71,7 +71,7 @@ fn render() -> BTreeMap<PathBuf, String> {
             ),
             (
                 PathBuf::from("framelinkNames.ts"),
-                (TypeId::of::<framelink::protocol::frame_def::FrameSignalDef>(), framelink_names()),
+                (TypeId::of::<wslib_framelink_protocol::frame_def::FrameSignalDef>(), framelink_names()),
             ),
         ]),
     };
@@ -290,16 +290,25 @@ fn can_fd_lengths() -> String {
 
 /// FrameLink's interface and signal value-type names, by their wire codes.
 fn framelink_names() -> String {
-    use framelink::protocol::{frame_def::value_type_name, types::interface_name};
-    let interfaces: String = (0..=u8::MAX)
-        .map(|code| (code, interface_name(code)))
-        .filter(|(_, name)| *name != "Unknown")
-        .map(|(code, name)| format!("  {code}: {name:?},\n"))
-        .collect();
-    let value_types: Vec<_> = (0..=u8::MAX).map(value_type_name).take_while(|name| *name != "unknown").collect();
+    use wslib_framelink_protocol::{frame_def::VALUE_TYPE_NAMES, types::INTERFACE_NAMES};
     format!(
-        "{HEADER}\nexport const INTERFACE_TYPE_NAMES: Record<number, string> = {{\n{interfaces}}};\n\nexport const VALUE_TYPE_NAMES = {value_types:?} as const;\n"
+        "{HEADER}\n{}\n{}",
+        names_by_code("INTERFACE_TYPE_NAMES", INTERFACE_NAMES),
+        names_by_code("VALUE_TYPE_NAMES", VALUE_TYPE_NAMES)
     )
+}
+
+fn names_by_code(name: &str, table: &[(u8, &str)]) -> String {
+    let rows: String = table.iter().map(|(code, name)| format!("  {code}: {name:?},\n")).collect();
+    format!("export const {name}: Record<number, string> = {{\n{rows}}};\n")
+}
+
+#[test]
+fn names_by_code_keys_each_name_by_its_code_across_a_gap() {
+    assert_eq!(
+        names_by_code("NAMES", &[(0, "zero"), (3, "three")]),
+        "export const NAMES: Record<number, string> = {\n  0: \"zero\",\n  3: \"three\",\n};\n"
+    );
 }
 
 /// Each byte of the longest payload as `wslib_wiretap_catalogue::byte_name` spells a
@@ -485,7 +494,7 @@ fn outputs_serialise_as_declared() {
         FcVerdict::Silent,
     ]);
     use crate::io::framelink::rules::{BridgeDescriptor, BridgeFilterDescriptor};
-    use ::framelink::protocol::bridge::{BridgeDefaultAction, BridgeFilterIde, BridgeFilterType};
+    use wslib_framelink_protocol::bridge::{BridgeDefaultAction, BridgeFilterIde, BridgeFilterType};
     let filter = |kind, ide| BridgeFilterDescriptor { kind, ide, a: 0, b: 0 };
     let bridge = |default_action| BridgeDescriptor {
         bridge_id: 0,

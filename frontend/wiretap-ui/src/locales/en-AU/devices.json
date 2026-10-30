@@ -195,6 +195,7 @@
     "choose": "Choose Firmware",
     "flash": "Flash",
     "cancel": "Cancel",
+    "cancelPastActivation": "Activation has started: the device will finish the update or revert to its previous image on its own.",
     "listImages": "List Images",
     "transport": "Transport",
     "noFileSelected": "No file selected",
@@ -222,7 +223,8 @@
       "confirmed": "✓ confirmed",
       "cancelled": "✗ cancelled",
       "complete": "✓ done",
-      "error": "✗ error: {{message}}"
+      "error": "✗ error: {{message}}",
+      "unknown": "? {{event}}"
     },
     "eta": {
       "unknown": "—",

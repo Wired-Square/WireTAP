@@ -8,4 +8,10 @@ export const INTERFACE_TYPE_NAMES: Record<number, string> = {
   5: "LIN",
 };
 
-export const VALUE_TYPE_NAMES = ["unsigned", "signed", "float", "bool", "array"] as const;
+export const VALUE_TYPE_NAMES: Record<number, string> = {
+  0: "unsigned",
+  1: "signed",
+  2: "float",
+  3: "bool",
+  4: "array",
+};
