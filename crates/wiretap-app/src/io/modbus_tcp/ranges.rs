@@ -11,7 +11,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
-use wiretap_catalog::modbus::{chunk_ranges, RangeSpec, RegisterRange};
+use wslib_modbus::{chunk_ranges, RangeSpec, RegisterRange};
 
 use super::reader::{PollEmitMode, PollGroup, RegisterType};
 
@@ -22,7 +22,7 @@ fn default_interval_ms() -> u64 {
     1000
 }
 fn default_block_size() -> u16 {
-    wiretap_catalog::modbus::MAX_REGISTERS_PER_READ
+    wslib_modbus::MAX_REGISTERS_PER_READ
 }
 fn default_emit_mode() -> PollEmitMode {
     PollEmitMode::PerRegister
@@ -38,7 +38,7 @@ fn default_max_groups() -> u16 {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[cfg_attr(test, derive(ts_rs::TS))]
 pub struct ModbusRange {
-    #[cfg_attr(test, ts(as = "wiretap_catalog::RegisterType"))]
+    #[cfg_attr(test, ts(as = "wslib_wiretap_catalogue::RegisterType"))]
     pub register_type: RegisterType,
     /// Protocol-level start address (0-based).
     pub start: u16,

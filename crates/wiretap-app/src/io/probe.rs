@@ -241,7 +241,7 @@ pub async fn probe_profile(profile: &IOProfile) -> Result<DeviceProbeResult, Str
         "serial" => {
             let port = profile.req_str("port")?;
 
-            let port_exists = wiretap_io::serial::ports()
+            let port_exists = wslib_serial::ports()
                 .unwrap_or_default()
                 .iter()
                 .any(|p| p.path == port);

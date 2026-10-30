@@ -23,11 +23,11 @@ use tokio::time::{sleep, Duration};
 
 use super::poll::{modbus_frame, per_register_frames, FrameSink, ReadData};
 use super::reader::RegisterType;
-use wiretap_catalog::modbus::{
+use wslib_modbus::{
     coils_to_bytes, registers_to_bytes, AddressBlock, ExceptionCode, RangeError, ReadOutcome, RegisterSweep,
     SweepEnd, SweepLimits, SweepProgress, SweepStep,
 };
-use wiretap_io::modbus::{DeviceIdCode, ModbusTcp, ReadRequest, Reading, RequestError, TcpOptions};
+use wslib_modbus::{DeviceIdCode, ModbusTcp, ReadRequest, Reading, RequestError, TcpOptions};
 use crate::io::SignalThrottle;
 
 /// Device identification info discovered via FC43 (Read Device Identification)
@@ -226,7 +226,7 @@ pub struct ModbusScanConfig {
     #[serde(default = "default_unit_id")]
     pub unit_id: u8,
     /// Register type to scan
-    #[cfg_attr(test, ts(as = "wiretap_catalog::RegisterType"))]
+    #[cfg_attr(test, ts(as = "wslib_wiretap_catalogue::RegisterType"))]
     pub register_type: RegisterType,
     /// First register address to scan (protocol-level, 0-based)
     pub start_register: u16,
@@ -294,7 +294,7 @@ pub struct UnitIdScanConfig {
     /// Register to probe for existence (default 0)
     pub test_register: u16,
     /// Register type to probe (default Holding)
-    #[cfg_attr(test, ts(as = "wiretap_catalog::RegisterType"))]
+    #[cfg_attr(test, ts(as = "wslib_wiretap_catalogue::RegisterType"))]
     pub register_type: RegisterType,
     /// Delay between scan requests in milliseconds
     pub inter_request_delay_ms: u64,
@@ -448,7 +448,7 @@ pub struct FcProbeEntry {
     /// True if any function code produced a reply.
     pub responded: bool,
     /// The register types worth sweeping on this unit.
-    #[cfg_attr(test, ts(as = "Vec<wiretap_catalog::RegisterType>"))]
+    #[cfg_attr(test, ts(as = "Vec<wslib_wiretap_catalogue::RegisterType>"))]
     pub supported_types: Vec<RegisterType>,
 }
 
@@ -1056,10 +1056,10 @@ pub async fn probe_function_codes(
 
 #[cfg(test)]
 mod tests {
-    use wiretap_io::modbus::testing::{self, device, Reply};
+    use wslib_modbus::testing::{self, device, Reply};
     use super::*;
     use tokio::time::timeout;
-    use wiretap_io::modbus::{ExceptionCode, TransportError};
+    use wslib_modbus::{ExceptionCode, TransportError};
 
     #[test]
     fn a_config_without_an_address_falls_back_to_the_documented_defaults() {

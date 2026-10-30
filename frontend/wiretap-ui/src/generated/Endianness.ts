@@ -1,7 +1,7 @@
 // Generated from the Rust serde types by `npm run gen:types`. Do not edit.
 
 /**
- * Byte / word ordering. `Big` is the standard convention (high-order first);
- * `Little` is byte/word-swapped (e.g. Sungrow's word-swapped "CDAB").
+ * Byte or word order: `Big` is high-order first, `Little` swapped ("CDAB" for
+ * words).
  */
 export type Endianness = "big" | "little";

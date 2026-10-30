@@ -11,7 +11,7 @@ use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use once_cell::sync::Lazy;
 use serde::Serialize;
 use tauri::AppHandle;
-use wiretap_gateway::QueryStats;
+use wslib_wiretap_gateway::QueryStats;
 
 use super::{QueryOutcome, QueryRequest};
 

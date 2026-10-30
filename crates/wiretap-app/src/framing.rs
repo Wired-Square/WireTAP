@@ -45,7 +45,7 @@ mod desktop {
         capture_store,
         io::{serial::utils::framed_serial, FrameMessage, FramingMode},
     };
-    use wiretap_catalog::serial_framing::{
+    use wslib_wiretap_catalogue::serial_framing::{
         DelimiterOptions, FrameIdConfig, FramingEncoding, SerialFramer,
     };
 
@@ -61,7 +61,7 @@ mod desktop {
         /// For modbus_rtu mode: the RTU settings. Re-framing has to agree with
         /// the live framer or the Framed tab changes on stop.
         #[serde(default)]
-        pub modbus: Option<wiretap_catalog::RtuSettings>,
+        pub modbus: Option<wslib_wiretap_catalogue::RtuSettings>,
     }
 
     /// Configuration for backend framing
@@ -108,7 +108,7 @@ mod desktop {
             FramingMode::Delimiter => {
                 let delimiter = match cfg.delimiter.as_deref() {
                     Some(hex) => {
-                        wiretap_decode::hex::parse_bytes(hex).map_err(|e| e.to_string())?
+                        wslib_bits::hex::parse_bytes(hex).map_err(|e| e.to_string())?
                     }
                     None => vec![0x0A], // Default LF
                 };
@@ -271,7 +271,7 @@ mod desktop {
     fn frame_messages(
         bytes: &[capture_store::TimestampedByte],
         config: &BackendFramingConfig,
-        catalog: Option<&wiretap_catalog::Catalog>,
+        catalog: Option<&wslib_wiretap_catalogue::Catalogue>,
     ) -> Result<(Vec<FrameMessage>, Vec<FrameMessage>), String> {
         // Build default framing encoding from config
         let default_encoding = build_encoding(&config.framing)?;
@@ -300,7 +300,7 @@ mod desktop {
             .checked()
             .map_err(|e| e.to_string())?;
 
-            let Some(mut framer) = SerialFramer::with_catalog(encoding, catalog) else {
+            let Some(mut framer) = SerialFramer::with_catalogue(encoding, catalog) else {
                 continue;
             };
             let line: Vec<u8> = bus_bytes.iter().map(|(_, byte)| byte.byte).collect();
@@ -394,8 +394,8 @@ mod desktop {
         }
 
         fn rtu(hex: &str) -> Vec<u8> {
-            let mut out = wiretap_decode::hex::parse_bytes(hex).unwrap();
-            out.extend(wiretap_checksum::algorithms::crc16_modbus_checksum(&out).to_le_bytes());
+            let mut out = wslib_bits::hex::parse_bytes(hex).unwrap();
+            out.extend(wslib_checksum::algorithms::crc16_modbus_checksum(&out).to_le_bytes());
             out
         }
 

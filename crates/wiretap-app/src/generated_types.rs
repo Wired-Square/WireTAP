@@ -47,7 +47,7 @@ fn render() -> BTreeMap<PathBuf, String> {
             ),
             (
                 PathBuf::from("byteNames.ts"),
-                (TypeId::of::<wiretap_decode::PayloadField>(), byte_names()),
+                (TypeId::of::<wslib_bits::PayloadField>(), byte_names()),
             ),
             (
                 PathBuf::from("settingRanges.ts"),
@@ -59,7 +59,7 @@ fn render() -> BTreeMap<PathBuf, String> {
             ),
             (
                 PathBuf::from("checksumAlgorithms.ts"),
-                (TypeId::of::<wiretap_checksum::ChecksumAlgorithm>(), checksum_algorithms()),
+                (TypeId::of::<wslib_checksum::ChecksumAlgorithm>(), checksum_algorithms()),
             ),
             (
                 PathBuf::from("protocolTraits.ts"),
@@ -193,16 +193,16 @@ fn render() -> BTreeMap<PathBuf, String> {
     r.visit::<crate::drafting::DraftWrite>();
     r.visit::<crate::drafting::ExportedCatalog>();
     r.visit::<wiretap_analysis::draft::ExportFrame>();
-    r.visit::<wiretap_catalog::model::Catalog>();
-    r.visit::<wiretap_catalog::model::ValidationError>();
-    r.visit::<wiretap_catalog::FrameLayout>();
-    r.visit::<wiretap_catalog::edit::EditOp>();
+    r.visit::<wslib_wiretap_catalogue::model::Catalogue>();
+    r.visit::<wslib_wiretap_catalogue::model::ValidationError>();
+    r.visit::<wslib_wiretap_catalogue::FrameLayout>();
+    r.visit::<wslib_wiretap_catalogue::edit::EditOp>();
     r.visit::<wiretap_analysis::draft::ExportMeta>();
     r.visit::<wiretap_analysis::draft::ModbusExportConfig>();
     r.visit::<wiretap_analysis::draft::ModbusRegister>();
     r.visit::<crate::decode_views::Grouping>();
-    r.visit::<wiretap_decode::groups::Group>();
-    r.visit::<wiretap_decode::groups::GroupOrder>();
+    r.visit::<wslib_bits::groups::Group>();
+    r.visit::<wslib_bits::groups::GroupOrder>();
     r.visit::<crate::decode_views::RegisterRead>();
     r.visit::<crate::decode_views::RegisterReading>();
     r.visit::<crate::decode_views::MaskMatch>();
@@ -212,14 +212,14 @@ fn render() -> BTreeMap<PathBuf, String> {
     r.visit::<crate::adhoc::RankRequest>();
     r.visit::<crate::adhoc::RankedHypotheses>();
     r.visit::<crate::checksums::ChecksumSweepResponse>();
-    r.visit::<wiretap_checksum::ChecksumSpec>();
-    r.visit::<wiretap_checksum::ChecksumValidationResult>();
-    r.visit::<wiretap_checksum::ChecksumDetectionOptions>();
-    r.visit::<wiretap_checksum::ChecksumDetectionResult>();
+    r.visit::<wslib_checksum::ChecksumSpec>();
+    r.visit::<wslib_checksum::ChecksumValidationResult>();
+    r.visit::<wslib_checksum::ChecksumDetectionOptions>();
+    r.visit::<wslib_checksum::ChecksumDetectionResult>();
     r.visit::<crate::checksum_discovery::DiscoveryFrame>();
     r.visit::<wiretap_analysis::ChecksumScanOptions>();
     r.visit::<wiretap_analysis::ChecksumScanResult>();
-    r.visit::<wiretap_gateway::DatabaseActivityResult>();
+    r.visit::<wslib_wiretap_gateway::DatabaseActivityResult>();
     r.files.into_iter().map(|(path, (_, text))| (path, text)).collect()
 }
 
@@ -240,7 +240,7 @@ fn wire_constants() -> String {
         format!("export const ENVELOPE_HEADER_SIZE = {ENVELOPE_HEADER_SIZE};\n"),
         table("MsgType", MsgType::VARIANTS.iter().map(|(k, v)| (*k, *v as u8)), 2),
         table("FrameType", FrameType::VARIANTS.iter().map(|(k, v)| (*k, *v as u8)), 2),
-        table("CanFlags", wiretap_protocol::can::CanFlags::NAMES.iter().copied(), 2),
+        table("CanFlags", wslib_can::CanFlags::NAMES.iter().copied(), 2),
         table("IdFlags", ID_FLAGS.iter().copied(), 8),
         table("StreamEndedFlags", STREAM_ENDED_FLAGS.iter().copied(), 2),
         names("SESSION_STATES", &SESSION_STATES),
@@ -257,8 +257,8 @@ fn wire_constants() -> String {
             "export const MODBUS_SCAN_SOURCE_TYPE = {:?};\n",
             crate::io::modbus_tcp::scan_source::MODBUS_SCAN_SOURCE_TYPE
         ),
-        format!("export const NAME_KEYED_FRAME_ID = {};\n", wiretap_catalog::NAME_KEYED_FRAME_ID),
-        format!("export const MAX_DATABASE_NAME_LEN = {};\n", wiretap_protocol::ingest::MAX_DATABASE_NAME_LEN),
+        format!("export const NAME_KEYED_FRAME_ID = {};\n", wslib_wiretap_catalogue::NAME_KEYED_FRAME_ID),
+        format!("export const MAX_DATABASE_NAME_LEN = {};\n", wslib_wiretap_protocol::ingest::MAX_DATABASE_NAME_LEN),
     ]
     .join("\n")
 }
@@ -267,7 +267,7 @@ fn wire_constants() -> String {
 /// parameterised ids (`crc_custom`, `sum8_negated`) are absent: their width is
 /// the declaration's `byte_length`.
 fn checksum_algorithms() -> String {
-    let rows: String = wiretap_checksum::ALL_ALGORITHMS
+    let rows: String = wslib_checksum::ALL_ALGORITHMS
         .iter()
         .map(|a| format!("  {}: {},\n", a.as_str(), a.output_bytes()))
         .collect();
@@ -285,7 +285,7 @@ fn protocol_traits() -> String {
 
 /// The payload lengths a CAN FD frame can carry, one per length code.
 fn can_fd_lengths() -> String {
-    format!("{HEADER}\nexport const CAN_FD_DLC_VALUES = {:?} as const;\n", wiretap_protocol::FD_DLC_LEN)
+    format!("{HEADER}\nexport const CAN_FD_DLC_VALUES = {:?} as const;\n", wslib_can::FD_DLC_LEN)
 }
 
 /// FrameLink's interface and signal value-type names, by their wire codes.
@@ -302,11 +302,11 @@ fn framelink_names() -> String {
     )
 }
 
-/// Each byte of the longest payload as `wiretap_decode::byte_name` spells a
+/// Each byte of the longest payload as `wslib_wiretap_catalogue::byte_name` spells a
 /// one-byte field, for the panels that chart every byte.
 fn byte_names() -> String {
     let names: String = (0..64)
-        .map(|i| format!("  \"{}\",\n", wiretap_decode::byte_name(i, 8, wiretap_decode::Endianness::Little)))
+        .map(|i| format!("  \"{}\",\n", wslib_wiretap_catalogue::byte_name(i, 8, wslib_bits::Endianness::Little)))
         .collect();
     format!("{HEADER}\nexport const BYTE_NAMES = [\n{names}] as const;\n")
 }
@@ -474,7 +474,7 @@ fn outputs_serialise_as_declared() {
         Log::Cleared,
     ]);
     for rt in [RegisterType::Holding, RegisterType::Input, RegisterType::Coil, RegisterType::Discrete] {
-        assert_declared::<wiretap_catalog::RegisterType>(&serde_json::to_value(rt).unwrap());
+        assert_declared::<wslib_wiretap_catalogue::RegisterType>(&serde_json::to_value(rt).unwrap());
     }
     assert_serialises_as_declared(&[modbus_tcp::PollEmitMode::Block, modbus_tcp::PollEmitMode::PerRegister]);
     use modbus_tcp::scanner::FcVerdict;
@@ -732,7 +732,7 @@ async fn drafts_serialise_as_declared() {
     let orders = wiretap_analysis::source::message_order(&source, &wiretap_analysis::source::FrameSelection::default(), None, None)
         .await
         .unwrap();
-    draft.apply_orders(orders.iter().map(|o| (wiretap_catalog::model::Protocol::Can, &o.order)));
+    draft.apply_orders(orders.iter().map(|o| (wslib_wiretap_catalogue::model::Protocol::Can, &o.order)));
     draft.serial_reserved.push(ByteSpan { start: -1, len: 1 });
     let preview = crate::drafting::draft_preview_cmd(Some(draft), Vec::new());
 
@@ -755,7 +755,7 @@ async fn drafts_serialise_as_declared() {
     for signal in json["signals"].as_array().unwrap().iter().flat_map(|s| s.as_array().unwrap()) {
         assert_declared::<DraftSignal>(signal);
     }
-    let candidates = crate::drafting::candidate_signals_cmd(0, 1, vec![8, 16], vec![wiretap_decode::Endianness::Big], None);
+    let candidates = crate::drafting::candidate_signals_cmd(0, 1, vec![8, 16], vec![wslib_bits::Endianness::Big], None);
     assert_declared::<CandidateSignal>(&serde_json::to_value(&candidates[0]).unwrap());
 }
 
@@ -765,7 +765,7 @@ async fn drafts_serialise_as_declared() {
 fn byte_note_codes_fixture_is_the_libs_answer() {
     use serde_json::Value;
     use wiretap_analysis::*;
-    use wiretap_checksum::columns::ColumnStats;
+    use wslib_checksum::columns::ColumnStats;
 
     fn n(v: &Value) -> usize {
         v.as_u64().unwrap() as usize
@@ -898,7 +898,7 @@ fn byte_note_codes_fixture_is_the_libs_answer() {
 fn query_shapes_serialise_as_declared() {
     use crate::query::tests::{fixture, form_specs, results_named};
     use crate::query::{queue::*, QueryOutcome, QueryRequest};
-    use wiretap_gateway::{
+    use wslib_wiretap_gateway::{
         ByteChangeResult, BytePositionStats, DistributionResult, FirstLastResult, FrameChangeResult, FrequencyBucket,
         GapResult, MirrorValidationResult, MuxCaseStats, MuxStatisticsResult, PatternSearchResult, QuerySpec, QueryStats,
         Word16Stats,

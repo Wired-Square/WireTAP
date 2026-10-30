@@ -1,5 +1,5 @@
 {
-  "note": "`ts` is what the scan table shows: interpret_registers_cmd over `first` then `second` (u16, s16 of `first`, and the pair); `rust` is wiretap-decode extract_field over `first` alone (u16, s16) and over `first` ++ `second` as a 32-bit register field with that word order (u32, s32). `rust`'s `f32` is null, extract_field having no f32 reading; a NaN `ts` f32 is null too.",
+  "note": "`ts` is what the scan table shows: interpret_registers_cmd over `first` then `second` (u16, s16 of `first`, and the pair); `rust` is wslib-bits extract_field over `first` alone (u16, s16) and over `first` ++ `second` as a 32-bit register field with that word order (u32, s32). `rust`'s `f32` is null, extract_field having no f32 reading; a NaN `ts` f32 is null too.",
   "rows": [
     {
       "name": "telemetry pair, high word first",

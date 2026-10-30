@@ -208,7 +208,7 @@ export function decodeFrameBatch(
 // Decoded-signal batch decoder (0x14)
 //
 // Pushed alongside FrameData when a catalogue is attached to the session.
-// Decoding happens once, in Rust (the wiretap-catalog crate); the payload is
+// Decoding happens once, in Rust (the wslib-wiretap-catalogue crate); the payload is
 // a UTF-8 JSON array, one entry per frame: decoded, or why it was not.
 // ============================================================================
 

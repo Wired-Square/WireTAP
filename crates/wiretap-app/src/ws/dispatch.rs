@@ -45,7 +45,7 @@ fn delivery_lock(session_id: &str) -> Arc<Mutex<()>> {
 /// stored path (when known) is the session's authoritative decoder path, which
 /// the frontend mirrors one-way via `ActiveSessionInfo.catalog_path`.
 static ATTACHED_CATALOGS: Lazy<
-    RwLock<HashMap<String, (Option<String>, Arc<wiretap_catalog::Catalog>)>>,
+    RwLock<HashMap<String, (Option<String>, Arc<wslib_wiretap_catalogue::Catalogue>)>>,
 > = Lazy::new(|| RwLock::new(HashMap::new()));
 
 /// Live `mirror_of` comparison state, one tracker per session. Built from the
@@ -56,7 +56,7 @@ static ATTACHED_CATALOGS: Lazy<
 /// `Arc<Mutex<_>>` for the same reason `ATTACHED_CATALOGS` holds an `Arc`: the
 /// per-batch work happens outside the map's lock, so one session's frame batch
 /// never blocks another's.
-type SharedMirrorTracker = Arc<Mutex<wiretap_catalog::MirrorTracker>>;
+type SharedMirrorTracker = Arc<Mutex<wslib_wiretap_catalogue::MirrorTracker>>;
 static MIRROR_TRACKERS: Lazy<RwLock<HashMap<String, SharedMirrorTracker>>> =
     Lazy::new(|| RwLock::new(HashMap::new()));
 
@@ -67,12 +67,12 @@ static MIRROR_TRACKERS: Lazy<RwLock<HashMap<String, SharedMirrorTracker>>> =
 /// unmodelled function code outright, so without the same declaration a vendor
 /// message would be framed on the wire and then dropped before the Modbus tab.
 /// One filter is subtractive, the other additive.
-static SERIAL_RTU_OPTIONS: Lazy<RwLock<HashMap<String, wiretap_catalog::RtuSettings>>> =
+static SERIAL_RTU_OPTIONS: Lazy<RwLock<HashMap<String, wslib_wiretap_catalogue::RtuSettings>>> =
     Lazy::new(|| RwLock::new(HashMap::new()));
 
 /// Publish how a serial session is framed. Called when the source resolves its
 /// framing, which may be before or after the catalogue is attached.
-pub fn set_serial_rtu_options(session_id: &str, mut options: wiretap_catalog::RtuSettings) {
+pub fn set_serial_rtu_options(session_id: &str, mut options: wslib_wiretap_catalogue::RtuSettings) {
     // Dropped on the way in, so the invariant holds by construction rather than
     // being restored at every read.
     options.device_address = None;
@@ -92,7 +92,7 @@ pub fn set_serial_rtu_options(session_id: &str, mut options: wiretap_catalog::Rt
 struct SessionTunnels {
     /// What the catalogue declares, by frame id. Immutable after attach, so it
     /// sits outside the lock — a non-tunnel frame costs one lookup, no mutex.
-    declared: HashMap<u32, wiretap_catalog::FrameTunnel>,
+    declared: HashMap<u32, wslib_wiretap_catalogue::FrameTunnel>,
     /// Live reassembly, one buffer per **(bus, frame id)**.
     ///
     /// Per bus, not per id: a multi-bus capture carries the same tunnel id on
@@ -101,7 +101,7 @@ struct SessionTunnels {
     /// capture (1497 frames of 0x1E0 across two buses) it loses 3 of 499
     /// responses, where a buffer per bus recovers all 499 and leaves no
     /// unconsumed bytes.
-    active: Mutex<HashMap<(u8, u32), wiretap_catalog::ModbusRtuStream>>,
+    active: Mutex<HashMap<(u8, u32), wslib_modbus::ModbusRtuStream>>,
     /// The same, for a serial port that is already RTU-framed — one stream per
     /// bus. `Some` only when the attached catalogue is a Modbus one, which is
     /// what says these frames are Modbus messages rather than some other
@@ -111,14 +111,14 @@ struct SessionTunnels {
     /// is one whole message and `interpret` reads it as such. The stream is
     /// still per-session state, because pairing a read response with the
     /// register address it answers needs the request that came before it.
-    serial: Option<Mutex<HashMap<u8, wiretap_catalog::ModbusRtuStream>>>,
+    serial: Option<Mutex<HashMap<u8, wslib_modbus::ModbusRtuStream>>>,
     /// The stamp of the last request per (bus, masked id, device, function). An
     /// unanswered request is superseded by the next rather than queued.
     requests: Mutex<HashMap<(u8, u32, u8, u8), u64>>,
 }
 
 impl SessionTunnels {
-    fn new(declared: HashMap<u32, wiretap_catalog::FrameTunnel>, modbus_catalog: bool) -> Self {
+    fn new(declared: HashMap<u32, wslib_wiretap_catalogue::FrameTunnel>, modbus_catalog: bool) -> Self {
         Self {
             declared,
             active: Mutex::new(HashMap::new()),
@@ -132,18 +132,18 @@ impl SessionTunnels {
         &self,
         bus: u8,
         masked_id: u32,
-        msg: &wiretap_catalog::ModbusRtuMessage,
+        msg: &wslib_modbus::ModbusRtuMessage,
         t: u64,
     ) -> Option<u64> {
         let mut requests = self.requests.lock().ok()?;
         // An exception response carries its request's function code with the high bit set.
         let key = (bus, masked_id, msg.device_address, msg.function & 0x7F);
         match msg.direction {
-            wiretap_catalog::Direction::Request => {
+            wslib_modbus::Direction::Request => {
                 requests.insert(key, t);
                 None
             }
-            wiretap_catalog::Direction::Response => {
+            wslib_modbus::Direction::Response => {
                 requests.get(&key).map(|sent| t.saturating_sub(*sent))
             }
         }
@@ -156,14 +156,14 @@ static TUNNEL_DECODERS: Lazy<RwLock<HashMap<String, SharedTunnels>>> =
 
 /// Attach a parsed catalogue to a session, enabling the decoded stream. `path` is
 /// the source file path when known — the authoritative decoder path for the session.
-pub fn attach_catalog(session_id: &str, path: Option<String>, catalog: wiretap_catalog::Catalog) {
-    let tracker = wiretap_catalog::MirrorTracker::new(&catalog);
-    let declared: HashMap<u32, wiretap_catalog::FrameTunnel> = catalog
+pub fn attach_catalog(session_id: &str, path: Option<String>, catalog: wslib_wiretap_catalogue::Catalogue) {
+    let tracker = wslib_wiretap_catalogue::MirrorTracker::new(&catalog);
+    let declared: HashMap<u32, wslib_wiretap_catalogue::FrameTunnel> = catalog
         .frames
         .iter()
         .filter_map(|f| Some((f.frame_id, f.tunnel.clone()?)))
         .collect();
-    let modbus_catalog = matches!(catalog.protocol, wiretap_catalog::Protocol::Modbus);
+    let modbus_catalog = matches!(catalog.protocol, wslib_wiretap_catalogue::Protocol::Modbus);
     // Catalogue first, then tracker: a batch landing between the two writes
     // should see the old pair, not a new tracker judging against the old
     // catalogue.
@@ -245,7 +245,7 @@ pub fn detach_catalog(session_id: &str) {
     }
 }
 
-pub(crate) fn attached_catalog(session_id: &str) -> Option<Arc<wiretap_catalog::Catalog>> {
+pub(crate) fn attached_catalog(session_id: &str) -> Option<Arc<wslib_wiretap_catalogue::Catalogue>> {
     ATTACHED_CATALOGS
         .read()
         .ok()
@@ -265,11 +265,11 @@ pub fn attached_catalog_path(session_id: &str) -> Option<String> {
 /// batch-final verdict per mirror, keyed by **masked** frame id.
 struct MirrorVerdicts {
     tracker: SharedMirrorTracker,
-    by_masked_id: HashMap<u32, wiretap_catalog::MirrorVerdict>,
+    by_masked_id: HashMap<u32, wslib_wiretap_catalogue::MirrorVerdict>,
 }
 
 impl MirrorVerdicts {
-    fn get(&self, raw_frame_id: u32) -> Option<&wiretap_catalog::MirrorVerdict> {
+    fn get(&self, raw_frame_id: u32) -> Option<&wslib_wiretap_catalogue::MirrorVerdict> {
         if self.by_masked_id.is_empty() {
             return None;
         }
@@ -314,11 +314,11 @@ fn mirror_verdicts(session_id: &str, frames: &[FrameMessage]) -> Option<MirrorVe
 /// whole message already, whether a live line's or an archive row.
 fn feed_tunnels(
     tunnels: Option<&SharedTunnels>,
-    catalog: &wiretap_catalog::Catalog,
+    catalog: &wslib_wiretap_catalogue::Catalogue,
     session_id: &str,
     frame: &FrameMessage,
     masked_id: u32,
-) -> Vec<wiretap_catalog::ModbusRtuMessage> {
+) -> Vec<wslib_modbus::ModbusRtuMessage> {
     let Some(tunnels) = tunnels else {
         return Vec::new();
     };
@@ -334,7 +334,7 @@ fn feed_tunnels(
         // for was already applied by the framer that produced this frame. The
         // vendor codes are not — see `SERIAL_RTU_OPTIONS`.
         let fallback = if archive {
-            wiretap_catalog::RtuSettings::tapped()
+            wslib_wiretap_catalogue::RtuSettings::tapped()
         } else {
             Default::default()
         };
@@ -346,7 +346,7 @@ fn feed_tunnels(
                     .ok()
                     .and_then(|m| m.get(session_id).cloned())
                     .unwrap_or(fallback);
-                wiretap_catalog::ModbusRtuOptions::from_settings(&settings, Some(catalog)).stream()
+                settings.options(Some(catalog)).stream()
             })
             .interpret(&frame.bytes)
             .into_iter()
@@ -371,7 +371,7 @@ fn feed_tunnels(
 const MAX_RENDERED_TUNNEL_MESSAGES: usize = 500;
 
 /// A completed tunnel message and, for a response, the time since its request.
-pub(crate) type TunnelMessage = (wiretap_catalog::ModbusRtuMessage, Option<u64>);
+pub(crate) type TunnelMessage = (wslib_modbus::ModbusRtuMessage, Option<u64>);
 
 /// Encode a frame batch against `catalog` into the `DecodedSignals` JSON
 /// payload, recording what decoded into `history`. `with_unrouted` adds an entry
@@ -380,7 +380,7 @@ pub(crate) type TunnelMessage = (wiretap_catalog::ModbusRtuMessage, Option<u64>)
 fn encode_decoded_batch(
     session_id: &str,
     frames: &[FrameMessage],
-    catalog: &wiretap_catalog::Catalog,
+    catalog: &wslib_wiretap_catalogue::Catalogue,
     verdicts: Option<&MirrorVerdicts>,
     tunnels: Option<&SharedTunnels>,
     with_unrouted: bool,
@@ -395,14 +395,14 @@ fn encode_decoded_batch(
 fn encode_decoded_page(
     session_id: &str,
     frames: &[FrameMessage],
-    catalog: &wiretap_catalog::Catalog,
+    catalog: &wslib_wiretap_catalogue::Catalogue,
     verdicts: Option<&MirrorVerdicts>,
     tunnels: Option<&SharedTunnels>,
     with_unrouted: bool,
     mut history: Option<&mut History>,
     unrendered: &mut usize,
 ) -> Vec<u8> {
-    let mask = wiretap_catalog::decode::frame_id_mask(catalog);
+    let mask = wslib_wiretap_catalogue::decode::frame_id_mask(catalog);
 
     // Tunnels first, over the whole batch: a payload is a slice of a byte
     // stream, so every frame must be fed in order whether or not it decodes to
@@ -454,7 +454,7 @@ fn encode_decoded_page(
 }
 
 /// The catalogue's serial `min_frame_length` says this is no frame of its own.
-fn below_min_length(catalog: &wiretap_catalog::Catalog, f: &FrameMessage) -> bool {
+fn below_min_length(catalog: &wslib_wiretap_catalogue::Catalogue, f: &FrameMessage) -> bool {
     catalog
         .serial
         .as_ref()
@@ -482,18 +482,18 @@ fn unrouted_entry(kind: UnroutedKind, f: &FrameMessage) -> DecodedSignalsEntry<'
 
 /// The id `catalog` knows `f` by, if any. A `modbus_rtu` row's id is its unit and
 /// function, which only a serial catalogue reads, and by its own `id` field.
-fn catalogue_id(catalog: &wiretap_catalog::Catalog, f: &FrameMessage) -> Option<u32> {
-    if f.protocol != wiretap_protocol::ingest::MODBUS_RTU_PROTOCOL {
+fn catalogue_id(catalog: &wslib_wiretap_catalogue::Catalogue, f: &FrameMessage) -> Option<u32> {
+    if f.protocol != wslib_wiretap_protocol::ingest::MODBUS_RTU_PROTOCOL {
         return Some(f.frame_id);
     }
-    if catalog.protocol != wiretap_catalog::model::Protocol::Serial {
+    if catalog.protocol != wslib_wiretap_catalogue::model::Protocol::Serial {
         return None;
     }
     let id_field = catalog.serial.as_ref().and_then(|s| {
-        Some(wiretap_catalog::FrameIdConfig {
+        Some(wslib_wiretap_catalogue::FrameIdConfig {
             start_byte: s.frame_id_start_byte?,
             num_bytes: s.frame_id_bytes? as u8,
-            big_endian: s.frame_id_byte_order != Some(wiretap_catalog::model::Endianness::Little),
+            big_endian: s.frame_id_byte_order != Some(wslib_wiretap_catalogue::model::Endianness::Little),
         })
     });
     Some(id_field.and_then(|field| field.extract(&f.bytes)).unwrap_or(f.frame_id))
@@ -504,9 +504,9 @@ fn catalogue_id(catalog: &wiretap_catalog::Catalog, f: &FrameMessage) -> Option<
 /// data to decode. Shared by the live stream and the MCP
 /// `get_decoded_signals` tool, so both describe a frame alike.
 pub(crate) fn decode_entry<'a>(
-    catalog: &'a wiretap_catalog::Catalog,
+    catalog: &'a wslib_wiretap_catalogue::Catalogue,
     f: &'a FrameMessage,
-    verdict: Option<&'a wiretap_catalog::MirrorVerdict>,
+    verdict: Option<&'a wslib_wiretap_catalogue::MirrorVerdict>,
     tunnel_messages: &'a [TunnelMessage],
 ) -> Option<DecodedFrameMsg<'a>> {
     if f.is_rtr {
@@ -520,7 +520,7 @@ pub(crate) fn decode_entry<'a>(
     // are decoded from the message — so a frame that decoded nothing still
     // has something to render when it carried a message.
     let decoded = id
-        .and_then(|id| wiretap_catalog::decode::decode_by_id(catalog, id, &f.bytes))
+        .and_then(|id| wslib_wiretap_catalogue::decode::decode_by_id(catalog, id, &f.bytes))
         .unwrap_or_default();
     if tunnel_messages.is_empty()
         && decoded.signals.is_empty()
@@ -530,7 +530,7 @@ pub(crate) fn decode_entry<'a>(
         return None;
     }
     let id = id.unwrap_or(f.frame_id);
-    let masked_id = wiretap_catalog::decode::frame_id_mask(catalog).map_or(id, |m| id & m);
+    let masked_id = wslib_wiretap_catalogue::decode::frame_id_mask(catalog).map_or(id, |m| id & m);
     let mismatches = verdict.zip(catalog.frame(masked_id)).map_or_else(Vec::new, |(v, frame)| {
         mirror_mismatches(v, frame, &decoded.selectors)
     });
@@ -585,14 +585,14 @@ pub(crate) fn decode_entry<'a>(
 /// did not compare them — a signal the mirror declares itself, or a mux case
 /// signal outside the inherited plain signals' bytes.
 fn mirror_mismatches(
-    verdict: &wiretap_catalog::MirrorVerdict,
-    frame: &wiretap_catalog::Frame,
-    selectors: &[wiretap_catalog::decode::MuxSelector],
+    verdict: &wslib_wiretap_catalogue::MirrorVerdict,
+    frame: &wslib_wiretap_catalogue::Frame,
+    selectors: &[wslib_wiretap_catalogue::decode::MuxSelector],
 ) -> Vec<Option<bool>> {
     let Some(is_valid) = verdict.is_valid else {
         return Vec::new();
     };
-    let compared = wiretap_catalog::mirror::inherited_byte_indices(frame);
+    let compared = wslib_wiretap_catalogue::mirror::inherited_byte_indices(frame);
     decoded_signal_defs(frame, selectors)
         .into_iter()
         .map(|def| {
@@ -607,9 +607,9 @@ fn mirror_mismatches(
 /// The catalogue signals behind a frame's decode, in the order `decode_frame`
 /// emits them: the plain signals, then each matched mux case's, outermost first.
 fn decoded_signal_defs<'a>(
-    frame: &'a wiretap_catalog::Frame,
-    selectors: &[wiretap_catalog::decode::MuxSelector],
-) -> Vec<&'a wiretap_catalog::Signal> {
+    frame: &'a wslib_wiretap_catalogue::Frame,
+    selectors: &[wslib_wiretap_catalogue::decode::MuxSelector],
+) -> Vec<&'a wslib_wiretap_catalogue::Signal> {
     let mut defs: Vec<_> = frame.signals.iter().collect();
     let mut mux = frame.mux.as_ref();
     for selector in selectors {
@@ -623,7 +623,7 @@ fn decoded_signal_defs<'a>(
     defs
 }
 
-fn byte_span(signal: &wiretap_catalog::Signal) -> Option<std::ops::RangeInclusive<usize>> {
+fn byte_span(signal: &wslib_wiretap_catalogue::Signal) -> Option<std::ops::RangeInclusive<usize>> {
     let (start_bit, bit_length) = (signal.start_bit?, signal.bit_length?);
     (bit_length > 0).then(|| (start_bit / 8) as usize..=((start_bit + bit_length - 1) / 8) as usize)
 }
@@ -820,7 +820,7 @@ fn redecode_pages(session_id: &str, page: usize, mut send: impl FnMut(Vec<u8>, b
     let tunnels = tunnel_decoders(session_id);
     let mut unrendered = 0;
     if let Some(shared) = &tunnels {
-        let mask = wiretap_catalog::decode::frame_id_mask(&catalog);
+        let mask = wslib_wiretap_catalogue::decode::frame_id_mask(&catalog);
         let completed: usize = delivered_pages(&capture_id, offset, page)
             .map_while(Result::ok)
             .flatten()
@@ -911,7 +911,7 @@ fn deliver_frames(session_id: &str, frames: &[FrameMessage]) {
     for (kind, payload) in frame_batch_messages(session_id, frames, history.as_deref_mut()) {
         server.send_to_channel(channel, protocol::encode_message(kind, channel, &payload));
     }
-    let mask = attached_catalog(session_id).and_then(|c| wiretap_catalog::decode::frame_id_mask(&c));
+    let mask = attached_catalog(session_id).and_then(|c| wslib_wiretap_catalogue::decode::frame_id_mask(&c));
     if let Some(history) = history.as_deref_mut() {
         crate::adhoc::record(session_id, frames, mask, history);
         history.record_toggles(frames, mask);
@@ -1189,7 +1189,7 @@ fn session_transition_payload(payload: &crate::io::SessionTransitionPayload) -> 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use wiretap_checksum::algorithms::crc16_modbus_checksum;
+    use wslib_checksum::algorithms::crc16_modbus_checksum;
 
     /// A Modbus RTU message: the body plus the CRC a device would append.
     fn rtu(body: &[u8]) -> Vec<u8> {
@@ -1340,8 +1340,8 @@ mod tests {
         }
     }
 
-    fn bare() -> wiretap_catalog::Catalog {
-        wiretap_catalog::Catalog::parse("[meta]\nname = \"bare\"\n").expect("catalogue parses")
+    fn bare() -> wslib_wiretap_catalogue::Catalogue {
+        wslib_wiretap_catalogue::Catalogue::parse("[meta]\nname = \"bare\"\n").expect("catalogue parses")
     }
 
     /// A 0x60 of 19 bytes whose first 18 also pass their CRC.
@@ -1354,8 +1354,8 @@ mod tests {
         msg
     }
 
-    fn tunnel_catalogue(function_code: &str) -> wiretap_catalog::Catalog {
-        wiretap_catalog::Catalog::parse(&tunnel_catalogue_toml(function_code)).expect("catalogue parses")
+    fn tunnel_catalogue(function_code: &str) -> wslib_wiretap_catalogue::Catalogue {
+        wslib_wiretap_catalogue::Catalogue::parse(&tunnel_catalogue_toml(function_code)).expect("catalogue parses")
     }
 
     fn tunnel_catalogue_toml(function_code: &str) -> String {
@@ -1379,7 +1379,7 @@ allow_broadcast = true
     #[test]
     fn a_tunnel_frames_a_vendor_code_by_its_catalogue_rule() {
         let msg = dispatch_short_by_one();
-        let framed_by = |catalog: wiretap_catalog::Catalog| -> Vec<usize> {
+        let framed_by = |catalog: wslib_wiretap_catalogue::Catalogue| -> Vec<usize> {
             let session = "tunnel-catalogue-rule";
             attach_catalog(session, None, catalog.clone());
             let tunnels = tunnel_decoders(session);
@@ -1414,14 +1414,14 @@ allow_broadcast = true
 
         let out = feed_tunnels(Some(&tunnels), &bare(), "test", &request, 0);
         assert_eq!(out.len(), 1);
-        assert_eq!(out[0].direction, wiretap_catalog::Direction::Request);
+        assert_eq!(out[0].direction, wslib_modbus::Direction::Request);
         assert_eq!(out[0].start_register, Some(0x6B));
         assert_eq!(out[0].quantity, Some(3));
         assert!(out[0].crc_valid);
 
         let out = feed_tunnels(Some(&tunnels), &bare(), "test", &response, 0);
         assert_eq!(out.len(), 1);
-        assert_eq!(out[0].direction, wiretap_catalog::Direction::Response);
+        assert_eq!(out[0].direction, wslib_modbus::Direction::Response);
         // Carried over from the request: a read response has no address of its own.
         assert_eq!(out[0].start_register, Some(0x6B));
         assert_eq!(out[0].registers(), [0x022B, 0x0000, 0x0064]);
@@ -1434,7 +1434,7 @@ allow_broadcast = true
     #[test]
     fn an_archive_message_interprets_whole_and_decodes_by_register() {
         let tunnels = Arc::new(modbus_session());
-        let catalog = wiretap_catalog::Catalog::parse(
+        let catalog = wslib_wiretap_catalogue::Catalogue::parse(
             r#"
 [meta]
 name = "line"
@@ -1488,7 +1488,7 @@ bit_length = 16
             feed_tunnels(Some(&tunnels), &bare(), session, &vendor, 0).len()
         };
 
-        set_serial_rtu_options("live-rtu-line", wiretap_catalog::RtuSettings::default());
+        set_serial_rtu_options("live-rtu-line", wslib_wiretap_catalogue::RtuSettings::default());
         assert_eq!(interpreted("live-rtu-line"), 0, "a stock line refuses an undeclared code");
         detach_catalog("live-rtu-line");
         assert_eq!(interpreted("archive-rtu-rows"), 1);
@@ -1520,7 +1520,7 @@ bit_length = 16
     /// register 0x0803, nor 0x0803 a CAN id.
     #[test]
     fn a_modbus_rtu_row_is_not_decoded_as_the_frame_its_id_spells() {
-        let modbus = wiretap_catalog::Catalog::parse(
+        let modbus = wslib_wiretap_catalogue::Catalogue::parse(
             r#"
 [meta]
 name = "registers"
@@ -1537,7 +1537,7 @@ bit_length = 16
 "#,
         )
         .expect("catalogue parses");
-        let can = wiretap_catalog::Catalog::parse(
+        let can = wslib_wiretap_catalogue::Catalogue::parse(
             "[meta]\nname = \"can\"\n[frame.can.\"0x803\"]\nlength = 8\n[[frame.can.\"0x803\".signals]]\nname = \"Spelt\"\nstart_bit = 0\nbit_length = 16\n",
         )
         .expect("catalogue parses");
@@ -1551,7 +1551,7 @@ bit_length = 16
     /// which still finds the message the line now stores by unit and function.
     #[test]
     fn a_serial_catalogue_finds_an_rtu_row_by_its_id_field() {
-        let catalog = wiretap_catalog::Catalog::parse(
+        let catalog = wslib_wiretap_catalogue::Catalogue::parse(
             r#"
 [meta]
 name = "rtu as serial"
@@ -1577,7 +1577,7 @@ byte_order = "big"
         assert_eq!((entry["frameId"].clone(), entry["maskedFrameId"].clone()), (0x0804.into(), 0x04.into()));
         assert_eq!(entry["signals"][0]["value"], f64::from(0x4DE2));
 
-        let no_id_field = wiretap_catalog::Catalog::parse(
+        let no_id_field = wslib_wiretap_catalogue::Catalogue::parse(
             "[meta]\nname = \"by unit and function\"\n[meta.serial]\nencoding = \"modbus_rtu\"\n[frame.serial.\"0x0804\"]\nlength = 8\n[[frame.serial.\"0x0804\".signals]]\nname = \"Register\"\nstart_bit = 16\nbit_length = 16\nbyte_order = \"big\"\n",
         )
         .expect("catalogue parses");
@@ -1603,7 +1603,7 @@ byte_order = "big"
         let tunnels = Arc::new(modbus_session());
         let vendor = serial_frame(rtu(&[0x01, 0x60, 0x00, 0x01, 0x0A]));
         assert!(feed_tunnels(Some(&tunnels), &bare(), "test", &vendor, 0).is_empty());
-        let catalog = wiretap_catalog::Catalog::parse(
+        let catalog = wslib_wiretap_catalogue::Catalogue::parse(
             "[meta]\nname = \"x\"\n[meta.modbus.function_code.0x60]\n",
         )
         .expect("catalogue parses");
@@ -1622,7 +1622,7 @@ byte_order = "big"
     }
 
     fn entries(
-        catalog: &wiretap_catalog::Catalog,
+        catalog: &wslib_wiretap_catalogue::Catalogue,
         frames: &[FrameMessage],
         with_unrouted: bool,
     ) -> Vec<serde_json::Value> {
@@ -1648,7 +1648,7 @@ bit_length = 8
 
     #[test]
     fn every_frame_is_routed_and_a_backlog_carries_decoded_only() {
-        let catalog = wiretap_catalog::Catalog::parse(ROUTED).expect("catalogue parses");
+        let catalog = wslib_wiretap_catalogue::Catalogue::parse(ROUTED).expect("catalogue parses");
         let frames = [can(0x1A5, 10, vec![7; 8]), can(0x2A5, 20, vec![1, 2])];
 
         let live = entries(&catalog, &frames, true);
@@ -1675,7 +1675,7 @@ bit_length = 8
 
     #[test]
     fn a_remote_frame_does_not_decode_signals() {
-        let catalog = wiretap_catalog::Catalog::parse(ROUTED).expect("catalogue parses");
+        let catalog = wslib_wiretap_catalogue::Catalogue::parse(ROUTED).expect("catalogue parses");
         let rtr = FrameMessage { is_rtr: true, dlc: 8, ..can(0x1A5, 10, vec![]) };
         let decoded = decode_entry(&catalog, &rtr, None, &[]).map(|e| serde_json::to_value(e).unwrap());
         assert_eq!(decoded, None);
@@ -1702,7 +1702,7 @@ bit_length = 8
 
     #[test]
     fn a_frame_under_the_catalogues_minimum_length_is_short_not_decoded() {
-        let catalog = wiretap_catalog::Catalog::parse(SERIAL).expect("catalogue parses");
+        let catalog = wslib_wiretap_catalogue::Catalogue::parse(SERIAL).expect("catalogue parses");
         let live = entries(&catalog, &[framed("serial", 1, vec![0x01, 0x02])], true);
         assert_eq!(live.len(), 1);
         assert_eq!(live[0]["kind"], "short");
@@ -1712,7 +1712,7 @@ bit_length = 8
 
     #[test]
     fn a_framed_serial_frame_carries_its_checksum_verdict() {
-        let catalog = wiretap_catalog::Catalog::parse(SERIAL).expect("catalogue parses");
+        let catalog = wslib_wiretap_catalogue::Catalogue::parse(SERIAL).expect("catalogue parses");
         let good = framed("serial", 1, vec![0x01, 0x02, 0x03, 0x01 ^ 0x02 ^ 0x03]);
         let bad = framed("serial", 1, vec![0x01, 0x02, 0x03, 0xFF]);
         let live = entries(&catalog, &[good, bad], true);
@@ -1721,7 +1721,7 @@ bit_length = 8
         assert_eq!(live[1]["checksum"]["valid"], false);
         assert_eq!(live[1]["checksum"]["extracted"], 0xFF);
 
-        let can_catalog = wiretap_catalog::Catalog::parse(ROUTED).expect("catalogue parses");
+        let can_catalog = wslib_wiretap_catalogue::Catalogue::parse(ROUTED).expect("catalogue parses");
         let live = entries(&can_catalog, &[can(0x100, 0, vec![0; 8])], true);
         assert!(live[0].get("checksum").is_none(), "no serial checksum, no verdict");
     }
@@ -1762,8 +1762,8 @@ bit_length = 8
 "#;
 
     fn mirror_signals(source: [u8; 8], mirror: [u8; 8]) -> HashMap<String, serde_json::Value> {
-        let catalog = wiretap_catalog::Catalog::parse(MIRRORED_MUX).expect("catalogue parses");
-        let mut tracker = wiretap_catalog::MirrorTracker::new(&catalog);
+        let catalog = wslib_wiretap_catalogue::Catalogue::parse(MIRRORED_MUX).expect("catalogue parses");
+        let mut tracker = wslib_wiretap_catalogue::MirrorTracker::new(&catalog);
         for k in 0..3 {
             tracker.observe(0x705, &source, f64::from(k));
             tracker.observe(0x005, &mirror, f64::from(k) + 0.01);
@@ -1854,7 +1854,7 @@ bit_length = 8
                 );
             }
         }
-        let catalog = wiretap_catalog::Catalog::parse(&toml).expect("catalogue parses");
+        let catalog = wslib_wiretap_catalogue::Catalogue::parse(&toml).expect("catalogue parses");
         let frames: Vec<_> = (0..300u32)
             .map(|i| can(0x100 + (i % 30), u64::from(i) * 1_000, vec![0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC, 0xDE, 0xF0]))
             .collect();
@@ -1872,7 +1872,7 @@ bit_length = 8
     #[test]
     fn a_playback_batch_carries_its_decode_at_the_captures_stamp() {
         let session = "playback-decode";
-        attach_catalog(session, None, wiretap_catalog::Catalog::parse(ROUTED).expect("catalogue parses"));
+        attach_catalog(session, None, wslib_wiretap_catalogue::Catalogue::parse(ROUTED).expect("catalogue parses"));
         let messages = frame_batch_messages(session, &[can(0x1A5, 1_234_567, vec![7; 8])], None);
         detach_catalog(session);
 
@@ -1933,7 +1933,7 @@ bit_length = 8
         let session = "dashboard-history-recording";
         let _db = crate::capture_db::use_own_database();
         crate::capture_store::create_session_capture(session, CaptureKind::Frames, session.to_string());
-        attach_catalog(session, None, wiretap_catalog::Catalog::parse(ROUTED).expect("catalogue parses"));
+        attach_catalog(session, None, wslib_wiretap_catalogue::Catalogue::parse(ROUTED).expect("catalogue parses"));
         let watch = json!({ "session_id": session, "signals": [{ "frameId": 0x100, "name": "byte[1]" }], "heatmaps": [0x100] });
         crate::adhoc::dispatch_adhoc_command("adhoc.set", watch, WINDOW).unwrap();
         let on_bus_1 = FrameMessage { bus: 1, ..can(0x1A5, 1_000, vec![1, 10, 0, 0, 0, 0, 0, 0]) };
@@ -1985,7 +1985,7 @@ bit_length = 8
         crate::capture_store::create_session_capture(session, CaptureKind::Frames, session.to_string());
         let level = |t| can(0x100, t, vec![t as u8; 8]);
         crate::capture_db::wait(crate::capture_store::append_frames_to_session(session, (1..=7).map(level).collect()));
-        attach_catalog(session, None, wiretap_catalog::Catalog::parse(ROUTED).expect("catalogue parses"));
+        attach_catalog(session, None, wslib_wiretap_catalogue::Catalogue::parse(ROUTED).expect("catalogue parses"));
         outbox::subscribe(session, CHANNEL);
         send_new_frames(session);
         assert_eq!(outbox::sent(CHANNEL, MsgType::FrameData).len(), 1);
@@ -2019,7 +2019,7 @@ bit_length = 8
         let _db = crate::capture_db::use_own_database();
         crate::capture_store::create_session_capture(session, CaptureKind::Frames, session.to_string());
         crate::capture_db::wait(crate::capture_store::append_frames_to_session(session, (1..=5).map(|t| can(0x2A5, t, vec![0; 8])).collect()));
-        attach_catalog(session, None, wiretap_catalog::Catalog::parse(ROUTED).expect("catalogue parses"));
+        attach_catalog(session, None, wslib_wiretap_catalogue::Catalogue::parse(ROUTED).expect("catalogue parses"));
         outbox::subscribe(session, 205);
         send_new_frames(session);
 
@@ -2124,10 +2124,10 @@ factor = 1e10
 "#;
 
     fn golden_mirror_entry<R>(read: impl FnOnce(&DecodedFrameMsg) -> R) -> R {
-        let catalog = wiretap_catalog::Catalog::parse(MIRRORED_MUX).expect("catalogue parses");
+        let catalog = wslib_wiretap_catalogue::Catalogue::parse(MIRRORED_MUX).expect("catalogue parses");
         let source = [0x10, 0x20, 0x01, 0x40, 0x50, 0, 0, 0];
         let mirror = [0x10, 0x21, 0x01, 0x41, 0x50, 0, 0, 0];
-        let mut tracker = wiretap_catalog::MirrorTracker::new(&catalog);
+        let mut tracker = wslib_wiretap_catalogue::MirrorTracker::new(&catalog);
         for k in 0..3 {
             tracker.observe(0x705, &source, f64::from(k));
             tracker.observe(0x005, &mirror, f64::from(k) + 0.01);
@@ -2141,7 +2141,7 @@ factor = 1e10
     /// address, a mux and a mirror verdict, a tunnel message with its latency,
     /// a checksum, and the unmatched and short entries.
     fn golden_batches() -> Vec<String> {
-        let headered = wiretap_catalog::Catalog::parse(HEADERED).expect("catalogue parses");
+        let headered = wslib_wiretap_catalogue::Catalogue::parse(HEADERED).expect("catalogue parses");
         let unmatched = FrameMessage { source_address: Some(0x42), ..can(0x18EE0042, 7, vec![9]) };
         let headered_batch =
             encode_decoded_batch("golden", &[can(0x18EF0042, 5, vec![2, 0x01, 0x02, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]), unmatched], &headered, None, None, true, None);
@@ -2163,7 +2163,7 @@ factor = 1e10
         let tunnel_batch = encode_decoded_batch(session, &frames, &tunnelled, None, tunnels.as_ref(), true, None);
         detach_catalog(session);
 
-        let serial = wiretap_catalog::Catalog::parse(SERIAL).expect("catalogue parses");
+        let serial = wslib_wiretap_catalogue::Catalogue::parse(SERIAL).expect("catalogue parses");
         let serial_batch = encode_decoded_batch(
             "golden",
             &[framed("serial", 1, vec![0x01, 0x02, 0x03, 0x00]), framed("serial", 1, vec![0x01])],
@@ -2197,7 +2197,7 @@ factor = 1e10
 
     #[test]
     fn decoded_and_unmatched_entries_carry_the_frames_can_flags_and_an_rtrs_requested_length() {
-        let headered = wiretap_catalog::Catalog::parse(HEADERED).expect("catalogue parses");
+        let headered = wslib_wiretap_catalogue::Catalogue::parse(HEADERED).expect("catalogue parses");
         let fd = |id| FrameMessage { is_fd: true, is_brs: true, ..can(id, 0, vec![2, 0x01, 0x02, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]) };
         let rtr = |id| FrameMessage { is_rtr: true, dlc: 6, ..can(id, 0, vec![]) };
         let frames = [fd(0x18EF0042), fd(0x18EE0042), rtr(0x18EF0042), rtr(0x18EE0042)];
@@ -2219,7 +2219,7 @@ factor = 1e10
 
     #[test]
     fn decoded_and_unmatched_entries_carry_the_frames_id_format() {
-        let catalog = wiretap_catalog::Catalog::parse(ROUTED).expect("catalogue parses");
+        let catalog = wslib_wiretap_catalogue::Catalogue::parse(ROUTED).expect("catalogue parses");
         let extended = |id| FrameMessage { is_extended: true, ..can(id, 0, vec![7; 8]) };
         let seen: Vec<_> = entries(&catalog, &[extended(0x1A5), extended(0x2A5)], true)
             .iter()
@@ -2230,7 +2230,7 @@ factor = 1e10
 
     #[test]
     fn decoded_and_unmatched_entries_carry_the_frames_esi_flag() {
-        let headered = wiretap_catalog::Catalog::parse(HEADERED).expect("catalogue parses");
+        let headered = wslib_wiretap_catalogue::Catalogue::parse(HEADERED).expect("catalogue parses");
         let esi = |id| FrameMessage { is_fd: true, is_esi: true, ..can(id, 0, vec![2, 0x01, 0x02, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]) };
         let bytes = encode_decoded_batch("can-esi", &[esi(0x18EF0042), esi(0x18EE0042)], &headered, None, None, true, None);
         let entries: Vec<serde_json::Value> = serde_json::from_slice(&bytes).unwrap();
@@ -2240,7 +2240,7 @@ factor = 1e10
 
     #[test]
     fn an_out_of_range_signal_sends_a_null_scaled_value() {
-        let catalog = wiretap_catalog::Catalog::parse(
+        let catalog = wslib_wiretap_catalogue::Catalogue::parse(
             r#"
 [meta]
 name = "huge"
@@ -2257,7 +2257,7 @@ factor = 1e10
         )
         .expect("catalogue parses");
 
-        let decoded = wiretap_catalog::decode::decode_by_id(&catalog, 0x104, &[0xFF; 8]).expect("decodes");
+        let decoded = wslib_wiretap_catalogue::decode::decode_by_id(&catalog, 0x104, &[0xFF; 8]).expect("decodes");
         let json = serde_json::to_value(DecodedSignalValue::from(decoded.signals[0].clone())).unwrap();
 
         assert_eq!(json["scaled"], serde_json::Value::Null);

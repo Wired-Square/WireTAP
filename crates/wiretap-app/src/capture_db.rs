@@ -14,13 +14,12 @@ use std::time::Duration;
 use sqlx::sqlite::SqliteRow;
 use wiretap_analysis::order::TimedFrame;
 use wiretap_analysis::source::{
-    FrameSelection, FrameSource, InventoryRow, PayloadQuery, PayloadSource, Sampling, Source, SourceFrame,
+    FrameSelection, FrameSource, InventoryRow, PayloadQuery, PayloadSource, Source, SourceFrame,
 };
 use wiretap_analysis::FrameKey;
 use wiretap_capture_store::{
     Cancel, CaptureError, Direction, FrameRecord, NewCaptureEvent, Sql, Store, StoredFrame,
 };
-use wslib_wiretap_protocol::ProtocolFrames;
 
 use crate::capture_events::CaptureEvent;
 use crate::capture_store::{CaptureFrameInfo, CaptureKind, CaptureMetadata, TimestampedByte};
@@ -151,30 +150,6 @@ fn messages_with_rowids(rows: Vec<(i64, StoredFrame)>) -> Vec<(i64, FrameMessage
         .collect()
 }
 
-/// The analysis crate's selection as the store reads it, until both come from one crate.
-fn selection_of(selection: &FrameSelection) -> wslib_wiretap_protocol::FrameSelection {
-    let whole = selection.protocols().into_iter().map(ProtocolFrames::whole);
-    let ids = selection
-        .pairs()
-        .into_iter()
-        .map(|(frame_id, protocol)| ProtocolFrames::ids(protocol, vec![frame_id]));
-    wslib_wiretap_protocol::FrameSelection::from_groups(whole.chain(ids).collect())
-}
-
-/// The analysis crate's payload query as the store reads it, until both come from one crate.
-fn payload_query(q: PayloadQuery<'_>) -> wslib_wiretap_protocol::PayloadQuery<'_> {
-    wslib_wiretap_protocol::PayloadQuery {
-        protocol: q.protocol,
-        frame_id: q.frame_id,
-        is_extended: q.is_extended,
-        limit: q.limit,
-        sampling: match q.sampling {
-            Sampling::Spread => wslib_wiretap_protocol::Sampling::Spread,
-            Sampling::Recent => wslib_wiretap_protocol::Sampling::Recent,
-        },
-    }
-}
-
 // ============================================================================
 // Initialisation
 // ============================================================================
@@ -267,11 +242,6 @@ pub struct Capture {
     id: String,
 }
 
-/// An inventory row as the analysis crate declares it, until both come from one crate.
-pub fn analysis_row(r: wslib_wiretap_protocol::InventoryRow) -> InventoryRow {
-    InventoryRow::new(&r.protocol, r.frame_id, r.is_extended, r.count, r.first_us, r.last_us, r.max_dlc)
-}
-
 /// Runs `read` over capture `id`.
 pub async fn analyse<T>(id: &str, read: impl AsyncFnOnce(&Capture) -> T) -> Result<T, String> {
     let capture = Capture {
@@ -297,13 +267,12 @@ impl Capture {
                 return Ok(store.get_frames_tail_rows(id, n).await?.0);
             }
         }
-        let selection = selection_of(selection);
         if let Some(n) = newest {
-            return Ok(store.get_frames_tail_filtered(id, n, &selection).await?.0);
+            return Ok(store.get_frames_tail_filtered(id, n, selection).await?.0);
         }
         let mut frames = Vec::new();
         loop {
-            let (page, _, total) = store.get_frames_paginated_filtered(id, frames.len(), FRAME_PAGE, &selection).await?;
+            let (page, _, total) = store.get_frames_paginated_filtered(id, frames.len(), FRAME_PAGE, selection).await?;
             let done = page.is_empty() || frames.len() + page.len() >= total;
             frames.extend(page);
             if done {
@@ -319,12 +288,11 @@ impl Source for Capture {
 
 impl PayloadSource for Capture {
     async fn inventory(&self, start_us: Option<i64>, end_us: Option<i64>) -> Result<Vec<InventoryRow>, CaptureError> {
-        let rows = self.store.frame_inventory(&self.id, start_us, end_us).await?;
-        Ok(rows.into_iter().map(analysis_row).collect())
+        self.store.frame_inventory(&self.id, start_us, end_us).await
     }
 
     async fn payloads(&self, q: PayloadQuery<'_>) -> Result<Vec<Vec<u8>>, CaptureError> {
-        self.store.payloads(&self.id, &payload_query(q)).await
+        self.store.payloads(&self.id, &q).await
     }
 }
 
@@ -432,7 +400,7 @@ pub async fn get_frames_paginated_filtered(
     selection: &FrameSelection,
 ) -> Result<(Vec<FrameMessage>, Vec<i64>, usize), String> {
     let (frames, rowids, total) = store()?
-        .get_frames_paginated_filtered(capture_id, offset, limit, &selection_of(selection))
+        .get_frames_paginated_filtered(capture_id, offset, limit, selection)
         .await
         .map_err(failed_to("read frames"))?;
     Ok((messages(frames), rowids, total))
@@ -454,7 +422,7 @@ pub async fn get_frames_tail_filtered(
     selection: &FrameSelection,
 ) -> Result<(Vec<FrameMessage>, Vec<i64>, usize), String> {
     let (frames, rowids, total) = store()?
-        .get_frames_tail_filtered(capture_id, limit, &selection_of(selection))
+        .get_frames_tail_filtered(capture_id, limit, selection)
         .await
         .map_err(failed_to("read frames"))?;
     Ok((messages(frames), rowids, total))
@@ -478,7 +446,7 @@ pub async fn find_offset_for_timestamp(
     selection: &FrameSelection,
 ) -> Result<usize, String> {
     store()?
-        .find_offset_for_timestamp(capture_id, target_us, &selection_of(selection))
+        .find_offset_for_timestamp(capture_id, target_us, selection)
         .await
         .map_err(failed_to("find a frame by time"))
 }
@@ -492,7 +460,7 @@ pub async fn search_frames(
     selection: &FrameSelection,
 ) -> Result<Vec<usize>, String> {
     store()?
-        .search_frames(capture_id, query, search_id, search_data, &selection_of(selection))
+        .search_frames(capture_id, query, search_id, search_data, selection)
         .await
         .map_err(failed_to("search frames"))
 }
@@ -552,7 +520,7 @@ pub async fn get_next_filtered_frame(
     backward: bool,
 ) -> Result<Option<(i64, usize, FrameMessage)>, String> {
     store()?
-        .get_next_filtered_frame(capture_id, current_rowid, &selection_of(selection), backward)
+        .get_next_filtered_frame(capture_id, current_rowid, selection, backward)
         .await
         .map(|row| row.map(|(rowid, index, f)| (rowid, index, f.into())))
         .map_err(failed_to("read frames"))
@@ -750,7 +718,7 @@ mod tests {
                 ..can(0x102, 1, vec![3], Some("rx"))
             },
             FrameMessage {
-                protocol: wiretap_protocol::ingest::MODBUS_RTU_PROTOCOL.into(),
+                protocol: wslib_wiretap_protocol::ingest::MODBUS_RTU_PROTOCOL.into(),
                 crc_valid: Some(false),
                 ..can(0x0103, 4, vec![1, 3, 0xAA, 0xBB], None)
             },

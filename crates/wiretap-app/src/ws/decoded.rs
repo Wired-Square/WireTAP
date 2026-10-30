@@ -5,9 +5,9 @@
 //! wrote before these structs replaced it.
 
 use serde::Serialize;
-use wiretap_catalog::decode::{Decoded, HeaderFieldValue, MuxSelector};
-use wiretap_catalog::MirrorVerdict;
-use wiretap_checksum::ChecksumValidationResult;
+use wslib_wiretap_catalogue::decode::{Decoded, HeaderFieldValue, MuxSelector};
+use wslib_wiretap_catalogue::MirrorVerdict;
+use wslib_checksum::ChecksumValidationResult;
 
 use super::tunnel_signals::DecodedTunnelMessage;
 
@@ -17,7 +17,7 @@ use super::tunnel_signals::DecodedTunnelMessage;
 pub struct DecodedSignalValue {
     pub display: String,
     #[cfg_attr(test, ts(as = "Option<String>"))]
-    pub format: Option<wiretap_catalog::SignalFormat>,
+    pub format: Option<wslib_wiretap_catalogue::SignalFormat>,
     /// On a mirror frame, whether the bytes this signal covers differed from the source.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[cfg_attr(test, ts(optional))]

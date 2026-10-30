@@ -1,7 +1,7 @@
 // Generated from the Rust serde types by `npm run gen:types`. Do not edit.
 
 /**
- * One group, in the desktop's `GroupedValue` shape. The readings are decimal
+ * One group, exported to TypeScript as `GroupedValue`. The readings are decimal
  * strings; bit positions count `byte * 8 + bit`, bit 0 least significant.
  */
 export type GroupedValue = { 

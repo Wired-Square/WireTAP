@@ -107,7 +107,7 @@ pub(crate) fn session_id_prefix<'a>(
         let spec = device_kinds::traits(&p.kind);
         let proto = spec.filter(|s| s.realtime).map(|s| s.protocol);
         if proto == Some(Protocol::Serial) {
-            emits_bytes |= wiretap_io::profile::resolve_serial_framing(p, None, emit_raw_bytes).1;
+            emits_bytes |= crate::io::profile::resolve_serial_framing(p, None, emit_raw_bytes).1;
         }
         if proto == Some(Protocol::Modbus) {
             return "m";

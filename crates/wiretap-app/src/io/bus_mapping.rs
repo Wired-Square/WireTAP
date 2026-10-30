@@ -6,7 +6,7 @@
 // profile asked for, and every one of them then renumbers or mutes a frame on
 // the way past. That is a session concept, not a protocol one — it lived in the
 // GVRET module only because GVRET was the first driver to need it, and once the
-// GVRET wire codec moved to `wiretap-protocol` there was nothing left in that
+// GVRET wire codec moved to `wslib-can-gvret` there was nothing left in that
 // module for it to be near.
 
 use crate::io::traits::traits_for_protocol;

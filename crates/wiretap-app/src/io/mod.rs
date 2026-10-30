@@ -5,8 +5,9 @@
 // with session-based isolation for multiple concurrent connections.
 
 // Core modules
-pub mod device_kinds; // Per-kind traits, beside the connection table in wiretap_io::profile
+pub mod device_kinds; // Per-kind traits, beside the connection table in io::profile
 pub mod ephemeral; // Ad-hoc devices, overlaid onto settings.io_profiles for this run
+pub mod profile; // A device profile as settings stores it, and its per-kind connection table
 pub mod profiles; // Profile lifecycle: reconfigure a device and reconnect it
 mod error;
 pub mod lifecycle; // Terminal state left behind by a detached source task
@@ -22,12 +23,13 @@ pub(crate) mod types;
 
 // Recorded sources (capture, csv, WireTAP backend)
 mod recorded;
+pub(crate) mod replay; // Recorded frames paced against the wall clock
 
 // Real-time drivers
 pub mod gs_usb; // pub for Tauri command access
 pub mod bus_mapping; // Device bus -> session bus, shared by every multi-bus driver
 pub mod bus_status;
-mod can_task; // Frames in and transmits out of a wiretap-io CAN task
+mod can_task; // Frames in and transmits out of a wslib-can task
 pub mod gvret; // GVRET TCP/USB driver
 pub mod modbus_tcp; // pub for scanner command access
 mod mqtt;
@@ -64,7 +66,7 @@ pub use modbus_tcp::{
 #[cfg(not(target_os = "ios"))]
 pub use gvret::probe_gvret_usb;
 pub use broker::{IOBroker, ProfileLoader, SerialOverrides, SourceConfig};
-pub use wiretap_catalog::FramingMode;
+pub use wslib_wiretap_catalogue::FramingMode;
 pub use mqtt::{MqttConfig, MqttSource};
 
 pub use error::{IoError, IoErrorKind, IoFailure};
@@ -291,7 +293,7 @@ impl Protocol {
     /// The check bytes that end each frame: a Modbus RTU message keeps its CRC.
     pub fn trailing_check_bytes(self) -> usize {
         match self {
-            Protocol::ModbusRtu => wiretap_checksum::ChecksumAlgorithm::Crc16Modbus.output_bytes(),
+            Protocol::ModbusRtu => wslib_checksum::ChecksumAlgorithm::Crc16Modbus.output_bytes(),
             _ => 0,
         }
     }

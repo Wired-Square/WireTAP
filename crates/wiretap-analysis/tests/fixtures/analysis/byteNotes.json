@@ -1,0 +1,750 @@
+{
+  "cases": [
+    {
+      "name": "no samples",
+      "input": {
+        "profile": { "protocol": "can", "frameId": 256, "isExtended": false, "frameIdHex": "0x100", "sampleCount": 0, "minLen": 0, "maxLen": 0, "identical": null, "analysedFrom": 0, "columns": [], "patterns": [], "endianness": null, "mux": null },
+        "isBurstFrame": false
+      },
+      "expected": {
+        "protocol": "can",
+        "frameId": 256,
+        "isExtended": false,
+        "sampleCount": 0,
+        "byteStats": [],
+        "multiBytePatterns": [],
+        "notes": ["No frames to analyze"],
+        "analyzedFromByte": 0,
+        "analyzedToByteExclusive": 0,
+        "isBurstFrame": false,
+        "isMuxFrame": false,
+        "hasVaryingLength": false,
+        "isIdentical": false
+      }
+    },
+    {
+      "name": "every role, length varying, burst",
+      "input": {
+        "profile": {
+          "protocol": "can",
+          "frameId": 256,
+          "isExtended": false,
+          "frameIdHex": "0x100",
+          "sampleCount": 20,
+          "minLen": 6,
+          "maxLen": 8,
+          "identical": null,
+          "analysedFrom": 0,
+          "columns": [
+            { "position": 0, "distinctValues": 20, "min": 0, "max": 255, "constantValue": 31, "changes": 0, "transitions": 19, "entropyBits": 0, "sampleCount": 20, "role": "static", "value": 31 },
+            { "position": 1, "distinctValues": 20, "min": 0, "max": 255, "constantValue": null, "changes": 0, "transitions": 19, "entropyBits": 0, "sampleCount": 20, "role": "counter", "direction": "up", "step": 1, "rollover": true, "looping": null },
+            {
+              "position": 2,
+              "distinctValues": 20,
+              "min": 0,
+              "max": 255,
+              "constantValue": null,
+              "changes": 0,
+              "transitions": 19,
+              "entropyBits": 0,
+              "sampleCount": 20,
+              "role": "counter",
+              "direction": "up",
+              "step": 1,
+              "rollover": true,
+              "looping": { "min": 0, "max": 9, "modulo": 10 }
+            },
+            { "position": 3, "distinctValues": 20, "min": 10, "max": 90, "constantValue": null, "changes": 0, "transitions": 19, "entropyBits": 0, "sampleCount": 20, "role": "sensor", "trend": "decreasing", "strength": 0.755, "rollover": false },
+            { "position": 4, "distinctValues": 20, "min": 0, "max": 255, "constantValue": null, "changes": 0, "transitions": 19, "entropyBits": 0, "sampleCount": 20, "role": "value" },
+            { "position": 5, "distinctValues": 20, "min": 0, "max": 255, "constantValue": null, "changes": 0, "transitions": 19, "entropyBits": 0, "sampleCount": 20, "role": "value" },
+            { "position": 6, "distinctValues": 20, "min": 0, "max": 255, "constantValue": null, "changes": 0, "transitions": 19, "entropyBits": 0, "sampleCount": 12, "role": "value" },
+            { "position": 7, "distinctValues": 20, "min": 0, "max": 255, "constantValue": null, "changes": 0, "transitions": 19, "entropyBits": 0, "sampleCount": 12, "role": "unknown" }
+          ],
+          "patterns": [
+            { "start": 4, "len": 2, "kind": "counter16", "endianness": "little", "rollover": false, "correlatedRollover": false, "slowUpperBytes": false, "range": null, "sampleText": null },
+            { "start": 6, "len": 2, "kind": "text", "endianness": null, "rollover": false, "correlatedRollover": false, "slowUpperBytes": false, "range": null, "sampleText": "OK" }
+          ],
+          "endianness": "little",
+          "mux": null
+        },
+        "isBurstFrame": true
+      },
+      "expected": {
+        "protocol": "can",
+        "frameId": 256,
+        "isExtended": false,
+        "sampleCount": 20,
+        "byteStats": [
+          { "byteIndex": 0, "min": 0, "max": 255, "distinctCount": 20, "sampleCount": 20, "role": "static", "staticValue": 31 },
+          { "byteIndex": 1, "min": 0, "max": 255, "distinctCount": 20, "sampleCount": 20, "role": "counter", "counterDirection": "up", "counterStep": 1, "rolloverDetected": true, "isLoopingCounter": false },
+          {
+            "byteIndex": 2,
+            "min": 0,
+            "max": 255,
+            "distinctCount": 20,
+            "sampleCount": 20,
+            "role": "counter",
+            "counterDirection": "up",
+            "counterStep": 1,
+            "rolloverDetected": true,
+            "isLoopingCounter": true,
+            "loopingRange": { "min": 0, "max": 9 },
+            "loopingModulo": 10
+          },
+          { "byteIndex": 3, "min": 10, "max": 90, "distinctCount": 20, "sampleCount": 20, "role": "sensor", "sensorTrend": "decreasing", "trendStrength": 0.755, "rolloverDetected": false },
+          { "byteIndex": 4, "min": 0, "max": 255, "distinctCount": 20, "sampleCount": 20, "role": "value" },
+          { "byteIndex": 5, "min": 0, "max": 255, "distinctCount": 20, "sampleCount": 20, "role": "value" },
+          { "byteIndex": 6, "min": 0, "max": 255, "distinctCount": 20, "sampleCount": 12, "role": "value" },
+          { "byteIndex": 7, "min": 0, "max": 255, "distinctCount": 20, "sampleCount": 12, "role": "unknown" }
+        ],
+        "multiBytePatterns": [
+          { "startByte": 4, "length": 2, "pattern": "counter16", "endianness": "little", "rolloverDetected": false, "correlatedRollover": false, "slowUpperBytes": false },
+          { "startByte": 6, "length": 2, "pattern": "text", "rolloverDetected": false, "correlatedRollover": false, "slowUpperBytes": false, "sampleText": "OK" }
+        ],
+        "notes": [
+          "Little-endian (inferred from 1 multi-byte pattern(s))",
+          "Varying length: 6–8 bytes",
+          "Burst frame: analyzing stable payload portion only",
+          "Static bytes: byte[0]=0x1F",
+          "Counter at byte[1]: incrementing, step=1 (rollover detected)",
+          "Looping counter at byte[2]: incrementing, step=1, range 0–9 (mod 10)",
+          "Sensor at byte[3]: ↓ range 10–90 (76% trend)",
+          "16-bit counter at byte[4:5], little endian",
+          "Text at byte[6:7] \"OK\""
+        ],
+        "analyzedFromByte": 0,
+        "analyzedToByteExclusive": 8,
+        "isBurstFrame": true,
+        "isMuxFrame": false,
+        "hasVaryingLength": true,
+        "lengthRange": { "min": 6, "max": 8 },
+        "isIdentical": false,
+        "inferredEndianness": "little"
+      }
+    },
+    {
+      "name": "down counter, mixed sensor with no strength, looping counter with modulo 0",
+      "input": {
+        "profile": {
+          "protocol": "can",
+          "frameId": 419364865,
+          "isExtended": true,
+          "frameIdHex": "0x18FF0001",
+          "sampleCount": 20,
+          "minLen": 8,
+          "maxLen": 8,
+          "identical": null,
+          "analysedFrom": 0,
+          "columns": [
+            {
+              "position": 0,
+              "distinctValues": 20,
+              "min": 0,
+              "max": 255,
+              "constantValue": null,
+              "changes": 0,
+              "transitions": 19,
+              "entropyBits": 0,
+              "sampleCount": 20,
+              "role": "counter",
+              "direction": "down",
+              "step": 2,
+              "rollover": false,
+              "looping": null
+            },
+            { "position": 1, "distinctValues": 20, "min": 3, "max": 200, "constantValue": null, "changes": 0, "transitions": 19, "entropyBits": 0, "sampleCount": 20, "role": "sensor", "trend": "mixed", "strength": 0, "rollover": true },
+            { "position": 2, "distinctValues": 20, "min": 0, "max": 15, "constantValue": null, "changes": 0, "transitions": 19, "entropyBits": 0, "sampleCount": 20, "role": "sensor", "trend": "increasing", "strength": 0.5, "rollover": false },
+            {
+              "position": 3,
+              "distinctValues": 20,
+              "min": 0,
+              "max": 255,
+              "constantValue": null,
+              "changes": 0,
+              "transitions": 19,
+              "entropyBits": 0,
+              "sampleCount": 20,
+              "role": "counter",
+              "direction": "up",
+              "step": 3,
+              "rollover": true,
+              "looping": { "min": 1, "max": 3, "modulo": 0 }
+            }
+          ],
+          "patterns": [],
+          "endianness": null,
+          "mux": null
+        },
+        "isBurstFrame": false
+      },
+      "expected": {
+        "protocol": "can",
+        "frameId": 419364865,
+        "isExtended": true,
+        "sampleCount": 20,
+        "byteStats": [
+          { "byteIndex": 0, "min": 0, "max": 255, "distinctCount": 20, "sampleCount": 20, "role": "counter", "counterDirection": "down", "counterStep": 2, "rolloverDetected": false, "isLoopingCounter": false },
+          { "byteIndex": 1, "min": 3, "max": 200, "distinctCount": 20, "sampleCount": 20, "role": "sensor", "sensorTrend": "mixed", "trendStrength": 0, "rolloverDetected": true },
+          { "byteIndex": 2, "min": 0, "max": 15, "distinctCount": 20, "sampleCount": 20, "role": "sensor", "sensorTrend": "increasing", "trendStrength": 0.5, "rolloverDetected": false },
+          {
+            "byteIndex": 3,
+            "min": 0,
+            "max": 255,
+            "distinctCount": 20,
+            "sampleCount": 20,
+            "role": "counter",
+            "counterDirection": "up",
+            "counterStep": 3,
+            "rolloverDetected": true,
+            "isLoopingCounter": true,
+            "loopingRange": { "min": 1, "max": 3 },
+            "loopingModulo": 0
+          }
+        ],
+        "multiBytePatterns": [],
+        "notes": ["Counter at byte[0]: decrementing, step=2", "Counter at byte[3]: incrementing, step=3 (rollover detected)", "Sensor at byte[1]: ↕ range 3–200", "Sensor at byte[2]: ↑ range 0–15 (50% trend)"],
+        "analyzedFromByte": 0,
+        "analyzedToByteExclusive": 8,
+        "isBurstFrame": false,
+        "isMuxFrame": false,
+        "hasVaryingLength": false,
+        "isIdentical": false
+      }
+    },
+    {
+      "name": "pattern bytes hide their counters and sensors but not their statics",
+      "input": {
+        "profile": {
+          "protocol": "can",
+          "frameId": 256,
+          "isExtended": false,
+          "frameIdHex": "0x100",
+          "sampleCount": 20,
+          "minLen": 8,
+          "maxLen": 8,
+          "identical": null,
+          "analysedFrom": 0,
+          "columns": [
+            { "position": 0, "distinctValues": 20, "min": 0, "max": 255, "constantValue": 0, "changes": 0, "transitions": 19, "entropyBits": 0, "sampleCount": 20, "role": "static", "value": 0 },
+            { "position": 1, "distinctValues": 20, "min": 0, "max": 255, "constantValue": null, "changes": 0, "transitions": 19, "entropyBits": 0, "sampleCount": 20, "role": "counter", "direction": "up", "step": 1, "rollover": false, "looping": null },
+            { "position": 2, "distinctValues": 20, "min": 0, "max": 255, "constantValue": null, "changes": 0, "transitions": 19, "entropyBits": 0, "sampleCount": 20, "role": "sensor", "trend": "increasing", "strength": 0.9, "rollover": false },
+            { "position": 3, "distinctValues": 20, "min": 0, "max": 255, "constantValue": null, "changes": 0, "transitions": 19, "entropyBits": 0, "sampleCount": 20, "role": "value" },
+            { "position": 4, "distinctValues": 20, "min": 0, "max": 255, "constantValue": null, "changes": 0, "transitions": 19, "entropyBits": 0, "sampleCount": 20, "role": "value" }
+          ],
+          "patterns": [
+            { "start": 0, "len": 2, "kind": "counter16", "endianness": "big", "rollover": true, "correlatedRollover": false, "slowUpperBytes": false, "range": null, "sampleText": null },
+            { "start": 2, "len": 2, "kind": "sensor16", "endianness": null, "rollover": false, "correlatedRollover": false, "slowUpperBytes": false, "range": null, "sampleText": null },
+            { "start": 4, "len": 4, "kind": "text", "endianness": null, "rollover": false, "correlatedRollover": false, "slowUpperBytes": false, "range": null, "sampleText": null }
+          ],
+          "endianness": null,
+          "mux": null
+        },
+        "isBurstFrame": false
+      },
+      "expected": {
+        "protocol": "can",
+        "frameId": 256,
+        "isExtended": false,
+        "sampleCount": 20,
+        "byteStats": [
+          { "byteIndex": 0, "min": 0, "max": 255, "distinctCount": 20, "sampleCount": 20, "role": "static", "staticValue": 0 },
+          { "byteIndex": 1, "min": 0, "max": 255, "distinctCount": 20, "sampleCount": 20, "role": "counter", "counterDirection": "up", "counterStep": 1, "rolloverDetected": false, "isLoopingCounter": false },
+          { "byteIndex": 2, "min": 0, "max": 255, "distinctCount": 20, "sampleCount": 20, "role": "sensor", "sensorTrend": "increasing", "trendStrength": 0.9, "rolloverDetected": false },
+          { "byteIndex": 3, "min": 0, "max": 255, "distinctCount": 20, "sampleCount": 20, "role": "value" },
+          { "byteIndex": 4, "min": 0, "max": 255, "distinctCount": 20, "sampleCount": 20, "role": "value" }
+        ],
+        "multiBytePatterns": [
+          { "startByte": 0, "length": 2, "pattern": "counter16", "endianness": "big", "rolloverDetected": true, "correlatedRollover": false, "slowUpperBytes": false },
+          { "startByte": 2, "length": 2, "pattern": "sensor16", "rolloverDetected": false, "correlatedRollover": false, "slowUpperBytes": false },
+          { "startByte": 4, "length": 4, "pattern": "text", "rolloverDetected": false, "correlatedRollover": false, "slowUpperBytes": false }
+        ],
+        "notes": ["Static bytes: byte[0]=0x00", "16-bit counter at byte[0:1], big endian (rollover detected)", "16-bit sensor at byte[2:3], undefined endian", "Text at byte[4:7]"],
+        "analyzedFromByte": 0,
+        "analyzedToByteExclusive": 8,
+        "isBurstFrame": false,
+        "isMuxFrame": false,
+        "hasVaryingLength": false,
+        "isIdentical": false
+      }
+    },
+    {
+      "name": "varying values counted only when nothing else explains them",
+      "input": {
+        "profile": {
+          "protocol": "can",
+          "frameId": 256,
+          "isExtended": false,
+          "frameIdHex": "0x100",
+          "sampleCount": 20,
+          "minLen": 8,
+          "maxLen": 8,
+          "identical": null,
+          "analysedFrom": 0,
+          "columns": [
+            { "position": 0, "distinctValues": 20, "min": 0, "max": 255, "constantValue": null, "changes": 0, "transitions": 19, "entropyBits": 0, "sampleCount": 20, "role": "value" },
+            { "position": 1, "distinctValues": 20, "min": 0, "max": 255, "constantValue": null, "changes": 0, "transitions": 19, "entropyBits": 0, "sampleCount": 20, "role": "value" },
+            { "position": 2, "distinctValues": 20, "min": 0, "max": 255, "constantValue": null, "changes": 0, "transitions": 19, "entropyBits": 0, "sampleCount": 20, "role": "unknown" }
+          ],
+          "patterns": [],
+          "endianness": null,
+          "mux": null
+        },
+        "isBurstFrame": false
+      },
+      "expected": {
+        "protocol": "can",
+        "frameId": 256,
+        "isExtended": false,
+        "sampleCount": 20,
+        "byteStats": [
+          { "byteIndex": 0, "min": 0, "max": 255, "distinctCount": 20, "sampleCount": 20, "role": "value" },
+          { "byteIndex": 1, "min": 0, "max": 255, "distinctCount": 20, "sampleCount": 20, "role": "value" },
+          { "byteIndex": 2, "min": 0, "max": 255, "distinctCount": 20, "sampleCount": 20, "role": "unknown" }
+        ],
+        "multiBytePatterns": [],
+        "notes": ["2 byte(s) with varying values detected"],
+        "analyzedFromByte": 0,
+        "analyzedToByteExclusive": 8,
+        "isBurstFrame": false,
+        "isMuxFrame": false,
+        "hasVaryingLength": false,
+        "isIdentical": false
+      }
+    },
+    {
+      "name": "sensors spanning columns, with ranges",
+      "input": {
+        "profile": {
+          "protocol": "can",
+          "frameId": 256,
+          "isExtended": false,
+          "frameIdHex": "0x100",
+          "sampleCount": 20,
+          "minLen": 8,
+          "maxLen": 8,
+          "identical": null,
+          "analysedFrom": 0,
+          "columns": [
+            { "position": 0, "distinctValues": 20, "min": 0, "max": 255, "constantValue": null, "changes": 0, "transitions": 19, "entropyBits": 0, "sampleCount": 20, "role": "value" },
+            { "position": 1, "distinctValues": 20, "min": 0, "max": 255, "constantValue": null, "changes": 0, "transitions": 19, "entropyBits": 0, "sampleCount": 20, "role": "value" },
+            { "position": 2, "distinctValues": 20, "min": 0, "max": 255, "constantValue": null, "changes": 0, "transitions": 19, "entropyBits": 0, "sampleCount": 20, "role": "value" },
+            { "position": 3, "distinctValues": 20, "min": 0, "max": 255, "constantValue": null, "changes": 0, "transitions": 19, "entropyBits": 0, "sampleCount": 20, "role": "value" },
+            { "position": 4, "distinctValues": 20, "min": 0, "max": 255, "constantValue": null, "changes": 0, "transitions": 19, "entropyBits": 0, "sampleCount": 20, "role": "value" },
+            { "position": 5, "distinctValues": 20, "min": 0, "max": 255, "constantValue": null, "changes": 0, "transitions": 19, "entropyBits": 0, "sampleCount": 20, "role": "value" }
+          ],
+          "patterns": [
+            { "start": 0, "len": 2, "kind": "sensor16", "endianness": "big", "rollover": true, "correlatedRollover": true, "slowUpperBytes": false, "range": [100, 700], "sampleText": null },
+            { "start": 2, "len": 4, "kind": "sensor32", "endianness": "little", "rollover": true, "correlatedRollover": true, "slowUpperBytes": true, "range": [5, 70000], "sampleText": null }
+          ],
+          "endianness": "mixed",
+          "mux": null
+        },
+        "isBurstFrame": false
+      },
+      "expected": {
+        "protocol": "can",
+        "frameId": 256,
+        "isExtended": false,
+        "sampleCount": 20,
+        "byteStats": [
+          { "byteIndex": 0, "min": 0, "max": 255, "distinctCount": 20, "sampleCount": 20, "role": "value" },
+          { "byteIndex": 1, "min": 0, "max": 255, "distinctCount": 20, "sampleCount": 20, "role": "value" },
+          { "byteIndex": 2, "min": 0, "max": 255, "distinctCount": 20, "sampleCount": 20, "role": "value" },
+          { "byteIndex": 3, "min": 0, "max": 255, "distinctCount": 20, "sampleCount": 20, "role": "value" },
+          { "byteIndex": 4, "min": 0, "max": 255, "distinctCount": 20, "sampleCount": 20, "role": "value" },
+          { "byteIndex": 5, "min": 0, "max": 255, "distinctCount": 20, "sampleCount": 20, "role": "value" }
+        ],
+        "multiBytePatterns": [
+          { "startByte": 0, "length": 2, "pattern": "sensor16", "endianness": "big", "rolloverDetected": true, "correlatedRollover": true, "slowUpperBytes": false, "minValue": 100, "maxValue": 700 },
+          { "startByte": 2, "length": 4, "pattern": "sensor32", "endianness": "little", "rolloverDetected": true, "correlatedRollover": true, "slowUpperBytes": true, "minValue": 5, "maxValue": 70000 }
+        ],
+        "notes": [
+          "Mixed endianness (inferred from 2 multi-byte pattern(s))",
+          "16-bit sensor at byte[0:1], big endian, range 100–700 (rollover correlation detected)",
+          "32-bit sensor at byte[2:5], little endian, range 5–70000 (slow-changing upper bytes) (rollover correlation detected)"
+        ],
+        "analyzedFromByte": 0,
+        "analyzedToByteExclusive": 8,
+        "isBurstFrame": false,
+        "isMuxFrame": false,
+        "hasVaryingLength": false,
+        "isIdentical": false,
+        "inferredEndianness": "mixed"
+      }
+    },
+    {
+      "name": "identical payload, serial protocol",
+      "input": {
+        "profile": {
+          "protocol": "serial",
+          "frameId": 1,
+          "isExtended": false,
+          "frameIdHex": "0x01",
+          "sampleCount": 3,
+          "minLen": 2,
+          "maxLen": 2,
+          "identical": [1, 171],
+          "analysedFrom": 0,
+          "columns": [
+            { "position": 0, "distinctValues": 20, "min": 0, "max": 255, "constantValue": 1, "changes": 0, "transitions": 19, "entropyBits": 0, "sampleCount": 20, "role": "static", "value": 1 },
+            { "position": 1, "distinctValues": 20, "min": 0, "max": 255, "constantValue": 171, "changes": 0, "transitions": 19, "entropyBits": 0, "sampleCount": 20, "role": "static", "value": 171 }
+          ],
+          "patterns": [],
+          "endianness": null,
+          "mux": null
+        },
+        "isBurstFrame": false
+      },
+      "expected": {
+        "protocol": "serial",
+        "frameId": 1,
+        "isExtended": false,
+        "sampleCount": 3,
+        "byteStats": [{ "byteIndex": 0, "min": 0, "max": 255, "distinctCount": 20, "sampleCount": 20, "role": "static", "staticValue": 1 }, { "byteIndex": 1, "min": 0, "max": 255, "distinctCount": 20, "sampleCount": 20, "role": "static", "staticValue": 171 }],
+        "multiBytePatterns": [],
+        "notes": ["Identical payload across all 3 samples: 01 AB", "Static bytes: byte[0]=0x01, byte[1]=0xAB"],
+        "analyzedFromByte": 0,
+        "analyzedToByteExclusive": 2,
+        "isBurstFrame": false,
+        "isMuxFrame": false,
+        "hasVaryingLength": false,
+        "isIdentical": true,
+        "identicalPayload": [1, 171]
+      }
+    },
+    {
+      "name": "endianness with no endian pattern, protocol absent",
+      "input": {
+        "profile": {
+          "frameId": 256,
+          "isExtended": false,
+          "frameIdHex": "0x100",
+          "sampleCount": 20,
+          "minLen": 8,
+          "maxLen": 8,
+          "identical": null,
+          "analysedFrom": 0,
+          "columns": [{ "position": 0, "distinctValues": 20, "min": 0, "max": 255, "constantValue": null, "changes": 0, "transitions": 19, "entropyBits": 0, "sampleCount": 20, "role": "value" }],
+          "patterns": [],
+          "endianness": "big",
+          "mux": null
+        },
+        "isBurstFrame": false
+      },
+      "expected": {
+        "frameId": 256,
+        "isExtended": false,
+        "sampleCount": 20,
+        "byteStats": [{ "byteIndex": 0, "min": 0, "max": 255, "distinctCount": 20, "sampleCount": 20, "role": "value" }],
+        "multiBytePatterns": [],
+        "notes": ["Big-endian (inferred from 0 multi-byte pattern(s))", "1 byte(s) with varying values detected"],
+        "analyzedFromByte": 0,
+        "analyzedToByteExclusive": 8,
+        "isBurstFrame": false,
+        "isMuxFrame": false,
+        "hasVaryingLength": false,
+        "isIdentical": false,
+        "inferredEndianness": "big"
+      }
+    },
+    {
+      "name": "one-byte mux, cases summarised and noted in short",
+      "input": {
+        "profile": {
+          "protocol": "can",
+          "frameId": 256,
+          "isExtended": false,
+          "frameIdHex": "0x100",
+          "sampleCount": 20,
+          "minLen": 8,
+          "maxLen": 8,
+          "identical": null,
+          "analysedFrom": 1,
+          "columns": [
+            { "position": 1, "distinctValues": 20, "min": 0, "max": 255, "constantValue": null, "changes": 0, "transitions": 19, "entropyBits": 0, "sampleCount": 20, "role": "counter", "direction": "up", "step": 1, "rollover": false, "looping": null },
+            { "position": 2, "distinctValues": 20, "min": 0, "max": 255, "constantValue": null, "changes": 0, "transitions": 19, "entropyBits": 0, "sampleCount": 20, "role": "value" }
+          ],
+          "patterns": [{ "start": 1, "len": 2, "kind": "counter16", "endianness": "little", "rollover": false, "correlatedRollover": false, "slowUpperBytes": false, "range": null, "sampleText": null }],
+          "endianness": "mixed",
+          "mux": {
+            "detection": { "selector": "oneByte", "occurrences": { "0": 10, "1": 10, "2": 10 } },
+            "cases": [
+              {
+                "value": 0,
+                "sampleCount": 10,
+                "columns": [
+                  { "position": 1, "distinctValues": 20, "min": 0, "max": 255, "constantValue": null, "changes": 0, "transitions": 19, "entropyBits": 0, "sampleCount": 20, "role": "counter", "direction": "down", "step": 1, "rollover": true, "looping": null },
+                  { "position": 2, "distinctValues": 20, "min": 0, "max": 255, "constantValue": 17, "changes": 0, "transitions": 19, "entropyBits": 0, "sampleCount": 20, "role": "static", "value": 17 },
+                  {
+                    "position": 3,
+                    "distinctValues": 20,
+                    "min": 0,
+                    "max": 255,
+                    "constantValue": null,
+                    "changes": 0,
+                    "transitions": 19,
+                    "entropyBits": 0,
+                    "sampleCount": 20,
+                    "role": "counter",
+                    "direction": "up",
+                    "step": 1,
+                    "rollover": false,
+                    "looping": { "min": 0, "max": 14, "modulo": 15 }
+                  },
+                  { "position": 4, "distinctValues": 20, "min": 4, "max": 44, "constantValue": null, "changes": 0, "transitions": 19, "entropyBits": 0, "sampleCount": 20, "role": "sensor", "trend": "decreasing", "strength": 0.6, "rollover": false }
+                ],
+                "patterns": []
+              },
+              {
+                "value": 1,
+                "sampleCount": 10,
+                "columns": [
+                  { "position": 1, "distinctValues": 20, "min": 0, "max": 255, "constantValue": null, "changes": 0, "transitions": 19, "entropyBits": 0, "sampleCount": 20, "role": "value" },
+                  { "position": 2, "distinctValues": 20, "min": 0, "max": 255, "constantValue": null, "changes": 0, "transitions": 19, "entropyBits": 0, "sampleCount": 20, "role": "value" },
+                  { "position": 3, "distinctValues": 20, "min": 0, "max": 255, "constantValue": null, "changes": 0, "transitions": 19, "entropyBits": 0, "sampleCount": 20, "role": "counter", "direction": "up", "step": 1, "rollover": false, "looping": null },
+                  { "position": 4, "distinctValues": 20, "min": 0, "max": 255, "constantValue": null, "changes": 0, "transitions": 19, "entropyBits": 0, "sampleCount": 20, "role": "value" },
+                  { "position": 5, "distinctValues": 20, "min": 0, "max": 255, "constantValue": null, "changes": 0, "transitions": 19, "entropyBits": 0, "sampleCount": 20, "role": "value" }
+                ],
+                "patterns": [
+                  { "start": 1, "len": 2, "kind": "sensor16", "endianness": "big", "rollover": false, "correlatedRollover": true, "slowUpperBytes": true, "range": [3, 900], "sampleText": null },
+                  { "start": 3, "len": 2, "kind": "counter16", "endianness": "big", "rollover": true, "correlatedRollover": false, "slowUpperBytes": false, "range": null, "sampleText": null },
+                  { "start": 5, "len": 3, "kind": "text", "endianness": null, "rollover": false, "correlatedRollover": false, "slowUpperBytes": false, "range": null, "sampleText": "abc" }
+                ]
+              },
+              {
+                "value": 2,
+                "sampleCount": 10,
+                "columns": [{ "position": 1, "distinctValues": 20, "min": 0, "max": 255, "constantValue": null, "changes": 0, "transitions": 19, "entropyBits": 0, "sampleCount": 20, "role": "value" }],
+                "patterns": [{ "start": 1, "len": 4, "kind": "sensor32", "endianness": "little", "rollover": false, "correlatedRollover": false, "slowUpperBytes": false, "range": null, "sampleText": null }]
+              }
+            ]
+          }
+        },
+        "isBurstFrame": false
+      },
+      "expected": {
+        "protocol": "can",
+        "frameId": 256,
+        "isExtended": false,
+        "sampleCount": 20,
+        "byteStats": [
+          { "byteIndex": 1, "min": 0, "max": 255, "distinctCount": 20, "sampleCount": 20, "role": "counter", "counterDirection": "up", "counterStep": 1, "rolloverDetected": false, "isLoopingCounter": false },
+          { "byteIndex": 2, "min": 0, "max": 255, "distinctCount": 20, "sampleCount": 20, "role": "value" }
+        ],
+        "multiBytePatterns": [{ "startByte": 1, "length": 2, "pattern": "counter16", "endianness": "little", "rolloverDetected": false, "correlatedRollover": false, "slowUpperBytes": false }],
+        "notes": ["Mixed endianness (inferred from 4 multi-byte pattern(s))", "Multiplexed frame: byte[0], cases: 0, 1, 2", "Case 0: 2 counter, 1 static", "Case 1: 1 counter, 0 static"],
+        "analyzedFromByte": 1,
+        "analyzedToByteExclusive": 8,
+        "isBurstFrame": false,
+        "isMuxFrame": true,
+        "muxInfo": { "selectorByte": 0, "selectorValues": [0, 1, 2], "isTwoByte": false },
+        "muxCaseAnalyses": [
+          {
+            "muxValue": 0,
+            "sampleCount": 10,
+            "byteStats": [
+              { "byteIndex": 1, "min": 0, "max": 255, "distinctCount": 20, "sampleCount": 20, "role": "counter", "counterDirection": "down", "counterStep": 1, "rolloverDetected": true, "isLoopingCounter": false },
+              { "byteIndex": 2, "min": 0, "max": 255, "distinctCount": 20, "sampleCount": 20, "role": "static", "staticValue": 17 },
+              {
+                "byteIndex": 3,
+                "min": 0,
+                "max": 255,
+                "distinctCount": 20,
+                "sampleCount": 20,
+                "role": "counter",
+                "counterDirection": "up",
+                "counterStep": 1,
+                "rolloverDetected": false,
+                "isLoopingCounter": true,
+                "loopingRange": { "min": 0, "max": 14 },
+                "loopingModulo": 15
+              },
+              { "byteIndex": 4, "min": 4, "max": 44, "distinctCount": 20, "sampleCount": 20, "role": "sensor", "sensorTrend": "decreasing", "trendStrength": 0.6, "rolloverDetected": false }
+            ],
+            "multiBytePatterns": [],
+            "notes": ["Static: byte[2]=0x11", "Counter byte[1]: dec, step=1 +rollover", "Loop counter byte[3]: inc, step=1, 0–14 (mod 15)", "Sensor byte[4]: ↓ range 4–44"]
+          },
+          {
+            "muxValue": 1,
+            "sampleCount": 10,
+            "byteStats": [
+              { "byteIndex": 1, "min": 0, "max": 255, "distinctCount": 20, "sampleCount": 20, "role": "value" },
+              { "byteIndex": 2, "min": 0, "max": 255, "distinctCount": 20, "sampleCount": 20, "role": "value" },
+              { "byteIndex": 3, "min": 0, "max": 255, "distinctCount": 20, "sampleCount": 20, "role": "counter", "counterDirection": "up", "counterStep": 1, "rolloverDetected": false, "isLoopingCounter": false },
+              { "byteIndex": 4, "min": 0, "max": 255, "distinctCount": 20, "sampleCount": 20, "role": "value" },
+              { "byteIndex": 5, "min": 0, "max": 255, "distinctCount": 20, "sampleCount": 20, "role": "value" }
+            ],
+            "multiBytePatterns": [
+              { "startByte": 1, "length": 2, "pattern": "sensor16", "endianness": "big", "rolloverDetected": false, "correlatedRollover": true, "slowUpperBytes": true, "minValue": 3, "maxValue": 900 },
+              { "startByte": 3, "length": 2, "pattern": "counter16", "endianness": "big", "rolloverDetected": true, "correlatedRollover": false, "slowUpperBytes": false },
+              { "startByte": 5, "length": 3, "pattern": "text", "rolloverDetected": false, "correlatedRollover": false, "slowUpperBytes": false, "sampleText": "abc" }
+            ],
+            "notes": ["16b sensor byte[1:2] big 3–900 +slow-upper +correlated", "16b counter byte[3:4] big +rollover", "Text byte[5:7] \"abc\""]
+          },
+          {
+            "muxValue": 2,
+            "sampleCount": 10,
+            "byteStats": [{ "byteIndex": 1, "min": 0, "max": 255, "distinctCount": 20, "sampleCount": 20, "role": "value" }],
+            "multiBytePatterns": [{ "startByte": 1, "length": 4, "pattern": "sensor32", "endianness": "little", "rolloverDetected": false, "correlatedRollover": false, "slowUpperBytes": false }],
+            "notes": ["32b sensor byte[1:4] little"]
+          }
+        ],
+        "hasVaryingLength": false,
+        "isIdentical": false,
+        "inferredEndianness": "mixed"
+      }
+    },
+    {
+      "name": "one-byte mux with more than six cases and more than four summaries",
+      "input": {
+        "profile": {
+          "protocol": "can",
+          "frameId": 256,
+          "isExtended": false,
+          "frameIdHex": "0x100",
+          "sampleCount": 20,
+          "minLen": 8,
+          "maxLen": 8,
+          "identical": null,
+          "analysedFrom": 1,
+          "columns": [],
+          "patterns": [],
+          "endianness": null,
+          "mux": {
+            "detection": { "selector": "oneByte", "occurrences": { "0": 4, "1": 4, "2": 4, "3": 4, "4": 4, "5": 4, "6": 4 } },
+            "cases": [
+              {
+                "value": 0,
+                "sampleCount": 4,
+                "columns": [{ "position": 1, "distinctValues": 20, "min": 0, "max": 255, "constantValue": 0, "changes": 0, "transitions": 19, "entropyBits": 0, "sampleCount": 20, "role": "static", "value": 0 }],
+                "patterns": []
+              },
+              {
+                "value": 1,
+                "sampleCount": 4,
+                "columns": [{ "position": 1, "distinctValues": 20, "min": 0, "max": 255, "constantValue": 1, "changes": 0, "transitions": 19, "entropyBits": 0, "sampleCount": 20, "role": "static", "value": 1 }],
+                "patterns": []
+              },
+              {
+                "value": 2,
+                "sampleCount": 4,
+                "columns": [{ "position": 1, "distinctValues": 20, "min": 0, "max": 255, "constantValue": 2, "changes": 0, "transitions": 19, "entropyBits": 0, "sampleCount": 20, "role": "static", "value": 2 }],
+                "patterns": []
+              },
+              {
+                "value": 3,
+                "sampleCount": 4,
+                "columns": [{ "position": 1, "distinctValues": 20, "min": 0, "max": 255, "constantValue": 3, "changes": 0, "transitions": 19, "entropyBits": 0, "sampleCount": 20, "role": "static", "value": 3 }],
+                "patterns": []
+              },
+              {
+                "value": 4,
+                "sampleCount": 4,
+                "columns": [{ "position": 1, "distinctValues": 20, "min": 0, "max": 255, "constantValue": 4, "changes": 0, "transitions": 19, "entropyBits": 0, "sampleCount": 20, "role": "static", "value": 4 }],
+                "patterns": []
+              },
+              {
+                "value": 5,
+                "sampleCount": 4,
+                "columns": [{ "position": 1, "distinctValues": 20, "min": 0, "max": 255, "constantValue": 5, "changes": 0, "transitions": 19, "entropyBits": 0, "sampleCount": 20, "role": "static", "value": 5 }],
+                "patterns": []
+              },
+              {
+                "value": 6,
+                "sampleCount": 4,
+                "columns": [{ "position": 1, "distinctValues": 20, "min": 0, "max": 255, "constantValue": 6, "changes": 0, "transitions": 19, "entropyBits": 0, "sampleCount": 20, "role": "static", "value": 6 }],
+                "patterns": []
+              }
+            ]
+          }
+        },
+        "isBurstFrame": false
+      },
+      "expected": {
+        "protocol": "can",
+        "frameId": 256,
+        "isExtended": false,
+        "sampleCount": 20,
+        "byteStats": [],
+        "multiBytePatterns": [],
+        "notes": ["Multiplexed frame: byte[0], 7 cases (0-6)"],
+        "analyzedFromByte": 1,
+        "analyzedToByteExclusive": 8,
+        "isBurstFrame": false,
+        "isMuxFrame": true,
+        "muxInfo": { "selectorByte": 0, "selectorValues": [0, 1, 2, 3, 4, 5, 6], "isTwoByte": false },
+        "muxCaseAnalyses": [
+          { "muxValue": 0, "sampleCount": 4, "byteStats": [{ "byteIndex": 1, "min": 0, "max": 255, "distinctCount": 20, "sampleCount": 20, "role": "static", "staticValue": 0 }], "multiBytePatterns": [], "notes": ["Static: byte[1]=0x00"] },
+          { "muxValue": 1, "sampleCount": 4, "byteStats": [{ "byteIndex": 1, "min": 0, "max": 255, "distinctCount": 20, "sampleCount": 20, "role": "static", "staticValue": 1 }], "multiBytePatterns": [], "notes": ["Static: byte[1]=0x01"] },
+          { "muxValue": 2, "sampleCount": 4, "byteStats": [{ "byteIndex": 1, "min": 0, "max": 255, "distinctCount": 20, "sampleCount": 20, "role": "static", "staticValue": 2 }], "multiBytePatterns": [], "notes": ["Static: byte[1]=0x02"] },
+          { "muxValue": 3, "sampleCount": 4, "byteStats": [{ "byteIndex": 1, "min": 0, "max": 255, "distinctCount": 20, "sampleCount": 20, "role": "static", "staticValue": 3 }], "multiBytePatterns": [], "notes": ["Static: byte[1]=0x03"] },
+          { "muxValue": 4, "sampleCount": 4, "byteStats": [{ "byteIndex": 1, "min": 0, "max": 255, "distinctCount": 20, "sampleCount": 20, "role": "static", "staticValue": 4 }], "multiBytePatterns": [], "notes": ["Static: byte[1]=0x04"] },
+          { "muxValue": 5, "sampleCount": 4, "byteStats": [{ "byteIndex": 1, "min": 0, "max": 255, "distinctCount": 20, "sampleCount": 20, "role": "static", "staticValue": 5 }], "multiBytePatterns": [], "notes": ["Static: byte[1]=0x05"] },
+          { "muxValue": 6, "sampleCount": 4, "byteStats": [{ "byteIndex": 1, "min": 0, "max": 255, "distinctCount": 20, "sampleCount": 20, "role": "static", "staticValue": 6 }], "multiBytePatterns": [], "notes": ["Static: byte[1]=0x06"] }
+        ],
+        "hasVaryingLength": false,
+        "isIdentical": false
+      }
+    },
+    {
+      "name": "two-byte mux, burst",
+      "input": {
+        "profile": {
+          "protocol": "can",
+          "frameId": 256,
+          "isExtended": false,
+          "frameIdHex": "0x100",
+          "sampleCount": 20,
+          "minLen": 8,
+          "maxLen": 8,
+          "identical": null,
+          "analysedFrom": 2,
+          "columns": [],
+          "patterns": [],
+          "endianness": null,
+          "mux": {
+            "detection": { "selector": "twoByte", "occurrences": { "257": 5, "258": 5 } },
+            "cases": [
+              {
+                "value": 257,
+                "sampleCount": 5,
+                "columns": [
+                  { "position": 2, "distinctValues": 20, "min": 0, "max": 255, "constantValue": null, "changes": 0, "transitions": 19, "entropyBits": 0, "sampleCount": 20, "role": "counter", "direction": "up", "step": 1, "rollover": false, "looping": null }
+                ],
+                "patterns": []
+              },
+              { "value": 258, "sampleCount": 5, "columns": [], "patterns": [] }
+            ]
+          }
+        },
+        "isBurstFrame": true
+      },
+      "expected": {
+        "protocol": "can",
+        "frameId": 256,
+        "isExtended": false,
+        "sampleCount": 20,
+        "byteStats": [],
+        "multiBytePatterns": [],
+        "notes": ["Burst frame with mux: analyzing stable payload portion only", "Multiplexed frame: byte[0:1], 2 cases", "Case 1:1: 1 counter, 0 static"],
+        "analyzedFromByte": 2,
+        "analyzedToByteExclusive": 8,
+        "isBurstFrame": true,
+        "isMuxFrame": true,
+        "muxInfo": { "selectorByte": -1, "selectorValues": [257, 258], "isTwoByte": true },
+        "muxCaseAnalyses": [
+          {
+            "muxValue": 257,
+            "sampleCount": 5,
+            "byteStats": [{ "byteIndex": 2, "min": 0, "max": 255, "distinctCount": 20, "sampleCount": 20, "role": "counter", "counterDirection": "up", "counterStep": 1, "rolloverDetected": false, "isLoopingCounter": false }],
+            "multiBytePatterns": [],
+            "notes": ["Counter byte[2]: inc, step=1"]
+          },
+          { "muxValue": 258, "sampleCount": 5, "byteStats": [], "multiBytePatterns": [], "notes": [] }
+        ],
+        "hasVaryingLength": false,
+        "isIdentical": false
+      }
+    }
+  ]
+}

@@ -12,10 +12,10 @@
 use async_trait::async_trait;
 use std::collections::VecDeque;
 use std::time::Duration;
-use wiretap_gateway::client::{ArchiveFrame, ClientError, FrameCursor};
-use wiretap_gateway::{FramesQuery, Protocol as ArchiveProtocol};
+use wslib_wiretap_gateway::client::{ArchiveFrame, ClientError, FrameCursor};
+use wslib_wiretap_gateway::{FramesQuery, Protocol as ArchiveProtocol};
 
-use wiretap_io::replay::{Pacer, PlaybackControl, Playout, Unlimited};
+use crate::io::replay::{Pacer, PlaybackControl, Playout, Unlimited};
 
 use super::base::{publish_position, RecordedSourceState};
 use crate::apiclient::{frame_tag, gateway};
@@ -74,7 +74,7 @@ impl IOSource for BackendApiSource {
         let caps = IOCapabilities::recorded_can().with_time_range(true);
         match self.config.protocol {
             ArchiveProtocol::Can => caps,
-            ArchiveProtocol::Modbus => caps.with_protocols(vec![Protocol::ModbusRtu]),
+            ArchiveProtocol::ModbusRtu => caps.with_protocols(vec![Protocol::ModbusRtu]),
             ArchiveProtocol::Serial => unreachable!("archive_protocol refuses serial"),
         }
     }
@@ -506,7 +506,7 @@ mod tests {
             dir: "rx".into(),
         };
         for crc_valid in [Some(false), Some(true), None] {
-            assert_eq!(frame_message(ArchiveProtocol::Modbus, row(crc_valid)).crc_valid, crc_valid);
+            assert_eq!(frame_message(ArchiveProtocol::ModbusRtu, row(crc_valid)).crc_valid, crc_valid);
         }
     }
 }

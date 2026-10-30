@@ -74,7 +74,7 @@ pub async fn platform_probe_slcan_device(
 ) -> SlcanProbeResultCompat {
     #[cfg(not(target_os = "ios"))]
     {
-        let parsed = wiretap_io::serial::LineSettings::parse(
+        let parsed = wslib_serial::LineSettings::parse(
             baud_rate,
             data_bits,
             stop_bits,

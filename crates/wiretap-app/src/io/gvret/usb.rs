@@ -8,8 +8,8 @@
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
-use wiretap_io::can::gvret::{open as open_gvret, probe, GvretOptions, Link};
-use wiretap_io::serial::LineSettings;
+use wslib_can_gvret::{open as open_gvret, probe, GvretOptions, Link};
+use wslib_serial::LineSettings;
 
 use super::common::{handshake_failed, probed_bus_count, GvretDeviceInfo, Stream};
 use crate::io::bus_mapping::BusMapping;
@@ -116,8 +116,8 @@ mod tests {
     use crate::io::IoFailure;
     use crate::io::can_task::{lost, reopen_failed};
     use crate::io::error::DevicePresence;
-    use wiretap_io::can::{CanError, CanEvent, DeviceInfo};
-    use wiretap_io::serial::Parity;
+    use wslib_can::{CanError, CanEvent, DeviceInfo};
+    use wslib_serial::Parity;
 
     const PORT: &str = "/dev/cu.usbmodem1";
 

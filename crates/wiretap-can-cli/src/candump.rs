@@ -1,7 +1,7 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use wiretap_io::can::{CanFrame, Direction};
-use wiretap_protocol::candump;
+use wslib_can::candump;
+use wslib_can::{CanFrame, Direction};
 
 /// An interface argument as a candump interface name: no whitespace, so a log
 /// line stays four fields, and the channel last, where `walk-diff` reads a bus.

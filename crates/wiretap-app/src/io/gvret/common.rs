@@ -3,13 +3,13 @@
 // The GVRET driver's half of the protocol: everything that is a session
 // concern rather than a wire concern.
 //
-// The wire itself is `wiretap_protocol::gvret`, shared with WireTAP-Server,
+// The wire itself is `wslib_can_gvret`, shared with WireTAP-Server,
 // which speaks the device end of the same protocol. What is left here is bus
 // mapping and the enumeration policy.
 
 use std::time::Duration;
 
-use wiretap_io::can::{CanError, CanEvent, DeviceInfo};
+use wslib_can::{CanError, CanEvent, DeviceInfo};
 
 use crate::io::bus_mapping::{gvret_protocols, reconcile_with_device, BusMapping};
 use crate::io::can_task::announce_on_event;
@@ -232,7 +232,8 @@ impl Stream {
 mod tests {
     use super::*;
     use std::time::UNIX_EPOCH;
-    use wiretap_io::can::{CanFrame, CanRead, Direction, TransportError};
+    use wslib_can::{CanFrame, CanRead, Direction};
+    use wslib_tcp::TransportError;
 
     fn reconcile_mapping(device_bus: u8, enabled: bool, output_bus: u8) -> BusMapping {
         BusMapping {
@@ -339,7 +340,7 @@ mod tests {
         assert!(probed_bus_count(Err(reset)).is_err());
     }
 
-    // --- a source on wiretap_io --------------------------------------------
+    // --- a source on wslib_can ---------------------------------------------
 
     const DEVICE: &str = "gvret_tcp(10.0.0.9:23)";
 

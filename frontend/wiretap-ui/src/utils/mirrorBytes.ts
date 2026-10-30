@@ -1,7 +1,7 @@
 // ui/src/utils/mirrorBytes.ts
 //
 // The bytes a mirror frame reproduces are Rust's answer
-// (`wiretap_catalog::mirror::inherited_byte_indices`); this only spans a signal
+// (`wslib_wiretap_catalogue::mirror::inherited_byte_indices`); this only spans a signal
 // for highlighting.
 
 import type { Signal } from "../types/catalogModel";

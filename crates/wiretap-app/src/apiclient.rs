@@ -7,7 +7,7 @@
 //
 // The archive is one table with a `protocol` column and every read on the
 // gateway defaults to CAN, so a profile names the protocol it reads
-// (`wiretap_gateway::Protocol`) and this module says so on every request that is
+// (`wslib_wiretap_gateway::Protocol`) and this module says so on every request that is
 // not CAN.
 
 use std::collections::HashMap;
@@ -15,11 +15,11 @@ use std::sync::LazyLock;
 
 use serde::Serialize;
 use wiretap_analysis::source::InventoryRow;
-use wiretap_gateway::client::{ClientError, ClientOptions, Db, GatewayClient};
-use wiretap_gateway::{
+use wslib_wiretap_gateway::client::{ClientError, ClientOptions, Db, GatewayClient};
+use wslib_wiretap_gateway::{
     DatabaseActivityResult, EventPatch, FrameFilter, NewEvent, Protocol, TimeRangeQuery,
 };
-use wiretap_io::profile::ConnValue;
+use crate::io::profile::ConnValue;
 
 use crate::capture_events::CaptureEvent;
 use crate::credentials::{self, get_credential};
@@ -48,7 +48,7 @@ pub(crate) fn gateway() -> &'static GatewayClient {
 pub fn archive_protocol(conn: &HashMap<String, ConnValue>) -> Result<Protocol, String> {
     match conn.get("protocol").and_then(|v| v.as_str()) {
         None | Some("") | Some("can") => Ok(Protocol::Can),
-        Some("modbus") => Ok(Protocol::Modbus),
+        Some("modbus") => Ok(Protocol::ModbusRtu),
         Some("serial") => Err("a WireTAP backend profile cannot read the serial archive yet".into()),
         Some(other) => Err(format!("unknown archive protocol '{other}'")),
     }
@@ -60,7 +60,7 @@ pub fn archive_protocol(conn: &HashMap<String, ConnValue>) -> Result<Protocol, S
 pub fn frame_tag(protocol: Protocol) -> &'static str {
     match protocol {
         Protocol::Can => "can",
-        Protocol::Modbus => "modbus_rtu",
+        Protocol::ModbusRtu => "modbus_rtu",
         Protocol::Serial => unreachable!("archive_protocol refuses serial"),
     }
 }
@@ -193,7 +193,7 @@ pub async fn frame_inventory(
 ) -> Result<Vec<InventoryRow>, String> {
     let api = resolve(profile)?;
     let bound = |us: Option<i64>| {
-        us.map(wiretap_gateway::rfc3339)
+        us.map(wslib_wiretap_gateway::rfc3339)
             .transpose()
             .map_err(|e| e.to_string())
     };
@@ -230,7 +230,8 @@ pub async fn fetch_frame_payloads(
 // Capture import — push a local SQLite capture to the backend
 // ---------------------------------------------------------------------------
 
-use wiretap_protocol::{can::CanFrame, import};
+use wslib_can::CanFrame;
+use wslib_wiretap_protocol::import;
 
 const IMPORT_PAGE: usize = 50_000;
 
@@ -247,8 +248,8 @@ pub(crate) struct ImportProgress {
 // Events — the archive's annotations, one per database
 // ---------------------------------------------------------------------------
 
-impl From<wiretap_gateway::Event> for CaptureEvent {
-    fn from(e: wiretap_gateway::Event) -> Self {
+impl From<wslib_wiretap_gateway::Event> for CaptureEvent {
+    fn from(e: wslib_wiretap_gateway::Event) -> Self {
         CaptureEvent {
             id: e.id.to_string(),
             timestamp_us: e.ts_us,
@@ -343,7 +344,7 @@ fn import_body(frames: &[crate::io::FrameMessage]) -> Vec<u8> {
     import::encode_header_into(&mut body);
     for f in frames {
         let frame = if f.is_rtr {
-            CanFrame::remote(f.bus, f.frame_id, f.is_extended, wiretap_protocol::payload_dlc(f.dlc as usize, false))
+            CanFrame::remote(f.bus, f.frame_id, f.is_extended, wslib_can::payload_dlc(f.dlc as usize, false))
         } else {
             let mut frame = CanFrame::data(f.bus, f.frame_id, f.is_extended, f.is_fd, f.is_brs, f.bytes.clone());
             frame.esi = f.is_esi;
@@ -356,7 +357,7 @@ fn import_body(frames: &[crate::io::FrameMessage]) -> Vec<u8> {
 
 #[tauri::command]
 pub fn api_valid_database_name(name: String) -> bool {
-    wiretap_protocol::ingest::valid_database_name(&name)
+    wslib_wiretap_protocol::ingest::valid_database_name(&name)
 }
 
 /// Upload a local SQLite capture's frames to a backend capture database.
@@ -400,7 +401,7 @@ async fn import_capture(
     create: bool,
     progress: impl Fn(ImportProgress),
 ) -> Result<u64, String> {
-    if !wiretap_protocol::ingest::valid_database_name(database) {
+    if !wslib_wiretap_protocol::ingest::valid_database_name(database) {
         return Err(format!("invalid database name '{database}'"));
     }
     ensure_only_can(capture_id).await?;
@@ -595,7 +596,7 @@ pub async fn api_database_protocols(
         .await
         .map_err(text)?;
     let modbus = client
-        .db(&database, Protocol::Modbus)
+        .db(&database, Protocol::ModbusRtu)
         .time_bounds()
         .await
         .map_err(text)?;
@@ -604,7 +605,7 @@ pub async fn api_database_protocols(
         out.push(Protocol::Can);
     }
     if modbus.min_ts_us.is_some() && modbus != can {
-        out.push(Protocol::Modbus);
+        out.push(Protocol::ModbusRtu);
     }
     Ok(out)
 }
@@ -622,13 +623,13 @@ mod tests {
     fn can_is_the_unsaid_default_modbus_is_named_and_serial_is_refused() {
         assert_eq!(archive_protocol(&conn(&[])).unwrap(), Protocol::Can);
         assert_eq!(archive_protocol(&conn(&[("protocol", json!("can"))])).unwrap(), Protocol::Can);
-        assert_eq!(archive_protocol(&conn(&[("protocol", json!("modbus"))])).unwrap(), Protocol::Modbus);
+        assert_eq!(archive_protocol(&conn(&[("protocol", json!("modbus"))])).unwrap(), Protocol::ModbusRtu);
         assert!(archive_protocol(&conn(&[("protocol", json!("modbsu"))])).is_err());
         let serial = archive_protocol(&conn(&[("protocol", json!("serial"))])).unwrap_err();
         assert!(serial.contains("serial"), "{serial}");
 
         assert_eq!(frame_tag(Protocol::Can), "can");
-        assert_eq!(frame_tag(Protocol::Modbus), "modbus_rtu");
+        assert_eq!(frame_tag(Protocol::ModbusRtu), "modbus_rtu");
     }
 
     fn uploaded(body: &[u8]) -> Vec<(i64, bool, CanFrame)> {
@@ -636,7 +637,7 @@ mod tests {
         let mut records = Vec::new();
         while let Some((record, consumed)) = import::parse_record(&body[at..]).unwrap() {
             at += consumed;
-            let wiretap_protocol::ingest::RecordFields::Can { transmitted, .. } = record.fields() else {
+            let wslib_wiretap_protocol::ingest::RecordFields::Can { transmitted, .. } = record.fields() else {
                 unreachable!("an import record is CAN")
             };
             records.push((record.ts_us, transmitted, record.into_can()));

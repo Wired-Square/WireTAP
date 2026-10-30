@@ -1,8 +1,7 @@
 // Generated from the Rust serde types by `npm run gen:types`. Do not edit.
 
 /**
- * How a dashboard should show a signal: `display = "rotary"`, or a table such as
- * `{ widget = "level-bar", orientation = "vertical" }`. The widget names are the
- * consumer's, and the options keep their keys as authored.
+ * A signal's `display` value: a name, or a table giving one as `widget` with
+ * its other keys kept as authored; none is interpreted here.
  */
 export type DisplayHint = { widget: string, [option: string]: unknown };

@@ -1110,8 +1110,8 @@ pub async fn set_framing(
 ) -> Result<IOCapabilities, String> {
     // Keep the WS decode path in step with the port, stock settings included: a
     // `modbus_rtu` frame from a session that published none reads as an archive's.
-    if let wiretap_catalog::FramingEncoding::ModbusRtu(options) =
-        wiretap_catalog::FramingEncoding::from_mode(req.encoding, req.modbus.as_ref())
+    if let wslib_wiretap_catalogue::FramingEncoding::ModbusRtu(options) =
+        wslib_wiretap_catalogue::FramingEncoding::from_mode(req.encoding, req.modbus.as_ref())
     {
         crate::ws::dispatch::set_serial_rtu_options(session_id, options);
     }
@@ -1825,7 +1825,7 @@ mod tests {
         store_playback_position(id, position);
         with_state(id, |s| s.suspended_at = Some(Instant::now()));
         CLOSING_SESSIONS.write().unwrap().insert(id.into());
-        let catalog = wiretap_catalog::Catalog::parse("[meta]\nname = \"gone\"\n").unwrap();
+        let catalog = wslib_wiretap_catalogue::Catalogue::parse("[meta]\nname = \"gone\"\n").unwrap();
         crate::ws::dispatch::attach_catalog(id, Some("gone.toml".into()), catalog);
 
         destroy_session(id, false).await.unwrap();

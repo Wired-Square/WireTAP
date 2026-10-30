@@ -9,10 +9,16 @@ edition = "2021"
 clap = { version = "4", features = ["derive"] }
 hex = "0.4"
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal", "time"] }
-wiretap-protocol = { git = "ssh://git@github.com/Wired-Square/wslib-wiretap-rs.git", tag = "v0.10.2" }
+wslib-can = { version = "0.1.1", registry = "wired-square", features = ["task"] }
+wslib-can-gvret = { version = "0.1", registry = "wired-square", features = ["serial"] }
+wslib-can-slcan = { version = "0.1.0", registry = "wired-square", features = ["transport"] }
 # Each transport gates itself by target: gs_usb and PEAK over nusb on macOS and Windows,
 # SocketCAN and the gs_usb sysfs listing on Linux.
-wiretap-io = { git = "ssh://git@github.com/Wired-Square/wslib-wiretap-rs.git", tag = "v0.10.2", features = ["can-gvret", "can-slcan", "can-gsusb", "can-pcan", "can-socketcan", "serial-ports"] }
+wslib-can-gsusb = { version = "0.1.0", registry = "wired-square", features = ["transport"] }
+wslib-can-pcan = { version = "0.1.0", registry = "wired-square", features = ["transport"] }
+wslib-can-socketcan = { version = "0.1", registry = "wired-square", features = ["transport"] }
+wslib-serial = { version = "0.1.1", registry = "wired-square", features = ["ports"] }
+wslib-wiretap-protocol = { version = "0.2.1", registry = "wired-square" }
 
 [target.'cfg(any(target_os = "macos", target_os = "windows"))'.dependencies]
 nusb = { version = "0.2", features = ["tokio"] }

@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use tauri::AppHandle;
 
 use crate::credentials;
-use wiretap_io::profile::{apply_defaults, validate_profile, ConnValue, ProfileValidationError};
+use crate::io::profile::{apply_defaults, validate_profile, ConnValue, ProfileValidationError};
 use crate::settings::{AppSettings, IOProfile};
 
 /// A device as the user described it. The id is minted by [`create_device`].

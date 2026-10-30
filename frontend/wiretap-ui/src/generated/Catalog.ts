@@ -22,6 +22,6 @@ protocol: Protocol, can?: CanConfig | null, serial?: SerialConfig | null, modbus
  */
 nodes?: Array<NodeDef>, 
 /**
- * The served copy of [`Catalog::derived_defaults`], for consumers.
+ * The served copy of [`Catalogue::derived_defaults`], for consumers.
  */
 effectiveDefaults: EffectiveDefaults, };

@@ -9,7 +9,7 @@ use std::collections::{BTreeMap, HashSet};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
-use wiretap_io::modbus::{
+use wslib_modbus::{
     ExceptionCode, ModbusTcp, ReadData, ReadRequest, Reading, RequestError, WriteRefused,
 };
 
@@ -29,7 +29,7 @@ use super::McpRunningConfig;
 use crate::capture_db::{self, source_error};
 use crate::payload_source::resolve;
 use crate::settings::SettingsSource;
-use wiretap_gateway::{QuerySpec, RowWindow};
+use wslib_wiretap_gateway::{QuerySpec, RowWindow};
 
 /// Counter for generating unique replay IDs without a clock/RNG.
 static REPLAY_SEQ: AtomicU64 = AtomicU64::new(1);
@@ -106,7 +106,7 @@ fn resolve_catalog_path(
     filename: &str,
 ) -> Result<(std::path::PathBuf, bool), McpError> {
     let name =
-        wiretap_catalog::text::sanitise_filename(filename).map_err(|e| err(e.to_string()))?;
+        wslib_wiretap_catalogue::text::sanitise_filename(filename).map_err(|e| err(e.to_string()))?;
     let settings = settings.load().map_err(err)?;
     let path = std::path::PathBuf::from(&settings.decoder_dir).join(&name);
     let exists = path.exists();
@@ -122,12 +122,12 @@ fn catalog_text(
     match (content, ops) {
         (Some(content), None) => Ok(content),
         (None, Some(ops)) => {
-            let ops: Vec<wiretap_catalog::edit::EditOp> = ops
+            let ops: Vec<wslib_wiretap_catalogue::edit::EditOp> = ops
                 .into_iter()
                 .map(serde_json::from_value)
                 .collect::<Result<_, _>>()
                 .map_err(|e| format!("invalid edit op: {e}"))?;
-            wiretap_catalog::edit::apply_edits(&base()?, &ops)
+            wslib_wiretap_catalogue::edit::apply_edits(&base()?, &ops)
         }
         _ => Err("give either content or ops".to_string()),
     }
@@ -135,7 +135,7 @@ fn catalog_text(
 
 /// Validate catalog TOML; on findings, return an error embedding them (no write).
 fn validate_or_reject(content: &str) -> Result<(), McpError> {
-    let findings = wiretap_catalog::validate::validate(content);
+    let findings = wslib_wiretap_catalogue::validate::validate(content);
     if findings.is_empty() {
         return Ok(());
     }
@@ -393,11 +393,11 @@ fn masked_id_of(filter: &str) -> Result<u32, String> {
 /// newest last. Signals merge by `muxValue:name`, so an inactive mux case keeps
 /// its last value, as the Decoder keeps it.
 fn decode_tail(
-    catalog: &wiretap_catalog::Catalog,
+    catalog: &wslib_wiretap_catalogue::Catalogue,
     frames: &[FrameMessage],
     wanted: Option<u32>,
 ) -> Vec<Value> {
-    let mask = wiretap_catalog::decode::frame_id_mask(catalog).unwrap_or(u32::MAX);
+    let mask = wslib_wiretap_catalogue::decode::frame_id_mask(catalog).unwrap_or(u32::MAX);
     let mut latest: Vec<(u32, Value)> = Vec::new();
     for f in frames {
         let masked = f.frame_id & mask;
@@ -686,7 +686,7 @@ impl WireTapTools {
         &self,
         Parameters(p): Parameters<ValidateCatalogParams>,
     ) -> Result<CallToolResult, McpError> {
-        let errors = wiretap_catalog::validate::validate(&p.content);
+        let errors = wslib_wiretap_catalogue::validate::validate(&p.content);
         ok_json(json!({ "valid": errors.is_empty(), "errors": errors }))
     }
 
@@ -697,10 +697,10 @@ impl WireTapTools {
     ) -> Result<CallToolResult, McpError> {
         let rt = p.register_type.to_lowercase();
         let register_type = match rt.as_str() {
-            "holding" => wiretap_catalog::RegisterType::Holding,
-            "input" => wiretap_catalog::RegisterType::Input,
-            "coil" => wiretap_catalog::RegisterType::Coil,
-            "discrete" => wiretap_catalog::RegisterType::Discrete,
+            "holding" => wslib_wiretap_catalogue::RegisterType::Holding,
+            "input" => wslib_wiretap_catalogue::RegisterType::Input,
+            "coil" => wslib_wiretap_catalogue::RegisterType::Coil,
+            "discrete" => wslib_wiretap_catalogue::RegisterType::Discrete,
             other => return Err(err(format!("Unknown register_type '{other}' (use holding/input/coil/discrete)"))),
         };
         let profile = session_modbus_profile(&self.ctx, &p.session_id)?;
@@ -913,7 +913,7 @@ impl WireTapTools {
         let src = resolve(p.capture_id, p.profile_id).map_err(err)?;
         let entry = self.ctx.find_catalog(&p.catalog).map_err(err)?;
         let toml = crate::catalog::open_catalog(entry.path).await.map_err(err)?;
-        let catalog = wiretap_catalog::Catalog::parse(&toml).map_err(|e| err(e.to_string()))?;
+        let catalog = wslib_wiretap_catalogue::Catalogue::parse(&toml).map_err(|e| err(e.to_string()))?;
         let report = wiretap_analysis::source::catalog_coverage(
             &src.reader(&self.ctx),
             &entry.name,
@@ -1275,7 +1275,7 @@ impl WireTapTools {
         &self,
         Parameters(p): Parameters<IngestBytesParams>,
     ) -> Result<CallToolResult, McpError> {
-        let data = wiretap_decode::hex::parse_bytes(&p.bytes)
+        let data = wslib_bits::hex::parse_bytes(&p.bytes)
             .map_err(|e| err(format!("bytes: {e}")))?;
         if data.is_empty() {
             return Err(err("bytes is empty"));
@@ -1521,7 +1521,7 @@ impl WireTapTools {
 #[tool_router(router = catalog_write_router)]
 impl WireTapTools {
     #[tool(
-        description = "Create a NEW decoder catalog file in the decoder directory. Validates the TOML first and refuses if the file already exists (use update_catalog to overwrite). Pass `content` (the full TOML) or `ops`: wiretap-catalog edit ops tagged by `op` (SetMeta, SetCanConfig, SetSerialConfig, SetModbusConfig, AddFrame, SetFrame, UpsertSignal, SetMux, DeleteAtPath, …), which build it from nothing and apply the catalogue's authoring rules. Requires the catalog-write MCP permission.",
+        description = "Create a NEW decoder catalog file in the decoder directory. Validates the TOML first and refuses if the file already exists (use update_catalog to overwrite). Pass `content` (the full TOML) or `ops`: catalogue edit ops tagged by `op` (SetMeta, SetCanConfig, SetSerialConfig, SetModbusConfig, AddFrame, SetFrame, UpsertSignal, SetMux, DeleteAtPath, …), which build it from nothing and apply the catalogue's authoring rules. Requires the catalog-write MCP permission.",
         annotations(read_only_hint = false, destructive_hint = false, idempotent_hint = false)
     )]
     async fn create_catalog(
@@ -1581,7 +1581,7 @@ impl WireTapTools {
 #[tool_router(router = catalog_modify_router)]
 impl WireTapTools {
     #[tool(
-        description = "Overwrite an EXISTING decoder catalog (by filename or display name). Validates the TOML first and refuses if no such catalog exists (use create_catalog for a new file). Pass `content` (the full TOML) or `ops`: wiretap-catalog edit ops tagged by `op` (SetMeta, SetCanConfig, SetSerialConfig, SetModbusConfig, AddFrame, SetFrame, UpsertSignal, SetMux, DeleteAtPath, …), which edit the file in place, keeping its comments, and apply the catalogue's authoring rules. Requires the catalog-modify MCP permission.",
+        description = "Overwrite an EXISTING decoder catalog (by filename or display name). Validates the TOML first and refuses if no such catalog exists (use create_catalog for a new file). Pass `content` (the full TOML) or `ops`: catalogue edit ops tagged by `op` (SetMeta, SetCanConfig, SetSerialConfig, SetModbusConfig, AddFrame, SetFrame, UpsertSignal, SetMux, DeleteAtPath, …), which edit the file in place, keeping its comments, and apply the catalogue's authoring rules. Requires the catalog-modify MCP permission.",
         annotations(read_only_hint = false, destructive_hint = true,  idempotent_hint = false)
     )]
     async fn update_catalog(
@@ -1693,7 +1693,7 @@ mod tests {
     use super::{analysis_window, catalog_text, modbus_write_json, parse_frame_key, scan_status};
     use crate::io::IOState;
     use std::time::Duration;
-    use wiretap_io::modbus::{ExceptionCode, RequestError, TransportError, WriteRefused};
+    use wslib_modbus::{ExceptionCode, RequestError, TransportError, WriteRefused};
 
     #[test]
     fn an_analysis_reads_discoverys_default_window_unless_told_otherwise() {
@@ -1708,8 +1708,8 @@ mod tests {
         let ops = vec![serde_json::json!({ "op": "AddFrame", "protocol": "modbus", "key": "5000", "frame": { "length": 2 } })];
         let text = catalog_text(base, None, Some(ops)).unwrap();
         assert!(text.starts_with("[meta]"), "{text}");
-        let catalog = wiretap_catalog::Catalog::parse(&text).unwrap();
-        let frame = catalog.frame_by_key(wiretap_catalog::Protocol::Modbus, "5000").unwrap();
+        let catalog = wslib_wiretap_catalogue::Catalogue::parse(&text).unwrap();
+        let frame = catalog.frame_by_key(wslib_wiretap_catalogue::Protocol::Modbus, "5000").unwrap();
         assert_eq!((frame.modbus_register_count, frame.signals.len()), (Some(2), 1));
         assert!(catalog_text(base, None, None).is_err());
         assert!(catalog_text(base, Some("x".into()), Some(vec![])).is_err());
@@ -1888,8 +1888,8 @@ mod tests {
             }
         }
 
-        fn mux_catalogue() -> wiretap_catalog::Catalog {
-            wiretap_catalog::Catalog::parse(
+        fn mux_catalogue() -> wslib_wiretap_catalogue::Catalogue {
+            wslib_wiretap_catalogue::Catalogue::parse(
                 r#"
 [meta]
 name = "mux"

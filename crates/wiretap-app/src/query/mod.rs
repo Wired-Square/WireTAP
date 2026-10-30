@@ -1,6 +1,6 @@
 // crates/wiretap-app/src/query/mod.rs
 //
-// The Query app's one path: a `wiretap_gateway::QuerySpec` run against a capture
+// The Query app's one path: a `wslib_wiretap_gateway::QuerySpec` run against a capture
 // or a WireTAP backend, answered with the SQL (or request) that ran, behind a
 // queue every window shares, and exported as CSV.
 
@@ -12,7 +12,7 @@ pub mod queue;
 use std::collections::BTreeSet;
 
 use serde::{Deserialize, Serialize};
-use wiretap_gateway::{
+use wslib_wiretap_gateway::{
     ByteChangeQueryResult, ByteChangeResult, DistributionQueryResult, DistributionResult,
     FirstLastQueryResult, FirstLastResult, FrameChangeQueryResult, FrameChangeResult,
     FrequencyBucket, FrequencyQueryResult, GapAnalysisQueryResult, GapResult,
@@ -134,7 +134,7 @@ fn mirror_compare(spec: &QuerySpec, catalog_path: Option<&str>) -> Result<Option
         return Ok(None);
     };
     let text = std::fs::read_to_string(path).map_err(|e| format!("Failed to read catalog file: {e}"))?;
-    let catalog = wiretap_catalog::Catalog::parse(&text).map_err(|e| e.to_string())?;
+    let catalog = wslib_wiretap_catalogue::Catalogue::parse(&text).map_err(|e| e.to_string())?;
     Ok(wiretap_analysis::query::mirror_compare_set(&catalog, *mirror_frame_id))
 }
 
@@ -182,7 +182,7 @@ pub(crate) mod tests {
     use std::sync::Arc;
 
     use serde_json::{json, Value};
-    use wiretap_gateway::{Protocol, RowWindow};
+    use wslib_wiretap_gateway::{Protocol, RowWindow};
 
     use super::*;
     use crate::capture_db::wait;
@@ -425,11 +425,11 @@ pub(crate) mod tests {
         );
         let cases: Vec<Value> = serde_json::from_str(&std::fs::read_to_string(fixture).expect("fixture")).expect("cases");
         for case in cases {
-            let frame: wiretap_catalog::Frame = serde_json::from_value(json!({
+            let frame: wslib_wiretap_catalogue::Frame = serde_json::from_value(json!({
                 "key": "0x100", "frameId": 0x100, "protocol": "can", "length": 8, "signals": case["signals"],
             }))
             .expect("frame");
-            let indices: Vec<usize> = wiretap_catalog::mirror::inherited_byte_indices(&frame).into_iter().collect();
+            let indices: Vec<usize> = wslib_wiretap_catalogue::mirror::inherited_byte_indices(&frame).into_iter().collect();
             assert_eq!(json!(indices), case["expected"], "{}", case["name"]);
         }
     }

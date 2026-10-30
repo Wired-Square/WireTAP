@@ -12,10 +12,10 @@ use wiretap_analysis::draft::{
     ExportFrame, ExportMeta, FrameDraft, ModbusExportConfig, ModbusRegister,
 };
 use wiretap_analysis::{ByteColumn, ByteRole, Direction, FrameKey};
-use wiretap_catalog::edit::EditOp;
-use wiretap_catalog::model::{Protocol, SerialConfig};
-use wiretap_checksum::columns::ColumnStats;
-use wiretap_decode::Endianness;
+use wslib_wiretap_catalogue::edit::EditOp;
+use wslib_wiretap_catalogue::model::{Protocol, SerialConfig};
+use wslib_checksum::columns::ColumnStats;
+use wslib_bits::Endianness;
 
 use crate::byte_roles::PayloadChanges;
 
@@ -196,7 +196,7 @@ pub struct ExportedCatalog {
 
 /// A new catalogue from `ops`, refused with its findings unless it validates.
 fn built(ops: &[EditOp]) -> Result<String, String> {
-    let text = wiretap_catalog::edit::apply_edits("", ops)?;
+    let text = wslib_wiretap_catalogue::edit::apply_edits("", ops)?;
     crate::catalog::refuse_unless_valid(&text)?;
     Ok(text)
 }
@@ -414,10 +414,10 @@ mod tests {
         assert!(toml.contains("start_bit = 8\nbit_length = 16"), "{toml}");
     }
 
-    fn reloaded_serial(serial: serde_json::Value) -> wiretap_catalog::model::SerialConfig {
+    fn reloaded_serial(serial: serde_json::Value) -> wslib_wiretap_catalogue::model::SerialConfig {
         let exported = build_framed(None, write(vec![frame("serial", 0x10, false, 8)], false), serial);
         assert!(exported.findings.is_empty());
-        wiretap_catalog::Catalog::parse(&exported.text).unwrap().serial.unwrap()
+        wslib_wiretap_catalogue::Catalogue::parse(&exported.text).unwrap().serial.unwrap()
     }
 
     #[test]

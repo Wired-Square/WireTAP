@@ -828,7 +828,7 @@ Two rules, neither obvious from any one call site:
   are not upstream.
 
 The increment itself is a **byte splice over the integer's own span**, in
-`wiretap_catalog::edit::bump_meta_version`, deliberately *not* an `EditOp`. Every op
+`wslib_wiretap_catalogue::edit::bump_meta_version`, deliberately *not* an `EditOp`. Every op
 round-trips a `toml_edit::DocumentMut`, which re-formats the key it replaces (taking the
 comment block above it, which the parser folds into that key's decor), drops a trailing
 comment on the value, and re-emits every line with a bare `\n` — so a CRLF catalogue

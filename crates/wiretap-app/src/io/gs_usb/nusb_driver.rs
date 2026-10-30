@@ -1,14 +1,14 @@
 // crates/wiretap-app/src/io/gs_usb/nusb_driver.rs
 //
 // gs_usb on Windows and macOS: the passive probe and device list here, and the
-// session's reader on wiretap-io's CAN task.
+// session's reader on wslib-can's task.
 
 use std::io;
 
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
-use wiretap_io::can::gsusb::{self, GsUsbDevice, GsUsbOptions};
-use wiretap_io::can::{CanError, CanEvent, CanOptions, DeviceInfo};
+use wslib_can_gsusb::{self as gsusb, GsUsbDevice, GsUsbOptions};
+use wslib_can::{CanError, CanEvent, CanOptions, DeviceInfo};
 
 use super::{GsUsbDeviceInfo, GsUsbProbeResult};
 use crate::io::bus_mapping::BusMapping;
@@ -180,7 +180,7 @@ pub async fn run_source(
 mod tests {
     use super::*;
     use std::time::{Duration, UNIX_EPOCH};
-    use wiretap_io::can::{BusState, CanFrame, CanRead, Direction, ErrorState};
+    use wslib_can::{BusState, CanFrame, CanRead, Direction, ErrorState};
 
     use crate::io::bus_status::BusErrorState;
     use crate::io::can_task::can_frame;

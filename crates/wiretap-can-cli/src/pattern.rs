@@ -6,13 +6,10 @@ use std::{
 
 use clap::ValueEnum;
 use tokio::time::{timeout_at, Instant};
-use wiretap_io::can::{CanEvent, CanFrame, CanTask, CanWriter, Direction};
-use wiretap_protocol::{
-    dlc_to_len,
-    testpattern::{
-        self as tp, capability, status_field, Command, Flags, Latencies, Message, Responder,
-        SequenceTracker,
-    },
+use wslib_can::{dlc_to_len, CanEvent, CanFrame, CanTask, CanWriter, Direction};
+use wslib_wiretap_protocol::testpattern::{
+    self as tp, capability, status_field, Command, Flags, Latencies, Message, Responder,
+    SequenceTracker,
 };
 
 const HELLO_ATTEMPTS: u32 = 3;

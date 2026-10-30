@@ -1,15 +1,15 @@
 // crates/wiretap-app/src/decode_views.rs
 //
-// Thin commands over `wiretap_decode`'s readings: the Frame Calculator's groups,
+// Thin commands over `wslib_bits`'s readings: the Frame Calculator's groups,
 // a Modbus scan's registers and the ids a CAN filter mask accepts.
 
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
-use wiretap_decode::frame_id::{matched_id_count, matched_range, MatchedRange};
-use wiretap_decode::groups::{decode_groups, parse_sizes, Group, GroupMode, GroupOrder};
-use wiretap_decode::register::{interpret_pair, interpret_register, RegisterPairView, RegisterView};
-use wiretap_decode::Endianness;
+use wslib_bits::frame_id::{matched_id_count, matched_range, MatchedRange};
+use wslib_bits::groups::{decode_groups, parse_sizes, Group, GroupMode, GroupOrder};
+use wslib_bits::register::{interpret_pair, interpret_register, RegisterPairView, RegisterView};
+use wslib_bits::Endianness;
 
 /// A preset, or the widths typed into the calculator in a unit of bits.
 #[derive(Debug, Deserialize)]
@@ -89,7 +89,7 @@ mod tests {
         serde_json::from_value(v.clone()).unwrap()
     }
 
-    /// wiretap-decode's D6 case 1, a 1B mid-* group naming the byte its value came from.
+    /// wslib-bits' D6 case 1, a 1B mid-* group naming the byte its value came from.
     const ONE_BYTE_MID: &[&str] = &[
         "1B mid-big 12 mixed",
         "1B mid-big 123456789abcdef0",

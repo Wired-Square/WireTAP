@@ -1,6 +1,6 @@
 // io/modbus_tcp/poll.rs
 //
-// The one Modbus poll loop: one `wiretap_io` poll task per source, drained
+// The one Modbus poll loop: one `wslib_modbus` poll task per source, drained
 // into a `FrameSink`.
 
 use std::collections::HashMap;
@@ -8,18 +8,18 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{LazyLock, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio::sync::{mpsc, watch};
-use wiretap_io::modbus::{
+use wslib_modbus::{
     spawn, tcp_endpoint, ModbusTcp, PollEvent, PollTask, PollWriter, Poller, TaskEvent,
     TaskOptions, TcpOptions, TransportError, UnitSource,
 };
 
 use super::reader::{PollEmitMode, PollGroup};
-use wiretap_catalog::modbus::{coils_to_bytes, registers_to_bytes, FrameBackoff};
+use wslib_modbus::{coils_to_bytes, registers_to_bytes, FrameBackoff};
 use crate::capture_store;
 use crate::io::types::SourceMessage;
 use crate::io::{emit_routine_session_error, emit_session_error, now_us, signal_frames_ready, FrameMessage, SignalThrottle};
 
-pub use wiretap_io::modbus::ReadData;
+pub use wslib_modbus::ReadData;
 
 // ============================================================================
 // Frame construction
@@ -577,8 +577,8 @@ mod tests {
     /// one — and coil 7 is off so the mirror cannot pass by luck.
     #[test]
     fn block_coils_decode_as_the_coils_that_were_read() {
-        use wiretap_catalog::{decode::decode_by_id, model::Catalog};
-        let catalog = Catalog::parse(
+        use wslib_wiretap_catalogue::{decode::decode_by_id, model::Catalogue};
+        let catalog = Catalogue::parse(
             r#"
 [meta]
 name = "relay"
@@ -640,7 +640,7 @@ bit_length = 20
         assert!((1..10_000).all(|n| !exhausted(n, 0)));
     }
 
-    use wiretap_io::modbus::testing::{self, device, Device, Reply};
+    use wslib_modbus::testing::{self, device, Device, Reply};
     use tokio::time::timeout;
 
     fn holding(start: u16, count: u16) -> PollGroup {

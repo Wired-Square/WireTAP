@@ -704,10 +704,10 @@ fn concurrent_soak() {
                             cancel.cancel();
                         })
                     };
-                    let spec = wiretap_gateway::QuerySpec::FrameChanges {
+                    let spec = wslib_wiretap_gateway::QuerySpec::FrameChanges {
                         frame_id: 0x101,
                         is_extended: None,
-                        window: wiretap_gateway::RowWindow::default(),
+                        window: wslib_wiretap_gateway::RowWindow::default(),
                         limit: None,
                     };
                     let t = Instant::now();

@@ -174,7 +174,7 @@ export function useFileHandlers({ settings, saveFrameIdFormat }: UseFileHandlers
     if (!catalogContent) return;
 
     try {
-      // Whole-catalogue validation is fully owned by the wiretap-catalog crate
+      // Whole-catalogue validation is fully owned by the wslib-wiretap-catalogue crate
       // (including the serial-encoding-required rule).
       const result = await validateCatalogWs(catalogContent);
       setValidation(result.errors, result.valid);

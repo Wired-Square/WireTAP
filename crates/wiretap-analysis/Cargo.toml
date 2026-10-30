@@ -1,0 +1,34 @@
+[package]
+name = "wiretap-analysis"
+version.workspace = true
+description = "Payload analysis for WireTAP frames: the identification pass that says which bytes are worth solving as a checksum, and the byte-role classifier."
+authors = ["Alex Ferrara"]
+edition = "2021"
+publish = false
+
+[dependencies]
+rayon = "1"
+serde = { version = "1", features = ["derive"] }
+ts-rs = { version = "12", optional = true, features = ["no-serde-warnings"] }
+wslib-bits = { version = "0.1", registry = "wired-square" }
+wslib-checksum = { version = "0.1", registry = "wired-square" }
+wslib-modbus = { version = "0.2.1", registry = "wired-square" }
+wslib-wiretap-catalogue = { version = "0.1", registry = "wired-square" }
+wslib-wiretap-gateway = { version = "0.2.0", registry = "wired-square" }
+wslib-wiretap-protocol = { version = "0.2.1", registry = "wired-square" }
+
+[features]
+ts = [
+    "dep:ts-rs",
+    "wslib-bits/ts",
+    "wslib-checksum/ts",
+    "wslib-wiretap-catalogue/ts",
+    "wslib-wiretap-gateway/ts",
+    "wslib-wiretap-protocol/ts",
+]
+testing = []
+
+[dev-dependencies]
+# So the workspace's `cargo test`, which names no features, has the fixture.
+wiretap-analysis = { path = ".", features = ["testing"] }
+serde_json = "1"

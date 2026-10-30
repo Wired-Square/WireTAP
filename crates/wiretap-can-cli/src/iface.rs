@@ -1,13 +1,14 @@
 use std::{fmt, str::FromStr, time::Duration};
 
 use clap::Args;
-use wiretap_io::can::{gvret, slcan, CanFrame, CanOptions, CanTask, CanWriter, DeviceInfo};
 #[cfg(any(target_os = "macos", target_os = "windows"))]
-use wiretap_io::can::{
-    pcan::{self, PcanDevice, PcanOptions},
-    CanError,
-};
-use wiretap_io::serial::{LineSettings, Parity};
+use wslib_can::CanError;
+use wslib_can::{CanFrame, CanOptions, CanTask, CanWriter, DeviceInfo};
+use wslib_can_gvret as gvret;
+#[cfg(any(target_os = "macos", target_os = "windows"))]
+use wslib_can_pcan::{self as pcan, PcanDevice, PcanOptions};
+use wslib_can_slcan as slcan;
+use wslib_serial::{LineSettings, Parity};
 
 const DEFAULT_BITRATE: u32 = 500_000;
 const PROBE_TIMEOUT: Duration = Duration::from_secs(2);
@@ -175,7 +176,7 @@ impl BusOptions {
 /// An interface with the options it can take, checked before anything is opened.
 enum Plan {
     #[cfg(any(target_os = "macos", target_os = "windows"))]
-    GsUsb(wiretap_io::can::gsusb::GsUsbOptions),
+    GsUsb(wslib_can_gsusb::GsUsbOptions),
     #[cfg(any(target_os = "macos", target_os = "windows"))]
     Pcan {
         device: UsbSelector,
@@ -225,7 +226,7 @@ fn tcp(endpoint: &str) -> gvret::Link {
 
 #[cfg(any(target_os = "macos", target_os = "windows"))]
 fn gs_usb_plan(device: &UsbSelector, channel: u8, bus: &BusOptions) -> Result<Plan, String> {
-    use wiretap_io::can::gsusb::GsUsbOptions;
+    use wslib_can_gsusb::GsUsbOptions;
     let mut gs = GsUsbOptions::new(usb_device(device), bus.bitrate.unwrap_or(DEFAULT_BITRATE));
     gs.channel = channel;
     gs.sample_point = bus.sample_point;
@@ -350,12 +351,12 @@ fn socketcan_plan(_: &str, _: &BusOptions) -> Result<Plan, String> {
 }
 
 #[cfg(any(target_os = "macos", target_os = "windows"))]
-fn usb_device(selector: &UsbSelector) -> wiretap_io::can::gsusb::GsUsbDevice {
+fn usb_device(selector: &UsbSelector) -> wslib_can_gsusb::GsUsbDevice {
     let (serial, bus, address) = match selector {
         UsbSelector::Serial(serial) => (Some(serial.clone()), 0, 0),
         UsbSelector::BusAddress(bus, address) => (None, *bus, *address),
     };
-    wiretap_io::can::gsusb::GsUsbDevice {
+    wslib_can_gsusb::GsUsbDevice {
         serial,
         bus,
         address,
@@ -375,11 +376,11 @@ pub async fn open(
     let mut options = CanOptions::default();
     options.listen_only = bus.listen_only;
     options.own_frames = own_frames;
-    options.time = wiretap_io::can::TimeMapping::Host;
+    options.time = wslib_can::TimeMapping::Host;
     options.reopen = reopen.then_some(Duration::from_secs(1));
     let opened = match plan {
         #[cfg(any(target_os = "macos", target_os = "windows"))]
-        Plan::GsUsb(gs) => wiretap_io::can::gsusb::open(gs, options).await,
+        Plan::GsUsb(gs) => wslib_can_gsusb::open(gs, options).await,
         #[cfg(any(target_os = "macos", target_os = "windows"))]
         Plan::Pcan {
             device,
@@ -398,7 +399,7 @@ pub async fn open(
             bitrate,
             dbitrate,
         } => {
-            use wiretap_io::can::socketcan;
+            use wslib_can_socketcan as socketcan;
             let set = socketcan::bitrates(&name).map_err(|e| format!("{name}: {e}"))?;
             for (flag, wanted, actual) in [
                 ("--bitrate", bitrate, set.nominal),
@@ -436,7 +437,7 @@ pub async fn send(writer: &CanWriter, frame: CanFrame) -> Result<(), String> {
 pub enum Probed {
     Device(DeviceInfo),
     #[cfg(target_os = "linux")]
-    Rates(wiretap_io::can::socketcan::Bitrates),
+    Rates(wslib_can_socketcan::Bitrates),
 }
 
 /// Reads what the device says of itself without starting its channel.
@@ -445,7 +446,7 @@ pub async fn probe(interface: &Interface) -> Result<Probed, String> {
     let info = match interface {
         #[cfg(any(target_os = "macos", target_os = "windows"))]
         Interface::GsUsb { device, .. } => {
-            wiretap_io::can::gsusb::probe(&usb_device(device), PROBE_TIMEOUT).await
+            wslib_can_gsusb::probe(&usb_device(device), PROBE_TIMEOUT).await
         }
         #[cfg(any(target_os = "macos", target_os = "windows"))]
         Interface::Pcan { device, .. } => {
@@ -458,7 +459,7 @@ pub async fn probe(interface: &Interface) -> Result<Probed, String> {
         Interface::Gvret { endpoint } => gvret::probe(tcp(endpoint), PROBE_TIMEOUT).await,
         #[cfg(target_os = "linux")]
         Interface::SocketCan { name } => {
-            return wiretap_io::can::socketcan::bitrates(name)
+            return wslib_can_socketcan::bitrates(name)
                 .map(Probed::Rates)
                 .map_err(|e| format!("{name}: {e}"));
         }
@@ -662,7 +663,7 @@ mod tests {
 
     #[cfg(any(target_os = "macos", target_os = "windows"))]
     mod peak {
-        use wiretap_io::can::pcan::PcanModel;
+        use wslib_can_pcan::PcanModel;
 
         use super::*;
 

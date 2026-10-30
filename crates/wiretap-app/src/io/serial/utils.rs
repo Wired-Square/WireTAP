@@ -2,7 +2,7 @@
 //
 // Shared utilities for serial port readers.
 
-use wiretap_protocol::ingest::{modbus_id, MODBUS_RTU_PROTOCOL};
+use wslib_wiretap_protocol::ingest::{modbus_id, MODBUS_RTU_PROTOCOL};
 
 use crate::io::error::DevicePresence;
 use crate::io::FrameMessage;
@@ -15,7 +15,7 @@ use crate::io::FrameMessage;
 /// failure can be told apart as "in use" (still present) vs "disconnected/reset"
 /// (gone).
 pub(crate) fn probe_serial_presence(port_name: &str) -> DevicePresence {
-    match wiretap_io::serial::ports() {
+    match wslib_serial::ports() {
         Ok(ports) if ports.iter().any(|p| p.path == port_name) => DevicePresence::Present,
         Ok(_) => DevicePresence::Absent,
         Err(_) => DevicePresence::Unknown,

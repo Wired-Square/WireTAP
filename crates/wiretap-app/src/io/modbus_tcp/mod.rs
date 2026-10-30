@@ -19,7 +19,7 @@ pub use scanner::{
 
 /// Read `host`/`port`/`unit_id` off a Modbus profile's connection map.
 ///
-/// The values come from the kind table in `wiretap_io::profile`, which is also what the form seeds
+/// The values come from the kind table in `crate::io::profile`, which is also what the form seeds
 /// from — this function used to carry its own `127.0.0.1`/502/1 while the form
 /// pre-filled `192.168.1.100`, so a profile with a blank host was dialled
 /// somewhere the user had never been shown.
@@ -66,7 +66,7 @@ pub fn session_modbus_profile<'a>(
 }
 
 /// Build Modbus poll groups from a catalogue's `[frame.modbus.*]` entries via the
-/// shared `wiretap-catalog` crate (which resolves the register-from-key and
+/// `wslib-wiretap-catalogue` crate (which resolves the register-from-key and
 /// signal-less-register shorthands, the `register_base` protocol address, the
 /// per-register slave address, and the poll interval). The single source of truth
 /// for catalogue → polls, shared by the interactive editor (`catalog.polls` WS
@@ -76,7 +76,7 @@ pub fn session_modbus_profile<'a>(
 /// Frames marked `disabled` are skipped — the catalogue crate defines that flag
 /// as "the poll task skips this frame entirely", which WireTAP previously ignored.
 pub fn build_polls_from_catalog(catalog_toml: &str) -> Result<Vec<PollGroup>, String> {
-    use wiretap_catalog::modbus::{ManifestError, ModbusManifest};
+    use wslib_modbus::{ManifestError, ModbusManifest};
     let manifest = match ModbusManifest::parse(catalog_toml) {
         Ok(m) => m,
         Err(ManifestError::NoFrames) => return Ok(vec![]),

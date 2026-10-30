@@ -4113,20 +4113,24 @@ dependencies = [
 
 [[package]]
 name = "nusb"
-version = "0.2.3"
+version = "0.2.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8a330b3bc7f8b4fc729a4c63164b3927eeeaced198222a3ce6b8b6e034851b7a"
+checksum = "18ef13beb3b3a8fc16fd7aea912ebd3d45dde00a9a5b968d0742297468065845"
 dependencies = [
  "core-foundation 0.10.1",
  "core-foundation-sys",
  "futures-core",
  "io-kit-sys 0.5.0",
+ "js-sys",
  "linux-raw-sys 0.12.1",
  "log",
  "once_cell",
  "rustix 1.1.4",
  "slab",
  "tokio",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
  "windows-sys 0.61.2",
 ]
 
@@ -7542,6 +7546,7 @@ dependencies = [
  "indexmap 2.14.0",
  "toml_datetime 1.1.1+spec-1.1.0",
  "toml_parser",
+ "toml_writer",
  "winnow 1.0.3",
 ]
 
@@ -8088,7 +8093,6 @@ dependencies = [
  "cfg-if",
  "once_cell",
  "rustversion",
- "serde",
  "wasm-bindgen-macro",
  "wasm-bindgen-shared",
 ]
@@ -8994,7 +8998,7 @@ dependencies = [
  "keepawake",
  "keyring",
  "notify",
- "nusb 0.2.3",
+ "nusb 0.2.7",
  "once_cell",
  "reqwest 0.12.28",
  "rumqttc",
@@ -9013,6 +9017,7 @@ dependencies = [
  "tauri-plugin-os",
  "tauri-plugin-safe-area-insets-css",
  "tauri-plugin-store",
+ "thiserror 2.0.18",
  "time",
  "tokio",
  "tokio-tungstenite",
@@ -9024,30 +9029,39 @@ dependencies = [
  "windows-sys 0.59.0",
  "wiretap-analysis",
  "wiretap-capture-store",
- "wiretap-catalog",
- "wiretap-checksum",
- "wiretap-decode",
- "wiretap-gateway",
- "wiretap-io",
- "wiretap-protocol",
+ "wslib-bits",
+ "wslib-can",
+ "wslib-can-gsusb",
+ "wslib-can-gvret",
+ "wslib-can-slcan",
+ "wslib-can-socketcan",
+ "wslib-checksum",
  "wslib-db-sqlite",
  "wslib-mcp",
  "wslib-mcu-flash",
+ "wslib-modbus",
+ "wslib-serial",
+ "wslib-tcp",
+ "wslib-wiretap-catalogue",
+ "wslib-wiretap-gateway",
  "wslib-wiretap-protocol",
 ]
 
 [[package]]
 name = "wiretap-analysis"
-version = "0.10.2"
-source = "git+ssh://git@github.com/Wired-Square/wslib-wiretap-rs.git?tag=v0.10.2#73858f484418584ab748cd91a1f97b966db72245"
+version = "0.15.0"
 dependencies = [
  "rayon",
  "serde",
+ "serde_json",
  "ts-rs",
- "wiretap-catalog",
- "wiretap-checksum",
- "wiretap-decode",
- "wiretap-gateway",
+ "wiretap-analysis",
+ "wslib-bits",
+ "wslib-checksum",
+ "wslib-modbus",
+ "wslib-wiretap-catalogue",
+ "wslib-wiretap-gateway",
+ "wslib-wiretap-protocol",
 ]
 
 [[package]]
@@ -9056,10 +9070,16 @@ version = "0.15.0"
 dependencies = [
  "clap",
  "hex",
- "nusb 0.2.3",
+ "nusb 0.2.7",
  "tokio",
- "wiretap-io",
- "wiretap-protocol",
+ "wslib-can",
+ "wslib-can-gsusb",
+ "wslib-can-gvret",
+ "wslib-can-pcan",
+ "wslib-can-slcan",
+ "wslib-can-socketcan",
+ "wslib-serial",
+ "wslib-wiretap-protocol",
 ]
 
 [[package]]
@@ -9075,93 +9095,6 @@ dependencies = [
  "ts-rs",
  "wslib-db-sqlite",
  "wslib-wiretap-protocol",
-]
-
-[[package]]
-name = "wiretap-catalog"
-version = "0.10.2"
-source = "git+ssh://git@github.com/Wired-Square/wslib-wiretap-rs.git?tag=v0.10.2#73858f484418584ab748cd91a1f97b966db72245"
-dependencies = [
- "can-dbc",
- "rust_decimal",
- "serde",
- "serde_json",
- "thiserror 2.0.18",
- "toml 0.8.23",
- "toml_edit 0.22.27",
- "ts-rs",
- "wiretap-checksum",
- "wiretap-decode",
- "wiretap-protocol",
-]
-
-[[package]]
-name = "wiretap-checksum"
-version = "0.10.2"
-source = "git+ssh://git@github.com/Wired-Square/wslib-wiretap-rs.git?tag=v0.10.2#73858f484418584ab748cd91a1f97b966db72245"
-dependencies = [
- "rayon",
- "serde",
- "serde_json",
- "ts-rs",
- "wiretap-decode",
-]
-
-[[package]]
-name = "wiretap-decode"
-version = "0.10.2"
-source = "git+ssh://git@github.com/Wired-Square/wslib-wiretap-rs.git?tag=v0.10.2#73858f484418584ab748cd91a1f97b966db72245"
-dependencies = [
- "rust_decimal",
- "serde",
- "ts-rs",
-]
-
-[[package]]
-name = "wiretap-gateway"
-version = "0.10.2"
-source = "git+ssh://git@github.com/Wired-Square/wslib-wiretap-rs.git?tag=v0.10.2#73858f484418584ab748cd91a1f97b966db72245"
-dependencies = [
- "reqwest 0.12.28",
- "serde",
- "serde_json",
- "ts-rs",
- "wiretap-decode",
- "wiretap-protocol",
-]
-
-[[package]]
-name = "wiretap-io"
-version = "0.10.2"
-source = "git+ssh://git@github.com/Wired-Square/wslib-wiretap-rs.git?tag=v0.10.2#73858f484418584ab748cd91a1f97b966db72245"
-dependencies = [
- "libc",
- "libloading 0.8.9",
- "nix 0.29.0",
- "nusb 0.2.3",
- "serde",
- "socketcan",
- "thiserror 2.0.18",
- "tokio",
- "tokio-modbus",
- "ts-rs",
- "wiretap-catalog",
- "wiretap-decode",
- "wiretap-protocol",
- "wiretap-serialport",
-]
-
-[[package]]
-name = "wiretap-protocol"
-version = "0.10.2"
-source = "git+ssh://git@github.com/Wired-Square/wslib-wiretap-rs.git?tag=v0.10.2#73858f484418584ab748cd91a1f97b966db72245"
-
-[[package]]
-name = "wiretap-serialport"
-version = "0.1.0"
-source = "git+ssh://git@github.com/Wired-Square/wslib-wiretap-rs.git?tag=v0.10.2#73858f484418584ab748cd91a1f97b966db72245"
-dependencies = [
- "serialport",
 ]
 
 [[package]]
@@ -9327,6 +9260,105 @@ dependencies = [
 ]
 
 [[package]]
+name = "wslib-backoff"
+version = "0.1.2"
+source = "sparse+https://forge.wiredsquare.com/api/packages/wired-square/cargo/"
+checksum = "9da7d552ef3942676aebe16e24107331f5167c502e39832a025a5538a8042c5c"
+
+[[package]]
+name = "wslib-bits"
+version = "0.1.0"
+source = "sparse+https://forge.wiredsquare.com/api/packages/wired-square/cargo/"
+checksum = "35b1bec308f2382e7b1079105d1a34d0ea28960c4c160928db59b1d88dfa4a53"
+dependencies = [
+ "rust_decimal",
+ "serde",
+ "serde_json",
+ "ts-rs",
+]
+
+[[package]]
+name = "wslib-can"
+version = "0.1.1"
+source = "sparse+https://forge.wiredsquare.com/api/packages/wired-square/cargo/"
+checksum = "087323f5c5d4508ba1d1a75bd323c421135c0f8cdb0f594fd368ad0beac1caec"
+dependencies = [
+ "thiserror 2.0.18",
+ "tokio",
+ "wslib-backoff",
+ "wslib-tcp",
+]
+
+[[package]]
+name = "wslib-can-gsusb"
+version = "0.1.0"
+source = "sparse+https://forge.wiredsquare.com/api/packages/wired-square/cargo/"
+checksum = "0bbbe15233ed761b1055eda53a32a665b1be00a1c3d8e7bb5267026fa20b4cc5"
+dependencies = [
+ "nusb 0.2.7",
+ "tokio",
+ "wslib-can",
+]
+
+[[package]]
+name = "wslib-can-gvret"
+version = "0.1.0"
+source = "sparse+https://forge.wiredsquare.com/api/packages/wired-square/cargo/"
+checksum = "f7231c8db8fa342083ec0b7ec2984206a5d9f9787c63b8f3abb4b2d23d2df9ea"
+dependencies = [
+ "tokio",
+ "wslib-can",
+ "wslib-serial",
+ "wslib-tcp",
+]
+
+[[package]]
+name = "wslib-can-pcan"
+version = "0.1.0"
+source = "sparse+https://forge.wiredsquare.com/api/packages/wired-square/cargo/"
+checksum = "0fbe6e021f1b6ce6cf4a1e12d7df7e325283a2b19f08d893faa385484e5afccd"
+dependencies = [
+ "libloading 0.8.9",
+ "nusb 0.2.7",
+ "tokio",
+ "wslib-can",
+]
+
+[[package]]
+name = "wslib-can-slcan"
+version = "0.1.0"
+source = "sparse+https://forge.wiredsquare.com/api/packages/wired-square/cargo/"
+checksum = "94c1a421c4346a0fe2fe292efca3891c983c1f5b4fca095fb9c9935ac9c16137"
+dependencies = [
+ "tokio",
+ "wslib-can",
+ "wslib-serial",
+]
+
+[[package]]
+name = "wslib-can-socketcan"
+version = "0.1.0"
+source = "sparse+https://forge.wiredsquare.com/api/packages/wired-square/cargo/"
+checksum = "51a9e47627441b30e27d102e23bc4d84817b543d8e5a2c01ba13ea6d97f62dd2"
+dependencies = [
+ "libc",
+ "socketcan",
+ "tokio",
+ "wslib-can",
+]
+
+[[package]]
+name = "wslib-checksum"
+version = "0.1.0"
+source = "sparse+https://forge.wiredsquare.com/api/packages/wired-square/cargo/"
+checksum = "460a0d9e5ec8ac6bf7681a7c3d8435c36e911329158cbb4165a7efcc998a24cd"
+dependencies = [
+ "serde",
+ "ts-rs",
+ "wslib-bits",
+]
+
+[[package]]
 name = "wslib-db-sqlite"
 version = "0.2.4"
 source = "sparse+https://forge.wiredsquare.com/api/packages/wired-square/cargo/"
@@ -9386,6 +9418,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "wslib-modbus"
+version = "0.2.1"
+source = "sparse+https://forge.wiredsquare.com/api/packages/wired-square/cargo/"
+checksum = "13057fe86d0ef9aea798f66573d908d178cc83b7a7394d6b157c3bf2167062e5"
+dependencies = [
+ "rust_decimal",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tokio",
+ "tokio-modbus",
+ "toml 1.1.2+spec-1.1.0",
+ "toml_edit 0.25.12+spec-1.1.0",
+ "ts-rs",
+ "wslib-backoff",
+ "wslib-bits",
+ "wslib-checksum",
+ "wslib-tcp",
+]
+
+[[package]]
 name = "wslib-secret"
 version = "0.1.3"
 source = "sparse+https://forge.wiredsquare.com/api/packages/wired-square/cargo/"
@@ -9396,12 +9449,74 @@ dependencies = [
 ]
 
 [[package]]
-name = "wslib-wiretap-protocol"
+name = "wslib-serial"
+version = "0.1.1"
+source = "sparse+https://forge.wiredsquare.com/api/packages/wired-square/cargo/"
+checksum = "3aede8ec33e6b557bea8163ea763b2d4d6871ec9f798a96371c9d69a79948f68"
+dependencies = [
+ "libc",
+ "serialport",
+ "thiserror 2.0.18",
+ "tokio",
+ "wslib-backoff",
+]
+
+[[package]]
+name = "wslib-tcp"
 version = "0.1.0"
 source = "sparse+https://forge.wiredsquare.com/api/packages/wired-square/cargo/"
-checksum = "6b9dace9d1bce8a41f50f8fa091ce7cf003f12f86f8ec8d52f90ee69db42d5d3"
+checksum = "a49cdc6e61f2a87c565c2e93181e32e83135634ba2ab7bcfbad4da0c11fa8226"
+dependencies = [
+ "thiserror 2.0.18",
+ "tokio",
+]
+
+[[package]]
+name = "wslib-wiretap-catalogue"
+version = "0.1.0"
+source = "sparse+https://forge.wiredsquare.com/api/packages/wired-square/cargo/"
+checksum = "21c95c5443508a4213fa8f0ac9a6a2ef706591867d6704af97887dc1b8a49d24"
+dependencies = [
+ "can-dbc",
+ "rust_decimal",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "toml 1.1.2+spec-1.1.0",
+ "toml_edit 0.25.12+spec-1.1.0",
+ "ts-rs",
+ "wslib-bits",
+ "wslib-checksum",
+ "wslib-modbus",
+ "wslib-serial",
+ "wslib-wiretap-protocol",
+]
+
+[[package]]
+name = "wslib-wiretap-gateway"
+version = "0.2.0"
+source = "sparse+https://forge.wiredsquare.com/api/packages/wired-square/cargo/"
+checksum = "16d7f30803b9d71d9895759c3d51a2ffdd36cccfcece90ddc6994062165ae9c2"
+dependencies = [
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "ts-rs",
+ "wslib-bits",
+ "wslib-can",
+ "wslib-wiretap-protocol",
+]
+
+[[package]]
+name = "wslib-wiretap-protocol"
+version = "0.2.1"
+source = "sparse+https://forge.wiredsquare.com/api/packages/wired-square/cargo/"
+checksum = "87b2594711405c1c9ca2b90366cb75b9868da343d192a848e42e71a18bea5309"
 dependencies = [
  "serde",
+ "ts-rs",
+ "wslib-can",
+ "wslib-checksum",
 ]
 
 [[package]]

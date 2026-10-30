@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use wiretap_catalog::text;
+use wslib_wiretap_catalogue::text;
 
 /// Open and parse a catalog TOML file using the Python CLI
 #[tauri::command]
@@ -24,7 +24,7 @@ pub async fn save_binary_file(path: String, data: Vec<u8>) -> Result<(), String>
         .map_err(|e| format!("Failed to write file: {}", e))
 }
 
-/// Dispatch a `catalog.*` WS command to the shared `wiretap-catalog` crate.
+/// Dispatch a `catalog.*` WS command to `wslib-wiretap-catalogue`.
 /// This is the request/response half of the canonical-catalogue work: the
 /// editor and tooling parse/validate/convert over the binary WebSocket instead
 /// of duplicating the logic in TypeScript. (Live decode is a separate push
@@ -47,46 +47,46 @@ pub async fn dispatch_catalog_command(
         // TOML → resolved Catalog model (CAN/Serial/Modbus; shorthands +
         // mirror/copy resolved).
         "catalog.parse" => {
-            let cat = wiretap_catalog::Catalog::parse(&content()?).map_err(|e| e.to_string())?;
+            let cat = wslib_wiretap_catalogue::Catalogue::parse(&content()?).map_err(|e| e.to_string())?;
             serde_json::to_value(cat).map_err(|e| e.to_string())
         }
         // Params: { content, protocol, key, path }; null when there is no such frame or item.
         "catalog.frameLayout" => {
-            let cat = wiretap_catalog::Catalog::parse(&content()?).map_err(|e| e.to_string())?;
+            let cat = wslib_wiretap_catalogue::Catalogue::parse(&content()?).map_err(|e| e.to_string())?;
             let protocol = serde_json::from_value(params.get("protocol").cloned().unwrap_or_default())
                 .map_err(|e| format!("invalid protocol: {e}"))?;
             let path: Vec<String> = serde_json::from_value(params.get("path").cloned().unwrap_or_default())
                 .map_err(|e| format!("invalid path: {e}"))?;
-            let layout = wiretap_catalog::frame_layout(&cat, protocol, &req("key")?, &path);
+            let layout = wslib_wiretap_catalogue::frame_layout(&cat, protocol, &req("key")?, &path);
             serde_json::to_value(layout).map_err(|e| e.to_string())
         }
         // A frame key → its numeric id, null for a name.
-        "catalog.parseId" => Ok(serde_json::json!(wiretap_catalog::parse::parse_id(&req("id")?))),
+        "catalog.parseId" => Ok(serde_json::json!(wslib_wiretap_catalogue::parse::parse_id(&req("id")?))),
         // TOML → field-path + message validation findings.
         "catalog.validate" => {
-            let errors = wiretap_catalog::validate::validate(&content()?);
+            let errors = wslib_wiretap_catalogue::validate::validate(&content()?);
             Ok(serde_json::json!({ "valid": errors.is_empty(), "errors": errors }))
         }
         // Granular, save-time form validation (single source of truth in the
         // crate). Each deserialises `params` into the matching input struct.
         "catalog.validateMeta" => {
             let input = serde_json::from_value(params).map_err(|e| e.to_string())?;
-            let errors = wiretap_catalog::validate::validate_meta_fields(&input);
+            let errors = wslib_wiretap_catalogue::validate::validate_meta_fields(&input);
             Ok(serde_json::json!({ "valid": errors.is_empty(), "errors": errors }))
         }
         "catalog.validateFrame" => {
             let input = serde_json::from_value(params).map_err(|e| e.to_string())?;
-            let errors = wiretap_catalog::validate::validate_frame_fields(&input);
+            let errors = wslib_wiretap_catalogue::validate::validate_frame_fields(&input);
             Ok(serde_json::json!({ "valid": errors.is_empty(), "errors": errors }))
         }
         "catalog.validateSignal" => {
             let input = serde_json::from_value(params).map_err(|e| e.to_string())?;
-            let errors = wiretap_catalog::validate::validate_signal_fields(&input);
+            let errors = wslib_wiretap_catalogue::validate::validate_signal_fields(&input);
             Ok(serde_json::json!({ "valid": errors.is_empty(), "errors": errors }))
         }
         "catalog.validateChecksum" => {
             let input = serde_json::from_value(params).map_err(|e| e.to_string())?;
-            let errors = wiretap_catalog::validate::validate_checksum_fields(&input);
+            let errors = wslib_wiretap_catalogue::validate::validate_checksum_fields(&input);
             Ok(serde_json::json!({ "valid": errors.is_empty(), "errors": errors }))
         }
         // The catalogue report. Params: { content, format }.
@@ -97,7 +97,7 @@ pub async fn dispatch_catalog_command(
         }
         // DBC text → catalogue TOML.
         "catalog.import_dbc" => {
-            let toml = wiretap_catalog::dbc::convert_dbc_to_toml(&content()?)?;
+            let toml = wslib_wiretap_catalogue::dbc::convert_dbc_to_toml(&content()?)?;
             Ok(serde_json::Value::String(toml))
         }
         // Attach a catalogue to a session so its frames are decoded in Rust and
@@ -107,7 +107,7 @@ pub async fn dispatch_catalog_command(
         "catalog.attach" => {
             let session_id = req("session_id")?;
             let path = params.get("path").and_then(|v| v.as_str()).map(str::to_string);
-            let cat = wiretap_catalog::Catalog::parse(&content()?).map_err(|e| e.to_string())?;
+            let cat = wslib_wiretap_catalogue::Catalogue::parse(&content()?).map_err(|e| e.to_string())?;
             let frame_count = cat.frames.len();
             // Return the resolved Catalog so the caller can feed its UI model from
             // this one parse instead of a separate catalog.parse round-trip.
@@ -135,32 +135,32 @@ pub async fn dispatch_catalog_command(
                 .and_then(|v| v.as_str())
                 .unwrap_or("WireTAP");
             let mode = match params.get("muxMode").and_then(|v| v.as_str()) {
-                Some("flattened") => wiretap_catalog::dbc::MuxExportMode::Flattened,
-                _ => wiretap_catalog::dbc::MuxExportMode::Extended,
+                Some("flattened") => wslib_wiretap_catalogue::dbc::MuxExportMode::Flattened,
+                _ => wslib_wiretap_catalogue::dbc::MuxExportMode::Extended,
             };
             let dbc =
-                wiretap_catalog::dbc::render_catalog_as_dbc_with_mode(&content()?, receiver, mode)?;
+                wslib_wiretap_catalogue::dbc::render_catalogue_as_dbc_with_mode(&content()?, receiver, mode)?;
             Ok(serde_json::Value::String(dbc))
         }
         // Comment-/formatting-preserving in-place edit. Params: { content, op, ...opArgs }.
-        // `op` + args deserialise into wiretap_catalog::edit::EditOp (the stray
+        // `op` + args deserialise into wslib_wiretap_catalogue::edit::EditOp (the stray
         // `content` key is ignored); returns the new TOML text.
         "catalog.edit" => {
             let text = content()?;
-            let op: wiretap_catalog::edit::EditOp = serde_json::from_value(params.clone())
+            let op: wslib_wiretap_catalogue::edit::EditOp = serde_json::from_value(params.clone())
                 .map_err(|e| format!("invalid edit op: {e}"))?;
-            let next = wiretap_catalog::edit::apply_edit(&text, op)?;
+            let next = wslib_wiretap_catalogue::edit::apply_edit(&text, op)?;
             Ok(serde_json::Value::String(next))
         }
         // Params: { content, ops }. All or nothing; returns the new TOML text.
         "catalog.edits" => {
-            let next = wiretap_catalog::edit::apply_edits(&content()?, &edit_ops(&params)?)?;
+            let next = wslib_wiretap_catalogue::edit::apply_edits(&content()?, &edit_ops(&params)?)?;
             Ok(serde_json::Value::String(next))
         }
         // A new catalogue from `ops` alone, refused with its findings unless it validates.
         // Params: { ops }.
         "catalog.build" => {
-            let text = wiretap_catalog::edit::apply_edits("", &edit_ops(&params)?)?;
+            let text = wslib_wiretap_catalogue::edit::apply_edits("", &edit_ops(&params)?)?;
             refuse_unless_valid(&text)?;
             Ok(serde_json::Value::String(text))
         }
@@ -170,7 +170,7 @@ pub async fn dispatch_catalog_command(
         // silent in-memory migration surfaces as a real, saveable diff. Params:
         // { content }.
         "catalog.migrate" => {
-            let m = wiretap_catalog::migrate::migrate(&content()?).map_err(|e| e.to_string())?;
+            let m = wslib_wiretap_catalogue::migrate::migrate(&content()?).map_err(|e| e.to_string())?;
             Ok(serde_json::json!({
                 "changed": m.changed,
                 "toml": m.toml,
@@ -197,13 +197,13 @@ pub async fn dispatch_catalog_command(
     }
 }
 
-fn edit_ops(params: &serde_json::Value) -> Result<Vec<wiretap_catalog::edit::EditOp>, String> {
+fn edit_ops(params: &serde_json::Value) -> Result<Vec<wslib_wiretap_catalogue::edit::EditOp>, String> {
     let ops = params.get("ops").cloned().ok_or("missing 'ops' param")?;
     serde_json::from_value(ops).map_err(|e| format!("invalid edit op: {e}"))
 }
 
 pub(crate) fn refuse_unless_valid(text: &str) -> Result<(), String> {
-    let findings = wiretap_catalog::validate::validate(text);
+    let findings = wslib_wiretap_catalogue::validate::validate(text);
     if findings.is_empty() {
         return Ok(());
     }
@@ -585,9 +585,9 @@ pub async fn import_catalog(
 }
 
 fn with_catalogue_name(content: &str, new_name: &str) -> Result<String, String> {
-    wiretap_catalog::edit::apply_edit(
+    wslib_wiretap_catalogue::edit::apply_edit(
         content,
-        wiretap_catalog::edit::EditOp::SetTable {
+        wslib_wiretap_catalogue::edit::EditOp::SetTable {
             path: vec!["meta".into()],
             value: serde_json::Map::from_iter([("name".into(), new_name.into())]),
             managed_keys: Vec::new(),
@@ -962,7 +962,7 @@ mod tests {
 
     #[test]
     fn a_signal_format_the_crate_cannot_name_serialises_as_other() {
-        assert_eq!(serde_json::to_value(wiretap_catalog::SignalFormat::Other).unwrap(), "other");
+        assert_eq!(serde_json::to_value(wslib_wiretap_catalogue::SignalFormat::Other).unwrap(), "other");
     }
 
     #[test]

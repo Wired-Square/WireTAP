@@ -1,7 +1,7 @@
 # wiretap-can-cli
 
 A can-utils work-alike for every CAN adapter WireTAP drives, on macOS, Windows
-and Linux. It opens devices through `wiretap-io`, the same code the app runs,
+and Linux. It opens devices through the wslib-rs transports, the same code the app runs,
 and needs no Tauri.
 
 ## Building
@@ -102,7 +102,7 @@ wiretap-can-cli gen gsusb:205933B831335010 -b -I i -L i -D i -g 1 --dbitrate 200
 
 ### `pattern`
 
-One end of a Test Pattern exchange (`wiretap_protocol::testpattern`). A
+One end of a Test Pattern exchange (`wslib_wiretap_protocol::testpattern`). A
 responder answers until Ctrl-C or `--duration`; an initiator runs `--mode`
 `echo`, `sweep`, `throughput`, `latency` or `reliability` for `--duration`
 seconds (10), prints the result and exits 1 on a failure. `--dbitrate` makes

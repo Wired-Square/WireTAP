@@ -1,6 +1,6 @@
 // ui/src/api/decode.ts
 //
-// `wiretap_decode`'s readings for the Frame Calculator, a Modbus scan and a CAN
+// `wslib_bits`' readings for the Frame Calculator, a Modbus scan and a CAN
 // filter mask, computed in Rust.
 
 import { invoke } from "@tauri-apps/api/core";

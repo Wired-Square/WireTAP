@@ -1,0 +1,7148 @@
+[
+  {
+    "name": "static",
+    "ts": {
+      "analysis": {
+        "frameId": 0,
+        "sampleCount": 20,
+        "byteStats": [
+          {
+            "byteIndex": 0,
+            "min": 192,
+            "max": 192,
+            "uniqueValues": [
+              192
+            ],
+            "role": "static",
+            "staticValue": 192,
+            "isCounter": false,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": false
+          },
+          {
+            "byteIndex": 1,
+            "min": 127,
+            "max": 127,
+            "uniqueValues": [
+              127
+            ],
+            "role": "static",
+            "staticValue": 127,
+            "isCounter": false,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": false
+          },
+          {
+            "byteIndex": 2,
+            "min": 0,
+            "max": 19,
+            "uniqueValues": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12,
+              13,
+              14,
+              15,
+              16,
+              17,
+              18,
+              19
+            ],
+            "role": "counter",
+            "isCounter": true,
+            "counterDirection": "up",
+            "counterStep": 1,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": false
+          }
+        ],
+        "multiBytePatterns": [],
+        "notes": [
+          "Static bytes: byte[0]=0xC0, byte[1]=0x7F",
+          "Counter at byte[2]: incrementing, step=1"
+        ],
+        "analyzedFromByte": 0,
+        "analyzedToByteExclusive": 3,
+        "isBurstFrame": false,
+        "isMuxFrame": false,
+        "hasVaryingLength": false,
+        "isIdentical": false
+      },
+      "mux": null
+    },
+    "rust": {
+      "bytes": [
+        {
+          "changes": 0,
+          "distinct": 1,
+          "index": 0,
+          "max": 192,
+          "min": 192,
+          "role": "static"
+        },
+        {
+          "changes": 0,
+          "distinct": 1,
+          "index": 1,
+          "max": 127,
+          "min": 127,
+          "role": "static"
+        },
+        {
+          "changes": 19,
+          "distinct": 20,
+          "index": 2,
+          "max": 19,
+          "min": 0,
+          "role": "counter"
+        }
+      ],
+      "max_len": 3
+    }
+  },
+  {
+    "name": "counter_up_1",
+    "ts": {
+      "analysis": {
+        "frameId": 0,
+        "sampleCount": 30,
+        "byteStats": [
+          {
+            "byteIndex": 0,
+            "min": 192,
+            "max": 192,
+            "uniqueValues": [
+              192
+            ],
+            "role": "static",
+            "staticValue": 192,
+            "isCounter": false,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": false
+          },
+          {
+            "byteIndex": 1,
+            "min": 10,
+            "max": 39,
+            "uniqueValues": [
+              10,
+              11,
+              12,
+              13,
+              14,
+              15,
+              16,
+              17,
+              18,
+              19,
+              20,
+              21,
+              22,
+              23,
+              24,
+              25,
+              26,
+              27,
+              28,
+              29,
+              30,
+              31,
+              32,
+              33,
+              34,
+              35,
+              36,
+              37,
+              38,
+              39
+            ],
+            "role": "counter",
+            "isCounter": true,
+            "counterDirection": "up",
+            "counterStep": 1,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": false
+          }
+        ],
+        "multiBytePatterns": [],
+        "notes": [
+          "Static bytes: byte[0]=0xC0",
+          "Counter at byte[1]: incrementing, step=1"
+        ],
+        "analyzedFromByte": 0,
+        "analyzedToByteExclusive": 2,
+        "isBurstFrame": false,
+        "isMuxFrame": false,
+        "hasVaryingLength": false,
+        "isIdentical": false
+      },
+      "mux": null
+    },
+    "rust": {
+      "bytes": [
+        {
+          "changes": 0,
+          "distinct": 1,
+          "index": 0,
+          "max": 192,
+          "min": 192,
+          "role": "static"
+        },
+        {
+          "changes": 29,
+          "distinct": 30,
+          "index": 1,
+          "max": 39,
+          "min": 10,
+          "role": "counter"
+        }
+      ],
+      "max_len": 2
+    }
+  },
+  {
+    "name": "counter_down_3",
+    "ts": {
+      "analysis": {
+        "frameId": 0,
+        "sampleCount": 30,
+        "byteStats": [
+          {
+            "byteIndex": 0,
+            "min": 192,
+            "max": 192,
+            "uniqueValues": [
+              192
+            ],
+            "role": "static",
+            "staticValue": 192,
+            "isCounter": false,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": false
+          },
+          {
+            "byteIndex": 1,
+            "min": 113,
+            "max": 200,
+            "uniqueValues": [
+              113,
+              116,
+              119,
+              122,
+              125,
+              128,
+              131,
+              134,
+              137,
+              140,
+              143,
+              146,
+              149,
+              152,
+              155,
+              158,
+              161,
+              164,
+              167,
+              170,
+              173,
+              176,
+              179,
+              182,
+              185,
+              188,
+              191,
+              194,
+              197,
+              200
+            ],
+            "role": "counter",
+            "isCounter": true,
+            "counterDirection": "down",
+            "counterStep": 3,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": false
+          }
+        ],
+        "multiBytePatterns": [],
+        "notes": [
+          "Static bytes: byte[0]=0xC0",
+          "Counter at byte[1]: decrementing, step=3"
+        ],
+        "analyzedFromByte": 0,
+        "analyzedToByteExclusive": 2,
+        "isBurstFrame": false,
+        "isMuxFrame": false,
+        "hasVaryingLength": false,
+        "isIdentical": false
+      },
+      "mux": null
+    },
+    "rust": {
+      "bytes": [
+        {
+          "changes": 0,
+          "distinct": 1,
+          "index": 0,
+          "max": 192,
+          "min": 192,
+          "role": "static"
+        },
+        {
+          "changes": 29,
+          "distinct": 30,
+          "index": 1,
+          "max": 200,
+          "min": 113,
+          "role": "counter"
+        }
+      ],
+      "max_len": 2
+    }
+  },
+  {
+    "name": "counter_rolling_250_to_5",
+    "ts": {
+      "analysis": {
+        "frameId": 0,
+        "sampleCount": 20,
+        "byteStats": [
+          {
+            "byteIndex": 0,
+            "min": 192,
+            "max": 192,
+            "uniqueValues": [
+              192
+            ],
+            "role": "static",
+            "staticValue": 192,
+            "isCounter": false,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": false
+          },
+          {
+            "byteIndex": 1,
+            "min": 0,
+            "max": 255,
+            "uniqueValues": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12,
+              13,
+              250,
+              251,
+              252,
+              253,
+              254,
+              255
+            ],
+            "role": "counter",
+            "isCounter": true,
+            "counterDirection": "up",
+            "counterStep": 1,
+            "rolloverDetected": true,
+            "isLoopingCounter": false,
+            "isSensor": false
+          }
+        ],
+        "multiBytePatterns": [],
+        "notes": [
+          "Static bytes: byte[0]=0xC0",
+          "Counter at byte[1]: incrementing, step=1 (rollover detected)"
+        ],
+        "analyzedFromByte": 0,
+        "analyzedToByteExclusive": 2,
+        "isBurstFrame": false,
+        "isMuxFrame": false,
+        "hasVaryingLength": false,
+        "isIdentical": false
+      },
+      "mux": null
+    },
+    "rust": {
+      "bytes": [
+        {
+          "changes": 0,
+          "distinct": 1,
+          "index": 0,
+          "max": 192,
+          "min": 192,
+          "role": "static"
+        },
+        {
+          "changes": 19,
+          "distinct": 20,
+          "index": 1,
+          "max": 255,
+          "min": 0,
+          "role": "counter"
+        }
+      ],
+      "max_len": 2
+    }
+  },
+  {
+    "name": "counter_step_150",
+    "ts": {
+      "analysis": {
+        "frameId": 0,
+        "sampleCount": 40,
+        "byteStats": [
+          {
+            "byteIndex": 0,
+            "min": 192,
+            "max": 192,
+            "uniqueValues": [
+              192
+            ],
+            "role": "static",
+            "staticValue": 192,
+            "isCounter": false,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": false
+          },
+          {
+            "byteIndex": 1,
+            "min": 0,
+            "max": 254,
+            "uniqueValues": [
+              0,
+              8,
+              16,
+              24,
+              26,
+              34,
+              42,
+              44,
+              52,
+              60,
+              68,
+              70,
+              78,
+              86,
+              88,
+              96,
+              104,
+              114,
+              122,
+              130,
+              132,
+              140,
+              148,
+              150,
+              158,
+              166,
+              174,
+              176,
+              184,
+              192,
+              194,
+              202,
+              210,
+              218,
+              220,
+              228,
+              236,
+              238,
+              246,
+              254
+            ],
+            "role": "sensor",
+            "isCounter": false,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": true,
+            "sensorTrend": "mixed",
+            "trendStrength": 0.5641025641025641
+          }
+        ],
+        "multiBytePatterns": [],
+        "notes": [
+          "Static bytes: byte[0]=0xC0",
+          "Sensor at byte[1]: ↕ range 0–254 (56% trend)"
+        ],
+        "analyzedFromByte": 0,
+        "analyzedToByteExclusive": 2,
+        "isBurstFrame": false,
+        "isMuxFrame": false,
+        "hasVaryingLength": false,
+        "isIdentical": false
+      },
+      "mux": null
+    },
+    "rust": {
+      "bytes": [
+        {
+          "changes": 0,
+          "distinct": 1,
+          "index": 0,
+          "max": 192,
+          "min": 192,
+          "role": "static"
+        },
+        {
+          "changes": 39,
+          "distinct": 40,
+          "index": 1,
+          "max": 254,
+          "min": 0,
+          "role": "counter"
+        }
+      ],
+      "max_len": 2
+    }
+  },
+  {
+    "name": "looping_mod10_under_50",
+    "ts": {
+      "analysis": {
+        "frameId": 0,
+        "sampleCount": 30,
+        "byteStats": [
+          {
+            "byteIndex": 0,
+            "min": 192,
+            "max": 192,
+            "uniqueValues": [
+              192
+            ],
+            "role": "static",
+            "staticValue": 192,
+            "isCounter": false,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": false
+          },
+          {
+            "byteIndex": 1,
+            "min": 0,
+            "max": 9,
+            "uniqueValues": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9
+            ],
+            "role": "counter",
+            "isCounter": true,
+            "counterDirection": "up",
+            "counterStep": 1,
+            "rolloverDetected": true,
+            "isLoopingCounter": true,
+            "loopingRange": {
+              "min": 0,
+              "max": 9
+            },
+            "loopingModulo": 10,
+            "isSensor": false
+          }
+        ],
+        "multiBytePatterns": [],
+        "notes": [
+          "Static bytes: byte[0]=0xC0",
+          "Looping counter at byte[1]: incrementing, step=1, range 0–9 (mod 10)"
+        ],
+        "analyzedFromByte": 0,
+        "analyzedToByteExclusive": 2,
+        "isBurstFrame": false,
+        "isMuxFrame": false,
+        "hasVaryingLength": false,
+        "isIdentical": false
+      },
+      "mux": null
+    },
+    "rust": {
+      "bytes": [
+        {
+          "changes": 0,
+          "distinct": 1,
+          "index": 0,
+          "max": 192,
+          "min": 192,
+          "role": "static"
+        },
+        {
+          "changes": 29,
+          "distinct": 10,
+          "index": 1,
+          "max": 9,
+          "min": 0,
+          "role": "counter"
+        }
+      ],
+      "max_len": 2
+    }
+  },
+  {
+    "name": "looping_mod10_over_50",
+    "ts": {
+      "analysis": {
+        "frameId": 0,
+        "sampleCount": 60,
+        "byteStats": [
+          {
+            "byteIndex": 0,
+            "min": 192,
+            "max": 192,
+            "uniqueValues": [
+              192
+            ],
+            "role": "static",
+            "staticValue": 192,
+            "isCounter": false,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": false
+          },
+          {
+            "byteIndex": 1,
+            "min": 0,
+            "max": 9,
+            "uniqueValues": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9
+            ],
+            "role": "counter",
+            "isCounter": true,
+            "counterDirection": "up",
+            "counterStep": 1,
+            "rolloverDetected": true,
+            "isLoopingCounter": true,
+            "loopingRange": {
+              "min": 0,
+              "max": 9
+            },
+            "loopingModulo": 10,
+            "isSensor": false
+          }
+        ],
+        "multiBytePatterns": [],
+        "notes": [
+          "Static bytes: byte[0]=0xC0",
+          "Looping counter at byte[1]: incrementing, step=1, range 0–9 (mod 10)"
+        ],
+        "analyzedFromByte": 0,
+        "analyzedToByteExclusive": 2,
+        "isBurstFrame": false,
+        "isMuxFrame": false,
+        "hasVaryingLength": false,
+        "isIdentical": false
+      },
+      "mux": null
+    },
+    "rust": {
+      "bytes": [
+        {
+          "changes": 0,
+          "distinct": 1,
+          "index": 0,
+          "max": 192,
+          "min": 192,
+          "role": "static"
+        },
+        {
+          "changes": 59,
+          "distinct": 10,
+          "index": 1,
+          "max": 9,
+          "min": 0,
+          "role": "counter"
+        }
+      ],
+      "max_len": 2
+    }
+  },
+  {
+    "name": "looping_mod16_under_50",
+    "ts": {
+      "analysis": {
+        "frameId": 0,
+        "sampleCount": 40,
+        "byteStats": [
+          {
+            "byteIndex": 0,
+            "min": 192,
+            "max": 192,
+            "uniqueValues": [
+              192
+            ],
+            "role": "static",
+            "staticValue": 192,
+            "isCounter": false,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": false
+          },
+          {
+            "byteIndex": 1,
+            "min": 0,
+            "max": 15,
+            "uniqueValues": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12,
+              13,
+              14,
+              15
+            ],
+            "role": "counter",
+            "isCounter": true,
+            "counterDirection": "up",
+            "counterStep": 1,
+            "rolloverDetected": true,
+            "isLoopingCounter": true,
+            "loopingRange": {
+              "min": 0,
+              "max": 15
+            },
+            "loopingModulo": 16,
+            "isSensor": false
+          }
+        ],
+        "multiBytePatterns": [],
+        "notes": [
+          "Static bytes: byte[0]=0xC0",
+          "Looping counter at byte[1]: incrementing, step=1, range 0–15 (mod 16)"
+        ],
+        "analyzedFromByte": 0,
+        "analyzedToByteExclusive": 2,
+        "isBurstFrame": false,
+        "isMuxFrame": false,
+        "hasVaryingLength": false,
+        "isIdentical": false
+      },
+      "mux": null
+    },
+    "rust": {
+      "bytes": [
+        {
+          "changes": 0,
+          "distinct": 1,
+          "index": 0,
+          "max": 192,
+          "min": 192,
+          "role": "static"
+        },
+        {
+          "changes": 39,
+          "distinct": 16,
+          "index": 1,
+          "max": 15,
+          "min": 0,
+          "role": "counter"
+        }
+      ],
+      "max_len": 2
+    }
+  },
+  {
+    "name": "looping_mod16_over_50",
+    "ts": {
+      "analysis": {
+        "frameId": 0,
+        "sampleCount": 64,
+        "byteStats": [
+          {
+            "byteIndex": 0,
+            "min": 192,
+            "max": 192,
+            "uniqueValues": [
+              192
+            ],
+            "role": "static",
+            "staticValue": 192,
+            "isCounter": false,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": false
+          },
+          {
+            "byteIndex": 1,
+            "min": 0,
+            "max": 15,
+            "uniqueValues": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12,
+              13,
+              14,
+              15
+            ],
+            "role": "counter",
+            "isCounter": true,
+            "counterDirection": "up",
+            "counterStep": 1,
+            "rolloverDetected": true,
+            "isLoopingCounter": true,
+            "loopingRange": {
+              "min": 0,
+              "max": 15
+            },
+            "loopingModulo": 16,
+            "isSensor": false
+          }
+        ],
+        "multiBytePatterns": [],
+        "notes": [
+          "Static bytes: byte[0]=0xC0",
+          "Looping counter at byte[1]: incrementing, step=1, range 0–15 (mod 16)"
+        ],
+        "analyzedFromByte": 0,
+        "analyzedToByteExclusive": 2,
+        "isBurstFrame": false,
+        "isMuxFrame": false,
+        "hasVaryingLength": false,
+        "isIdentical": false
+      },
+      "mux": null
+    },
+    "rust": {
+      "bytes": [
+        {
+          "changes": 0,
+          "distinct": 1,
+          "index": 0,
+          "max": 192,
+          "min": 192,
+          "role": "static"
+        },
+        {
+          "changes": 63,
+          "distinct": 16,
+          "index": 1,
+          "max": 15,
+          "min": 0,
+          "role": "counter"
+        }
+      ],
+      "max_len": 2
+    }
+  },
+  {
+    "name": "sensor_increasing_variable_step",
+    "ts": {
+      "analysis": {
+        "frameId": 0,
+        "sampleCount": 60,
+        "byteStats": [
+          {
+            "byteIndex": 0,
+            "min": 192,
+            "max": 192,
+            "uniqueValues": [
+              192
+            ],
+            "role": "static",
+            "staticValue": 192,
+            "isCounter": false,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": false
+          },
+          {
+            "byteIndex": 1,
+            "min": 20,
+            "max": 124,
+            "uniqueValues": [
+              20,
+              21,
+              24,
+              25,
+              26,
+              27,
+              29,
+              33,
+              36,
+              40,
+              43,
+              47,
+              49,
+              52,
+              53,
+              54,
+              56,
+              57,
+              61,
+              62,
+              64,
+              66,
+              69,
+              71,
+              74,
+              77,
+              81,
+              84,
+              86,
+              90,
+              92,
+              93,
+              94,
+              98,
+              100,
+              101,
+              105,
+              108,
+              111,
+              114,
+              116,
+              117,
+              118,
+              120,
+              123,
+              124
+            ],
+            "role": "sensor",
+            "isCounter": false,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": true,
+            "sensorTrend": "increasing",
+            "trendStrength": 1
+          }
+        ],
+        "multiBytePatterns": [],
+        "notes": [
+          "Static bytes: byte[0]=0xC0",
+          "Sensor at byte[1]: ↑ range 20–124 (100% trend)"
+        ],
+        "analyzedFromByte": 0,
+        "analyzedToByteExclusive": 2,
+        "isBurstFrame": false,
+        "isMuxFrame": false,
+        "hasVaryingLength": false,
+        "isIdentical": false
+      },
+      "mux": null
+    },
+    "rust": {
+      "bytes": [
+        {
+          "changes": 0,
+          "distinct": 1,
+          "index": 0,
+          "max": 192,
+          "min": 192,
+          "role": "static"
+        },
+        {
+          "changes": 45,
+          "distinct": 46,
+          "index": 1,
+          "max": 124,
+          "min": 20,
+          "role": "sensor"
+        }
+      ],
+      "max_len": 2
+    }
+  },
+  {
+    "name": "sensor_decreasing",
+    "ts": {
+      "analysis": {
+        "frameId": 0,
+        "sampleCount": 60,
+        "byteStats": [
+          {
+            "byteIndex": 0,
+            "min": 192,
+            "max": 192,
+            "uniqueValues": [
+              192
+            ],
+            "role": "static",
+            "staticValue": 192,
+            "isCounter": false,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": false
+          },
+          {
+            "byteIndex": 1,
+            "min": 112,
+            "max": 230,
+            "uniqueValues": [
+              112,
+              114,
+              117,
+              120,
+              123,
+              125,
+              126,
+              129,
+              130,
+              132,
+              133,
+              136,
+              140,
+              142,
+              146,
+              150,
+              151,
+              152,
+              153,
+              156,
+              157,
+              158,
+              162,
+              164,
+              168,
+              172,
+              174,
+              177,
+              180,
+              182,
+              183,
+              187,
+              189,
+              190,
+              194,
+              195,
+              198,
+              200,
+              202,
+              203,
+              206,
+              209,
+              211,
+              212,
+              216,
+              220,
+              224,
+              228,
+              229,
+              230
+            ],
+            "role": "sensor",
+            "isCounter": false,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": true,
+            "sensorTrend": "decreasing",
+            "trendStrength": 1
+          }
+        ],
+        "multiBytePatterns": [],
+        "notes": [
+          "Static bytes: byte[0]=0xC0",
+          "Sensor at byte[1]: ↓ range 112–230 (100% trend)"
+        ],
+        "analyzedFromByte": 0,
+        "analyzedToByteExclusive": 2,
+        "isBurstFrame": false,
+        "isMuxFrame": false,
+        "hasVaryingLength": false,
+        "isIdentical": false
+      },
+      "mux": null
+    },
+    "rust": {
+      "bytes": [
+        {
+          "changes": 0,
+          "distinct": 1,
+          "index": 0,
+          "max": 192,
+          "min": 192,
+          "role": "static"
+        },
+        {
+          "changes": 49,
+          "distinct": 50,
+          "index": 1,
+          "max": 230,
+          "min": 112,
+          "role": "sensor"
+        }
+      ],
+      "max_len": 2
+    }
+  },
+  {
+    "name": "sensor_mixed",
+    "ts": {
+      "analysis": {
+        "frameId": 0,
+        "sampleCount": 60,
+        "byteStats": [
+          {
+            "byteIndex": 0,
+            "min": 192,
+            "max": 192,
+            "uniqueValues": [
+              192
+            ],
+            "role": "static",
+            "staticValue": 192,
+            "isCounter": false,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": false
+          },
+          {
+            "byteIndex": 1,
+            "min": 88,
+            "max": 112,
+            "uniqueValues": [
+              88,
+              92,
+              96,
+              100,
+              104,
+              108,
+              112
+            ],
+            "role": "sensor",
+            "isCounter": false,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": true,
+            "sensorTrend": "mixed",
+            "trendStrength": 0.5084745762711864
+          }
+        ],
+        "multiBytePatterns": [],
+        "notes": [
+          "Static bytes: byte[0]=0xC0",
+          "Sensor at byte[1]: ↕ range 88–112 (51% trend)"
+        ],
+        "analyzedFromByte": 0,
+        "analyzedToByteExclusive": 2,
+        "isBurstFrame": false,
+        "isMuxFrame": false,
+        "hasVaryingLength": false,
+        "isIdentical": false
+      },
+      "mux": null
+    },
+    "rust": {
+      "bytes": [
+        {
+          "changes": 0,
+          "distinct": 1,
+          "index": 0,
+          "max": 192,
+          "min": 192,
+          "role": "static"
+        },
+        {
+          "changes": 59,
+          "distinct": 7,
+          "index": 1,
+          "max": 112,
+          "min": 88,
+          "role": "sensor"
+        }
+      ],
+      "max_len": 2
+    }
+  },
+  {
+    "name": "flag_two_values",
+    "ts": {
+      "analysis": {
+        "frameId": 0,
+        "sampleCount": 40,
+        "byteStats": [
+          {
+            "byteIndex": 0,
+            "min": 192,
+            "max": 192,
+            "uniqueValues": [
+              192
+            ],
+            "role": "static",
+            "staticValue": 192,
+            "isCounter": false,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": false
+          },
+          {
+            "byteIndex": 1,
+            "min": 0,
+            "max": 1,
+            "uniqueValues": [
+              0,
+              1
+            ],
+            "role": "value",
+            "isCounter": false,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": false
+          }
+        ],
+        "multiBytePatterns": [],
+        "notes": [
+          "Static bytes: byte[0]=0xC0",
+          "1 byte(s) with varying values detected"
+        ],
+        "analyzedFromByte": 0,
+        "analyzedToByteExclusive": 2,
+        "isBurstFrame": false,
+        "isMuxFrame": false,
+        "hasVaryingLength": false,
+        "isIdentical": false
+      },
+      "mux": null
+    },
+    "rust": {
+      "bytes": [
+        {
+          "changes": 0,
+          "distinct": 1,
+          "index": 0,
+          "max": 192,
+          "min": 192,
+          "role": "static"
+        },
+        {
+          "changes": 4,
+          "distinct": 2,
+          "index": 1,
+          "max": 1,
+          "min": 0,
+          "role": "sensor"
+        }
+      ],
+      "max_len": 2
+    }
+  },
+  {
+    "name": "value_held_random",
+    "ts": {
+      "analysis": {
+        "frameId": 0,
+        "sampleCount": 100,
+        "byteStats": [
+          {
+            "byteIndex": 0,
+            "min": 192,
+            "max": 192,
+            "uniqueValues": [
+              192
+            ],
+            "role": "static",
+            "staticValue": 192,
+            "isCounter": false,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": false
+          },
+          {
+            "byteIndex": 1,
+            "min": 0,
+            "max": 255,
+            "uniqueValues": [
+              0,
+              3,
+              6,
+              24,
+              31,
+              45,
+              63,
+              73,
+              76,
+              91,
+              92,
+              97,
+              104,
+              114,
+              126,
+              136,
+              140,
+              147,
+              148,
+              150,
+              152,
+              173,
+              177,
+              182,
+              183,
+              186,
+              198,
+              202,
+              219,
+              223,
+              235,
+              245,
+              248,
+              255
+            ],
+            "role": "value",
+            "isCounter": false,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": false
+          }
+        ],
+        "multiBytePatterns": [],
+        "notes": [
+          "Static bytes: byte[0]=0xC0",
+          "1 byte(s) with varying values detected"
+        ],
+        "analyzedFromByte": 0,
+        "analyzedToByteExclusive": 2,
+        "isBurstFrame": false,
+        "isMuxFrame": false,
+        "hasVaryingLength": false,
+        "isIdentical": false
+      },
+      "mux": null
+    },
+    "rust": {
+      "bytes": [
+        {
+          "changes": 0,
+          "distinct": 1,
+          "index": 0,
+          "max": 192,
+          "min": 192,
+          "role": "static"
+        },
+        {
+          "changes": 33,
+          "distinct": 34,
+          "index": 1,
+          "max": 255,
+          "min": 0,
+          "role": "sensor"
+        }
+      ],
+      "max_len": 2
+    }
+  },
+  {
+    "name": "unknown_three_values",
+    "ts": {
+      "analysis": {
+        "frameId": 0,
+        "sampleCount": 100,
+        "byteStats": [
+          {
+            "byteIndex": 0,
+            "min": 192,
+            "max": 192,
+            "uniqueValues": [
+              192
+            ],
+            "role": "static",
+            "staticValue": 192,
+            "isCounter": false,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": false
+          },
+          {
+            "byteIndex": 1,
+            "min": 10,
+            "max": 30,
+            "uniqueValues": [
+              10,
+              20,
+              30
+            ],
+            "role": "unknown",
+            "isCounter": false,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": false
+          }
+        ],
+        "multiBytePatterns": [],
+        "notes": [
+          "Static bytes: byte[0]=0xC0"
+        ],
+        "analyzedFromByte": 0,
+        "analyzedToByteExclusive": 2,
+        "isBurstFrame": false,
+        "isMuxFrame": false,
+        "hasVaryingLength": false,
+        "isIdentical": false
+      },
+      "mux": null
+    },
+    "rust": {
+      "bytes": [
+        {
+          "changes": 0,
+          "distinct": 1,
+          "index": 0,
+          "max": 192,
+          "min": 192,
+          "role": "static"
+        },
+        {
+          "changes": 9,
+          "distinct": 3,
+          "index": 1,
+          "max": 30,
+          "min": 10,
+          "role": "sensor"
+        }
+      ],
+      "max_len": 2
+    }
+  },
+  {
+    "name": "counter16_le",
+    "ts": {
+      "analysis": {
+        "frameId": 0,
+        "sampleCount": 40,
+        "byteStats": [
+          {
+            "byteIndex": 0,
+            "min": 192,
+            "max": 192,
+            "uniqueValues": [
+              192
+            ],
+            "role": "static",
+            "staticValue": 192,
+            "isCounter": false,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": false
+          },
+          {
+            "byteIndex": 1,
+            "min": 0,
+            "max": 255,
+            "uniqueValues": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12,
+              13,
+              14,
+              15,
+              16,
+              17,
+              18,
+              19,
+              20,
+              21,
+              22,
+              23,
+              240,
+              241,
+              242,
+              243,
+              244,
+              245,
+              246,
+              247,
+              248,
+              249,
+              250,
+              251,
+              252,
+              253,
+              254,
+              255
+            ],
+            "role": "counter",
+            "isCounter": true,
+            "counterDirection": "up",
+            "counterStep": 1,
+            "rolloverDetected": true,
+            "isLoopingCounter": false,
+            "isSensor": false
+          },
+          {
+            "byteIndex": 2,
+            "min": 18,
+            "max": 19,
+            "uniqueValues": [
+              18,
+              19
+            ],
+            "role": "value",
+            "isCounter": false,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": false
+          }
+        ],
+        "multiBytePatterns": [
+          {
+            "startByte": 1,
+            "length": 2,
+            "pattern": "counter16",
+            "endianness": "little",
+            "rolloverDetected": false
+          }
+        ],
+        "notes": [
+          "Little-endian (inferred from 1 multi-byte pattern(s))",
+          "Static bytes: byte[0]=0xC0",
+          "16-bit counter at byte[1:2], little endian"
+        ],
+        "analyzedFromByte": 0,
+        "analyzedToByteExclusive": 3,
+        "isBurstFrame": false,
+        "isMuxFrame": false,
+        "hasVaryingLength": false,
+        "isIdentical": false,
+        "inferredEndianness": "little"
+      },
+      "mux": null
+    },
+    "rust": {
+      "bytes": [
+        {
+          "changes": 0,
+          "distinct": 1,
+          "index": 0,
+          "max": 192,
+          "min": 192,
+          "role": "static"
+        },
+        {
+          "changes": 39,
+          "distinct": 40,
+          "index": 1,
+          "max": 255,
+          "min": 0,
+          "role": "counter"
+        },
+        {
+          "changes": 1,
+          "distinct": 2,
+          "index": 2,
+          "max": 19,
+          "min": 18,
+          "role": "sensor"
+        }
+      ],
+      "max_len": 3
+    }
+  },
+  {
+    "name": "counter16_be",
+    "ts": {
+      "analysis": {
+        "frameId": 0,
+        "sampleCount": 60,
+        "byteStats": [
+          {
+            "byteIndex": 0,
+            "min": 192,
+            "max": 192,
+            "uniqueValues": [
+              192
+            ],
+            "role": "static",
+            "staticValue": 192,
+            "isCounter": false,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": false
+          },
+          {
+            "byteIndex": 1,
+            "min": 1,
+            "max": 23,
+            "uniqueValues": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12,
+              13,
+              14,
+              15,
+              16,
+              17,
+              18,
+              19,
+              20,
+              21,
+              22,
+              23
+            ],
+            "role": "sensor",
+            "isCounter": false,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": true,
+            "sensorTrend": "increasing",
+            "trendStrength": 1
+          },
+          {
+            "byteIndex": 2,
+            "min": 0,
+            "max": 253,
+            "uniqueValues": [
+              0,
+              5,
+              8,
+              13,
+              16,
+              21,
+              24,
+              32,
+              35,
+              40,
+              43,
+              48,
+              51,
+              56,
+              59,
+              67,
+              70,
+              75,
+              78,
+              83,
+              86,
+              91,
+              94,
+              97,
+              102,
+              105,
+              110,
+              113,
+              118,
+              121,
+              129,
+              132,
+              137,
+              140,
+              145,
+              148,
+              153,
+              156,
+              164,
+              167,
+              172,
+              175,
+              180,
+              183,
+              191,
+              194,
+              199,
+              202,
+              207,
+              210,
+              215,
+              218,
+              226,
+              229,
+              234,
+              237,
+              242,
+              245,
+              250,
+              253
+            ],
+            "role": "sensor",
+            "isCounter": false,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": true,
+            "sensorTrend": "increasing",
+            "trendStrength": 0.6271186440677966
+          }
+        ],
+        "multiBytePatterns": [
+          {
+            "startByte": 1,
+            "length": 2,
+            "pattern": "counter16",
+            "endianness": "big",
+            "rolloverDetected": false
+          }
+        ],
+        "notes": [
+          "Big-endian (inferred from 1 multi-byte pattern(s))",
+          "Static bytes: byte[0]=0xC0",
+          "16-bit counter at byte[1:2], big endian"
+        ],
+        "analyzedFromByte": 0,
+        "analyzedToByteExclusive": 3,
+        "isBurstFrame": false,
+        "isMuxFrame": false,
+        "hasVaryingLength": false,
+        "isIdentical": false,
+        "inferredEndianness": "big"
+      },
+      "mux": null
+    },
+    "rust": {
+      "bytes": [
+        {
+          "changes": 0,
+          "distinct": 1,
+          "index": 0,
+          "max": 192,
+          "min": 192,
+          "role": "static"
+        },
+        {
+          "changes": 22,
+          "distinct": 23,
+          "index": 1,
+          "max": 23,
+          "min": 1,
+          "role": "sensor"
+        },
+        {
+          "changes": 59,
+          "distinct": 60,
+          "index": 2,
+          "max": 253,
+          "min": 0,
+          "role": "counter"
+        }
+      ],
+      "max_len": 3
+    }
+  },
+  {
+    "name": "sensor16_le",
+    "ts": {
+      "analysis": {
+        "frameId": 0,
+        "sampleCount": 80,
+        "byteStats": [
+          {
+            "byteIndex": 0,
+            "min": 192,
+            "max": 192,
+            "uniqueValues": [
+              192
+            ],
+            "role": "static",
+            "staticValue": 192,
+            "isCounter": false,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": false
+          },
+          {
+            "byteIndex": 1,
+            "min": 3,
+            "max": 255,
+            "uniqueValues": [
+              3,
+              4,
+              7,
+              10,
+              12,
+              15,
+              17,
+              19,
+              21,
+              24,
+              28,
+              32,
+              33,
+              34,
+              38,
+              41,
+              44,
+              46,
+              47,
+              49,
+              51,
+              53,
+              56,
+              59,
+              60,
+              61,
+              62,
+              64,
+              67,
+              71,
+              74,
+              77,
+              79,
+              81,
+              84,
+              86,
+              89,
+              92,
+              93,
+              97,
+              101,
+              102,
+              103,
+              107,
+              111,
+              114,
+              115,
+              119,
+              122,
+              126,
+              130,
+              131,
+              135,
+              137,
+              139,
+              141,
+              144,
+              147,
+              150,
+              153,
+              155,
+              159,
+              163,
+              164,
+              165,
+              169,
+              171,
+              174,
+              177,
+              178,
+              240,
+              241,
+              242,
+              243,
+              244,
+              247,
+              248,
+              250,
+              253,
+              255
+            ],
+            "role": "sensor",
+            "isCounter": false,
+            "rolloverDetected": true,
+            "isLoopingCounter": false,
+            "isSensor": true,
+            "sensorTrend": "increasing",
+            "trendStrength": 1
+          },
+          {
+            "byteIndex": 2,
+            "min": 3,
+            "max": 4,
+            "uniqueValues": [
+              3,
+              4
+            ],
+            "role": "value",
+            "isCounter": false,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": false
+          }
+        ],
+        "multiBytePatterns": [
+          {
+            "startByte": 1,
+            "length": 2,
+            "pattern": "sensor16",
+            "endianness": "little",
+            "rolloverDetected": true,
+            "correlatedRollover": true,
+            "minValue": 1008,
+            "maxValue": 1202
+          }
+        ],
+        "notes": [
+          "Little-endian (inferred from 1 multi-byte pattern(s))",
+          "Static bytes: byte[0]=0xC0",
+          "16-bit sensor at byte[1:2], little endian, range 1008–1202 (rollover correlation detected)"
+        ],
+        "analyzedFromByte": 0,
+        "analyzedToByteExclusive": 3,
+        "isBurstFrame": false,
+        "isMuxFrame": false,
+        "hasVaryingLength": false,
+        "isIdentical": false,
+        "inferredEndianness": "little"
+      },
+      "mux": null
+    },
+    "rust": {
+      "bytes": [
+        {
+          "changes": 0,
+          "distinct": 1,
+          "index": 0,
+          "max": 192,
+          "min": 192,
+          "role": "static"
+        },
+        {
+          "changes": 79,
+          "distinct": 80,
+          "index": 1,
+          "max": 255,
+          "min": 3,
+          "role": "sensor"
+        },
+        {
+          "changes": 1,
+          "distinct": 2,
+          "index": 2,
+          "max": 4,
+          "min": 3,
+          "role": "sensor"
+        }
+      ],
+      "max_len": 3
+    }
+  },
+  {
+    "name": "sensor16_be",
+    "ts": {
+      "analysis": {
+        "frameId": 0,
+        "sampleCount": 80,
+        "byteStats": [
+          {
+            "byteIndex": 0,
+            "min": 192,
+            "max": 192,
+            "uniqueValues": [
+              192
+            ],
+            "role": "static",
+            "staticValue": 192,
+            "isCounter": false,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": false
+          },
+          {
+            "byteIndex": 1,
+            "min": 3,
+            "max": 4,
+            "uniqueValues": [
+              3,
+              4
+            ],
+            "role": "value",
+            "isCounter": false,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": false
+          },
+          {
+            "byteIndex": 2,
+            "min": 2,
+            "max": 254,
+            "uniqueValues": [
+              2,
+              5,
+              9,
+              10,
+              13,
+              17,
+              21,
+              25,
+              29,
+              31,
+              34,
+              38,
+              39,
+              43,
+              47,
+              51,
+              52,
+              54,
+              57,
+              59,
+              63,
+              65,
+              68,
+              72,
+              74,
+              78,
+              81,
+              83,
+              86,
+              89,
+              90,
+              93,
+              95,
+              99,
+              100,
+              101,
+              104,
+              105,
+              106,
+              107,
+              108,
+              110,
+              113,
+              117,
+              120,
+              124,
+              128,
+              130,
+              133,
+              135,
+              138,
+              140,
+              143,
+              145,
+              146,
+              149,
+              153,
+              156,
+              159,
+              162,
+              164,
+              165,
+              168,
+              169,
+              173,
+              176,
+              177,
+              180,
+              183,
+              186,
+              190,
+              191,
+              195,
+              196,
+              240,
+              242,
+              244,
+              246,
+              250,
+              254
+            ],
+            "role": "sensor",
+            "isCounter": false,
+            "rolloverDetected": true,
+            "isLoopingCounter": false,
+            "isSensor": true,
+            "sensorTrend": "increasing",
+            "trendStrength": 1
+          }
+        ],
+        "multiBytePatterns": [
+          {
+            "startByte": 1,
+            "length": 2,
+            "pattern": "sensor16",
+            "endianness": "big",
+            "rolloverDetected": true,
+            "correlatedRollover": true,
+            "minValue": 1008,
+            "maxValue": 1220
+          }
+        ],
+        "notes": [
+          "Big-endian (inferred from 1 multi-byte pattern(s))",
+          "Static bytes: byte[0]=0xC0",
+          "16-bit sensor at byte[1:2], big endian, range 1008–1220 (rollover correlation detected)"
+        ],
+        "analyzedFromByte": 0,
+        "analyzedToByteExclusive": 3,
+        "isBurstFrame": false,
+        "isMuxFrame": false,
+        "hasVaryingLength": false,
+        "isIdentical": false,
+        "inferredEndianness": "big"
+      },
+      "mux": null
+    },
+    "rust": {
+      "bytes": [
+        {
+          "changes": 0,
+          "distinct": 1,
+          "index": 0,
+          "max": 192,
+          "min": 192,
+          "role": "static"
+        },
+        {
+          "changes": 1,
+          "distinct": 2,
+          "index": 1,
+          "max": 4,
+          "min": 3,
+          "role": "sensor"
+        },
+        {
+          "changes": 79,
+          "distinct": 80,
+          "index": 2,
+          "max": 254,
+          "min": 2,
+          "role": "sensor"
+        }
+      ],
+      "max_len": 3
+    }
+  },
+  {
+    "name": "sensor32_le",
+    "ts": {
+      "analysis": {
+        "frameId": 0,
+        "sampleCount": 2400,
+        "byteStats": [
+          {
+            "byteIndex": 0,
+            "min": 192,
+            "max": 192,
+            "uniqueValues": [
+              192
+            ],
+            "role": "static",
+            "staticValue": 192,
+            "isCounter": false,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": false
+          },
+          {
+            "byteIndex": 1,
+            "min": 0,
+            "max": 255,
+            "uniqueValues": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12,
+              13,
+              14,
+              15,
+              16,
+              17,
+              18,
+              19,
+              20,
+              21,
+              22,
+              23,
+              24,
+              25,
+              26,
+              27,
+              28,
+              29,
+              30,
+              31,
+              32,
+              33,
+              34,
+              35,
+              36,
+              37,
+              38,
+              39,
+              40,
+              41,
+              42,
+              43,
+              44,
+              45,
+              46,
+              47,
+              48,
+              49,
+              50,
+              51,
+              52,
+              53,
+              54,
+              55,
+              56,
+              57,
+              58,
+              59,
+              60,
+              61,
+              62,
+              63,
+              64,
+              65,
+              66,
+              67,
+              68,
+              69,
+              70,
+              71,
+              72,
+              73,
+              74,
+              75,
+              76,
+              77,
+              78,
+              79,
+              80,
+              81,
+              82,
+              83,
+              84,
+              85,
+              86,
+              87,
+              88,
+              89,
+              90,
+              91,
+              92,
+              93,
+              94,
+              95,
+              96,
+              97,
+              98,
+              99,
+              100,
+              101,
+              102,
+              103,
+              104,
+              105,
+              106,
+              107,
+              108,
+              109,
+              110,
+              111,
+              112,
+              113,
+              114,
+              115,
+              116,
+              117,
+              118,
+              119,
+              120,
+              121,
+              122,
+              123,
+              124,
+              125,
+              126,
+              127,
+              128,
+              129,
+              130,
+              131,
+              132,
+              133,
+              134,
+              135,
+              136,
+              137,
+              138,
+              139,
+              140,
+              141,
+              142,
+              143,
+              144,
+              145,
+              146,
+              147,
+              148,
+              149,
+              150,
+              151,
+              152,
+              153,
+              154,
+              155,
+              156,
+              157,
+              158,
+              159,
+              160,
+              161,
+              162,
+              163,
+              164,
+              165,
+              166,
+              167,
+              168,
+              169,
+              170,
+              171,
+              172,
+              173,
+              174,
+              175,
+              176,
+              177,
+              178,
+              179,
+              180,
+              181,
+              182,
+              183,
+              184,
+              185,
+              186,
+              187,
+              188,
+              189,
+              190,
+              191,
+              192,
+              193,
+              194,
+              195,
+              196,
+              197,
+              198,
+              199,
+              200,
+              201,
+              202,
+              203,
+              204,
+              205,
+              206,
+              207,
+              208,
+              209,
+              210,
+              211,
+              212,
+              213,
+              214,
+              215,
+              216,
+              217,
+              218,
+              219,
+              220,
+              221,
+              222,
+              223,
+              224,
+              225,
+              226,
+              227,
+              228,
+              229,
+              230,
+              231,
+              232,
+              233,
+              234,
+              235,
+              236,
+              237,
+              238,
+              239,
+              240,
+              241,
+              242,
+              243,
+              244,
+              245,
+              246,
+              247,
+              248,
+              249,
+              250,
+              251,
+              252,
+              253,
+              254,
+              255
+            ],
+            "role": "sensor",
+            "isCounter": false,
+            "rolloverDetected": true,
+            "isLoopingCounter": false,
+            "isSensor": true,
+            "sensorTrend": "increasing",
+            "trendStrength": 1
+          },
+          {
+            "byteIndex": 2,
+            "min": 0,
+            "max": 255,
+            "uniqueValues": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12,
+              13,
+              14,
+              15,
+              16,
+              17,
+              18,
+              19,
+              20,
+              21,
+              22,
+              23,
+              24,
+              25,
+              26,
+              27,
+              28,
+              29,
+              30,
+              31,
+              32,
+              33,
+              34,
+              35,
+              36,
+              37,
+              38,
+              39,
+              40,
+              41,
+              42,
+              43,
+              44,
+              45,
+              46,
+              47,
+              48,
+              49,
+              50,
+              51,
+              52,
+              53,
+              54,
+              55,
+              56,
+              57,
+              58,
+              59,
+              60,
+              61,
+              62,
+              63,
+              64,
+              65,
+              66,
+              67,
+              68,
+              69,
+              70,
+              71,
+              72,
+              73,
+              74,
+              75,
+              76,
+              77,
+              78,
+              79,
+              80,
+              81,
+              82,
+              83,
+              84,
+              85,
+              86,
+              87,
+              88,
+              89,
+              90,
+              91,
+              92,
+              93,
+              94,
+              95,
+              96,
+              97,
+              98,
+              99,
+              100,
+              101,
+              102,
+              103,
+              104,
+              105,
+              106,
+              107,
+              108,
+              109,
+              110,
+              111,
+              112,
+              113,
+              114,
+              115,
+              116,
+              117,
+              118,
+              119,
+              120,
+              121,
+              122,
+              123,
+              124,
+              125,
+              126,
+              127,
+              128,
+              129,
+              130,
+              131,
+              132,
+              133,
+              240,
+              241,
+              242,
+              243,
+              244,
+              245,
+              246,
+              247,
+              248,
+              249,
+              250,
+              251,
+              252,
+              253,
+              254,
+              255
+            ],
+            "role": "sensor",
+            "isCounter": false,
+            "rolloverDetected": true,
+            "isLoopingCounter": false,
+            "isSensor": true,
+            "sensorTrend": "increasing",
+            "trendStrength": 1
+          },
+          {
+            "byteIndex": 3,
+            "min": 1,
+            "max": 2,
+            "uniqueValues": [
+              1,
+              2
+            ],
+            "role": "value",
+            "isCounter": false,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": false
+          },
+          {
+            "byteIndex": 4,
+            "min": 0,
+            "max": 0,
+            "uniqueValues": [
+              0
+            ],
+            "role": "static",
+            "staticValue": 0,
+            "isCounter": false,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": false
+          }
+        ],
+        "multiBytePatterns": [
+          {
+            "startByte": 1,
+            "length": 4,
+            "pattern": "sensor32",
+            "endianness": "little",
+            "rolloverDetected": true,
+            "correlatedRollover": true,
+            "slowUpperBytes": true,
+            "minValue": 126976,
+            "maxValue": 165322
+          }
+        ],
+        "notes": [
+          "Little-endian (inferred from 1 multi-byte pattern(s))",
+          "Static bytes: byte[0]=0xC0, byte[4]=0x00",
+          "32-bit sensor at byte[1:4], little endian, range 126976–165322 (slow-changing upper bytes) (rollover correlation detected)"
+        ],
+        "analyzedFromByte": 0,
+        "analyzedToByteExclusive": 5,
+        "isBurstFrame": false,
+        "isMuxFrame": false,
+        "hasVaryingLength": false,
+        "isIdentical": false,
+        "inferredEndianness": "little"
+      },
+      "mux": null
+    },
+    "rust": {
+      "bytes": [
+        {
+          "changes": 0,
+          "distinct": 1,
+          "index": 0,
+          "max": 192,
+          "min": 192,
+          "role": "static"
+        },
+        {
+          "changes": 2399,
+          "distinct": 256,
+          "index": 1,
+          "max": 255,
+          "min": 0,
+          "role": "sensor"
+        },
+        {
+          "changes": 149,
+          "distinct": 150,
+          "index": 2,
+          "max": 255,
+          "min": 0,
+          "role": "sensor"
+        },
+        {
+          "changes": 1,
+          "distinct": 2,
+          "index": 3,
+          "max": 2,
+          "min": 1,
+          "role": "sensor"
+        },
+        {
+          "changes": 0,
+          "distinct": 1,
+          "index": 4,
+          "max": 0,
+          "min": 0,
+          "role": "static"
+        }
+      ],
+      "max_len": 5
+    }
+  },
+  {
+    "name": "sensor32_le_high_word_over_8000",
+    "ts": {
+      "analysis": {
+        "frameId": 0,
+        "sampleCount": 2400,
+        "byteStats": [
+          {
+            "byteIndex": 0,
+            "min": 192,
+            "max": 192,
+            "uniqueValues": [
+              192
+            ],
+            "role": "static",
+            "staticValue": 192,
+            "isCounter": false,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": false
+          },
+          {
+            "byteIndex": 1,
+            "min": 0,
+            "max": 255,
+            "uniqueValues": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12,
+              13,
+              14,
+              15,
+              16,
+              17,
+              18,
+              19,
+              20,
+              21,
+              22,
+              23,
+              24,
+              25,
+              26,
+              27,
+              28,
+              29,
+              30,
+              31,
+              32,
+              33,
+              34,
+              35,
+              36,
+              37,
+              38,
+              39,
+              40,
+              41,
+              42,
+              43,
+              44,
+              45,
+              46,
+              47,
+              48,
+              49,
+              50,
+              51,
+              52,
+              53,
+              54,
+              55,
+              56,
+              57,
+              58,
+              59,
+              60,
+              61,
+              62,
+              63,
+              64,
+              65,
+              66,
+              67,
+              68,
+              69,
+              70,
+              71,
+              72,
+              73,
+              74,
+              75,
+              76,
+              77,
+              78,
+              79,
+              80,
+              81,
+              82,
+              83,
+              84,
+              85,
+              86,
+              87,
+              88,
+              89,
+              90,
+              91,
+              92,
+              93,
+              94,
+              95,
+              96,
+              97,
+              98,
+              99,
+              100,
+              101,
+              102,
+              103,
+              104,
+              105,
+              106,
+              107,
+              108,
+              109,
+              110,
+              111,
+              112,
+              113,
+              114,
+              115,
+              116,
+              117,
+              118,
+              119,
+              120,
+              121,
+              122,
+              123,
+              124,
+              125,
+              126,
+              127,
+              128,
+              129,
+              130,
+              131,
+              132,
+              133,
+              134,
+              135,
+              136,
+              137,
+              138,
+              139,
+              140,
+              141,
+              142,
+              143,
+              144,
+              145,
+              146,
+              147,
+              148,
+              149,
+              150,
+              151,
+              152,
+              153,
+              154,
+              155,
+              156,
+              157,
+              158,
+              159,
+              160,
+              161,
+              162,
+              163,
+              164,
+              165,
+              166,
+              167,
+              168,
+              169,
+              170,
+              171,
+              172,
+              173,
+              174,
+              175,
+              176,
+              177,
+              178,
+              179,
+              180,
+              181,
+              182,
+              183,
+              184,
+              185,
+              186,
+              187,
+              188,
+              189,
+              190,
+              191,
+              192,
+              193,
+              194,
+              195,
+              196,
+              197,
+              198,
+              199,
+              200,
+              201,
+              202,
+              203,
+              204,
+              205,
+              206,
+              207,
+              208,
+              209,
+              210,
+              211,
+              212,
+              213,
+              214,
+              215,
+              216,
+              217,
+              218,
+              219,
+              220,
+              221,
+              222,
+              223,
+              224,
+              225,
+              226,
+              227,
+              228,
+              229,
+              230,
+              231,
+              232,
+              233,
+              234,
+              235,
+              236,
+              237,
+              238,
+              239,
+              240,
+              241,
+              242,
+              243,
+              244,
+              245,
+              246,
+              247,
+              248,
+              249,
+              250,
+              251,
+              252,
+              253,
+              254,
+              255
+            ],
+            "role": "sensor",
+            "isCounter": false,
+            "rolloverDetected": true,
+            "isLoopingCounter": false,
+            "isSensor": true,
+            "sensorTrend": "increasing",
+            "trendStrength": 1
+          },
+          {
+            "byteIndex": 2,
+            "min": 0,
+            "max": 255,
+            "uniqueValues": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12,
+              13,
+              14,
+              15,
+              16,
+              17,
+              18,
+              19,
+              20,
+              21,
+              22,
+              23,
+              24,
+              25,
+              26,
+              27,
+              28,
+              29,
+              30,
+              31,
+              32,
+              33,
+              34,
+              35,
+              36,
+              37,
+              38,
+              39,
+              40,
+              41,
+              42,
+              43,
+              44,
+              45,
+              46,
+              47,
+              48,
+              49,
+              50,
+              51,
+              52,
+              53,
+              54,
+              55,
+              56,
+              57,
+              58,
+              59,
+              60,
+              61,
+              62,
+              63,
+              64,
+              65,
+              66,
+              67,
+              68,
+              69,
+              70,
+              71,
+              72,
+              73,
+              74,
+              75,
+              76,
+              77,
+              78,
+              79,
+              80,
+              81,
+              82,
+              83,
+              84,
+              85,
+              86,
+              87,
+              88,
+              89,
+              90,
+              91,
+              92,
+              93,
+              94,
+              95,
+              96,
+              97,
+              98,
+              99,
+              100,
+              101,
+              102,
+              103,
+              104,
+              105,
+              106,
+              107,
+              108,
+              109,
+              110,
+              111,
+              112,
+              113,
+              114,
+              115,
+              116,
+              117,
+              118,
+              119,
+              120,
+              121,
+              122,
+              123,
+              124,
+              125,
+              126,
+              127,
+              128,
+              129,
+              130,
+              131,
+              132,
+              133,
+              134,
+              240,
+              241,
+              242,
+              243,
+              244,
+              245,
+              246,
+              247,
+              248,
+              249,
+              250,
+              251,
+              252,
+              253,
+              254,
+              255
+            ],
+            "role": "sensor",
+            "isCounter": false,
+            "rolloverDetected": true,
+            "isLoopingCounter": false,
+            "isSensor": true,
+            "sensorTrend": "increasing",
+            "trendStrength": 1
+          },
+          {
+            "byteIndex": 3,
+            "min": 1,
+            "max": 2,
+            "uniqueValues": [
+              1,
+              2
+            ],
+            "role": "value",
+            "isCounter": false,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": false
+          },
+          {
+            "byteIndex": 4,
+            "min": 128,
+            "max": 128,
+            "uniqueValues": [
+              128
+            ],
+            "role": "static",
+            "staticValue": 128,
+            "isCounter": false,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": false
+          }
+        ],
+        "multiBytePatterns": [
+          {
+            "startByte": 1,
+            "length": 4,
+            "pattern": "sensor32",
+            "endianness": "little",
+            "rolloverDetected": true,
+            "correlatedRollover": true,
+            "slowUpperBytes": true,
+            "minValue": -2147356672,
+            "maxValue": 0
+          }
+        ],
+        "notes": [
+          "Little-endian (inferred from 1 multi-byte pattern(s))",
+          "Static bytes: byte[0]=0xC0, byte[4]=0x80",
+          "32-bit sensor at byte[1:4], little endian, range -2147356672–0 (slow-changing upper bytes) (rollover correlation detected)"
+        ],
+        "analyzedFromByte": 0,
+        "analyzedToByteExclusive": 5,
+        "isBurstFrame": false,
+        "isMuxFrame": false,
+        "hasVaryingLength": false,
+        "isIdentical": false,
+        "inferredEndianness": "little"
+      },
+      "mux": null
+    },
+    "rust": {
+      "bytes": [
+        {
+          "changes": 0,
+          "distinct": 1,
+          "index": 0,
+          "max": 192,
+          "min": 192,
+          "role": "static"
+        },
+        {
+          "changes": 2399,
+          "distinct": 256,
+          "index": 1,
+          "max": 255,
+          "min": 0,
+          "role": "sensor"
+        },
+        {
+          "changes": 150,
+          "distinct": 151,
+          "index": 2,
+          "max": 255,
+          "min": 0,
+          "role": "sensor"
+        },
+        {
+          "changes": 1,
+          "distinct": 2,
+          "index": 3,
+          "max": 2,
+          "min": 1,
+          "role": "sensor"
+        },
+        {
+          "changes": 0,
+          "distinct": 1,
+          "index": 4,
+          "max": 128,
+          "min": 128,
+          "role": "static"
+        }
+      ],
+      "max_len": 5
+    }
+  },
+  {
+    "name": "text",
+    "ts": {
+      "analysis": {
+        "frameId": 0,
+        "sampleCount": 20,
+        "byteStats": [
+          {
+            "byteIndex": 0,
+            "min": 192,
+            "max": 192,
+            "uniqueValues": [
+              192
+            ],
+            "role": "static",
+            "staticValue": 192,
+            "isCounter": false,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": false
+          },
+          {
+            "byteIndex": 1,
+            "min": 84,
+            "max": 84,
+            "uniqueValues": [
+              84
+            ],
+            "role": "static",
+            "staticValue": 84,
+            "isCounter": false,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": false
+          },
+          {
+            "byteIndex": 2,
+            "min": 61,
+            "max": 61,
+            "uniqueValues": [
+              61
+            ],
+            "role": "static",
+            "staticValue": 61,
+            "isCounter": false,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": false
+          },
+          {
+            "byteIndex": 3,
+            "min": 50,
+            "max": 50,
+            "uniqueValues": [
+              50
+            ],
+            "role": "static",
+            "staticValue": 50,
+            "isCounter": false,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": false
+          },
+          {
+            "byteIndex": 4,
+            "min": 48,
+            "max": 54,
+            "uniqueValues": [
+              48,
+              49,
+              50,
+              51,
+              52,
+              53,
+              54
+            ],
+            "role": "counter",
+            "isCounter": true,
+            "counterDirection": "up",
+            "counterStep": 1,
+            "rolloverDetected": true,
+            "isLoopingCounter": true,
+            "loopingRange": {
+              "min": 48,
+              "max": 54
+            },
+            "loopingModulo": 7,
+            "isSensor": false
+          },
+          {
+            "byteIndex": 5,
+            "min": 67,
+            "max": 67,
+            "uniqueValues": [
+              67
+            ],
+            "role": "static",
+            "staticValue": 67,
+            "isCounter": false,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": false
+          },
+          {
+            "byteIndex": 6,
+            "min": 0,
+            "max": 19,
+            "uniqueValues": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12,
+              13,
+              14,
+              15,
+              16,
+              17,
+              18,
+              19
+            ],
+            "role": "counter",
+            "isCounter": true,
+            "counterDirection": "up",
+            "counterStep": 1,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": false
+          }
+        ],
+        "multiBytePatterns": [
+          {
+            "startByte": 1,
+            "length": 5,
+            "pattern": "text",
+            "sampleText": "T=20C"
+          }
+        ],
+        "notes": [
+          "Static bytes: byte[0]=0xC0, byte[1]=0x54, byte[2]=0x3D, byte[3]=0x32, byte[5]=0x43",
+          "Counter at byte[6]: incrementing, step=1",
+          "Text at byte[1:5] \"T=20C\""
+        ],
+        "analyzedFromByte": 0,
+        "analyzedToByteExclusive": 7,
+        "isBurstFrame": false,
+        "isMuxFrame": false,
+        "hasVaryingLength": false,
+        "isIdentical": false
+      },
+      "mux": null
+    },
+    "rust": {
+      "bytes": [
+        {
+          "changes": 0,
+          "distinct": 1,
+          "index": 0,
+          "max": 192,
+          "min": 192,
+          "role": "static"
+        },
+        {
+          "changes": 0,
+          "distinct": 1,
+          "index": 1,
+          "max": 84,
+          "min": 84,
+          "role": "static"
+        },
+        {
+          "changes": 0,
+          "distinct": 1,
+          "index": 2,
+          "max": 61,
+          "min": 61,
+          "role": "static"
+        },
+        {
+          "changes": 0,
+          "distinct": 1,
+          "index": 3,
+          "max": 50,
+          "min": 50,
+          "role": "static"
+        },
+        {
+          "changes": 19,
+          "distinct": 7,
+          "index": 4,
+          "max": 54,
+          "min": 48,
+          "role": "counter"
+        },
+        {
+          "changes": 0,
+          "distinct": 1,
+          "index": 5,
+          "max": 67,
+          "min": 67,
+          "role": "static"
+        },
+        {
+          "changes": 19,
+          "distinct": 20,
+          "index": 6,
+          "max": 19,
+          "min": 0,
+          "role": "counter"
+        }
+      ],
+      "max_len": 7
+    }
+  },
+  {
+    "name": "identical",
+    "ts": {
+      "analysis": {
+        "frameId": 0,
+        "sampleCount": 10,
+        "byteStats": [
+          {
+            "byteIndex": 0,
+            "min": 1,
+            "max": 1,
+            "uniqueValues": [
+              1
+            ],
+            "role": "static",
+            "staticValue": 1,
+            "isCounter": false,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": false
+          },
+          {
+            "byteIndex": 1,
+            "min": 2,
+            "max": 2,
+            "uniqueValues": [
+              2
+            ],
+            "role": "static",
+            "staticValue": 2,
+            "isCounter": false,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": false
+          },
+          {
+            "byteIndex": 2,
+            "min": 3,
+            "max": 3,
+            "uniqueValues": [
+              3
+            ],
+            "role": "static",
+            "staticValue": 3,
+            "isCounter": false,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": false
+          },
+          {
+            "byteIndex": 3,
+            "min": 4,
+            "max": 4,
+            "uniqueValues": [
+              4
+            ],
+            "role": "static",
+            "staticValue": 4,
+            "isCounter": false,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": false
+          }
+        ],
+        "multiBytePatterns": [],
+        "notes": [
+          "Identical payload across all 10 samples: 01 02 03 04",
+          "Static bytes: byte[0]=0x01, byte[1]=0x02, byte[2]=0x03, byte[3]=0x04"
+        ],
+        "analyzedFromByte": 0,
+        "analyzedToByteExclusive": 4,
+        "isBurstFrame": false,
+        "isMuxFrame": false,
+        "hasVaryingLength": false,
+        "isIdentical": true,
+        "identicalPayload": [
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "mux": null
+    },
+    "rust": {
+      "bytes": [
+        {
+          "changes": 0,
+          "distinct": 1,
+          "index": 0,
+          "max": 1,
+          "min": 1,
+          "role": "static"
+        },
+        {
+          "changes": 0,
+          "distinct": 1,
+          "index": 1,
+          "max": 2,
+          "min": 2,
+          "role": "static"
+        },
+        {
+          "changes": 0,
+          "distinct": 1,
+          "index": 2,
+          "max": 3,
+          "min": 3,
+          "role": "static"
+        },
+        {
+          "changes": 0,
+          "distinct": 1,
+          "index": 3,
+          "max": 4,
+          "min": 4,
+          "role": "static"
+        }
+      ],
+      "max_len": 4
+    }
+  },
+  {
+    "name": "varying_lengths",
+    "ts": {
+      "analysis": {
+        "frameId": 0,
+        "sampleCount": 30,
+        "byteStats": [
+          {
+            "byteIndex": 0,
+            "min": 192,
+            "max": 192,
+            "uniqueValues": [
+              192
+            ],
+            "role": "static",
+            "staticValue": 192,
+            "isCounter": false,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": false
+          },
+          {
+            "byteIndex": 1,
+            "min": 0,
+            "max": 29,
+            "uniqueValues": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12,
+              13,
+              14,
+              15,
+              16,
+              17,
+              18,
+              19,
+              20,
+              21,
+              22,
+              23,
+              24,
+              25,
+              26,
+              27,
+              28,
+              29
+            ],
+            "role": "counter",
+            "isCounter": true,
+            "counterDirection": "up",
+            "counterStep": 1,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": false
+          },
+          {
+            "byteIndex": 2,
+            "min": 85,
+            "max": 85,
+            "uniqueValues": [
+              85
+            ],
+            "role": "static",
+            "staticValue": 85,
+            "isCounter": false,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": false
+          },
+          {
+            "byteIndex": 3,
+            "min": 0,
+            "max": 58,
+            "uniqueValues": [
+              0,
+              2,
+              4,
+              6,
+              8,
+              10,
+              12,
+              14,
+              16,
+              18,
+              20,
+              22,
+              24,
+              26,
+              28,
+              30,
+              32,
+              34,
+              36,
+              38,
+              40,
+              42,
+              44,
+              46,
+              48,
+              50,
+              52,
+              54,
+              56,
+              58
+            ],
+            "role": "counter",
+            "isCounter": true,
+            "counterDirection": "up",
+            "counterStep": 2,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": false
+          }
+        ],
+        "multiBytePatterns": [],
+        "notes": [
+          "Varying length: 4–8 bytes",
+          "Static bytes: byte[0]=0xC0, byte[2]=0x55",
+          "Counter at byte[1]: incrementing, step=1",
+          "Counter at byte[3]: incrementing, step=2"
+        ],
+        "analyzedFromByte": 0,
+        "analyzedToByteExclusive": 4,
+        "isBurstFrame": false,
+        "isMuxFrame": false,
+        "hasVaryingLength": true,
+        "lengthRange": {
+          "min": 4,
+          "max": 8
+        },
+        "isIdentical": false
+      },
+      "mux": null
+    },
+    "rust": {
+      "bytes": [
+        {
+          "changes": 0,
+          "distinct": 1,
+          "index": 0,
+          "max": 192,
+          "min": 192,
+          "role": "static"
+        },
+        {
+          "changes": 29,
+          "distinct": 30,
+          "index": 1,
+          "max": 29,
+          "min": 0,
+          "role": "counter"
+        },
+        {
+          "changes": 0,
+          "distinct": 1,
+          "index": 2,
+          "max": 85,
+          "min": 85,
+          "role": "static"
+        },
+        {
+          "changes": 29,
+          "distinct": 30,
+          "index": 3,
+          "max": 58,
+          "min": 0,
+          "role": "counter"
+        },
+        {
+          "changes": 0,
+          "distinct": 1,
+          "index": 4,
+          "max": 164,
+          "min": 164,
+          "role": "static"
+        },
+        {
+          "changes": 0,
+          "distinct": 1,
+          "index": 5,
+          "max": 165,
+          "min": 165,
+          "role": "static"
+        },
+        {
+          "changes": 0,
+          "distinct": 1,
+          "index": 6,
+          "max": 166,
+          "min": 166,
+          "role": "static"
+        },
+        {
+          "changes": 0,
+          "distinct": 1,
+          "index": 7,
+          "max": 167,
+          "min": 167,
+          "role": "static"
+        }
+      ],
+      "max_len": 8
+    }
+  },
+  {
+    "name": "runt_in_middle",
+    "ts": {
+      "analysis": {
+        "frameId": 0,
+        "sampleCount": 20,
+        "byteStats": [
+          {
+            "byteIndex": 0,
+            "min": 192,
+            "max": 192,
+            "uniqueValues": [
+              192
+            ],
+            "role": "static",
+            "staticValue": 192,
+            "isCounter": false,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": false
+          }
+        ],
+        "multiBytePatterns": [],
+        "notes": [
+          "Varying length: 1–3 bytes",
+          "Static bytes: byte[0]=0xC0"
+        ],
+        "analyzedFromByte": 0,
+        "analyzedToByteExclusive": 1,
+        "isBurstFrame": false,
+        "isMuxFrame": false,
+        "hasVaryingLength": true,
+        "lengthRange": {
+          "min": 1,
+          "max": 3
+        },
+        "isIdentical": false
+      },
+      "mux": null
+    },
+    "rust": {
+      "bytes": [
+        {
+          "changes": 0,
+          "distinct": 1,
+          "index": 0,
+          "max": 192,
+          "min": 192,
+          "role": "static"
+        },
+        {
+          "changes": 18,
+          "distinct": 19,
+          "index": 1,
+          "max": 19,
+          "min": 0,
+          "role": "counter"
+        },
+        {
+          "changes": 18,
+          "distinct": 19,
+          "index": 2,
+          "max": 73,
+          "min": 16,
+          "role": "counter"
+        }
+      ],
+      "max_len": 3
+    }
+  },
+  {
+    "name": "mux_one_byte",
+    "ts": {
+      "analysis": {
+        "frameId": 0,
+        "sampleCount": 48,
+        "byteStats": [
+          {
+            "byteIndex": 1,
+            "min": 0,
+            "max": 0,
+            "uniqueValues": [
+              0
+            ],
+            "role": "static",
+            "staticValue": 0,
+            "isCounter": false,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": false
+          },
+          {
+            "byteIndex": 2,
+            "min": 0,
+            "max": 11,
+            "uniqueValues": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              11
+            ],
+            "role": "counter",
+            "isCounter": true,
+            "counterDirection": "up",
+            "counterStep": 1,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": false
+          },
+          {
+            "byteIndex": 3,
+            "min": 128,
+            "max": 128,
+            "uniqueValues": [
+              128
+            ],
+            "role": "static",
+            "staticValue": 128,
+            "isCounter": false,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": false
+          },
+          {
+            "byteIndex": 4,
+            "min": 0,
+            "max": 0,
+            "uniqueValues": [
+              0
+            ],
+            "role": "static",
+            "staticValue": 0,
+            "isCounter": false,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": false
+          },
+          {
+            "byteIndex": 5,
+            "min": 0,
+            "max": 0,
+            "uniqueValues": [
+              0
+            ],
+            "role": "static",
+            "staticValue": 0,
+            "isCounter": false,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": false
+          },
+          {
+            "byteIndex": 6,
+            "min": 0,
+            "max": 0,
+            "uniqueValues": [
+              0
+            ],
+            "role": "static",
+            "staticValue": 0,
+            "isCounter": false,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": false
+          },
+          {
+            "byteIndex": 7,
+            "min": 0,
+            "max": 0,
+            "uniqueValues": [
+              0
+            ],
+            "role": "static",
+            "staticValue": 0,
+            "isCounter": false,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": false
+          }
+        ],
+        "multiBytePatterns": [],
+        "notes": [
+          "Multiplexed frame: byte[0], cases: 0, 1, 2, 3",
+          "Case 0: 1 counter, 6 static",
+          "Case 1: 1 counter, 6 static",
+          "Case 2: 1 counter, 6 static",
+          "Case 3: 1 counter, 6 static"
+        ],
+        "analyzedFromByte": 1,
+        "analyzedToByteExclusive": 8,
+        "isBurstFrame": false,
+        "isMuxFrame": true,
+        "muxInfo": {
+          "selectorByte": 0,
+          "selectorValues": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "isTwoByte": false
+        },
+        "muxCaseAnalyses": [
+          {
+            "muxValue": 0,
+            "sampleCount": 12,
+            "byteStats": [
+              {
+                "byteIndex": 1,
+                "min": 0,
+                "max": 0,
+                "uniqueValues": [
+                  0
+                ],
+                "role": "static",
+                "staticValue": 0,
+                "isCounter": false,
+                "rolloverDetected": false,
+                "isLoopingCounter": false,
+                "isSensor": false
+              },
+              {
+                "byteIndex": 2,
+                "min": 0,
+                "max": 11,
+                "uniqueValues": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6,
+                  7,
+                  8,
+                  9,
+                  10,
+                  11
+                ],
+                "role": "counter",
+                "isCounter": true,
+                "counterDirection": "up",
+                "counterStep": 1,
+                "rolloverDetected": false,
+                "isLoopingCounter": false,
+                "isSensor": false
+              },
+              {
+                "byteIndex": 3,
+                "min": 128,
+                "max": 128,
+                "uniqueValues": [
+                  128
+                ],
+                "role": "static",
+                "staticValue": 128,
+                "isCounter": false,
+                "rolloverDetected": false,
+                "isLoopingCounter": false,
+                "isSensor": false
+              },
+              {
+                "byteIndex": 4,
+                "min": 0,
+                "max": 0,
+                "uniqueValues": [
+                  0
+                ],
+                "role": "static",
+                "staticValue": 0,
+                "isCounter": false,
+                "rolloverDetected": false,
+                "isLoopingCounter": false,
+                "isSensor": false
+              },
+              {
+                "byteIndex": 5,
+                "min": 0,
+                "max": 0,
+                "uniqueValues": [
+                  0
+                ],
+                "role": "static",
+                "staticValue": 0,
+                "isCounter": false,
+                "rolloverDetected": false,
+                "isLoopingCounter": false,
+                "isSensor": false
+              },
+              {
+                "byteIndex": 6,
+                "min": 0,
+                "max": 0,
+                "uniqueValues": [
+                  0
+                ],
+                "role": "static",
+                "staticValue": 0,
+                "isCounter": false,
+                "rolloverDetected": false,
+                "isLoopingCounter": false,
+                "isSensor": false
+              },
+              {
+                "byteIndex": 7,
+                "min": 0,
+                "max": 0,
+                "uniqueValues": [
+                  0
+                ],
+                "role": "static",
+                "staticValue": 0,
+                "isCounter": false,
+                "rolloverDetected": false,
+                "isLoopingCounter": false,
+                "isSensor": false
+              }
+            ],
+            "multiBytePatterns": [],
+            "notes": [
+              "Static: byte[1]=0x00, byte[3]=0x80, byte[4]=0x00, byte[5]=0x00, byte[6]=0x00, byte[7]=0x00",
+              "Counter byte[2]: inc, step=1"
+            ]
+          },
+          {
+            "muxValue": 1,
+            "sampleCount": 12,
+            "byteStats": [
+              {
+                "byteIndex": 1,
+                "min": 17,
+                "max": 17,
+                "uniqueValues": [
+                  17
+                ],
+                "role": "static",
+                "staticValue": 17,
+                "isCounter": false,
+                "rolloverDetected": false,
+                "isLoopingCounter": false,
+                "isSensor": false
+              },
+              {
+                "byteIndex": 2,
+                "min": 0,
+                "max": 11,
+                "uniqueValues": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6,
+                  7,
+                  8,
+                  9,
+                  10,
+                  11
+                ],
+                "role": "counter",
+                "isCounter": true,
+                "counterDirection": "up",
+                "counterStep": 1,
+                "rolloverDetected": false,
+                "isLoopingCounter": false,
+                "isSensor": false
+              },
+              {
+                "byteIndex": 3,
+                "min": 129,
+                "max": 129,
+                "uniqueValues": [
+                  129
+                ],
+                "role": "static",
+                "staticValue": 129,
+                "isCounter": false,
+                "rolloverDetected": false,
+                "isLoopingCounter": false,
+                "isSensor": false
+              },
+              {
+                "byteIndex": 4,
+                "min": 0,
+                "max": 0,
+                "uniqueValues": [
+                  0
+                ],
+                "role": "static",
+                "staticValue": 0,
+                "isCounter": false,
+                "rolloverDetected": false,
+                "isLoopingCounter": false,
+                "isSensor": false
+              },
+              {
+                "byteIndex": 5,
+                "min": 0,
+                "max": 0,
+                "uniqueValues": [
+                  0
+                ],
+                "role": "static",
+                "staticValue": 0,
+                "isCounter": false,
+                "rolloverDetected": false,
+                "isLoopingCounter": false,
+                "isSensor": false
+              },
+              {
+                "byteIndex": 6,
+                "min": 0,
+                "max": 0,
+                "uniqueValues": [
+                  0
+                ],
+                "role": "static",
+                "staticValue": 0,
+                "isCounter": false,
+                "rolloverDetected": false,
+                "isLoopingCounter": false,
+                "isSensor": false
+              },
+              {
+                "byteIndex": 7,
+                "min": 0,
+                "max": 0,
+                "uniqueValues": [
+                  0
+                ],
+                "role": "static",
+                "staticValue": 0,
+                "isCounter": false,
+                "rolloverDetected": false,
+                "isLoopingCounter": false,
+                "isSensor": false
+              }
+            ],
+            "multiBytePatterns": [],
+            "notes": [
+              "Static: byte[1]=0x11, byte[3]=0x81, byte[4]=0x00, byte[5]=0x00, byte[6]=0x00, byte[7]=0x00",
+              "Counter byte[2]: inc, step=1"
+            ]
+          },
+          {
+            "muxValue": 2,
+            "sampleCount": 12,
+            "byteStats": [
+              {
+                "byteIndex": 1,
+                "min": 34,
+                "max": 34,
+                "uniqueValues": [
+                  34
+                ],
+                "role": "static",
+                "staticValue": 34,
+                "isCounter": false,
+                "rolloverDetected": false,
+                "isLoopingCounter": false,
+                "isSensor": false
+              },
+              {
+                "byteIndex": 2,
+                "min": 0,
+                "max": 11,
+                "uniqueValues": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6,
+                  7,
+                  8,
+                  9,
+                  10,
+                  11
+                ],
+                "role": "counter",
+                "isCounter": true,
+                "counterDirection": "up",
+                "counterStep": 1,
+                "rolloverDetected": false,
+                "isLoopingCounter": false,
+                "isSensor": false
+              },
+              {
+                "byteIndex": 3,
+                "min": 130,
+                "max": 130,
+                "uniqueValues": [
+                  130
+                ],
+                "role": "static",
+                "staticValue": 130,
+                "isCounter": false,
+                "rolloverDetected": false,
+                "isLoopingCounter": false,
+                "isSensor": false
+              },
+              {
+                "byteIndex": 4,
+                "min": 0,
+                "max": 0,
+                "uniqueValues": [
+                  0
+                ],
+                "role": "static",
+                "staticValue": 0,
+                "isCounter": false,
+                "rolloverDetected": false,
+                "isLoopingCounter": false,
+                "isSensor": false
+              },
+              {
+                "byteIndex": 5,
+                "min": 0,
+                "max": 0,
+                "uniqueValues": [
+                  0
+                ],
+                "role": "static",
+                "staticValue": 0,
+                "isCounter": false,
+                "rolloverDetected": false,
+                "isLoopingCounter": false,
+                "isSensor": false
+              },
+              {
+                "byteIndex": 6,
+                "min": 0,
+                "max": 0,
+                "uniqueValues": [
+                  0
+                ],
+                "role": "static",
+                "staticValue": 0,
+                "isCounter": false,
+                "rolloverDetected": false,
+                "isLoopingCounter": false,
+                "isSensor": false
+              },
+              {
+                "byteIndex": 7,
+                "min": 0,
+                "max": 0,
+                "uniqueValues": [
+                  0
+                ],
+                "role": "static",
+                "staticValue": 0,
+                "isCounter": false,
+                "rolloverDetected": false,
+                "isLoopingCounter": false,
+                "isSensor": false
+              }
+            ],
+            "multiBytePatterns": [],
+            "notes": [
+              "Static: byte[1]=0x22, byte[3]=0x82, byte[4]=0x00, byte[5]=0x00, byte[6]=0x00, byte[7]=0x00",
+              "Counter byte[2]: inc, step=1"
+            ]
+          },
+          {
+            "muxValue": 3,
+            "sampleCount": 12,
+            "byteStats": [
+              {
+                "byteIndex": 1,
+                "min": 51,
+                "max": 51,
+                "uniqueValues": [
+                  51
+                ],
+                "role": "static",
+                "staticValue": 51,
+                "isCounter": false,
+                "rolloverDetected": false,
+                "isLoopingCounter": false,
+                "isSensor": false
+              },
+              {
+                "byteIndex": 2,
+                "min": 0,
+                "max": 11,
+                "uniqueValues": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6,
+                  7,
+                  8,
+                  9,
+                  10,
+                  11
+                ],
+                "role": "counter",
+                "isCounter": true,
+                "counterDirection": "up",
+                "counterStep": 1,
+                "rolloverDetected": false,
+                "isLoopingCounter": false,
+                "isSensor": false
+              },
+              {
+                "byteIndex": 3,
+                "min": 131,
+                "max": 131,
+                "uniqueValues": [
+                  131
+                ],
+                "role": "static",
+                "staticValue": 131,
+                "isCounter": false,
+                "rolloverDetected": false,
+                "isLoopingCounter": false,
+                "isSensor": false
+              },
+              {
+                "byteIndex": 4,
+                "min": 0,
+                "max": 0,
+                "uniqueValues": [
+                  0
+                ],
+                "role": "static",
+                "staticValue": 0,
+                "isCounter": false,
+                "rolloverDetected": false,
+                "isLoopingCounter": false,
+                "isSensor": false
+              },
+              {
+                "byteIndex": 5,
+                "min": 0,
+                "max": 0,
+                "uniqueValues": [
+                  0
+                ],
+                "role": "static",
+                "staticValue": 0,
+                "isCounter": false,
+                "rolloverDetected": false,
+                "isLoopingCounter": false,
+                "isSensor": false
+              },
+              {
+                "byteIndex": 6,
+                "min": 0,
+                "max": 0,
+                "uniqueValues": [
+                  0
+                ],
+                "role": "static",
+                "staticValue": 0,
+                "isCounter": false,
+                "rolloverDetected": false,
+                "isLoopingCounter": false,
+                "isSensor": false
+              },
+              {
+                "byteIndex": 7,
+                "min": 0,
+                "max": 0,
+                "uniqueValues": [
+                  0
+                ],
+                "role": "static",
+                "staticValue": 0,
+                "isCounter": false,
+                "rolloverDetected": false,
+                "isLoopingCounter": false,
+                "isSensor": false
+              }
+            ],
+            "multiBytePatterns": [],
+            "notes": [
+              "Static: byte[1]=0x33, byte[3]=0x83, byte[4]=0x00, byte[5]=0x00, byte[6]=0x00, byte[7]=0x00",
+              "Counter byte[2]: inc, step=1"
+            ]
+          }
+        ],
+        "hasVaryingLength": false,
+        "isIdentical": false
+      },
+      "mux": {
+        "selectorByte": 0,
+        "selectorValues": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "isTwoByte": false,
+        "occurrencesPerValue": {
+          "0": 12,
+          "1": 12,
+          "2": 12,
+          "3": 12
+        }
+      }
+    },
+    "rust": {
+      "bytes": [
+        {
+          "changes": 47,
+          "distinct": 4,
+          "index": 0,
+          "max": 3,
+          "min": 0,
+          "role": "sensor"
+        },
+        {
+          "changes": 47,
+          "distinct": 4,
+          "index": 1,
+          "max": 51,
+          "min": 0,
+          "role": "sensor"
+        },
+        {
+          "changes": 11,
+          "distinct": 12,
+          "index": 2,
+          "max": 11,
+          "min": 0,
+          "role": "sensor"
+        },
+        {
+          "changes": 47,
+          "distinct": 4,
+          "index": 3,
+          "max": 131,
+          "min": 128,
+          "role": "sensor"
+        },
+        {
+          "changes": 0,
+          "distinct": 1,
+          "index": 4,
+          "max": 0,
+          "min": 0,
+          "role": "static"
+        },
+        {
+          "changes": 0,
+          "distinct": 1,
+          "index": 5,
+          "max": 0,
+          "min": 0,
+          "role": "static"
+        },
+        {
+          "changes": 0,
+          "distinct": 1,
+          "index": 6,
+          "max": 0,
+          "min": 0,
+          "role": "static"
+        },
+        {
+          "changes": 0,
+          "distinct": 1,
+          "index": 7,
+          "max": 0,
+          "min": 0,
+          "role": "static"
+        }
+      ],
+      "max_len": 8
+    }
+  },
+  {
+    "name": "mux_two_byte",
+    "ts": {
+      "analysis": {
+        "frameId": 0,
+        "sampleCount": 45,
+        "byteStats": [
+          {
+            "byteIndex": 2,
+            "min": 0,
+            "max": 4,
+            "uniqueValues": [
+              0,
+              1,
+              2,
+              3,
+              4
+            ],
+            "role": "counter",
+            "isCounter": true,
+            "counterDirection": "up",
+            "counterStep": 1,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": false
+          },
+          {
+            "byteIndex": 3,
+            "min": 170,
+            "max": 170,
+            "uniqueValues": [
+              170
+            ],
+            "role": "static",
+            "staticValue": 170,
+            "isCounter": false,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": false
+          }
+        ],
+        "multiBytePatterns": [],
+        "notes": [
+          "Multiplexed frame: byte[0:1], 9 cases"
+        ],
+        "analyzedFromByte": 2,
+        "analyzedToByteExclusive": 4,
+        "isBurstFrame": false,
+        "isMuxFrame": true,
+        "muxInfo": {
+          "selectorByte": -1,
+          "selectorValues": [
+            257,
+            258,
+            259,
+            513,
+            514,
+            515,
+            769,
+            770,
+            771
+          ],
+          "isTwoByte": true
+        },
+        "muxCaseAnalyses": [
+          {
+            "muxValue": 257,
+            "sampleCount": 5,
+            "byteStats": [
+              {
+                "byteIndex": 2,
+                "min": 0,
+                "max": 4,
+                "uniqueValues": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4
+                ],
+                "role": "counter",
+                "isCounter": true,
+                "counterDirection": "up",
+                "counterStep": 1,
+                "rolloverDetected": false,
+                "isLoopingCounter": false,
+                "isSensor": false
+              },
+              {
+                "byteIndex": 3,
+                "min": 170,
+                "max": 170,
+                "uniqueValues": [
+                  170
+                ],
+                "role": "static",
+                "staticValue": 170,
+                "isCounter": false,
+                "rolloverDetected": false,
+                "isLoopingCounter": false,
+                "isSensor": false
+              }
+            ],
+            "multiBytePatterns": [],
+            "notes": [
+              "Static: byte[3]=0xAA",
+              "Counter byte[2]: inc, step=1"
+            ]
+          },
+          {
+            "muxValue": 258,
+            "sampleCount": 5,
+            "byteStats": [
+              {
+                "byteIndex": 2,
+                "min": 0,
+                "max": 4,
+                "uniqueValues": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4
+                ],
+                "role": "counter",
+                "isCounter": true,
+                "counterDirection": "up",
+                "counterStep": 1,
+                "rolloverDetected": false,
+                "isLoopingCounter": false,
+                "isSensor": false
+              },
+              {
+                "byteIndex": 3,
+                "min": 170,
+                "max": 170,
+                "uniqueValues": [
+                  170
+                ],
+                "role": "static",
+                "staticValue": 170,
+                "isCounter": false,
+                "rolloverDetected": false,
+                "isLoopingCounter": false,
+                "isSensor": false
+              }
+            ],
+            "multiBytePatterns": [],
+            "notes": [
+              "Static: byte[3]=0xAA",
+              "Counter byte[2]: inc, step=1"
+            ]
+          },
+          {
+            "muxValue": 259,
+            "sampleCount": 5,
+            "byteStats": [
+              {
+                "byteIndex": 2,
+                "min": 0,
+                "max": 4,
+                "uniqueValues": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4
+                ],
+                "role": "counter",
+                "isCounter": true,
+                "counterDirection": "up",
+                "counterStep": 1,
+                "rolloverDetected": false,
+                "isLoopingCounter": false,
+                "isSensor": false
+              },
+              {
+                "byteIndex": 3,
+                "min": 170,
+                "max": 170,
+                "uniqueValues": [
+                  170
+                ],
+                "role": "static",
+                "staticValue": 170,
+                "isCounter": false,
+                "rolloverDetected": false,
+                "isLoopingCounter": false,
+                "isSensor": false
+              }
+            ],
+            "multiBytePatterns": [],
+            "notes": [
+              "Static: byte[3]=0xAA",
+              "Counter byte[2]: inc, step=1"
+            ]
+          },
+          {
+            "muxValue": 513,
+            "sampleCount": 5,
+            "byteStats": [
+              {
+                "byteIndex": 2,
+                "min": 0,
+                "max": 4,
+                "uniqueValues": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4
+                ],
+                "role": "counter",
+                "isCounter": true,
+                "counterDirection": "up",
+                "counterStep": 1,
+                "rolloverDetected": false,
+                "isLoopingCounter": false,
+                "isSensor": false
+              },
+              {
+                "byteIndex": 3,
+                "min": 170,
+                "max": 170,
+                "uniqueValues": [
+                  170
+                ],
+                "role": "static",
+                "staticValue": 170,
+                "isCounter": false,
+                "rolloverDetected": false,
+                "isLoopingCounter": false,
+                "isSensor": false
+              }
+            ],
+            "multiBytePatterns": [],
+            "notes": [
+              "Static: byte[3]=0xAA",
+              "Counter byte[2]: inc, step=1"
+            ]
+          },
+          {
+            "muxValue": 514,
+            "sampleCount": 5,
+            "byteStats": [
+              {
+                "byteIndex": 2,
+                "min": 0,
+                "max": 4,
+                "uniqueValues": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4
+                ],
+                "role": "counter",
+                "isCounter": true,
+                "counterDirection": "up",
+                "counterStep": 1,
+                "rolloverDetected": false,
+                "isLoopingCounter": false,
+                "isSensor": false
+              },
+              {
+                "byteIndex": 3,
+                "min": 170,
+                "max": 170,
+                "uniqueValues": [
+                  170
+                ],
+                "role": "static",
+                "staticValue": 170,
+                "isCounter": false,
+                "rolloverDetected": false,
+                "isLoopingCounter": false,
+                "isSensor": false
+              }
+            ],
+            "multiBytePatterns": [],
+            "notes": [
+              "Static: byte[3]=0xAA",
+              "Counter byte[2]: inc, step=1"
+            ]
+          },
+          {
+            "muxValue": 515,
+            "sampleCount": 5,
+            "byteStats": [
+              {
+                "byteIndex": 2,
+                "min": 0,
+                "max": 4,
+                "uniqueValues": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4
+                ],
+                "role": "counter",
+                "isCounter": true,
+                "counterDirection": "up",
+                "counterStep": 1,
+                "rolloverDetected": false,
+                "isLoopingCounter": false,
+                "isSensor": false
+              },
+              {
+                "byteIndex": 3,
+                "min": 170,
+                "max": 170,
+                "uniqueValues": [
+                  170
+                ],
+                "role": "static",
+                "staticValue": 170,
+                "isCounter": false,
+                "rolloverDetected": false,
+                "isLoopingCounter": false,
+                "isSensor": false
+              }
+            ],
+            "multiBytePatterns": [],
+            "notes": [
+              "Static: byte[3]=0xAA",
+              "Counter byte[2]: inc, step=1"
+            ]
+          },
+          {
+            "muxValue": 769,
+            "sampleCount": 5,
+            "byteStats": [
+              {
+                "byteIndex": 2,
+                "min": 0,
+                "max": 4,
+                "uniqueValues": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4
+                ],
+                "role": "counter",
+                "isCounter": true,
+                "counterDirection": "up",
+                "counterStep": 1,
+                "rolloverDetected": false,
+                "isLoopingCounter": false,
+                "isSensor": false
+              },
+              {
+                "byteIndex": 3,
+                "min": 170,
+                "max": 170,
+                "uniqueValues": [
+                  170
+                ],
+                "role": "static",
+                "staticValue": 170,
+                "isCounter": false,
+                "rolloverDetected": false,
+                "isLoopingCounter": false,
+                "isSensor": false
+              }
+            ],
+            "multiBytePatterns": [],
+            "notes": [
+              "Static: byte[3]=0xAA",
+              "Counter byte[2]: inc, step=1"
+            ]
+          },
+          {
+            "muxValue": 770,
+            "sampleCount": 5,
+            "byteStats": [
+              {
+                "byteIndex": 2,
+                "min": 0,
+                "max": 4,
+                "uniqueValues": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4
+                ],
+                "role": "counter",
+                "isCounter": true,
+                "counterDirection": "up",
+                "counterStep": 1,
+                "rolloverDetected": false,
+                "isLoopingCounter": false,
+                "isSensor": false
+              },
+              {
+                "byteIndex": 3,
+                "min": 170,
+                "max": 170,
+                "uniqueValues": [
+                  170
+                ],
+                "role": "static",
+                "staticValue": 170,
+                "isCounter": false,
+                "rolloverDetected": false,
+                "isLoopingCounter": false,
+                "isSensor": false
+              }
+            ],
+            "multiBytePatterns": [],
+            "notes": [
+              "Static: byte[3]=0xAA",
+              "Counter byte[2]: inc, step=1"
+            ]
+          },
+          {
+            "muxValue": 771,
+            "sampleCount": 5,
+            "byteStats": [
+              {
+                "byteIndex": 2,
+                "min": 0,
+                "max": 4,
+                "uniqueValues": [
+                  0,
+                  1,
+                  2,
+                  3,
+                  4
+                ],
+                "role": "counter",
+                "isCounter": true,
+                "counterDirection": "up",
+                "counterStep": 1,
+                "rolloverDetected": false,
+                "isLoopingCounter": false,
+                "isSensor": false
+              },
+              {
+                "byteIndex": 3,
+                "min": 170,
+                "max": 170,
+                "uniqueValues": [
+                  170
+                ],
+                "role": "static",
+                "staticValue": 170,
+                "isCounter": false,
+                "rolloverDetected": false,
+                "isLoopingCounter": false,
+                "isSensor": false
+              }
+            ],
+            "multiBytePatterns": [],
+            "notes": [
+              "Static: byte[3]=0xAA",
+              "Counter byte[2]: inc, step=1"
+            ]
+          }
+        ],
+        "hasVaryingLength": false,
+        "isIdentical": false
+      },
+      "mux": {
+        "selectorByte": -1,
+        "selectorValues": [
+          257,
+          258,
+          259,
+          513,
+          514,
+          515,
+          769,
+          770,
+          771
+        ],
+        "isTwoByte": true,
+        "occurrencesPerValue": {
+          "257": 5,
+          "258": 5,
+          "259": 5,
+          "513": 5,
+          "514": 5,
+          "515": 5,
+          "769": 5,
+          "770": 5,
+          "771": 5
+        }
+      }
+    },
+    "rust": {
+      "bytes": [
+        {
+          "changes": 14,
+          "distinct": 3,
+          "index": 0,
+          "max": 3,
+          "min": 1,
+          "role": "sensor"
+        },
+        {
+          "changes": 44,
+          "distinct": 3,
+          "index": 1,
+          "max": 3,
+          "min": 1,
+          "role": "sensor"
+        },
+        {
+          "changes": 4,
+          "distinct": 5,
+          "index": 2,
+          "max": 4,
+          "min": 0,
+          "role": "sensor"
+        },
+        {
+          "changes": 0,
+          "distinct": 1,
+          "index": 3,
+          "max": 170,
+          "min": 170,
+          "role": "static"
+        }
+      ],
+      "max_len": 4
+    }
+  },
+  {
+    "name": "mux_rejected_sparse",
+    "ts": {
+      "analysis": {
+        "frameId": 0,
+        "sampleCount": 20,
+        "byteStats": [
+          {
+            "byteIndex": 0,
+            "min": 0,
+            "max": 10,
+            "uniqueValues": [
+              0,
+              10
+            ],
+            "role": "value",
+            "isCounter": false,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": false
+          },
+          {
+            "byteIndex": 1,
+            "min": 0,
+            "max": 19,
+            "uniqueValues": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12,
+              13,
+              14,
+              15,
+              16,
+              17,
+              18,
+              19
+            ],
+            "role": "counter",
+            "isCounter": true,
+            "counterDirection": "up",
+            "counterStep": 1,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": false
+          },
+          {
+            "byteIndex": 2,
+            "min": 51,
+            "max": 51,
+            "uniqueValues": [
+              51
+            ],
+            "role": "static",
+            "staticValue": 51,
+            "isCounter": false,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": false
+          }
+        ],
+        "multiBytePatterns": [],
+        "notes": [
+          "Static bytes: byte[2]=0x33",
+          "Counter at byte[1]: incrementing, step=1"
+        ],
+        "analyzedFromByte": 0,
+        "analyzedToByteExclusive": 3,
+        "isBurstFrame": false,
+        "isMuxFrame": false,
+        "hasVaryingLength": false,
+        "isIdentical": false
+      },
+      "mux": null
+    },
+    "rust": {
+      "bytes": [
+        {
+          "changes": 19,
+          "distinct": 2,
+          "index": 0,
+          "max": 10,
+          "min": 0,
+          "role": "sensor"
+        },
+        {
+          "changes": 19,
+          "distinct": 20,
+          "index": 1,
+          "max": 19,
+          "min": 0,
+          "role": "counter"
+        },
+        {
+          "changes": 0,
+          "distinct": 1,
+          "index": 2,
+          "max": 51,
+          "min": 51,
+          "role": "static"
+        }
+      ],
+      "max_len": 3
+    }
+  },
+  {
+    "name": "mux_rejected_unbalanced",
+    "ts": {
+      "analysis": {
+        "frameId": 0,
+        "sampleCount": 24,
+        "byteStats": [
+          {
+            "byteIndex": 0,
+            "min": 0,
+            "max": 2,
+            "uniqueValues": [
+              0,
+              1,
+              2
+            ],
+            "role": "sensor",
+            "isCounter": false,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": true,
+            "sensorTrend": "increasing",
+            "trendStrength": 1
+          },
+          {
+            "byteIndex": 1,
+            "min": 0,
+            "max": 23,
+            "uniqueValues": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12,
+              13,
+              14,
+              15,
+              16,
+              17,
+              18,
+              19,
+              20,
+              21,
+              22,
+              23
+            ],
+            "role": "counter",
+            "isCounter": true,
+            "counterDirection": "up",
+            "counterStep": 1,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": false
+          },
+          {
+            "byteIndex": 2,
+            "min": 51,
+            "max": 51,
+            "uniqueValues": [
+              51
+            ],
+            "role": "static",
+            "staticValue": 51,
+            "isCounter": false,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": false
+          }
+        ],
+        "multiBytePatterns": [
+          {
+            "startByte": 0,
+            "length": 2,
+            "pattern": "counter16",
+            "endianness": "little",
+            "rolloverDetected": false
+          }
+        ],
+        "notes": [
+          "Little-endian (inferred from 1 multi-byte pattern(s))",
+          "Static bytes: byte[2]=0x33",
+          "16-bit counter at byte[0:1], little endian"
+        ],
+        "analyzedFromByte": 0,
+        "analyzedToByteExclusive": 3,
+        "isBurstFrame": false,
+        "isMuxFrame": false,
+        "hasVaryingLength": false,
+        "isIdentical": false,
+        "inferredEndianness": "little"
+      },
+      "mux": null
+    },
+    "rust": {
+      "bytes": [
+        {
+          "changes": 2,
+          "distinct": 3,
+          "index": 0,
+          "max": 2,
+          "min": 0,
+          "role": "sensor"
+        },
+        {
+          "changes": 23,
+          "distinct": 24,
+          "index": 1,
+          "max": 23,
+          "min": 0,
+          "role": "counter"
+        },
+        {
+          "changes": 0,
+          "distinct": 1,
+          "index": 2,
+          "max": 51,
+          "min": 51,
+          "role": "static"
+        }
+      ],
+      "max_len": 3
+    }
+  },
+  {
+    "name": "empty",
+    "ts": {
+      "analysis": {
+        "frameId": 0,
+        "sampleCount": 0,
+        "byteStats": [],
+        "multiBytePatterns": [],
+        "notes": [
+          "No frames to analyze"
+        ],
+        "analyzedFromByte": 0,
+        "analyzedToByteExclusive": 0,
+        "isBurstFrame": false,
+        "isMuxFrame": false
+      },
+      "mux": null
+    },
+    "rust": {
+      "bytes": [],
+      "max_len": 0
+    }
+  },
+  {
+    "name": "one_sample",
+    "ts": {
+      "analysis": {
+        "frameId": 0,
+        "sampleCount": 1,
+        "byteStats": [
+          {
+            "byteIndex": 0,
+            "min": 192,
+            "max": 192,
+            "uniqueValues": [
+              192
+            ],
+            "role": "static",
+            "staticValue": 192,
+            "isCounter": false,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": false
+          },
+          {
+            "byteIndex": 1,
+            "min": 1,
+            "max": 1,
+            "uniqueValues": [
+              1
+            ],
+            "role": "static",
+            "staticValue": 1,
+            "isCounter": false,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": false
+          },
+          {
+            "byteIndex": 2,
+            "min": 2,
+            "max": 2,
+            "uniqueValues": [
+              2
+            ],
+            "role": "static",
+            "staticValue": 2,
+            "isCounter": false,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": false
+          }
+        ],
+        "multiBytePatterns": [],
+        "notes": [
+          "Static bytes: byte[0]=0xC0, byte[1]=0x01, byte[2]=0x02"
+        ],
+        "analyzedFromByte": 0,
+        "analyzedToByteExclusive": 3,
+        "isBurstFrame": false,
+        "isMuxFrame": false,
+        "hasVaryingLength": false,
+        "isIdentical": false
+      },
+      "mux": null
+    },
+    "rust": {
+      "bytes": [
+        {
+          "changes": 0,
+          "distinct": 1,
+          "index": 0,
+          "max": 192,
+          "min": 192,
+          "role": "static"
+        },
+        {
+          "changes": 0,
+          "distinct": 1,
+          "index": 1,
+          "max": 1,
+          "min": 1,
+          "role": "static"
+        },
+        {
+          "changes": 0,
+          "distinct": 1,
+          "index": 2,
+          "max": 2,
+          "min": 2,
+          "role": "static"
+        }
+      ],
+      "max_len": 3
+    }
+  },
+  {
+    "name": "two_samples",
+    "ts": {
+      "analysis": {
+        "frameId": 0,
+        "sampleCount": 2,
+        "byteStats": [
+          {
+            "byteIndex": 0,
+            "min": 192,
+            "max": 192,
+            "uniqueValues": [
+              192
+            ],
+            "role": "static",
+            "staticValue": 192,
+            "isCounter": false,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": false
+          },
+          {
+            "byteIndex": 1,
+            "min": 1,
+            "max": 2,
+            "uniqueValues": [
+              1,
+              2
+            ],
+            "role": "value",
+            "isCounter": false,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": false
+          },
+          {
+            "byteIndex": 2,
+            "min": 2,
+            "max": 2,
+            "uniqueValues": [
+              2
+            ],
+            "role": "static",
+            "staticValue": 2,
+            "isCounter": false,
+            "rolloverDetected": false,
+            "isLoopingCounter": false,
+            "isSensor": false
+          }
+        ],
+        "multiBytePatterns": [],
+        "notes": [
+          "Static bytes: byte[0]=0xC0, byte[2]=0x02",
+          "1 byte(s) with varying values detected"
+        ],
+        "analyzedFromByte": 0,
+        "analyzedToByteExclusive": 3,
+        "isBurstFrame": false,
+        "isMuxFrame": false,
+        "hasVaryingLength": false,
+        "isIdentical": false
+      },
+      "mux": null
+    },
+    "rust": {
+      "bytes": [
+        {
+          "changes": 0,
+          "distinct": 1,
+          "index": 0,
+          "max": 192,
+          "min": 192,
+          "role": "static"
+        },
+        {
+          "changes": 1,
+          "distinct": 2,
+          "index": 1,
+          "max": 2,
+          "min": 1,
+          "role": "counter"
+        },
+        {
+          "changes": 0,
+          "distinct": 1,
+          "index": 2,
+          "max": 2,
+          "min": 2,
+          "role": "static"
+        }
+      ],
+      "max_len": 3
+    }
+  },
+  {
+    "name": "twc_sources_1",
+    "ts": {
+      "structure": {
+        "frameCount": 60,
+        "minLength": 13,
+        "maxLength": 13,
+        "hasVaryingLength": false,
+        "candidateIdGroups": [
+          {
+            "startByte": 0,
+            "length": 1,
+            "uniqueValues": [
+              251,
+              252,
+              253
+            ],
+            "sampleCount": 60,
+            "confidence": 97.5,
+            "notes": [
+              "Contains common protocol markers (0xFB-0xFE)"
+            ]
+          },
+          {
+            "startByte": 0,
+            "length": 2,
+            "uniqueValues": [
+              64480,
+              64737,
+              64994
+            ],
+            "sampleCount": 60,
+            "confidence": 80,
+            "notes": [
+              "First byte has only 3 values (type + subtype pattern)"
+            ]
+          },
+          {
+            "startByte": 1,
+            "length": 1,
+            "uniqueValues": [
+              224,
+              225,
+              226
+            ],
+            "sampleCount": 60,
+            "confidence": 80,
+            "notes": []
+          },
+          {
+            "startByte": 1,
+            "length": 2,
+            "uniqueValues": [
+              57463,
+              57719,
+              57975
+            ],
+            "sampleCount": 60,
+            "confidence": 70,
+            "notes": [
+              "First byte has only 3 values (type + subtype pattern)"
+            ]
+          },
+          {
+            "startByte": 3,
+            "length": 2,
+            "uniqueValues": [
+              30470,
+              30471,
+              30474,
+              30477,
+              30480,
+              30482,
+              30486,
+              30497,
+              30502,
+              30508,
+              30511,
+              30514,
+              30517,
+              30520,
+              30538,
+              30545,
+              30547,
+              30549,
+              30554,
+              30559,
+              30565,
+              30566,
+              30583,
+              30586,
+              30587,
+              30592,
+              30593,
+              30602,
+              30606,
+              30613,
+              30618,
+              30625,
+              30626,
+              30627,
+              30628,
+              30634,
+              30636,
+              30637,
+              30642,
+              30648,
+              30649,
+              30657,
+              30662,
+              30663,
+              30665,
+              30676,
+              30678,
+              30689,
+              30690,
+              30691,
+              30692,
+              30693,
+              30701,
+              30705,
+              30708,
+              30710,
+              30716
+            ],
+            "sampleCount": 60,
+            "confidence": 50,
+            "notes": [
+              "First byte has only 1 values (type + subtype pattern)"
+            ]
+          }
+        ],
+        "candidateSourceAddresses": [
+          {
+            "startByte": 1,
+            "length": 2,
+            "uniqueValues": [
+              57463,
+              57719,
+              57975
+            ],
+            "sampleCount": 60,
+            "confidence": 80,
+            "notes": [
+              "3 unique 16-bit addresses (strong pattern)",
+              "Even distribution",
+              "No zero address"
+            ]
+          },
+          {
+            "startByte": 1,
+            "length": 1,
+            "uniqueValues": [
+              224,
+              225,
+              226
+            ],
+            "sampleCount": 60,
+            "confidence": 70,
+            "notes": [
+              "3 unique addresses (typical device count)",
+              "Even distribution across addresses",
+              "No zero address (typical for device IDs)"
+            ]
+          }
+        ],
+        "notes": [
+          "Fixed length: 13 bytes",
+          "Best ID candidate: byte [0] with 3 distinct values",
+          "Best source address candidate: bytes [1:2] with 3 distinct values"
+        ]
+      }
+    },
+    "rust": null
+  },
+  {
+    "name": "twc_sources_2",
+    "ts": {
+      "structure": {
+        "frameCount": 60,
+        "minLength": 13,
+        "maxLength": 13,
+        "hasVaryingLength": false,
+        "candidateIdGroups": [
+          {
+            "startByte": 0,
+            "length": 1,
+            "uniqueValues": [
+              251,
+              252,
+              253
+            ],
+            "sampleCount": 60,
+            "confidence": 97.5,
+            "notes": [
+              "Contains common protocol markers (0xFB-0xFE)"
+            ]
+          },
+          {
+            "startByte": 1,
+            "length": 2,
+            "uniqueValues": [
+              57463,
+              57484,
+              57719,
+              57740,
+              57975,
+              57996
+            ],
+            "sampleCount": 60,
+            "confidence": 85,
+            "notes": [
+              "First byte has only 3 values (type + subtype pattern)"
+            ]
+          },
+          {
+            "startByte": 0,
+            "length": 2,
+            "uniqueValues": [
+              64480,
+              64737,
+              64994
+            ],
+            "sampleCount": 60,
+            "confidence": 80,
+            "notes": [
+              "First byte has only 3 values (type + subtype pattern)"
+            ]
+          },
+          {
+            "startByte": 1,
+            "length": 1,
+            "uniqueValues": [
+              224,
+              225,
+              226
+            ],
+            "sampleCount": 60,
+            "confidence": 80,
+            "notes": []
+          },
+          {
+            "startByte": 2,
+            "length": 2,
+            "uniqueValues": [
+              30583,
+              35870
+            ],
+            "sampleCount": 60,
+            "confidence": 60,
+            "notes": [
+              "First byte has only 2 values (type + subtype pattern)"
+            ]
+          },
+          {
+            "startByte": 2,
+            "length": 1,
+            "uniqueValues": [
+              119,
+              140
+            ],
+            "sampleCount": 60,
+            "confidence": 55,
+            "notes": []
+          },
+          {
+            "startByte": 3,
+            "length": 2,
+            "uniqueValues": [
+              7686,
+              7719,
+              7722,
+              7727,
+              7733,
+              7736,
+              7737,
+              7768,
+              7783,
+              7791,
+              7806,
+              7809,
+              7811,
+              7817,
+              7822,
+              7823,
+              7826,
+              7837,
+              7857,
+              7865,
+              7885,
+              7888,
+              7891,
+              7897,
+              7900,
+              7902,
+              7927,
+              7932,
+              30465,
+              30466,
+              30469,
+              30486,
+              30504,
+              30532,
+              30537,
+              30542,
+              30545,
+              30547,
+              30550,
+              30559,
+              30571,
+              30573,
+              30576,
+              30594,
+              30600,
+              30606,
+              30609,
+              30622,
+              30640,
+              30645,
+              30663,
+              30681,
+              30684,
+              30685,
+              30690,
+              30700,
+              30705,
+              30714
+            ],
+            "sampleCount": 60,
+            "confidence": 50,
+            "notes": [
+              "First byte has only 2 values (type + subtype pattern)"
+            ]
+          },
+          {
+            "startByte": 3,
+            "length": 1,
+            "uniqueValues": [
+              30,
+              119
+            ],
+            "sampleCount": 60,
+            "confidence": 45,
+            "notes": []
+          }
+        ],
+        "candidateSourceAddresses": [
+          {
+            "startByte": 1,
+            "length": 2,
+            "uniqueValues": [
+              57463,
+              57484,
+              57719,
+              57740,
+              57975,
+              57996
+            ],
+            "sampleCount": 60,
+            "confidence": 80,
+            "notes": [
+              "6 unique 16-bit addresses (strong pattern)",
+              "Even distribution",
+              "No zero address"
+            ]
+          },
+          {
+            "startByte": 2,
+            "length": 2,
+            "uniqueValues": [
+              30583,
+              35870
+            ],
+            "sampleCount": 60,
+            "confidence": 80,
+            "notes": [
+              "2 unique 16-bit addresses (strong pattern)",
+              "Even distribution",
+              "No zero address"
+            ]
+          },
+          {
+            "startByte": 1,
+            "length": 1,
+            "uniqueValues": [
+              224,
+              225,
+              226
+            ],
+            "sampleCount": 60,
+            "confidence": 70,
+            "notes": [
+              "3 unique addresses (typical device count)",
+              "Even distribution across addresses",
+              "No zero address (typical for device IDs)"
+            ]
+          },
+          {
+            "startByte": 2,
+            "length": 1,
+            "uniqueValues": [
+              119,
+              140
+            ],
+            "sampleCount": 60,
+            "confidence": 70,
+            "notes": [
+              "2 unique addresses (typical device count)",
+              "Even distribution across addresses",
+              "No zero address (typical for device IDs)"
+            ]
+          },
+          {
+            "startByte": 3,
+            "length": 1,
+            "uniqueValues": [
+              30,
+              119
+            ],
+            "sampleCount": 60,
+            "confidence": 70,
+            "notes": [
+              "2 unique addresses (typical device count)",
+              "Even distribution across addresses",
+              "No zero address (typical for device IDs)"
+            ]
+          }
+        ],
+        "notes": [
+          "Fixed length: 13 bytes",
+          "Best ID candidate: byte [0] with 3 distinct values",
+          "Best source address candidate: bytes [1:2] with 6 distinct values"
+        ]
+      }
+    },
+    "rust": null
+  },
+  {
+    "name": "twc_sources_3",
+    "ts": {
+      "structure": {
+        "frameCount": 60,
+        "minLength": 13,
+        "maxLength": 13,
+        "hasVaryingLength": false,
+        "candidateIdGroups": [
+          {
+            "startByte": 0,
+            "length": 1,
+            "uniqueValues": [
+              251,
+              252,
+              253
+            ],
+            "sampleCount": 60,
+            "confidence": 97.5,
+            "notes": [
+              "Contains common protocol markers (0xFB-0xFE)"
+            ]
+          },
+          {
+            "startByte": 1,
+            "length": 2,
+            "uniqueValues": [
+              57386,
+              57463,
+              57484,
+              57642,
+              57719,
+              57740,
+              57898,
+              57975,
+              57996
+            ],
+            "sampleCount": 60,
+            "confidence": 85,
+            "notes": [
+              "First byte has only 3 values (type + subtype pattern)"
+            ]
+          },
+          {
+            "startByte": 0,
+            "length": 2,
+            "uniqueValues": [
+              64480,
+              64737,
+              64994
+            ],
+            "sampleCount": 60,
+            "confidence": 80,
+            "notes": [
+              "First byte has only 3 values (type + subtype pattern)"
+            ]
+          },
+          {
+            "startByte": 1,
+            "length": 1,
+            "uniqueValues": [
+              224,
+              225,
+              226
+            ],
+            "sampleCount": 60,
+            "confidence": 80,
+            "notes": []
+          },
+          {
+            "startByte": 2,
+            "length": 1,
+            "uniqueValues": [
+              42,
+              119,
+              140
+            ],
+            "sampleCount": 60,
+            "confidence": 70,
+            "notes": []
+          },
+          {
+            "startByte": 2,
+            "length": 2,
+            "uniqueValues": [
+              10827,
+              30583,
+              35870
+            ],
+            "sampleCount": 60,
+            "confidence": 60,
+            "notes": [
+              "First byte has only 3 values (type + subtype pattern)"
+            ]
+          },
+          {
+            "startByte": 3,
+            "length": 1,
+            "uniqueValues": [
+              30,
+              75,
+              119
+            ],
+            "sampleCount": 60,
+            "confidence": 60,
+            "notes": []
+          },
+          {
+            "startByte": 3,
+            "length": 2,
+            "uniqueValues": [
+              7688,
+              7696,
+              7727,
+              7728,
+              7747,
+              7753,
+              7761,
+              7775,
+              7809,
+              7833,
+              7885,
+              7888,
+              7890,
+              7904,
+              7908,
+              7909,
+              7914,
+              7915,
+              7933,
+              19206,
+              19241,
+              19246,
+              19248,
+              19292,
+              19294,
+              19310,
+              19316,
+              19322,
+              19327,
+              19333,
+              19344,
+              19356,
+              19375,
+              19386,
+              19401,
+              19408,
+              19416,
+              30474,
+              30481,
+              30537,
+              30544,
+              30554,
+              30568,
+              30572,
+              30574,
+              30584,
+              30627,
+              30640,
+              30643,
+              30651,
+              30660,
+              30665,
+              30668,
+              30679,
+              30694,
+              30715
+            ],
+            "sampleCount": 60,
+            "confidence": 50,
+            "notes": [
+              "First byte has only 3 values (type + subtype pattern)"
+            ]
+          }
+        ],
+        "candidateSourceAddresses": [
+          {
+            "startByte": 1,
+            "length": 2,
+            "uniqueValues": [
+              57386,
+              57463,
+              57484,
+              57642,
+              57719,
+              57740,
+              57898,
+              57975,
+              57996
+            ],
+            "sampleCount": 60,
+            "confidence": 80,
+            "notes": [
+              "9 unique 16-bit addresses (strong pattern)",
+              "Even distribution",
+              "No zero address"
+            ]
+          },
+          {
+            "startByte": 2,
+            "length": 2,
+            "uniqueValues": [
+              10827,
+              30583,
+              35870
+            ],
+            "sampleCount": 60,
+            "confidence": 80,
+            "notes": [
+              "3 unique 16-bit addresses (strong pattern)",
+              "Even distribution",
+              "No zero address"
+            ]
+          },
+          {
+            "startByte": 1,
+            "length": 1,
+            "uniqueValues": [
+              224,
+              225,
+              226
+            ],
+            "sampleCount": 60,
+            "confidence": 70,
+            "notes": [
+              "3 unique addresses (typical device count)",
+              "Even distribution across addresses",
+              "No zero address (typical for device IDs)"
+            ]
+          },
+          {
+            "startByte": 2,
+            "length": 1,
+            "uniqueValues": [
+              42,
+              119,
+              140
+            ],
+            "sampleCount": 60,
+            "confidence": 70,
+            "notes": [
+              "3 unique addresses (typical device count)",
+              "Even distribution across addresses",
+              "No zero address (typical for device IDs)"
+            ]
+          },
+          {
+            "startByte": 3,
+            "length": 1,
+            "uniqueValues": [
+              30,
+              75,
+              119
+            ],
+            "sampleCount": 60,
+            "confidence": 70,
+            "notes": [
+              "3 unique addresses (typical device count)",
+              "Even distribution across addresses",
+              "No zero address (typical for device IDs)"
+            ]
+          }
+        ],
+        "notes": [
+          "Fixed length: 13 bytes",
+          "Best ID candidate: byte [0] with 3 distinct values",
+          "Best source address candidate: bytes [1:2] with 9 distinct values"
+        ]
+      }
+    },
+    "rust": null
+  },
+  {
+    "name": "twc_sources_4",
+    "ts": {
+      "structure": {
+        "frameCount": 60,
+        "minLength": 13,
+        "maxLength": 13,
+        "hasVaryingLength": false,
+        "candidateIdGroups": [
+          {
+            "startByte": 0,
+            "length": 1,
+            "uniqueValues": [
+              251,
+              252,
+              253
+            ],
+            "sampleCount": 60,
+            "confidence": 97.5,
+            "notes": [
+              "Contains common protocol markers (0xFB-0xFE)"
+            ]
+          },
+          {
+            "startByte": 1,
+            "length": 2,
+            "uniqueValues": [
+              57349,
+              57386,
+              57463,
+              57484,
+              57605,
+              57642,
+              57719,
+              57740,
+              57861,
+              57898,
+              57975,
+              57996
+            ],
+            "sampleCount": 60,
+            "confidence": 85,
+            "notes": [
+              "First byte has only 3 values (type + subtype pattern)"
+            ]
+          },
+          {
+            "startByte": 0,
+            "length": 2,
+            "uniqueValues": [
+              64480,
+              64737,
+              64994
+            ],
+            "sampleCount": 60,
+            "confidence": 80,
+            "notes": [
+              "First byte has only 3 values (type + subtype pattern)"
+            ]
+          },
+          {
+            "startByte": 1,
+            "length": 1,
+            "uniqueValues": [
+              224,
+              225,
+              226
+            ],
+            "sampleCount": 60,
+            "confidence": 80,
+            "notes": []
+          },
+          {
+            "startByte": 2,
+            "length": 1,
+            "uniqueValues": [
+              5,
+              42,
+              119,
+              140
+            ],
+            "sampleCount": 60,
+            "confidence": 75,
+            "notes": [
+              "Contains small sequential values (likely command IDs)"
+            ]
+          },
+          {
+            "startByte": 2,
+            "length": 2,
+            "uniqueValues": [
+              1305,
+              10827,
+              30583,
+              35870
+            ],
+            "sampleCount": 60,
+            "confidence": 60,
+            "notes": [
+              "First byte has only 4 values (type + subtype pattern)"
+            ]
+          },
+          {
+            "startByte": 3,
+            "length": 1,
+            "uniqueValues": [
+              25,
+              30,
+              75,
+              119
+            ],
+            "sampleCount": 60,
+            "confidence": 60,
+            "notes": []
+          },
+          {
+            "startByte": 3,
+            "length": 2,
+            "uniqueValues": [
+              6408,
+              6431,
+              6452,
+              6463,
+              6480,
+              6512,
+              6513,
+              6519,
+              6521,
+              6531,
+              6550,
+              6583,
+              6622,
+              6625,
+              7725,
+              7726,
+              7738,
+              7752,
+              7753,
+              7767,
+              7810,
+              7817,
+              7831,
+              7848,
+              7849,
+              7879,
+              7891,
+              7903,
+              7918,
+              19239,
+              19248,
+              19251,
+              19266,
+              19272,
+              19302,
+              19309,
+              19329,
+              19345,
+              19353,
+              19389,
+              19432,
+              19434,
+              19444,
+              19445,
+              30468,
+              30487,
+              30501,
+              30532,
+              30546,
+              30550,
+              30566,
+              30612,
+              30613,
+              30617,
+              30665,
+              30682,
+              30690,
+              30706,
+              30708
+            ],
+            "sampleCount": 60,
+            "confidence": 50,
+            "notes": [
+              "First byte has only 4 values (type + subtype pattern)"
+            ]
+          }
+        ],
+        "candidateSourceAddresses": [
+          {
+            "startByte": 2,
+            "length": 2,
+            "uniqueValues": [
+              1305,
+              10827,
+              30583,
+              35870
+            ],
+            "sampleCount": 60,
+            "confidence": 80,
+            "notes": [
+              "4 unique 16-bit addresses (strong pattern)",
+              "Even distribution",
+              "No zero address"
+            ]
+          },
+          {
+            "startByte": 1,
+            "length": 1,
+            "uniqueValues": [
+              224,
+              225,
+              226
+            ],
+            "sampleCount": 60,
+            "confidence": 70,
+            "notes": [
+              "3 unique addresses (typical device count)",
+              "Even distribution across addresses",
+              "No zero address (typical for device IDs)"
+            ]
+          },
+          {
+            "startByte": 2,
+            "length": 1,
+            "uniqueValues": [
+              5,
+              42,
+              119,
+              140
+            ],
+            "sampleCount": 60,
+            "confidence": 70,
+            "notes": [
+              "4 unique addresses (typical device count)",
+              "Even distribution across addresses",
+              "No zero address (typical for device IDs)"
+            ]
+          },
+          {
+            "startByte": 3,
+            "length": 1,
+            "uniqueValues": [
+              25,
+              30,
+              75,
+              119
+            ],
+            "sampleCount": 60,
+            "confidence": 70,
+            "notes": [
+              "4 unique addresses (typical device count)",
+              "Even distribution across addresses",
+              "No zero address (typical for device IDs)"
+            ]
+          },
+          {
+            "startByte": 1,
+            "length": 2,
+            "uniqueValues": [
+              57349,
+              57386,
+              57463,
+              57484,
+              57605,
+              57642,
+              57719,
+              57740,
+              57861,
+              57898,
+              57975,
+              57996
+            ],
+            "sampleCount": 60,
+            "confidence": 55,
+            "notes": [
+              "12 unique 16-bit addresses",
+              "Even distribution"
+            ]
+          }
+        ],
+        "notes": [
+          "Fixed length: 13 bytes",
+          "Best ID candidate: byte [0] with 3 distinct values",
+          "Best source address candidate: bytes [2:3] with 4 distinct values"
+        ]
+      }
+    },
+    "rust": null
+  },
+  {
+    "name": "type_subtype",
+    "ts": {
+      "structure": {
+        "frameCount": 60,
+        "minLength": 8,
+        "maxLength": 8,
+        "hasVaryingLength": false,
+        "candidateIdGroups": [
+          {
+            "startByte": 0,
+            "length": 2,
+            "uniqueValues": [
+              4096,
+              4097,
+              4098,
+              4099,
+              4100,
+              4101,
+              4102,
+              4103,
+              4104,
+              4105,
+              4352,
+              4353,
+              4354,
+              4355,
+              4356,
+              4357,
+              4358,
+              4359,
+              4360,
+              4361
+            ],
+            "sampleCount": 60,
+            "confidence": 95,
+            "notes": [
+              "First byte has only 2 values (type + subtype pattern)"
+            ]
+          },
+          {
+            "startByte": 1,
+            "length": 1,
+            "uniqueValues": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9
+            ],
+            "sampleCount": 60,
+            "confidence": 85,
+            "notes": [
+              "Contains small sequential values (likely command IDs)"
+            ]
+          },
+          {
+            "startByte": 0,
+            "length": 1,
+            "uniqueValues": [
+              16,
+              17
+            ],
+            "sampleCount": 60,
+            "confidence": 80,
+            "notes": [
+              "Contains small sequential values (likely command IDs)"
+            ]
+          },
+          {
+            "startByte": 1,
+            "length": 2,
+            "uniqueValues": [
+              2,
+              24,
+              96,
+              152,
+              153,
+              211,
+              265,
+              279,
+              302,
+              335,
+              346,
+              445,
+              593,
+              669,
+              681,
+              713,
+              730,
+              770,
+              779,
+              802,
+              875,
+              955,
+              970,
+              1031,
+              1078,
+              1106,
+              1165,
+              1246,
+              1271,
+              1299,
+              1321,
+              1372,
+              1404,
+              1455,
+              1460,
+              1589,
+              1595,
+              1626,
+              1629,
+              1662,
+              1753,
+              1805,
+              1824,
+              1867,
+              1956,
+              1961,
+              2003,
+              2060,
+              2079,
+              2246,
+              2261,
+              2269,
+              2281,
+              2310,
+              2410,
+              2443,
+              2456,
+              2466,
+              2532
+            ],
+            "sampleCount": 60,
+            "confidence": 60,
+            "notes": []
+          },
+          {
+            "startByte": 2,
+            "length": 2,
+            "uniqueValues": [
+              593,
+              670,
+              1621,
+              1805,
+              2509,
+              3017,
+              3256,
+              3376,
+              4973,
+              6132,
+              6313,
+              8056,
+              8229,
+              8802,
+              10542,
+              11813,
+              13625,
+              13877,
+              15239,
+              19415,
+              20456,
+              20878,
+              21177,
+              23088,
+              23190,
+              23613,
+              23906,
+              24790,
+              27289,
+              27519,
+              31841,
+              32410,
+              35696,
+              36202,
+              38956,
+              38962,
+              39180,
+              40214,
+              40322,
+              41685,
+              42214,
+              43307,
+              43310,
+              45009,
+              46103,
+              47874,
+              48512,
+              50873,
+              51592,
+              51749,
+              54138,
+              54230,
+              54538,
+              55630,
+              55815,
+              56747,
+              56852,
+              58593,
+              59868,
+              63339
+            ],
+            "sampleCount": 60,
+            "confidence": 50,
+            "notes": []
+          },
+          {
+            "startByte": 3,
+            "length": 2,
+            "uniqueValues": [
+              616,
+              1907,
+              2619,
+              3214,
+              3542,
+              5139,
+              5677,
+              6034,
+              9656,
+              9709,
+              9727,
+              11177,
+              11365,
+              11875,
+              11904,
+              12319,
+              12508,
+              12918,
+              13604,
+              14601,
+              15658,
+              20200,
+              20743,
+              21803,
+              24931,
+              25224,
+              25299,
+              27168,
+              27589,
+              27985,
+              28785,
+              30725,
+              31346,
+              32756,
+              32878,
+              33496,
+              34606,
+              34847,
+              36453,
+              38400,
+              39371,
+              39462,
+              40604,
+              43271,
+              43869,
+              47320,
+              47417,
+              47512,
+              51672,
+              52507,
+              53530,
+              54620,
+              54948,
+              54990,
+              55141,
+              56570,
+              57620,
+              59001,
+              59500,
+              62624
+            ],
+            "sampleCount": 60,
+            "confidence": 40,
+            "notes": []
+          }
+        ],
+        "candidateSourceAddresses": [],
+        "notes": [
+          "Fixed length: 8 bytes",
+          "Best ID candidate: bytes [0:1] with 20 distinct values"
+        ]
+      }
+    },
+    "rust": null
+  },
+  {
+    "name": "two_byte_source_over_ff",
+    "ts": {
+      "structure": {
+        "frameCount": 60,
+        "minLength": 8,
+        "maxLength": 8,
+        "hasVaryingLength": false,
+        "candidateIdGroups": [
+          {
+            "startByte": 0,
+            "length": 1,
+            "uniqueValues": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "sampleCount": 60,
+            "confidence": 95,
+            "notes": [
+              "Contains small sequential values (likely command IDs)"
+            ]
+          },
+          {
+            "startByte": 0,
+            "length": 2,
+            "uniqueValues": [
+              257,
+              513,
+              769,
+              1025,
+              1281
+            ],
+            "sampleCount": 60,
+            "confidence": 95,
+            "notes": [
+              "First byte has only 5 values (type + subtype pattern)"
+            ]
+          },
+          {
+            "startByte": 2,
+            "length": 1,
+            "uniqueValues": [
+              1,
+              2,
+              3,
+              4
+            ],
+            "sampleCount": 60,
+            "confidence": 75,
+            "notes": [
+              "Contains small sequential values (likely command IDs)"
+            ]
+          },
+          {
+            "startByte": 1,
+            "length": 2,
+            "uniqueValues": [
+              257,
+              258,
+              259,
+              260
+            ],
+            "sampleCount": 60,
+            "confidence": 70,
+            "notes": [
+              "First byte has only 1 values (type + subtype pattern)"
+            ]
+          },
+          {
+            "startByte": 2,
+            "length": 2,
+            "uniqueValues": [
+              258,
+              266,
+              269,
+              285,
+              291,
+              302,
+              329,
+              344,
+              348,
+              373,
+              420,
+              445,
+              452,
+              481,
+              509,
+              526,
+              531,
+              551,
+              556,
+              585,
+              631,
+              632,
+              640,
+              643,
+              645,
+              647,
+              649,
+              679,
+              690,
+              741,
+              783,
+              841,
+              844,
+              852,
+              855,
+              869,
+              873,
+              882,
+              892,
+              896,
+              948,
+              983,
+              995,
+              1001,
+              1013,
+              1024,
+              1025,
+              1042,
+              1048,
+              1113,
+              1121,
+              1149,
+              1154,
+              1207,
+              1228,
+              1229,
+              1238,
+              1240,
+              1243,
+              1277
+            ],
+            "sampleCount": 60,
+            "confidence": 60,
+            "notes": [
+              "First byte has only 4 values (type + subtype pattern)"
+            ]
+          },
+          {
+            "startByte": 3,
+            "length": 2,
+            "uniqueValues": [
+              246,
+              335,
+              565,
+              2583,
+              3440,
+              3673,
+              4067,
+              4751,
+              5006,
+              6343,
+              7655,
+              9132,
+              10094,
+              11485,
+              11800,
+              18852,
+              18884,
+              18901,
+              19703,
+              21537,
+              22472,
+              22762,
+              22912,
+              23583,
+              24921,
+              25981,
+              27127,
+              29237,
+              30189,
+              30649,
+              30812,
+              31791,
+              32147,
+              32783,
+              32894,
+              33427,
+              33551,
+              34082,
+              34786,
+              35191,
+              42187,
+              42828,
+              45699,
+              46160,
+              46951,
+              48438,
+              50179,
+              52369,
+              52611,
+              55031,
+              55167,
+              55467,
+              56281,
+              57748,
+              58336,
+              58808,
+              59810,
+              62975,
+              64846,
+              64855
+            ],
+            "sampleCount": 60,
+            "confidence": 40,
+            "notes": []
+          }
+        ],
+        "candidateSourceAddresses": [
+          {
+            "startByte": 1,
+            "length": 2,
+            "uniqueValues": [
+              257,
+              258,
+              259,
+              260
+            ],
+            "sampleCount": 60,
+            "confidence": 95,
+            "notes": [
+              "4 unique 16-bit addresses (strong pattern)",
+              "12-bit address range",
+              "Even distribution",
+              "No zero address"
+            ]
+          },
+          {
+            "startByte": 2,
+            "length": 1,
+            "uniqueValues": [
+              1,
+              2,
+              3,
+              4
+            ],
+            "sampleCount": 60,
+            "confidence": 85,
+            "notes": [
+              "4 unique addresses (typical device count)",
+              "Even distribution across addresses",
+              "Small address values (0x00-0x20)",
+              "No zero address (typical for device IDs)"
+            ]
+          }
+        ],
+        "notes": [
+          "Fixed length: 8 bytes",
+          "Best ID candidate: byte [0] with 5 distinct values",
+          "Best source address candidate: bytes [1:2] with 4 distinct values"
+        ]
+      }
+    },
+    "rust": null
+  }
+]

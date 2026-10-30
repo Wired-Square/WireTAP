@@ -16,7 +16,6 @@ matchRate: number,
  */
 confidence: number, notes: Array<ChecksumNote>, 
 /**
- * Other calculation ranges that scored identically. Kept rather than
- * dropped, so a user who disagrees with the winner can see the alternatives.
+ * Other calculation ranges that scored identically.
  */
 equivalentRanges: Array<CalcRange>, };
