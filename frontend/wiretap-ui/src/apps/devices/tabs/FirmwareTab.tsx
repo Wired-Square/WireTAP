@@ -11,6 +11,7 @@ import { FolderOpen, HardDriveUpload, ListChecks, XCircle } from "lucide-react";
 import {
   labelSimple,
   textDanger,
+  textMuted,
   textPrimary,
   textSecondary,
   textSuccess,
@@ -260,15 +261,19 @@ export default function FirmwareTab({ deviceId, availableTransports }: Props) {
         {/* Action buttons */}
         <div className="flex items-center gap-2 pt-1">
           {running ? (
-            <DangerButton
-              onClick={handleCancel}
-              disabled={activating}
-              title={activating ? t("firmware.cancelPastActivation") : undefined}
-              className="min-w-40"
-            >
-              <XCircle className="w-4 h-4" />
-              {t("firmware.cancel")}
-            </DangerButton>
+            <>
+              <DangerButton
+                onClick={handleCancel}
+                disabled={activating}
+                className="min-w-40"
+              >
+                <XCircle className="w-4 h-4" />
+                {t("firmware.cancel")}
+              </DangerButton>
+              {activating && (
+                <span className={`text-xs ${textMuted}`}>{t("firmware.cancelPastActivation")}</span>
+              )}
+            </>
           ) : (
             <PrimaryButton
               onClick={handleStart}

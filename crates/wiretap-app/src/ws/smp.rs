@@ -22,13 +22,18 @@ use wslib_framelink::{ImageSlot as FlImageSlot, OtaEvent, OtaOptions, Transport}
 /// Set when an OTA is in flight; gates concurrent `ota_start` calls.
 static OTA_IN_FLIGHT: AtomicBool = AtomicBool::new(false);
 
-/// Clears `OTA_IN_FLIGHT` on drop. Holds the in-flight slot for the lifetime
-/// of the spawned pump task — even if the task panics or is dropped before
-/// completing, the slot is released.
+/// Set once the in-flight update reaches `Activating`, after which dropping
+/// its stream no longer cancels it.
+static OTA_ACTIVATING: AtomicBool = AtomicBool::new(false);
+
+/// Clears `OTA_IN_FLIGHT` and `OTA_ACTIVATING` on drop. Holds the in-flight
+/// slot for the lifetime of the spawned pump task — even if the task panics
+/// or is dropped before completing, the slot is released.
 struct InFlightGuard;
 
 impl Drop for InFlightGuard {
     fn drop(&mut self) {
+        OTA_ACTIVATING.store(false, Ordering::Release);
         OTA_IN_FLIGHT.store(false, Ordering::Release);
     }
 }
@@ -141,7 +146,7 @@ async fn ota_start(params: serde_json::Value) -> Result<serde_json::Value, Strin
     let id = resolve_device_id(&p.device_id, p.transport.into()).await?;
     let options = p
         .reconnect_timeout_secs
-        .map(|secs| OtaOptions { reconnect_timeout: Duration::from_secs(secs.into()) })
+        .map(|secs| OtaOptions::default().with_reconnect_timeout(Duration::from_secs(secs.into())))
         .unwrap_or_default();
     let discovery = discovery_handle().await?;
 
@@ -162,7 +167,10 @@ async fn ota_start(params: serde_json::Value) -> Result<serde_json::Value, Strin
                     break;
                 }
                 next = stream.next() => match next {
-                    Some(Ok(ev)) => send_ota_event(&serialise_event(&ev)),
+                    Some(Ok(ev)) => {
+                        note_stage(&ev);
+                        send_ota_event(&serialise_event(&ev));
+                    }
                     Some(Err(e)) => {
                         send_ota_event(&serde_json::json!({
                             "type": "Error",
@@ -182,7 +190,18 @@ async fn ota_start(params: serde_json::Value) -> Result<serde_json::Value, Strin
     Ok(serde_json::json!({}))
 }
 
+fn note_stage(ev: &OtaEvent) {
+    if matches!(ev, OtaEvent::Activating) {
+        OTA_ACTIVATING.store(true, Ordering::Release);
+    }
+}
+
 async fn ota_cancel() -> Result<serde_json::Value, String> {
+    if OTA_ACTIVATING.load(Ordering::Acquire) {
+        return Err("activation has started: the device will finish the update \
+                    or revert to its previous image on its own"
+            .into());
+    }
     OTA_CANCEL.notify_waiters();
     Ok(serde_json::json!({}))
 }
@@ -227,5 +246,22 @@ fn serialise_event(ev: &OtaEvent) -> serde_json::Value {
                 "event": serde_json::to_value(other).unwrap_or_default(),
             })
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn cancel_is_refused_from_activating_until_the_update_ends() {
+        let guard = InFlightGuard;
+        assert!(ota_cancel().await.is_ok());
+
+        note_stage(&OtaEvent::Activating);
+        assert!(ota_cancel().await.unwrap_err().contains("activation has started"));
+
+        drop(guard);
+        assert!(ota_cancel().await.is_ok());
     }
 }
