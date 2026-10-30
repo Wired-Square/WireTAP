@@ -79,10 +79,10 @@ wslib-db-sqlite = { version = "0.2.4", registry = "wired-square" }
 futures = "0.3"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 # The FrameLink protocol, board definitions and session: BLE scanning, mDNS
-# discovery and the WiFi-prov GATT service.
+# discovery, the WiFi-prov GATT service and SMP firmware upgrade.
 wslib-framelink-protocol = { version = "0.1", registry = "wired-square", features = ["ts"] }
 wslib-framelink-board = { version = "0.1", registry = "wired-square" }
-wslib-framelink = { version = "0.1", registry = "wired-square", features = ["discovery", "ble", "wifi-prov"] }
+wslib-framelink = { version = "0.1.1", registry = "wired-square", features = ["discovery", "ble", "wifi-prov", "smp"] }
 # The catalogue: parse, validate, decode, encode and DBC for CAN, Serial and Modbus.
 wslib-wiretap-catalogue = { version = "0.1", registry = "wired-square" }
 wslib-checksum = { version = "0.1", registry = "wired-square" }

@@ -222,7 +222,8 @@
       "confirmed": "✓ confirmed",
       "cancelled": "✗ cancelled",
       "complete": "✓ done",
-      "error": "✗ error: {{message}}"
+      "error": "✗ error: {{message}}",
+      "unknown": "? {{event}}"
     },
     "eta": {
       "unknown": "—",

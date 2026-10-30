@@ -187,7 +187,6 @@ pub fn canonical_device_id(device_id: String) -> DeviceId {
 ///    BLE and UDP).
 /// 3. Returns an error if nothing matches — the caller gets a clear
 ///    diagnostic rather than a silent wrong-id failure downstream.
-#[allow(dead_code)] // SMP's, until it moves onto wslib-mcumgr
 pub async fn resolve_device_id(
     raw: &str,
     transport: Transport,
