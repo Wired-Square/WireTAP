@@ -10,7 +10,7 @@ use tokio_util::sync::CancellationToken;
 
 use super::convert_stream_frame;
 use super::shared;
-use framelink::protocol::types::{IFACE_CAN, IFACE_CANFD, IFACE_RS232, IFACE_RS485};
+use wslib_framelink_protocol::types::{IFACE_CAN, IFACE_CANFD, IFACE_RS232, IFACE_RS485};
 
 use crate::io::error::IoError;
 use crate::io::bus_mapping::{reconcile_with_device, BusMapping};

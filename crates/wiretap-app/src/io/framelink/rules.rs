@@ -10,20 +10,20 @@ use serde_json::Value;
 
 use super::shared::{get_device_id, IntoStringErr};
 
-use framelink::protocol::bridge::{self, BridgeInfo};
-use framelink::protocol::dsig;
-use framelink::protocol::frame_def::{self, FrameDefInfo};
-use framelink::protocol::generator::{self, GeneratorInfo};
-use framelink::protocol::persist;
-use framelink::protocol::types::*;
-use framelink::protocol::xform::{self, SignalMapping, TransformerInfo, TransformParams};
+use wslib_framelink_protocol::bridge::{self, BridgeInfo};
+use wslib_framelink_protocol::dsig;
+use wslib_framelink_protocol::frame_def::{self, FrameDefInfo};
+use wslib_framelink_protocol::generator::{self, GeneratorInfo};
+use wslib_framelink_protocol::persist;
+use wslib_framelink_protocol::types::*;
+use wslib_framelink_protocol::xform::{self, SignalMapping, TransformerInfo, TransformParams};
 
-use framelink::board::{
+use wslib_framelink_board::{
     self as board_mod, ActivityTrigger, BoardDef, DiscoveredLed,
     INDICATOR_XFORM_ID_BASE,
 };
-use framelink::board::display::{resolve_frame_def_display, resolve_iface_display, resolve_signal_name};
-use framelink::board::editable::{EditableBoardDef, EditableSignal};
+use wslib_framelink_board::display::{resolve_frame_def_display, resolve_iface_display, resolve_signal_name};
+use wslib_framelink_board::editable::{EditableBoardDef, EditableSignal};
 
 use super::shared;
 
@@ -69,7 +69,7 @@ pub struct BridgeDescriptor {
     pub dest_interface_name: String,
     pub interface_type_name: String,
     pub enabled: bool,
-    #[cfg_attr(test, ts(type = r#""pass" | "block""#))]
+    #[cfg_attr(test, ts(inline))]
     pub default_action: bridge::BridgeDefaultAction,
     pub filters: Vec<BridgeFilterDescriptor>,
 }
@@ -77,9 +77,9 @@ pub struct BridgeDescriptor {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(test, derive(ts_rs::TS))]
 pub struct BridgeFilterDescriptor {
-    #[cfg_attr(test, ts(type = r#""mask" | "range""#))]
+    #[cfg_attr(test, ts(inline))]
     pub kind: bridge::BridgeFilterType,
-    #[cfg_attr(test, ts(type = r#""any" | "std" | "ext""#))]
+    #[cfg_attr(test, ts(inline))]
     pub ide: bridge::BridgeFilterIde,
     /// Mask: `can_id`. Range: inclusive `lo`.
     pub a: u32,
@@ -140,7 +140,7 @@ pub struct GeneratorDescriptor {
 /// Resolve a frame def signal's display name.
 /// Checks EditableBoardDef first (has user-edited names), then falls back to BoardDef.
 fn resolve_signal_from_editable(
-    sig: &framelink::protocol::frame_def::FrameSignalDef,
+    sig: &frame_def::FrameSignalDef,
     frame_def_id: u16,
     editable: Option<&EditableBoardDef>,
     board_def: Option<&BoardDef>,
@@ -166,10 +166,10 @@ fn frame_def_to_descriptor(
     editable: Option<&EditableBoardDef>,
 ) -> FrameDefDescriptor {
     let (can_id, dlc, extended) = match &info.header {
-        framelink::protocol::frame_def::FrameHeader::Can { can_id, dlc, flags } => {
-            (Some(*can_id), Some(*dlc), Some((*flags & 1) != 0))
+        frame_def::FrameHeader::Can { can_id, dlc, flags } => {
+            (Some(*can_id), Some(*dlc), Some(*flags & frame_def::CAN_FLAG_EXTENDED != 0))
         }
-        framelink::protocol::frame_def::FrameHeader::Rs485 { .. } => (None, None, None),
+        _ => (None, None, None),
     };
 
     let (name, description) = if let Some(ed) = editable {
@@ -241,6 +241,7 @@ fn mapping_to_descriptor(m: &SignalMapping) -> SignalMappingDescriptor {
         }
         TransformParams::Invert => ("invert".to_string(), None, None, None),
         TransformParams::Mask { mask: m } => ("mask".to_string(), None, None, Some(*m)),
+        _ => ("unknown".to_string(), None, None, None),
     };
     SignalMappingDescriptor {
         source_signal_id: m.source_signal_id,
@@ -366,7 +367,7 @@ fn parse_frame_def_info(v: &Value) -> Result<FrameDefInfo, String> {
         frame_def::FrameHeader::Can {
             can_id,
             dlc,
-            flags: if extended { 1 } else { 0 },
+            flags: if extended { frame_def::CAN_FLAG_EXTENDED } else { 0 },
         }
     };
 
@@ -643,7 +644,7 @@ async fn cmd_frame_def_add(params: Value) -> Result<Value, String> {
         .unwrap_or_default();
 
     if !signal_names.is_empty() {
-        use framelink::board::editable::EditableFrameSignal;
+        use wslib_framelink_board::editable::EditableFrameSignal;
 
         let frame_def_id = info.frame_def_id;
         let signals_from_ui: Vec<EditableFrameSignal> = info.signals.iter().zip(signal_names.iter())
@@ -899,7 +900,9 @@ async fn cmd_persist_save(params: Value) -> Result<Value, String> {
     // Step 4: Upload merged TOML to device
     if let Some(ref toml_str) = merged_toml {
         let conn = shared::get_connection(&device_id, timeout).await?;
-        framelink::board::transfer::upload_board_def(&conn.session, toml_str).await?;
+        wslib_framelink::board::upload_board_def(&conn.session, toml_str)
+            .await
+            .map_err(|e| e.to_string())?;
     }
 
     // Step 5: Merge pending on the real EditableBoardDef (clearing pending state)
@@ -1077,7 +1080,7 @@ async fn cmd_dsig_write(params: Value) -> Result<Value, String> {
 }
 
 // ============================================================================
-// Indicator discovery (delegates to framelink::board::discover_leds)
+// Indicator discovery (delegates to wslib_framelink_board::discover_leds)
 // ============================================================================
 
 async fn cmd_indicators_list(params: Value) -> Result<Value, String> {
@@ -1092,7 +1095,7 @@ async fn cmd_indicators_list(params: Value) -> Result<Value, String> {
     let board_def = shared::load_board_def(&device_id).await;
 
     // Discover LEDs using the library function
-    let mut indicators = framelink::board::discover_leds(&all_signals, board_def.as_ref());
+    let mut indicators = wslib_framelink_board::discover_leds(&all_signals, board_def.as_ref());
 
     // Build batch of signal reads — all sent pipelined, matching the TUI pattern
     let mut read_messages: Vec<(u8, u8, Vec<u8>)> = Vec::new();
@@ -1366,7 +1369,7 @@ async fn cmd_signals_selectable(params: Value) -> Result<Value, String> {
     let conn = shared::get_connection(&device_id, timeout).await?;
     let board_def = shared::load_board_def(&device_id).await;
     let signals =
-        framelink::board::selectable::list_selectable_signals(&conn.session, board_def.as_ref())
+        wslib_framelink::board::list_selectable_signals(&conn.session, board_def.as_ref())
             .await
             .map_err(|e| format!("Failed to list selectable signals: {e}"))?;
     serde_json::to_value(&signals).map_err(|e| e.to_string())
@@ -1410,8 +1413,8 @@ pub enum FrameLinkIdKind {
 fn next_id(used: &[u16], kind: FrameLinkIdKind) -> u16 {
     let used = used.iter().copied();
     match kind {
-        FrameLinkIdKind::Rule => framelink::protocol::next_free_id(used),
-        FrameLinkIdKind::Signal => framelink::protocol::next_free_id(used.chain([0])),
+        FrameLinkIdKind::Rule => wslib_framelink_protocol::next_free_id(used),
+        FrameLinkIdKind::Signal => wslib_framelink_protocol::next_free_id(used.chain([0])),
     }
 }
 

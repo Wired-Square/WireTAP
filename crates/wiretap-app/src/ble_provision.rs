@@ -1,7 +1,7 @@
 // BLE WiFi provisioning module
 //
-// Drives `framelink::WifiProvSession` handles vended by
-// `framelink::Discovery` (single source of truth for BLE connection
+// Drives `wslib_framelink::ble::wifi_prov::WifiProvSession` handles vended by
+// `wslib_framelink::Discovery` (single source of truth for BLE connection
 // state — see `device_scan` for the discovery handle). Each Tauri
 // command takes the target `device_id`, fetches the cached session
 // via `discovery.open_wifi_prov(&id)`, and runs the operation.
@@ -9,8 +9,9 @@
 // `device_scan` — there is no per-protocol `disconnect` here.
 
 use crate::device_scan::{canonical_device_id, device_scan_start, device_scan_stop, discovery_handle};
-use framelink::{
-    Discovery, ProvisioningEvent as FlProvisioningEvent, WifiCredentials as FlWifiCredentials,
+use wslib_framelink::Discovery;
+use wslib_framelink::ble::wifi_prov::{
+    ProvisioningEvent as FlProvisioningEvent, WifiCredentials as FlWifiCredentials,
     WifiProvSession, WifiSecurity, WifiStatus,
 };
 use futures::StreamExt;
@@ -74,17 +75,8 @@ static STATE: Lazy<Arc<Mutex<BleProvisionState>>> = Lazy::new(|| {
 // Helpers
 // ============================================================================
 
-fn wifi_status_byte(status: WifiStatus) -> u8 {
-    match status {
-        WifiStatus::Disconnected => 0,
-        WifiStatus::Connecting => 1,
-        WifiStatus::Connected => 2,
-        WifiStatus::Error => 3,
-    }
-}
-
 fn provisioning_status_payload(status: WifiStatus) -> ProvisioningStatus {
-    let code = wifi_status_byte(status);
+    let code = status as u8;
     let name = match code {
         0 => "disconnected",
         1 => "connecting",
@@ -180,7 +172,7 @@ pub async fn ble_read_device_state(device_id: String) -> Result<DeviceWifiState,
     Ok(DeviceWifiState {
         ssid: s.ssid,
         security: s.security.map(|sec| sec.byte()),
-        status: wifi_status_byte(s.status),
+        status: s.status as u8,
         ip_address: s.ip_address.map(|ip| ip.to_string()),
     })
 }
@@ -211,6 +203,7 @@ pub async fn ble_provision_wifi(
             Ok(FlProvisioningEvent::IpAddress { address }) => {
                 let _ = app.emit("ble-provision-ip", address.to_string());
             }
+            Ok(_) => {}
             Err(e) => {
                 return Err(format!("Provisioning failed: {e}"));
             }
@@ -244,6 +237,7 @@ pub async fn ble_subscribe_status(app: AppHandle, device_id: String) -> Result<(
                 Ok(FlProvisioningEvent::IpAddress { address }) => {
                     let _ = app_clone.emit("ble-provision-ip", address.to_string());
                 }
+                Ok(_) => {}
                 Err(e) => {
                     tlog!("[ble_provision] watch stream ended: {e}");
                     break;
