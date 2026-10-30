@@ -1,6 +1,6 @@
 // Copyright 2026 Wired Square Pty Ltd
 //
-// Signal identity-tuple axes, mirrored from framelink-rs `protocol::types`.
+// Signal identity-tuple axes, mirrored from `wslib_framelink_protocol::types`.
 // A device signal's control affordance is chosen from these structured codes
 // (role/quantity/aspect), never from its display name or unit string.
 

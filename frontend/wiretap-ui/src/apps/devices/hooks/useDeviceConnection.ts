@@ -1,7 +1,7 @@
 // ui/src/apps/devices/hooks/useDeviceConnection.ts
 //
 // Per-device-tab activation hooks. Each tab calls the matching
-// ensureXxx() on mount; framelink-rs's `Discovery` is the single
+// ensureXxx() on mount; wslib-framelink's `Discovery` is the single
 // source of truth for sessions, so these calls just warm its cache
 // (idempotent — repeat calls hand back the same session). Tear-down
 // is the unified `releaseDevice(deviceId)` exposed via
@@ -11,7 +11,7 @@
 // React 19 StrictMode invokes effects twice in development, so each
 // tab's useEffect calls ensureXxx() twice in quick succession. The
 // dedupe below collapses the duplicate so we don't fire two parallel
-// open requests at framelink-rs.
+// open requests at wslib-framelink.
 
 import { useCallback } from "react";
 import { useDevicesStore } from "../stores/devicesStore";
@@ -124,7 +124,7 @@ export function useDeviceConnection(): DeviceConnection {
       async () => {
         const { data } = useDevicesStore.getState();
 
-        // Single tear-down call per transport-id. framelink-rs drops
+        // Single tear-down call per transport-id. wslib-framelink drops
         // the cached sessions; the lease's strong count falls to zero
         // once any in-flight operation releases its local clone, which
         // is when the BLE link actually closes.

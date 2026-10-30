@@ -90,7 +90,6 @@ step "Frontend typecheck and tests"
 
 if $all; then
   # Built from the commit outside the checkout, so no local cargo override applies.
-  export CARGO_NET_GIT_FETCH_WITH_CLI=true
   unset CARGO_TARGET_DIR APPLE_ID APPLE_PASSWORD APPLE_API_KEY APPLE_INSTALLER_IDENTITY SENTRY_AUTH_TOKEN
   src=$(mktemp -d)
   trap 'rm -rf "$src"' EXIT

@@ -105,7 +105,7 @@ export default function DevicesScanView() {
     String(useSettingsStore.getState().general.smpPort),
   );
 
-  // Registered devices come from the framelink-rs registry — they exist
+  // Registered devices come from the wslib-framelink registry — they exist
   // independently of any live scan, so they're loaded directly and never
   // stale-pruned.
   const [registered, setRegistered] = useState<DeviceRegistryEntry[]>([]);

@@ -1,6 +1,6 @@
 // Copyright 2026 Wired Square Pty Ltd
 //
-// Device registry — WS command wrappers over the framelink-rs registry.
+// Device registry — WS command wrappers over the wslib-framelink registry.
 // The registry is the single source of truth for which devices exist and
 // how to reach them: `auto` resolves the address via mDNS at connect time,
 // `manual` always connects to a stored host and never discovers. This is
