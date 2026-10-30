@@ -219,7 +219,7 @@ export type TunnelTransaction = DecodedTunnelMessage & {
 /**
  * Mirror validation result for one mirror frame — the wire type verbatim.
  *
- * Computed in Rust (`wiretap_catalog::mirror::MirrorTracker`) and delivered on
+ * Computed in Rust (`wslib_wiretap_catalogue::mirror::MirrorTracker`) and delivered on
  * the DecodedSignals stream: the byte comparison, the fuzz window and the
  * mismatch latch all live there, so the frontend only stores what it is told.
  */

@@ -438,7 +438,7 @@ impl IoError {
 }
 
 // ============================================================================
-// From `wiretap_io`'s CAN, serial and TCP errors: the kind from the app's
+// From `wslib_can`, `wslib_serial` and `wslib_tcp` errors: the kind from the app's
 // taxonomy, the words as each was shown before.
 // ============================================================================
 

@@ -1,6 +1,6 @@
 // src/types/catalogModel.ts
 //
-// The `wiretap-catalog` model as `catalog.parse` serves it, generated from Rust.
+// The `wslib-wiretap-catalogue` model as `catalog.parse` serves it, generated from Rust.
 
 export type { Catalog } from "../generated/Catalog";
 export type { DisplayHint } from "../generated/DisplayHint";

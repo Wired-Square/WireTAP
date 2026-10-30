@@ -1,6 +1,6 @@
 // src/types/catalogEdit.ts
 //
-// The `wiretap-catalog` typed edit ops as `catalog.edits` and `catalog.build` read
+// The `wslib-wiretap-catalogue` typed edit ops as `catalog.edits` and `catalog.build` read
 // them, generated from Rust.
 
 export type { CanConfigFields } from "../generated/CanConfigFields";

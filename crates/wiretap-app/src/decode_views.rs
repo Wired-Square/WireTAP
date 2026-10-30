@@ -89,7 +89,7 @@ mod tests {
         serde_json::from_value(v.clone()).unwrap()
     }
 
-    /// wiretap-decode's D6 case 1, a 1B mid-* group naming the byte its value came from.
+    /// wslib-bits' D6 case 1, a 1B mid-* group naming the byte its value came from.
     const ONE_BYTE_MID: &[&str] = &[
         "1B mid-big 12 mixed",
         "1B mid-big 123456789abcdef0",

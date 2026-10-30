@@ -340,7 +340,7 @@ mod tests {
         assert!(probed_bus_count(Err(reset)).is_err());
     }
 
-    // --- a source on wiretap_io --------------------------------------------
+    // --- a source on wslib_can ---------------------------------------------
 
     const DEVICE: &str = "gvret_tcp(10.0.0.9:23)";
 

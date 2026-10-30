@@ -1,5 +1,5 @@
 {
-  "note": "Each CAN FD payload length. `ts`: offered by the FD length dropdown (CAN_FD_DLC_VALUES, generated from wiretap_protocol::FD_DLC_LEN). `rust`: a length wiretap_protocol::dlc carries exactly (dlc_to_len(len_to_dlc(len), true) == len).",
+  "note": "Each CAN FD payload length. `ts`: offered by the FD length dropdown (CAN_FD_DLC_VALUES, generated from wslib_can::FD_DLC_LEN). `rust`: a length wslib_can carries exactly (dlc_to_len(len_to_dlc(len), true) == len).",
   "rows": [
     {
       "length": 0,

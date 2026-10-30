@@ -55,7 +55,7 @@ export interface ValidationResult {
   errors: ValidationError[];
 }
 
-// ── Canonical catalogue API over the binary WebSocket (wiretap-catalog crate) ──
+// ── Canonical catalogue API over the binary WebSocket (wslib-wiretap-catalogue crate) ──
 // These route to the `catalog.*` command surface in crates/wiretap-app (dispatch_catalog_command);
 // the live decode they enable is pushed as DecodedSignals.
 
@@ -130,7 +130,7 @@ export async function validateChecksumWs(checksum: object): Promise<ValidationEr
 }
 
 /**
- * Apply one comment-/formatting-preserving edit in Rust (the `wiretap-catalog`
+ * Apply one comment-/formatting-preserving edit in Rust (the `wslib-wiretap-catalogue`
  * crate, via `toml_edit`) and return the new TOML. `op` is an `EditOp` payload
  * (see editorOps.ts); only the targeted entry changes, comments survive.
  */

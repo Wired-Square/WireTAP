@@ -8,7 +8,7 @@ one of them broadcast from address 0.
 
 Undeclared, the vendor messages do not merely fail to frame: the bytes they
 leave behind swallow the legitimate messages after them. Over the four cycles
-wiretap-catalog's `framing_detect` tests pin (`--start 8 --cycles 4`, 41
+wslib-wiretap-catalogue's `framing_detect` tests pin (`--start 8 --cycles 4`, 41
 messages) that is 14 framed out of 41. Declaring 0x20, 0x60 and 0x65 and
 allowing broadcast recovers all 41 — which is the thing worth seeing in the app.
 

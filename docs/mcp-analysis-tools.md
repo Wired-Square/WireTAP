@@ -308,7 +308,7 @@ through the capture tools.
 The Test Pattern app's runs, for an agent driving both ends of a link — an
 initiator on one host and a responder on another, each through its own MCP
 server. Thin wrappers over `io_test.rs`; the wire contract is
-`wiretap_protocol::testpattern`.
+`wslib_wiretap_protocol::testpattern`.
 
 - **`test_pattern_start { session_id, mode, role?, duration_sec?, rate_hz?, bus?, use_fd?, use_extended? }`**
   — gated by **control**. `mode` is `echo`, `sweep`, `throughput`, `latency`,
@@ -338,7 +338,7 @@ gate:
 - **`update_catalog { filename, content | ops }`** — gated by **catalog modify**. Overwrites
   an *existing* catalog (by filename or display name); **refuses if it doesn't exist**.
 
-Each takes either `content` (the full TOML) or `ops`: the `wiretap-catalog` edit ops,
+Each takes either `content` (the full TOML) or `ops`: the `wslib-wiretap-catalogue` edit ops,
 tagged by `op` (`SetMeta`, `Set{Can,Serial,Modbus}Config`, `AddFrame`, `SetFrame`,
 `UpsertSignal`, `SetMux`, `DeleteAtPath`, …), the same ones the Catalog Editor sends.
 `create_catalog` applies them to an empty file; `update_catalog` to the file on disk,

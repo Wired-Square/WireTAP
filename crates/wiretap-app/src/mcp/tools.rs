@@ -1521,7 +1521,7 @@ impl WireTapTools {
 #[tool_router(router = catalog_write_router)]
 impl WireTapTools {
     #[tool(
-        description = "Create a NEW decoder catalog file in the decoder directory. Validates the TOML first and refuses if the file already exists (use update_catalog to overwrite). Pass `content` (the full TOML) or `ops`: wiretap-catalog edit ops tagged by `op` (SetMeta, SetCanConfig, SetSerialConfig, SetModbusConfig, AddFrame, SetFrame, UpsertSignal, SetMux, DeleteAtPath, …), which build it from nothing and apply the catalogue's authoring rules. Requires the catalog-write MCP permission.",
+        description = "Create a NEW decoder catalog file in the decoder directory. Validates the TOML first and refuses if the file already exists (use update_catalog to overwrite). Pass `content` (the full TOML) or `ops`: catalogue edit ops tagged by `op` (SetMeta, SetCanConfig, SetSerialConfig, SetModbusConfig, AddFrame, SetFrame, UpsertSignal, SetMux, DeleteAtPath, …), which build it from nothing and apply the catalogue's authoring rules. Requires the catalog-write MCP permission.",
         annotations(read_only_hint = false, destructive_hint = false, idempotent_hint = false)
     )]
     async fn create_catalog(
@@ -1581,7 +1581,7 @@ impl WireTapTools {
 #[tool_router(router = catalog_modify_router)]
 impl WireTapTools {
     #[tool(
-        description = "Overwrite an EXISTING decoder catalog (by filename or display name). Validates the TOML first and refuses if no such catalog exists (use create_catalog for a new file). Pass `content` (the full TOML) or `ops`: wiretap-catalog edit ops tagged by `op` (SetMeta, SetCanConfig, SetSerialConfig, SetModbusConfig, AddFrame, SetFrame, UpsertSignal, SetMux, DeleteAtPath, …), which edit the file in place, keeping its comments, and apply the catalogue's authoring rules. Requires the catalog-modify MCP permission.",
+        description = "Overwrite an EXISTING decoder catalog (by filename or display name). Validates the TOML first and refuses if no such catalog exists (use create_catalog for a new file). Pass `content` (the full TOML) or `ops`: catalogue edit ops tagged by `op` (SetMeta, SetCanConfig, SetSerialConfig, SetModbusConfig, AddFrame, SetFrame, UpsertSignal, SetMux, DeleteAtPath, …), which edit the file in place, keeping its comments, and apply the catalogue's authoring rules. Requires the catalog-modify MCP permission.",
         annotations(read_only_hint = false, destructive_hint = true,  idempotent_hint = false)
     )]
     async fn update_catalog(

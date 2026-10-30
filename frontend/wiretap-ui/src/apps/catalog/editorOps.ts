@@ -1,7 +1,7 @@
 // ui/src/apps/catalog/editorOps.ts
 //
 // Catalogue edit operations. Each builds an `EditOp` and applies it in Rust (the
-// wiretap-catalog crate, via toml_edit) so comments and formatting survive. The
+// wslib-wiretap-catalogue crate, via toml_edit) so comments and formatting survive. The
 // typed ops (frames, signals, mux, meta, protocol configs) own what is written;
 // the generic ones write what they are given.
 

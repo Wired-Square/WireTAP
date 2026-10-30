@@ -4,17 +4,3 @@ members = ["crates/wiretap-analysis", "crates/wiretap-app", "crates/wiretap-can-
 
 [workspace.package]
 version = "0.15.0"
-
-# Goes when wave D publishes these crates.
-[patch.wired-square]
-wslib-backoff = { path = "../wslib-rs-wiretap-d/crates/wslib-backoff" }
-wslib-bits = { path = "../wslib-rs-wiretap-d/crates/wslib-bits" }
-wslib-can = { path = "../wslib-rs-wiretap-d/crates/wslib-can" }
-wslib-can-gsusb = { path = "../wslib-rs-wiretap-d/crates/wslib-can-gsusb" }
-wslib-can-pcan = { path = "../wslib-rs-wiretap-d/crates/wslib-can-pcan" }
-wslib-can-slcan = { path = "../wslib-rs-wiretap-d/crates/wslib-can-slcan" }
-wslib-checksum = { path = "../wslib-rs-wiretap-d/crates/wslib-checksum" }
-wslib-serial = { path = "../wslib-rs-wiretap-d/crates/wslib-serial" }
-wslib-tcp = { path = "../wslib-rs-wiretap-d/crates/wslib-tcp" }
-wslib-wiretap-gateway = { path = "../wslib-rs-wiretap-d/crates/wslib-wiretap-gateway" }
-wslib-wiretap-protocol = { path = "../wslib-rs-wiretap-d/crates/wslib-wiretap-protocol" }

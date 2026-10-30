@@ -135,7 +135,7 @@ export default function ExportCatalogDialog({
 
       if (formatInfo.group === "data") {
         // Export as data format. TOML is the catalogue as-is; DBC is rendered by
-        // the shared wiretap-catalog crate over the WebSocket.
+        // the shared wslib-wiretap-catalogue crate over the WebSocket.
         const output = format === "dbc"
           ? await exportDbcWs(catalogContent, "WireTAP", dbcMuxMode)
           : catalogContent;

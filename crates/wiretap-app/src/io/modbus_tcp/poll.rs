@@ -1,6 +1,6 @@
 // io/modbus_tcp/poll.rs
 //
-// The one Modbus poll loop: one `wiretap_io` poll task per source, drained
+// The one Modbus poll loop: one `wslib_modbus` poll task per source, drained
 // into a `FrameSink`.
 
 use std::collections::HashMap;

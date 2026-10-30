@@ -282,7 +282,7 @@ for their host. FrameLink, the GVRET TCP probe and the Modbus scanner resolve
 through [`io/net.rs::resolve_host_port`](../crates/wiretap-app/src/io/net.rs), a
 wrapper over `tokio::net::lookup_host` that bounds the lookup with `DNS_TIMEOUT`
 and classifies failures as `IoError::DnsResolution`. The GVRET TCP reader and the
-Modbus TCP poll hand `net::tcp_endpoint` to `wiretap-io`, which resolves with its
+Modbus TCP poll hand `net::tcp_endpoint` to `wslib-tcp`, which resolves with its
 own bound; GVRET words the library's resolve failure the same way
 (`gvret/tcp.rs::connect_failed`). New TCP transports must do one or the other —
 parsing `"host:port"` straight into a `SocketAddr` accepts only numeric IPs and
@@ -846,7 +846,7 @@ sweep's summary through `await_scan_result`.
 
 **Connection contention.** A sweep opens its own connection. Routing it through
 a running source's connection would avoid that and is not implemented: that
-connection belongs to the source's `wiretap-io` `PollTask`, which is reachable
+connection belongs to the source's `wslib-modbus` `PollTask`, which is reachable
 only as a `PollWriter` for MCP writes (`modbus_tcp::poll::poll_writer`), not for
 a sweep's reads.
 
@@ -1278,7 +1278,7 @@ this.
 ### Decoded-signal stream
 
 Catalogue decoding is done **once, in Rust**, by the shared
-[`wiretap-catalog`](../../wiretap-lib-rs) crate — the frontend no longer
+`wslib-wiretap-catalogue` crate — the frontend no longer
 re-decodes every frame. Two surfaces, both over this WebSocket:
 
 - **`catalog.*` commands** (request/response via `Command`/`CommandResponse`,
@@ -1362,7 +1362,7 @@ vendor_functions = [0x20, 0x60, 0x65] # optional; codes the RTU length rules do 
 allow_broadcast = true                # optional; lets address 0 start a message
 ```
 
-Reassembly is `wiretap_catalog::modbus_rtu_stream::ModbusRtuStream`, held in
+Reassembly is `wslib_modbus::ModbusRtuStream`, held in
 `ws/dispatch.rs` as `TUNNEL_DECODERS` beside `MIRROR_TRACKERS` and built at
 `catalog.attach`.
 
@@ -1497,7 +1497,7 @@ mirror declares itself, or a mux case signal whose bytes lie outside the
 inherited plain signals' — so an inherited mux case shows no tick or cross for a
 check that never ran.
 
-State is a `wiretap_catalog::mirror::MirrorTracker` per session, held in
+State is a `wslib_wiretap_catalogue::mirror::MirrorTracker` per session, held in
 `ws/dispatch.rs` beside `ATTACHED_CATALOGS` and **built at `catalog.attach`,
 dropped at `catalog.detach`** — so a verdict, and the inherited byte set behind
 it, can never outlive the catalogue that produced it. (It used to live in
@@ -2018,7 +2018,7 @@ permanent failure stops it and leaves the reason on its rows. The timing triad
 (fire immediately, then once per interval, stopping on a cancel flag) lives in
 `Cadence` ([io/periodic.rs](../crates/wiretap-app/src/io/periodic.rs)):
 callers write `while cadence.next().await.is_some() { … }`. Modbus TCP register
-polling no longer uses it: each source's groups are scheduled by `wiretap-io`'s
+polling no longer uses it: each source's groups are scheduled by `wslib-modbus`'s
 `PollTask` ([io/modbus_tcp/poll.rs](../crates/wiretap-app/src/io/modbus_tcp/poll.rs)).
 
 ---
@@ -2061,7 +2061,7 @@ polling no longer uses it: each source's groups are scheduled by `wiretap-io`'s
 | [crates/wiretap-app/src/io/profiles.rs](../crates/wiretap-app/src/io/profiles.rs) | `reconfigure_device` — write a device's settings and reconnect it |
 | [crates/wiretap-app/src/io/device_kinds.rs](../crates/wiretap-app/src/io/device_kinds.rs) | Per-kind connection defaults and required fields (see [Connection defaults](#connection-defaults--one-table)) |
 | [crates/wiretap-app/src/io/broker/](../crates/wiretap-app/src/io/broker/) | `IOBroker` — source aggregator / merge task |
-| [crates/wiretap-app/src/io/can_task.rs](../crates/wiretap-app/src/io/can_task.rs) | The desktop side of a `wiretap_io::can` task (GVRET, slcan, SocketCAN): reads to `FrameMessage`, `serve`, how a lost link ends the source |
+| [crates/wiretap-app/src/io/can_task.rs](../crates/wiretap-app/src/io/can_task.rs) | The desktop side of a `wslib_can` task (GVRET, slcan, SocketCAN): reads to `FrameMessage`, `serve`, how a lost link ends the source |
 | [crates/wiretap-app/src/io/signal_throttle.rs](../crates/wiretap-app/src/io/signal_throttle.rs) | 2 Hz per-signal rate limiter |
 | [crates/wiretap-app/src/io/periodic.rs](../crates/wiretap-app/src/io/periodic.rs) | `Cadence` — shared interval/cancel/pause primitive for repeat-transmit |
 | [crates/wiretap-app/src/io/post_session.rs](../crates/wiretap-app/src/io/post_session.rs) | 10 s TTL cache for post-session fetches |

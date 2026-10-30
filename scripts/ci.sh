@@ -79,7 +79,7 @@ cargo clippy --workspace --all-targets --locked
 
 if $cross_windows; then
   step "Clippy for $win"
-  cargo clippy -p wiretap -p wiretap-can-cli -p wiretap-capture-store --target $win --locked
+  cargo clippy -p wiretap -p wiretap-analysis -p wiretap-can-cli -p wiretap-capture-store --target $win --locked
 fi
 
 step "Rust tests"

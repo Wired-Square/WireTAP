@@ -1,6 +1,6 @@
 // crates/wiretap-app/src/io/can_task.rs
 //
-// The desktop's side of a `wiretap_io::can` task: its reads become
+// The desktop's side of a `wslib_can` task: its reads become
 // `FrameMessage`s, and the session's transmits reach its `CanWriter`.
 
 use std::future::Future;
