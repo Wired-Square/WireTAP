@@ -63,7 +63,7 @@ struct OtaStartParams {
     /// Path to the firmware .bin on the local filesystem.
     file_path: PathBuf,
     /// Failsafe seconds to wait for the device to reappear in
-    /// discovery after reset. Default 30.
+    /// discovery after reset. Defaults to `OtaOptions::default()`.
     reconnect_timeout_secs: Option<u32>,
 }
 
@@ -145,9 +145,10 @@ async fn ota_start(params: serde_json::Value) -> Result<serde_json::Value, Strin
         .map_err(|e| format!("read firmware: {e}"))?
         .into();
     let id = resolve_device_id(&p.device_id, p.transport.into()).await?;
-    let options = OtaOptions {
-        reconnect_timeout: Duration::from_secs(p.reconnect_timeout_secs.unwrap_or(30) as u64),
-    };
+    let options = p
+        .reconnect_timeout_secs
+        .map(|secs| OtaOptions { reconnect_timeout: Duration::from_secs(secs.into()) })
+        .unwrap_or_default();
     let discovery = discovery_handle().await?;
 
     // Drop any cached session for this device so the OTA opens a fresh
