@@ -163,6 +163,7 @@ fn render() -> BTreeMap<PathBuf, String> {
     r.visit::<crate::replay::ReplayEstimate>();
     r.visit::<crate::replay::ReplaySource>();
     r.visit::<crate::replay::ReplayState>();
+    r.visit::<crate::ws::smp::OtaCancelOutcome>();
     r.visit::<crate::transmit::SerialFraming>();
     r.visit::<crate::transmit::TransmitProfile>();
     r.visit::<crate::transmit_queue::NewQueueRow>();

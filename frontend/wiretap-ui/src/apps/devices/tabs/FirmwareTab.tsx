@@ -201,7 +201,7 @@ export default function FirmwareTab({ deviceId, availableTransports }: Props) {
 
   async function handleCancel() {
     try {
-      await otaCancel();
+      if ((await otaCancel()) === "too-late") setActivating(true);
     } catch (e) {
       setEvents((prev) => [...prev, { type: "Error", message: String(e) }]);
     }

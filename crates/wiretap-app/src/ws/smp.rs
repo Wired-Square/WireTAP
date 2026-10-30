@@ -1,9 +1,9 @@
 // Copyright 2026 Wired Square Pty Ltd
 
-//! WS dispatch surface for SMP/OTA. Two read-only RPCs (`list_images`,
-//! `ota_cancel`) and one fire-and-forget `ota_start` that drives
-//! `Discovery::ota_on` and pumps each `OtaEvent` onto the global
-//! WS channel as `MsgType::OtaEvent`.
+//! WS dispatch surface for SMP/OTA. `list_images`, `ota_cancel`, and a
+//! fire-and-forget `ota_start` that drives `Discovery::ota_on_cancellable`
+//! and pumps each `OtaEvent` onto the global WS channel as
+//! `MsgType::OtaEvent`.
 //!
 //! Single OTA at a time. A second `ota_start` while one is in flight
 //! returns an error.
@@ -16,31 +16,54 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
-use tokio::sync::Notify;
-use wslib_framelink::{ImageSlot as FlImageSlot, OtaEvent, OtaOptions, Transport};
+use tokio::sync::Mutex;
+use wslib_framelink::{
+    CancelOutcome, ImageSlot as FlImageSlot, OtaCancel, OtaEvent, OtaOptions, OtaStream, Transport,
+};
 
 /// Set when an OTA is in flight; gates concurrent `ota_start` calls.
 static OTA_IN_FLIGHT: AtomicBool = AtomicBool::new(false);
 
-/// Set once the in-flight update reaches `Activating`, after which dropping
-/// its stream no longer cancels it.
-static OTA_ACTIVATING: AtomicBool = AtomicBool::new(false);
-
-/// Clears `OTA_IN_FLIGHT` and `OTA_ACTIVATING` on drop. Holds the in-flight
-/// slot for the lifetime of the spawned pump task — even if the task panics
-/// or is dropped before completing, the slot is released.
+/// Clears `OTA_IN_FLIGHT` on drop. Holds the in-flight slot for the
+/// lifetime of the spawned pump task — even if the task panics or is
+/// dropped before completing, the slot is released.
 struct InFlightGuard;
 
 impl Drop for InFlightGuard {
     fn drop(&mut self) {
-        OTA_ACTIVATING.store(false, Ordering::Release);
         OTA_IN_FLIGHT.store(false, Ordering::Release);
     }
 }
 
-/// Cancel signal. `ota_cancel` notifies; the OTA pump task selects
-/// against it and drops the stream, which ends the update.
-static OTA_CANCEL: Lazy<Notify> = Lazy::new(Notify::new);
+/// The running update's cancel handle, and what a cancel of it decided.
+/// `ota_cancel` holds the lock until the update has stopped, so the pump,
+/// which locks it once the stream ends, names the right terminator.
+#[derive(Default)]
+struct CancelSlot {
+    handle: Option<OtaCancel>,
+    outcome: Option<OtaCancelOutcome>,
+}
+
+static OTA_CANCEL: Lazy<Mutex<CancelSlot>> = Lazy::new(Default::default);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[serde(rename_all = "kebab-case")]
+pub enum OtaCancelOutcome {
+    Cancelled,
+    /// The device has been asked to test the image; the update carries on.
+    TooLate,
+}
+
+impl From<CancelOutcome> for OtaCancelOutcome {
+    fn from(outcome: CancelOutcome) -> Self {
+        match outcome {
+            CancelOutcome::Cancelled => Self::Cancelled,
+            // An outcome this build doesn't know can't be taken to have stopped the update.
+            _ => Self::TooLate,
+        }
+    }
+}
 
 #[derive(Clone, Serialize)]
 pub struct ImageSlotInfo {
@@ -156,54 +179,40 @@ async fn ota_start(params: serde_json::Value) -> Result<serde_json::Value, Strin
     // (e.g. between list_images and start OTA).
     discovery.release_device(&id).await;
 
-    let mut stream = discovery.ota_on(&id, bytes, options, p.transport.into());
+    let (stream, cancel) = discovery.ota_on_cancellable(&id, bytes, options, p.transport.into());
+    *OTA_CANCEL.lock().await = CancelSlot { handle: Some(cancel), outcome: None };
     tokio::spawn(async move {
         let _guard = guard;
-        loop {
-            tokio::select! {
-                biased;
-                _ = OTA_CANCEL.notified() => {
-                    send_ota_event(&serde_json::json!({ "type": "Cancelled" }));
-                    break;
-                }
-                next = stream.next() => match next {
-                    Some(Ok(ev)) => {
-                        note_stage(&ev);
-                        send_ota_event(&serialise_event(&ev));
-                    }
-                    Some(Err(e)) => {
-                        send_ota_event(&serde_json::json!({
-                            "type": "Error",
-                            "message": e.to_string(),
-                        }));
-                        break;
-                    }
-                    None => {
-                        send_ota_event(&serde_json::json!({ "type": "Complete" }));
-                        break;
-                    }
-                }
-            }
-        }
+        send_ota_event(&pump(stream).await);
     });
 
     Ok(serde_json::json!({}))
 }
 
-fn note_stage(ev: &OtaEvent) {
-    if matches!(ev, OtaEvent::Activating) {
-        OTA_ACTIVATING.store(true, Ordering::Release);
+/// Forwards the update's events and returns its terminator.
+async fn pump(mut stream: OtaStream) -> serde_json::Value {
+    let ended = loop {
+        match stream.next().await {
+            Some(Ok(ev)) => send_ota_event(&serialise_event(&ev)),
+            Some(Err(e)) => break serde_json::json!({ "type": "Error", "message": e.to_string() }),
+            None => break serde_json::json!({ "type": "Complete" }),
+        }
+    };
+    let slot = std::mem::take(&mut *OTA_CANCEL.lock().await);
+    match slot.outcome {
+        Some(OtaCancelOutcome::Cancelled) => serde_json::json!({ "type": "Cancelled" }),
+        _ => ended,
     }
 }
 
 async fn ota_cancel() -> Result<serde_json::Value, String> {
-    if OTA_ACTIVATING.load(Ordering::Acquire) {
-        return Err("activation has started: the device will finish the update \
-                    or revert to its previous image on its own"
-            .into());
-    }
-    OTA_CANCEL.notify_waiters();
-    Ok(serde_json::json!({}))
+    let mut slot = OTA_CANCEL.lock().await;
+    let outcome = match slot.handle.take() {
+        Some(handle) => OtaCancelOutcome::from(handle.cancel().await),
+        None => slot.outcome.ok_or("no firmware update is running")?,
+    };
+    slot.outcome = Some(outcome);
+    serde_json::to_value(outcome).map_err(|e| format!("serialise: {e}"))
 }
 
 /// Map an `OtaEvent` to a JSON object the frontend can decode without
@@ -252,16 +261,24 @@ fn serialise_event(ev: &OtaEvent) -> serde_json::Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::net::UdpSocket;
 
     #[tokio::test]
-    async fn cancel_is_refused_from_activating_until_the_update_ends() {
-        let guard = InFlightGuard;
-        assert!(ota_cancel().await.is_ok());
+    async fn a_cancel_stops_the_update_and_ends_it_as_cancelled() {
+        assert!(ota_cancel().await.is_err());
 
-        note_stage(&OtaEvent::Activating);
-        assert!(ota_cancel().await.unwrap_err().contains("activation has started"));
+        let silent_device = UdpSocket::bind("127.0.0.1:0").unwrap();
+        let (stream, cancel) = wslib_framelink::ota_udp_addr_cancellable(
+            silent_device.local_addr().unwrap(),
+            "silent".into(),
+            std::sync::Arc::from(vec![0u8; 64]),
+            OtaOptions::default(),
+        );
+        *OTA_CANCEL.lock().await = CancelSlot { handle: Some(cancel), outcome: None };
+        let terminator = tokio::spawn(pump(stream));
 
-        drop(guard);
-        assert!(ota_cancel().await.is_ok());
+        assert_eq!(ota_cancel().await.unwrap(), "cancelled");
+        assert_eq!(terminator.await.unwrap()["type"], "Cancelled");
+        assert!(ota_cancel().await.is_err());
     }
 }

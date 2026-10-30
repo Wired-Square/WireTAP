@@ -10,7 +10,7 @@ All notable changes to WireTAP will be documented in this file.
 
 ### Changed
 
-- **FrameLink devices need firmware that speaks protocol 4.** Devices on older firmware no longer connect; update them before moving to this version. A firmware upgrade can no longer be cancelled once the device has started activating the new image, because stopping it there could leave the device without working firmware.
+- **FrameLink devices need firmware that speaks protocol 4.** Devices on older firmware no longer connect; update them before moving to this version. A firmware upgrade can no longer be cancelled once the device has been asked to test the new image; Cancel then says so and the upgrade finishes. A cancel that succeeds now waits for the upgrade to stop, so the device can be upgraded again straight away.
 - **The capture database is upgraded in place the first time this version opens it.** Every capture is kept. Once it has been upgraded, don't go back to an older WireTAP with it; a capture database written by a newer WireTAP is left untouched and reported at startup rather than opened.
 - **A CAN or serial device that drops out is retried with a growing pause.** WireTAP waits 1 s before the first reopen and doubles the wait up to 30 s, so a missing adapter no longer gets hammered. A device plugged back in can take up to 30 s to resume.
 

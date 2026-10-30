@@ -4,6 +4,7 @@
 
 import { wsTransport } from "../services/wsTransport";
 import { MsgType } from "../services/wsProtocol";
+import type { OtaCancelOutcome } from "../generated/OtaCancelOutcome";
 
 export interface ImageSlotInfo {
   slot: number;
@@ -73,8 +74,8 @@ export async function otaStart(params: OtaStartParams): Promise<void> {
   });
 }
 
-export async function otaCancel(): Promise<void> {
-  await wsTransport.command<Record<string, never>>("smp.ota_cancel", {});
+export async function otaCancel(): Promise<OtaCancelOutcome> {
+  return wsTransport.command<OtaCancelOutcome>("smp.ota_cancel", {});
 }
 
 /**
