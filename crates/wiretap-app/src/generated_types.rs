@@ -291,11 +291,24 @@ fn can_fd_lengths() -> String {
 /// FrameLink's interface and signal value-type names, by their wire codes.
 fn framelink_names() -> String {
     use wslib_framelink_protocol::{frame_def::VALUE_TYPE_NAMES, types::INTERFACE_NAMES};
-    let interfaces: String = INTERFACE_NAMES.iter().map(|(code, name)| format!("  {code}: {name:?},\n")).collect();
-    let value_types: Vec<_> = VALUE_TYPE_NAMES.iter().map(|(_, name)| *name).collect();
     format!(
-        "{HEADER}\nexport const INTERFACE_TYPE_NAMES: Record<number, string> = {{\n{interfaces}}};\n\nexport const VALUE_TYPE_NAMES = {value_types:?} as const;\n"
+        "{HEADER}\n{}\n{}",
+        names_by_code("INTERFACE_TYPE_NAMES", INTERFACE_NAMES),
+        names_by_code("VALUE_TYPE_NAMES", VALUE_TYPE_NAMES)
     )
+}
+
+fn names_by_code(name: &str, table: &[(u8, &str)]) -> String {
+    let rows: String = table.iter().map(|(code, name)| format!("  {code}: {name:?},\n")).collect();
+    format!("export const {name}: Record<number, string> = {{\n{rows}}};\n")
+}
+
+#[test]
+fn names_by_code_keys_each_name_by_its_code_across_a_gap() {
+    assert_eq!(
+        names_by_code("NAMES", &[(0, "zero"), (3, "three")]),
+        "export const NAMES: Record<number, string> = {\n  0: \"zero\",\n  3: \"three\",\n};\n"
+    );
 }
 
 /// Each byte of the longest payload as `wslib_wiretap_catalogue::byte_name` spells a
