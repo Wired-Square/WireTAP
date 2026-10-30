@@ -17,7 +17,7 @@ use crate::io::error::{IoError, IoFailure};
 use wslib_framelink_protocol::capabilities::decode_capabilities;
 use wslib_framelink_protocol::types::{FLAG_ACK_REQ, MSG_CAPABILITIES_REQ};
 use wslib_framelink_protocol::PROTOCOL_VERSION;
-use wslib_framelink::FrameLinkSession;
+use wslib_framelink::{FrameLinkSession, Probe};
 use once_cell::sync::Lazy;
 use tokio::sync::Mutex;
 
@@ -371,19 +371,26 @@ async fn diagnose_failed_connect(addr: SocketAddr, display_key: &str, original: 
         return original;
     }
 
-    let verdict = wslib_framelink::probe_version(addr).await;
+    let verdict = wslib_framelink::probe(addr).await;
     tlog!(
         "[framelink:{}] Capabilities failed ({}); version probe says {:?}",
         display_key,
         original,
         verdict
     );
+    explain_probe(verdict, display_key, original)
+}
 
+fn explain_probe(
+    verdict: Result<Probe, wslib_framelink::Error>,
+    display_key: &str,
+    original: IoError,
+) -> IoError {
     match verdict {
         // The peer speaks our version, so the mismatch story would be a lie —
         // report what actually went wrong.
-        Ok(Some(PROTOCOL_VERSION)) => original,
-        Ok(Some(v)) => IoError::protocol(
+        Ok(Probe::Answered(PROTOCOL_VERSION)) => original,
+        Ok(Probe::Answered(v)) => IoError::protocol(
             display_key,
             format!(
                 "device speaks FrameLink protocol v{v}, but this build speaks \
@@ -391,11 +398,17 @@ async fn diagnose_failed_connect(addr: SocketAddr, display_key: &str, original: 
                  firmware, then try again."
             ),
         ),
+        Ok(Probe::Unparseable) => IoError::protocol(
+            display_key,
+            "device replied in a FrameLink dialect this build cannot read — its \
+             firmware predates a change to the frame format. Update the device \
+             firmware, then try again.",
+        ),
         // Connected, pinged in every dialect, heard nothing. On a device that
         // serves exactly one client that is overwhelmingly "someone else has
         // it" — which is what DeviceBusy already says, including the close-the-
         // other-app instruction this used to reinvent without.
-        Ok(None) | Err(_) => IoError::busy(display_key),
+        _ => IoError::busy(display_key),
     }
 }
 
@@ -798,5 +811,26 @@ mod tests {
 
         drop(lease);
         POOL.lock().await.remove("sweep.revived");
+    }
+
+    #[test]
+    fn a_probe_names_what_the_device_answered() {
+        let explain = |verdict| explain_probe(verdict, "dev", IoError::timeout("dev", "capabilities"));
+        let other = PROTOCOL_VERSION + 1;
+
+        assert!(matches!(explain(Ok(Probe::Answered(PROTOCOL_VERSION))), IoError::Timeout { .. }));
+        assert!(matches!(
+            explain(Ok(Probe::Answered(other))),
+            IoError::Protocol { details, .. } if details.contains(&format!("speaks FrameLink protocol v{other}"))
+        ));
+        assert!(matches!(
+            explain(Ok(Probe::Unparseable)),
+            IoError::Protocol { details, .. } if details.contains("dialect this build cannot read")
+        ));
+        assert!(matches!(explain(Ok(Probe::Silent)), IoError::DeviceBusy { .. }));
+        assert!(matches!(
+            explain(Err(wslib_framelink::Error::from(std::io::Error::other("refused")))),
+            IoError::DeviceBusy { .. }
+        ));
     }
 }
