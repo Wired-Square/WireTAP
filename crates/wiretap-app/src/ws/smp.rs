@@ -2,7 +2,7 @@
 
 //! WS dispatch surface for SMP/OTA. Two read-only RPCs (`list_images`,
 //! `ota_cancel`) and one fire-and-forget `ota_start` that drives
-//! `Discovery::ota_ble`/`ota_udp` and pumps each `OtaEvent` onto the global
+//! `Discovery::ota_on` and pumps each `OtaEvent` onto the global
 //! WS channel as `MsgType::OtaEvent`.
 //!
 //! Single OTA at a time. A second `ota_start` while one is in flight
@@ -93,7 +93,7 @@ fn map_image_slot(s: FlImageSlot) -> ImageSlotInfo {
         confirmed: s.confirmed,
         active: s.active,
         permanent: s.permanent,
-        image: s.image,
+        image: s.image.map(i32::from),
     }
 }
 
@@ -151,10 +151,7 @@ async fn ota_start(params: serde_json::Value) -> Result<serde_json::Value, Strin
     // (e.g. between list_images and start OTA).
     discovery.release_device(&id).await;
 
-    let mut stream = match p.transport {
-        TransportArg::Ble => discovery.ota_ble(&id, bytes, options),
-        TransportArg::Udp => discovery.ota_udp(&id, bytes, options),
-    };
+    let mut stream = discovery.ota_on(&id, bytes, options, p.transport.into());
     tokio::spawn(async move {
         let _guard = guard;
         loop {
