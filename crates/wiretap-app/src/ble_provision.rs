@@ -76,7 +76,7 @@ static STATE: Lazy<Arc<Mutex<BleProvisionState>>> = Lazy::new(|| {
 // ============================================================================
 
 fn provisioning_status_payload(status: WifiStatus) -> ProvisioningStatus {
-    let code = status as u8;
+    let code = status.as_byte();
     let name = match code {
         0 => "disconnected",
         1 => "connecting",
@@ -172,7 +172,7 @@ pub async fn ble_read_device_state(device_id: String) -> Result<DeviceWifiState,
     Ok(DeviceWifiState {
         ssid: s.ssid,
         security: s.security.map(|sec| sec.byte()),
-        status: s.status as u8,
+        status: s.status.as_byte(),
         ip_address: s.ip_address.map(|ip| ip.to_string()),
     })
 }
