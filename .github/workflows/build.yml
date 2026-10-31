@@ -60,7 +60,9 @@ jobs:
 
       - name: Read the wslib crates from the registry mirror
         shell: bash
-        run: cat .cargo/mirror.toml >> "${CARGO_HOME:-$HOME/.cargo}/config.toml"
+        run: |
+          mkdir -p "${CARGO_HOME:-$HOME/.cargo}"
+          cat .cargo/mirror.toml >> "${CARGO_HOME:-$HOME/.cargo}/config.toml"
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@1.99
