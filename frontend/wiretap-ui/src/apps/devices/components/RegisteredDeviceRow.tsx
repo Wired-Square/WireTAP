@@ -1,6 +1,6 @@
 // ui/src/apps/devices/components/RegisteredDeviceRow.tsx
 //
-// One row per registered device (framelink-rs registry entry). Unlike the
+// One row per registered device (wslib-framelink registry entry). Unlike the
 // live-scan card, this never asserts live state — a registered device is
 // "known and reachable at a stored host", not "seen on the network now". It
 // shows identity + stored host/ports + resolution mode, and offers connect

@@ -1,7 +1,7 @@
 // ui/src/apps/devices/components/ResolutionToggle.tsx
 //
 // Per-device Auto/Manual resolution control. Manual pins the device to its
-// current address in the framelink-rs registry (reached directly on every
+// current address in the wslib-framelink registry (reached directly on every
 // transport, never discovered); Auto removes the pin and restores mDNS
 // resolution. Only meaningful for an IP-reachable device, so it renders
 // nothing when the selected device has no address.

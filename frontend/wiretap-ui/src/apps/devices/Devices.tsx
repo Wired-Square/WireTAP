@@ -65,7 +65,7 @@ export default function Devices() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Cleanup on unmount: stop scan, release the active device once via
-  // framelink-rs (single tear-down path), reset stores.
+  // wslib-framelink (single tear-down path), reset stores.
   useEffect(() => {
     return () => {
       deviceScanStop().catch(() => {});

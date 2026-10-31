@@ -41,7 +41,7 @@ export function deviceScanStop(): Promise<void> {
   return invoke("device_scan_stop");
 }
 
-/** Drop every cached session framelink-rs is holding for this device.
+/** Drop every cached session wslib-framelink is holding for this device.
  *  Once any in-flight operation drops its local session clone, the BLE
  *  link closes (or the UDP socket goes away). Single point of tear-down
  *  for either transport — there are no per-protocol disconnect commands. */

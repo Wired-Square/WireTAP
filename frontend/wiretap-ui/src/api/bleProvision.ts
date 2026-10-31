@@ -60,7 +60,7 @@ export async function bleScanStop(): Promise<void> {
 }
 
 /** Warm the WiFi-prov session cache for the device. Idempotent — the
- *  framelink-rs Discovery returns the same session handle to subsequent
+ *  wslib-framelink Discovery returns the same session handle to subsequent
  *  operation commands. Tear-down is `releaseDevice(deviceId)`. */
 export async function bleConnect(deviceId: string): Promise<void> {
   await invoke("ble_connect", { deviceId });
