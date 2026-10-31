@@ -9432,9 +9432,9 @@ dependencies = [
 
 [[package]]
 name = "wslib-mcu-flash"
-version = "0.1.0"
+version = "0.1.2"
 source = "sparse+https://forge.wiredsquare.com/api/packages/wired-square/cargo/"
-checksum = "f7236017f34bdf78418c48c46689518a662f56bf05ff4c17cdff8f1aaeaccefd"
+checksum = "14ff693f24a6afcbef0843ca089a6a751c972184ea7763af12475968ac915319"
 dependencies = [
  "dfu-nusb",
  "espflash",
@@ -9508,9 +9508,9 @@ dependencies = [
 
 [[package]]
 name = "wslib-serial"
-version = "0.1.1"
+version = "0.1.3"
 source = "sparse+https://forge.wiredsquare.com/api/packages/wired-square/cargo/"
-checksum = "3aede8ec33e6b557bea8163ea763b2d4d6871ec9f798a96371c9d69a79948f68"
+checksum = "652093d74aae4fe6d9ec4d4a9fc949931cb5f3f23533aba511fbee480c158bbf"
 dependencies = [
  "libc",
  "serialport",
