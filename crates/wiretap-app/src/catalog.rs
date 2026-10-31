@@ -521,20 +521,11 @@ pub fn new_catalog_filename(name: String, hex_ids: bool) -> String {
     text::suggested_filename(&name, hex_ids)
 }
 
-/// Write a file via a temp name plus rename, so no reader can observe a partial
-/// file.
-///
-/// Matters for anything in the decoder directory: the `notify` watcher fires on
-/// create/modify, and `scan_catalogs` swallows read failures and falls back to
-/// the filename — so a torn read shows up as a catalogue with the wrong name
-/// rather than as an error.
+/// Replace `path` whole or not at all: the decoder directory's watcher would
+/// otherwise rescan a torn catalogue and list it under its filename.
 pub fn write_file_atomically(path: &Path, bytes: &[u8]) -> Result<(), String> {
-    let tmp = path.with_extension("tmp-write");
-    std::fs::write(&tmp, bytes).map_err(|e| format!("Failed to write {}: {e}", path.display()))?;
-    std::fs::rename(&tmp, path).map_err(|e| {
-        let _ = std::fs::remove_file(&tmp);
-        format!("Failed to replace {}: {e}", path.display())
-    })
+    wslib_file_atomic::replace_readable(path, bytes)
+        .map_err(|e| format!("Failed to write {}: {e}", path.display()))
 }
 
 /// First unused `name-N.toml` beside `name.toml`, for a non-destructive save.

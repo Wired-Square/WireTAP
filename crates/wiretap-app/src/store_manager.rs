@@ -128,14 +128,8 @@ fn save_to_disk_internal() -> Result<(), String> {
 
     drop(manager); // Release read lock before file operations
 
-    // Atomic write: write to temp file, then rename
-    let temp_path = path.with_extension("json.tmp");
-
-    fs::write(&temp_path, &json)
-        .map_err(|e| format!("Failed to write temp file: {}", e))?;
-
-    fs::rename(&temp_path, &path)
-        .map_err(|e| format!("Failed to rename temp file: {}", e))?;
+    wslib_file_atomic::replace_readable(&path, json.as_bytes())
+        .map_err(|e| format!("Failed to write store file: {}", e))?;
 
     // Clear dirty flag
     if let Ok(mut manager) = STORE_MANAGER.write() {
@@ -355,7 +349,7 @@ mod tests {
 
         let saved: serde_json::Value = serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
         assert_eq!(saved, json!({"added": "x", "selectionSets.all": ["a"]}));
-        assert!(!path.with_extension("json.tmp").exists());
+        assert!(!wslib_file_atomic::beside(&path, "new").exists());
 
         fs::write(&path, "not json").unwrap();
         assert!(initialise_at(path).unwrap_err().starts_with("Failed to parse store file"));

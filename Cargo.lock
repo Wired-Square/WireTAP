@@ -9004,6 +9004,7 @@ dependencies = [
  "wslib-can-socketcan",
  "wslib-checksum",
  "wslib-db-sqlite",
+ "wslib-file-atomic",
  "wslib-framelink",
  "wslib-framelink-board",
  "wslib-framelink-protocol",

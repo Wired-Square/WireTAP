@@ -76,6 +76,7 @@ tokio-tungstenite = "0.26"
 # The transmit history database and the capture store's statements.
 sqlx = { version = "0.8.5", default-features = false, features = ["macros", "migrate", "runtime-tokio", "sqlite"] }
 wslib-db-sqlite = { version = "0.2.4", registry = "wired-square" }
+wslib-file-atomic = { version = "0.1.8", registry = "wired-square" }
 futures = "0.3"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 # The FrameLink protocol, board definitions and session: BLE scanning, mDNS
