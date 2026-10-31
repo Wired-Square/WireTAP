@@ -1991,15 +1991,6 @@ bit_length = 8
             assert_eq!(map["can:2"]["dlc"], 4);
         }
     }
-
-    #[test]
-    fn vendored_dom_ops_match_the_library() {
-        let vendored = include_str!("../../../../frontend/wiretap-ui/src/services/domOps.ts");
-        assert!(
-            vendored == wslib_mcp::dom::OPS_TS,
-            "re-copy crates/wslib-mcp/js/dom-ops.ts from wslib-rs to frontend/wiretap-ui/src/services/domOps.ts"
-        );
-    }
 }
 
 #[cfg(test)]

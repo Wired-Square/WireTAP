@@ -2950,7 +2950,7 @@ dependencies = [
  "js-sys",
  "log",
  "wasm-bindgen",
- "windows-core 0.61.2",
+ "windows-core 0.62.2",
 ]
 
 [[package]]
@@ -9415,9 +9415,9 @@ dependencies = [
 
 [[package]]
 name = "wslib-mcp"
-version = "0.1.0"
+version = "0.2.1"
 source = "sparse+https://forge.wiredsquare.com/api/packages/wired-square/cargo/"
-checksum = "d79dc783d13f509e9016f9532a62873fd1c0b5d132e21c32b9d03c3503b29348"
+checksum = "469dfd38568b34dfb48a8ac4b1b60474fd0f3de422b900190f1c437bae73b592"
 dependencies = [
  "axum",
  "ipnet",
