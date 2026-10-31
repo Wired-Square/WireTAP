@@ -2,7 +2,8 @@
 # The CI definition. The pre-push hook and the release script call this rather
 # than restating it. Everyday: text gates, clippy (also for Windows), the Rust
 # and frontend suites. --tag adds a clean release build of every target this
-# host can reach, once per clean commit.
+# host can reach, once per clean commit, as .github/workflows/build.yml builds
+# it on a v* tag; keep the two in step.
 #
 #   scripts/ci.sh [--tag]
 set -euo pipefail
@@ -99,7 +100,8 @@ if $all; then
   (cd "$src" && npm ci --no-audit --no-fund >/dev/null)
 
   if [[ $(uname) == Darwin ]]; then
-    for t in aarch64-apple-darwin x86_64-apple-darwin; do
+    for t in aarch64-apple-darwin:macOS_arm64 x86_64-apple-darwin:macOS_x64; do
+      label=${t#*:} t=${t%:*}
       rustup target list --installed | grep -qx $t || die "$t missing: rustup target add $t"
       step "Release build: $t"
       (cd "$src" && bash scripts/tauri.sh build --target $t --bundles app)
@@ -107,7 +109,7 @@ if $all; then
       app=$bundle/macos/WireTAP.app
       version=$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "$app/Contents/Info.plist")
       mkdir -p "$bundle/pkg"
-      (cd "$src" && bash scripts/macos-pkg.sh "$app" "$bundle/pkg/WireTAP_${version}_$t.pkg")
+      (cd "$src" && bash scripts/macos-pkg.sh "$app" "$bundle/pkg/WireTAP_${version}_$label.pkg")
     done
   else
     skip "macOS builds: not a macOS host"
