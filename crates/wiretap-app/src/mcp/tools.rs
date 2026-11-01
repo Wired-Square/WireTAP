@@ -2058,7 +2058,7 @@ mod context_tests {
         }
 
         fn decoder_dir(&self) -> PathBuf {
-            self.root.join("Documents/WireTAP/Decoders")
+            self.root.join("Documents").join("WireTAP").join("Decoders")
         }
 
         fn add_catalog(&self, filename: &str) -> CatalogFile {
@@ -2216,7 +2216,7 @@ mod context_tests {
         let fixture = Fixture::with_profiles("dashboard", vec![]);
         let content = json!({ "schema": "wiretap.dashboard/1", "panels": [], "layout": [] }).to_string();
         let saved = json_of(fixture.tools.create_dashboard(params(json!({ "filename": "board", "content": content }))).await);
-        let path = fixture.decoder_dir().join("dashboards/board.dashboard.json");
+        let path = fixture.decoder_dir().join("dashboards").join("board.dashboard.json");
         assert_eq!(saved, json!({ "saved": true, "path": path.to_string_lossy() }));
         assert_eq!(read(&path), content);
     }

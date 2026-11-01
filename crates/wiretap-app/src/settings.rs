@@ -1411,12 +1411,14 @@ mod tests {
         assert_eq!(*value, fixture, "{file}");
     }
 
+    const DIRS: [&str; 3] = ["decoder_dir", "dump_dir", "report_dir"];
+
     /// `settingsGoldens.test.ts` checks the frontend changes nothing of this.
     /// The directories depend on the host, so they are blanked.
     #[test]
     fn defaults_match_the_fixture() {
         let mut defaults = serde_json::to_value(AppSettings::default()).unwrap();
-        for dir in ["decoder_dir", "dump_dir", "report_dir"] {
+        for dir in DIRS {
             defaults[dir] = "".into();
         }
         golden("settingsDefaults.rust.json", &defaults);
@@ -1425,7 +1427,11 @@ mod tests {
     fn served(raw: &serde_json::Value) -> serde_json::Value {
         let (mut settings, _) = parse_settings(&raw.to_string()).expect("readable");
         migrate(&mut settings, Some(Path::new("/Documents")));
-        serde_json::to_value(settings).unwrap()
+        let mut value = serde_json::to_value(settings).unwrap();
+        for dir in DIRS {
+            value[dir] = value[dir].as_str().unwrap().replace('\\', "/").into();
+        }
+        value
     }
 
     /// Objects with their keys sorted, so a rewritten fixture does not churn with
@@ -1551,7 +1557,7 @@ mod tests {
         let scratch = Scratch::new("first-run");
         let loaded = scratch.load().unwrap();
         assert!(loaded.written);
-        let decoders = scratch.0.join("Documents/WireTAP/Decoders");
+        let decoders = scratch.0.join("Documents").join("WireTAP").join("Decoders");
         assert_eq!(loaded.settings.decoder_dir, decoders.to_string_lossy());
         assert!(decoders.is_dir());
         assert_eq!(loaded.settings.install_id.len(), 36);
