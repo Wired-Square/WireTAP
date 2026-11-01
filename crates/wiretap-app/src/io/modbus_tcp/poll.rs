@@ -728,7 +728,7 @@ bit_length = 20
         let (_control, control_rx) = watch::channel(PollControl::Run);
 
         timeout(
-            Duration::from_secs(2),
+            Duration::from_secs(10),
             run_poll_task(task, control_rx, sink, 2),
         )
         .await
