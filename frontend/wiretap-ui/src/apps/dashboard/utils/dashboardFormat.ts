@@ -7,10 +7,24 @@
 export function formatValue(v: number | null | undefined): string {
   if (v == null || !Number.isFinite(v)) return "—";
   const abs = Math.abs(v);
-  if (abs >= 10_000) return v.toFixed(0);
-  if (abs >= 1_000) return v.toFixed(1);
-  if (abs >= 100) return v.toFixed(2);
-  return v.toFixed(3);
+  const places = abs >= 10_000 ? 0 : abs >= 1_000 ? 1 : abs >= 100 ? 2 : 3;
+  return toFixedHalfAwayFromZero(v, places);
+}
+
+// Rounds the shortest decimal form of `v`, as wslib-quantity's `format_decimal` does,
+// so 1.0005 reads 1.001 (toFixed rounds the binary value, 1.000499…) and no -0.000.
+function toFixedHalfAwayFromZero(v: number, places: number): string {
+  const [mantissa, exponent = "0"] = Math.abs(v).toString().split("e");
+  const [whole, fraction = ""] = mantissa.split(".");
+  const pointAt = whole.length + Number(exponent);
+  const digits = whole + fraction;
+  const at = (i: number) => (i >= 0 && i < digits.length ? digits[i] : "0");
+  let kept = "";
+  for (let i = Math.min(pointAt, 0); i < pointAt + places; i++) kept += at(i);
+  const scaled = BigInt(kept) + (at(pointAt + places) >= "5" ? 1n : 0n);
+  const text = scaled.toString().padStart(places + 1, "0");
+  const sign = v < 0 && scaled !== 0n ? "-" : "";
+  return places === 0 ? sign + text : `${sign}${text.slice(0, -places)}.${text.slice(-places)}`;
 }
 
 /** Format a time delta in seconds for human-readable display.
