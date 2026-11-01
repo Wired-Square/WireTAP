@@ -1514,7 +1514,7 @@ pub(crate) mod tests {
     async fn throughput_waits_out_a_full_send_queue() {
         let mut config = config(TestMode::Throughput, false);
         config.duration_sec = 1.0;
-        let peer = Wire::Backlogged(Responder::new(0, 0), 200);
+        let peer = Wire::Backlogged(Responder::new(0, 0), MAX_CONSECUTIVE_FAILURES * 2);
         let state = run("test_throughput_backlogged", peer, &config).await;
 
         assert!(state.tx_count > 0, "frames went out once the queue drained");
@@ -1575,6 +1575,8 @@ pub(crate) mod tests {
     async fn an_echo_run_reaches_its_expected_tx() {
         let mut config = config(TestMode::Echo, false);
         config.duration_sec = 1.0;
+        // Slow enough to pace on Windows' 15.6 ms timer, which a 200 Hz run cannot.
+        config.rate_hz = 40.0;
         let state = run("test_echo_gauge", Wire::Peer(Responder::new(0, 0)), &config).await;
 
         let expected = state.expected_tx.expect("a paced run has an expected count");
