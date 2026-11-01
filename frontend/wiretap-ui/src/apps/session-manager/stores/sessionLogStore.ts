@@ -2,7 +2,7 @@
 //
 // This window's copy of the Rust session log ring, plus the log view's UI state.
 
-import { create } from "zustand";
+import { create } from "@wired-square/store/react";
 import type { BadgeStyleProps } from "../../../components/Badge";
 import type { SessionLogEntry } from "../../../generated/SessionLogEntry";
 import type { SessionLogEvent } from "../../../generated/SessionLogEvent";

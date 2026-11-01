@@ -12,7 +12,7 @@
 // the live profile list, so it always edits what the device is now rather than
 // a copy taken when the menu was opened.
 
-import { create } from "zustand";
+import { create } from "@wired-square/store/react";
 
 export interface DeviceEditRequest {
   profileId: string;

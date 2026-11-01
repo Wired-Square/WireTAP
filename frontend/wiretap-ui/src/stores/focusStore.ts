@@ -3,7 +3,7 @@
 // action acts on). The set of OPEN apps now lives in the Rust-owned open-app
 // registry (see openAppsStore / useOpenAppsSync), not here.
 
-import { create } from "zustand";
+import { create } from "@wired-square/store/react";
 
 interface FocusState {
   /** The currently focused panel ID, or null if none */

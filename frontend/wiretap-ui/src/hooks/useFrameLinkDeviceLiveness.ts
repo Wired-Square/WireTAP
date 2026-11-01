@@ -15,8 +15,7 @@
 // scan stream and probe results.
 
 import { useEffect } from "react";
-import { create } from "zustand";
-import { useShallow } from "zustand/react/shallow";
+import { create, useShallow } from "@wired-square/store/react";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import {
   deviceScanStart,

@@ -5,7 +5,7 @@
 // and tracks sources while the Catalog editor publishes, so the state is not
 // editor-local, and catalogEditorStore is already large.
 
-import { create } from "zustand";
+import { create } from "@wired-square/store/react";
 import {
   applyCatalogUpdate,
   asShareError,

@@ -3,7 +3,7 @@
 // Frame picker and selection state for Discovery. The frames themselves live in the
 // session's capture; the picker is the capture's inventory, which Rust pushes.
 
-import { create } from 'zustand';
+import { create } from '@wired-square/store/react';
 import { tlog } from '../api/settings';
 import type { CaptureFrameInfo } from '../api/capture';
 import type { FrameMessage } from '../types/frame';

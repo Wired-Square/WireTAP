@@ -1,6 +1,6 @@
 // Copyright 2026 Wired Square Pty Ltd
 
-import { create } from "zustand";
+import { create } from "@wired-square/store/react";
 import type {
   FrameDefDescriptor,
   BridgeDescriptor,

@@ -6,7 +6,7 @@
 // useOpenAppsSync. The Session Manager graph sources its app nodes from here so it
 // can show apps from every window.
 
-import { create } from "zustand";
+import { create } from "@wired-square/store/react";
 import type { AppInstanceInfo } from "../api/io";
 
 interface OpenAppsState {

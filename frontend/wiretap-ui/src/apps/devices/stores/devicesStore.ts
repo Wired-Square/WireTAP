@@ -4,7 +4,7 @@
 // per-device tabbed page. Per-tab data (provisioning credentials) lives in
 // provisioningStore.
 
-import { create } from "zustand";
+import { create } from "@wired-square/store/react";
 import type { UnifiedDevice } from "../../../api/deviceScan";
 
 // ============================================================================

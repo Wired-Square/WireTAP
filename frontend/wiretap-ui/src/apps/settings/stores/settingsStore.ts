@@ -1,6 +1,6 @@
 // ui/src/apps/settings/stores/settingsStore.ts
 
-import { create } from 'zustand';
+import { create } from '@wired-square/store/react';
 import {
   loadSettings as loadSettingsApi,
   saveSettings as saveSettingsApi,

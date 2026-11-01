@@ -6,7 +6,7 @@
 
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useShallow } from "zustand/react/shallow";
+import { useShallow } from "@wired-square/store/react";
 import { Loader2, RefreshCw, Palette } from "lucide-react";
 import { useRulesStore } from "../stores/rulesStore";
 import { textPrimary, textSecondary } from "../../../styles";

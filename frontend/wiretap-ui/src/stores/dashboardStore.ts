@@ -1,6 +1,6 @@
 // ui/src/stores/dashboardStore.ts
 
-import { create } from 'zustand';
+import { create } from '@wired-square/store/react';
 import { tlog } from '../api/settings';
 import type { Confidence } from '../types/catalog';
 import type { Catalog, Frame } from '../types/catalogModel';

@@ -32,7 +32,7 @@ vi.mock("../hooks/useIOSession", () => ({
   },
 }));
 vi.mock("../stores/sessionStore", async () => {
-  const { create } = await import("zustand");
+  const { create } = await import("@wired-square/store/react");
   return {
     createAndStartMultiSourceSession: vi.fn(async (o: { sessionId: string | null; profileIds: string[] }) => ({
       sessionId: o.sessionId ?? `opened:${o.profileIds.join("+")}`,

@@ -4,7 +4,7 @@
 // Handles raw byte display, client-side framing, and frame ID mapping.
 // Supports backend capture mode for large captures (bytes stored in Rust).
 
-import { create } from 'zustand';
+import { create } from '@wired-square/store/react';
 import { tlog } from '../api/settings';
 import type { FrameMessage } from '../types/frame';
 import {

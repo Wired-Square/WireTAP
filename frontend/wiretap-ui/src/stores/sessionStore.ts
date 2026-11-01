@@ -5,7 +5,7 @@
 // This store manages frontend state and event listeners.
 
 import * as Sentry from "@sentry/react";
-import { create } from "zustand";
+import { create } from "@wired-square/store/react";
 import { listen, emit } from "@tauri-apps/api/event";
 import { WINDOW_EVENTS } from "../events/registry";
 import {

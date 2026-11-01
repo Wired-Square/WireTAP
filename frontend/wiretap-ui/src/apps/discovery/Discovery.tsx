@@ -17,7 +17,7 @@ import { useDiscoveryFrameStore } from "../../stores/discoveryFrameStore";
 import { useDiscoveryUIStore } from "../../stores/discoveryUIStore";
 import { useDiscoverySerialStore } from "../../stores/discoverySerialStore";
 import { isOwnScanSession, runningModbusScan, useDiscoveryToolboxStore } from "../../stores/discoveryToolboxStore";
-import { useShallow } from "zustand/react/shallow";
+import { useShallow } from "@wired-square/store/react";
 import { useDiscoveryHandlers } from "./hooks/useDiscoveryHandlers";
 import { useModbusScanSync } from "./hooks/useModbusScanSync";
 import type { StreamEndedInfo, PlaybackPosition, FcProbeConfig, ModbusScanConfig, UnitIdScanConfig } from '../../api/io';

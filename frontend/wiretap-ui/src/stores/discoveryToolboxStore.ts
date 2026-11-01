@@ -3,7 +3,7 @@
 // Toolbox state and analysis functionality for Discovery app.
 // Manages analysis tools (message order, changes, serial analysis) and the catalogue draft they grow.
 
-import { create } from 'zustand';
+import { create } from '@wired-square/store/react';
 import type { FrameMessage } from '../types/frame';
 import type { ChangesFrame } from '../api/byteRoles';
 import type { OrderStart } from '../generated/OrderStart';

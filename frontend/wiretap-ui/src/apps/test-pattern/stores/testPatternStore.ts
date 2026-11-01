@@ -1,6 +1,6 @@
 // src/apps/test-pattern/stores/testPatternStore.ts
 
-import { create } from "zustand";
+import { create } from "@wired-square/store/react";
 import type { IOTestState, TestMode, TestRole } from "../../../api/testPattern";
 
 interface TestPatternState {

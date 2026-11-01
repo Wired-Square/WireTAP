@@ -4,7 +4,7 @@
 // the Transmit queue, which is Rust's process state (`transmit_queue.rs`) pushed
 // to every window over WS.
 
-import { create } from "zustand";
+import { create } from "@wired-square/store/react";
 import {
   type CanTransmitFrame,
   type NewQueueRow,
