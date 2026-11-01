@@ -1,7 +1,7 @@
 // ui/src/api/serialTerminal.ts
 //
 // Direct serial-terminal API. Bypasses the multi-source IO session pipeline
-// — the backend opens a dedicated serialport handle per terminal id and
+// — the backend opens a dedicated wslib-serial task per terminal id and
 // emits raw bytes on `serial-terminal-data`.
 
 import { invoke } from "@tauri-apps/api/core";

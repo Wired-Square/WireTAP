@@ -1,26 +1,24 @@
 //! Direct serial-terminal backend for the Serial app.
 //!
 //! Bypasses the multi-source IO session pipeline — the terminal owns a
-//! dedicated `serialport` handle and a single read loop that emits bytes
-//! straight to the frontend. Each open terminal has a UUID-style id and
-//! its own cancel flag.
+//! dedicated `wslib_serial` task whose reads are emitted straight to the
+//! frontend. Each open terminal has a UUID-style id and its own stop token.
 
 #![cfg(not(target_os = "ios"))]
 
 use std::collections::HashMap;
-use std::io::{Read, Write};
-use std::sync::{
-    atomic::{AtomicBool, Ordering},
-    Arc, Mutex,
-};
+use std::io;
+use std::sync::Mutex;
 use std::time::Duration;
 
 use once_cell::sync::Lazy;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter};
+use tokio_util::sync::CancellationToken;
 
-use serialport::{DataBits, SerialPort, StopBits};
-use wslib_serial::{LineSettings, Parity};
+use wslib_serial::{
+    Access, LineSettings, SerialEvent, SerialOptions, SerialTask, SerialWriter, WriteRefused,
+};
 
 use crate::blocking::off_runtime;
 
@@ -41,15 +39,11 @@ struct TerminalErrorPayload {
 const SERIAL_TERMINAL_ERROR_EVENT: &str = "serial-terminal-error";
 
 struct Terminal {
-    /// Writer-only handle — separate from the reader so writes don't block on
-    /// the reader's `read()` call. Backed by the same OS file descriptor via
-    /// `SerialPort::try_clone`, so DTR/RTS toggles affect the live port.
-    writer: Arc<Mutex<Box<dyn SerialPort>>>,
-    stop_flag: Arc<AtomicBool>,
+    writer: SerialWriter,
+    stop: CancellationToken,
 }
 
-static TERMINALS: Lazy<Mutex<HashMap<String, Terminal>>> =
-    Lazy::new(|| Mutex::new(HashMap::new()));
+static TERMINALS: Lazy<Mutex<HashMap<String, Terminal>>> = Lazy::new(|| Mutex::new(HashMap::new()));
 
 fn new_terminal_id() -> String {
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -60,26 +54,14 @@ fn new_terminal_id() -> String {
     format!("term_{:x}", nanos as u64)
 }
 
-/// The terminal keeps its own serialport handle rather than `wslib_serial::open`,
-/// because the reset pulse needs RTS and DTR, which the library's task does not expose.
-fn open_port(port: &str, line: LineSettings) -> serialport::Result<Box<dyn SerialPort>> {
-    serialport::new(port, line.baud)
-        .data_bits(match line.data_bits {
-            5 => DataBits::Five,
-            6 => DataBits::Six,
-            7 => DataBits::Seven,
-            _ => DataBits::Eight,
-        })
-        .stop_bits(if line.stop_bits == 2 { StopBits::Two } else { StopBits::One })
-        .parity(match line.parity {
-            Parity::None => serialport::Parity::None,
-            Parity::Odd => serialport::Parity::Odd,
-            Parity::Even => serialport::Parity::Even,
-        })
-        // Short enough that the reader loop sees the stop flag promptly; writes
-        // go through a cloned handle, so it does not bound write latency.
-        .timeout(Duration::from_millis(10))
-        .open()
+/// A read error ends the terminal with `serial-terminal-error` rather than
+/// reopening the port.
+fn terminal_options() -> SerialOptions {
+    SerialOptions {
+        access: Access::ReadWrite,
+        reopen: None,
+        ..SerialOptions::default()
+    }
 }
 
 #[tauri::command(rename_all = "snake_case")]
@@ -92,83 +74,75 @@ pub async fn serial_terminal_open(
     parity: Option<String>,
 ) -> Result<String, String> {
     let line = LineSettings::parse(baud_rate, data_bits, stop_bits, parity.as_deref())?;
-    off_runtime(move || open_terminal(app, port, line)).await
-}
-
-fn open_terminal(app: AppHandle, port: String, line: LineSettings) -> Result<String, String> {
-    let mut reader = open_port(&port, line).map_err(|e| format!("Failed to open {}: {}", port, e))?;
-
-    let writer = reader
-        .try_clone()
-        .map_err(|e| format!("Failed to clone serial handle for writes: {}", e))?;
+    let path = port.clone();
+    let task = off_runtime(move || wslib_serial::open(path, line, terminal_options()))
+        .await
+        .map_err(|e| e.to_string())?;
 
     let terminal_id = new_terminal_id();
-    let writer_handle = Arc::new(Mutex::new(writer));
-    let stop_flag = Arc::new(AtomicBool::new(false));
+    let stop = CancellationToken::new();
+    TERMINALS.lock().unwrap().insert(
+        terminal_id.clone(),
+        Terminal {
+            writer: task.writer(),
+            stop: stop.clone(),
+        },
+    );
+    tlog!(
+        "[serial_terminal] Opened {} (terminal_id={}, {})",
+        port,
+        terminal_id,
+        line
+    );
 
-    {
-        let mut map = TERMINALS.lock().unwrap();
-        map.insert(
-            terminal_id.clone(),
-            Terminal {
-                writer: writer_handle.clone(),
-                stop_flag: stop_flag.clone(),
-            },
-        );
-    }
-
-    tlog!("[serial_terminal] Opened {} (terminal_id={}, {})", port, terminal_id, line);
-
-    let id_for_task = terminal_id.clone();
-    let app_for_task = app.clone();
-    let stop_flag_for_task = stop_flag.clone();
-    std::thread::spawn(move || {
-        let mut buf = [0u8; 1024];
-        // The reader thread owns its handle outright — writes go through the
-        // cloned `writer` handle behind the mutex, so this loop never
-        // contends with the writer.
-        while !stop_flag_for_task.load(Ordering::SeqCst) {
-            match reader.read(&mut buf) {
-                Ok(n) if n > 0 => {
-                    let _ = app_for_task.emit(
-                        SERIAL_TERMINAL_DATA_EVENT,
-                        TerminalDataPayload {
-                            terminal_id: id_for_task.clone(),
-                            bytes: buf[..n].to_vec(),
-                        },
-                    );
-                }
-                Ok(_) => { /* zero bytes — short timeout, loop */ }
-                Err(ref e) if e.kind() == std::io::ErrorKind::TimedOut => {
-                    // Expected: short read timeout. Loop again.
-                }
-                Err(e) => {
-                    let _ = app_for_task.emit(
-                        SERIAL_TERMINAL_ERROR_EVENT,
-                        TerminalErrorPayload {
-                            terminal_id: id_for_task.clone(),
-                            message: format!("Read error: {}", e),
-                        },
-                    );
-                    return;
-                }
-            }
-        }
-        tlog!("[serial_terminal] Read loop exited for {}", id_for_task);
-    });
-
+    tauri::async_runtime::spawn(forward_reads(app, terminal_id.clone(), task, stop));
     Ok(terminal_id)
+}
+
+async fn forward_reads(
+    app: AppHandle,
+    terminal_id: String,
+    mut task: SerialTask,
+    stop: CancellationToken,
+) {
+    loop {
+        let event = tokio::select! {
+            () = stop.cancelled() => break,
+            event = task.next_event() => event,
+        };
+        match event {
+            Some(SerialEvent::Read { bytes, .. }) => {
+                let _ = app.emit(
+                    SERIAL_TERMINAL_DATA_EVENT,
+                    TerminalDataPayload {
+                        terminal_id: terminal_id.clone(),
+                        bytes,
+                    },
+                );
+            }
+            Some(SerialEvent::Disconnected { error, .. }) => {
+                let _ = app.emit(
+                    SERIAL_TERMINAL_ERROR_EVENT,
+                    TerminalErrorPayload {
+                        terminal_id: terminal_id.clone(),
+                        message: format!("Read error: {}", error),
+                    },
+                );
+            }
+            Some(SerialEvent::Connected) => {}
+            None => break,
+        }
+    }
+    task.stop().await;
+    tlog!("[serial_terminal] Read loop exited for {}", terminal_id);
 }
 
 #[tauri::command(rename_all = "snake_case")]
 pub async fn serial_terminal_close(terminal_id: String) -> Result<(), String> {
-    let removed = {
-        let mut map = TERMINALS.lock().unwrap();
-        map.remove(&terminal_id)
-    };
+    let removed = TERMINALS.lock().unwrap().remove(&terminal_id);
     match removed {
         Some(t) => {
-            t.stop_flag.store(true, Ordering::SeqCst);
+            t.stop.cancel();
             tlog!("[serial_terminal] Closed terminal {}", terminal_id);
             Ok(())
         }
@@ -176,27 +150,29 @@ pub async fn serial_terminal_close(terminal_id: String) -> Result<(), String> {
     }
 }
 
+fn writer(terminal_id: &str) -> Result<SerialWriter, String> {
+    TERMINALS
+        .lock()
+        .unwrap()
+        .get(terminal_id)
+        .map(|t| t.writer.clone())
+        .ok_or_else(|| format!("Terminal {} not found", terminal_id))
+}
+
+fn answered(what: &str, answer: Result<io::Result<()>, WriteRefused>) -> Result<(), String> {
+    match answer {
+        Ok(Ok(())) => Ok(()),
+        Ok(Err(e)) => Err(format!("{}: {}", what, e)),
+        Err(e) => Err(format!("{}: {}", what, e)),
+    }
+}
+
 #[tauri::command(rename_all = "snake_case")]
 pub async fn serial_terminal_write(terminal_id: String, bytes: Vec<u8>) -> Result<(), String> {
-    off_runtime(move || write_terminal(&terminal_id, &bytes)).await
+    answered("Write error", writer(&terminal_id)?.write(bytes).await)
 }
 
-fn write_terminal(terminal_id: &str, bytes: &[u8]) -> Result<(), String> {
-    let port = {
-        let map = TERMINALS.lock().unwrap();
-        map.get(terminal_id)
-            .map(|t| t.writer.clone())
-            .ok_or_else(|| format!("Terminal {} not found", terminal_id))?
-    };
-    let mut p = port
-        .lock()
-        .map_err(|e| format!("Port mutex poisoned: {}", e))?;
-    p.write_all(bytes)
-        .and_then(|_| p.flush())
-        .map_err(|e| format!("Write error: {}", e))
-}
-
-/// Pulse RTS low → high to reset the connected µC.
+/// Pulse RTS and DTR low → high to reset the connected µC.
 ///
 /// This works for the common dev-board wiring where RTS is tied (often
 /// through a transistor) to the chip's reset line — ESP32 dev kits,
@@ -204,33 +180,30 @@ fn write_terminal(terminal_id: &str, bytes: &[u8]) -> Result<(), String> {
 /// instead route reset through DTR are covered by the parallel DTR pulse.
 #[tauri::command(rename_all = "snake_case")]
 pub async fn serial_terminal_reset(terminal_id: String) -> Result<(), String> {
-    off_runtime(move || reset_terminal(&terminal_id)).await
-}
-
-fn reset_terminal(terminal_id: &str) -> Result<(), String> {
-    let port = {
-        let map = TERMINALS.lock().unwrap();
-        map.get(terminal_id)
-            .map(|t| t.writer.clone())
-            .ok_or_else(|| format!("Terminal {} not found", terminal_id))?
-    };
-    let mut p = port
-        .lock()
-        .map_err(|e| format!("Port mutex poisoned: {}", e))?;
-
-    // Assert reset (RTS+DTR low) — covers boards that route reset through
-    // either control line. DTR low alone is the Arduino reset; RTS low
-    // alone is the ESP32 EN line.
-    p.write_request_to_send(true)
-        .map_err(|e| format!("Failed to assert RTS: {}", e))?;
-    p.write_data_terminal_ready(true)
-        .map_err(|e| format!("Failed to assert DTR: {}", e))?;
-    std::thread::sleep(Duration::from_millis(100));
-    p.write_request_to_send(false)
-        .map_err(|e| format!("Failed to release RTS: {}", e))?;
-    p.write_data_terminal_ready(false)
-        .map_err(|e| format!("Failed to release DTR: {}", e))?;
-
+    let writer = writer(&terminal_id)?;
+    set_reset_lines(&writer, true, "assert").await?;
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    set_reset_lines(&writer, false, "release").await?;
     tlog!("[serial_terminal] Reset pulse on {}", terminal_id);
     Ok(())
+}
+
+/// Queues RTS then DTR together, so the task sets them back to back rather
+/// than with a read between them.
+async fn set_reset_lines(writer: &SerialWriter, level: bool, verb: &str) -> Result<(), String> {
+    let (rts, dtr) = futures::join!(writer.set_rts(level), writer.set_dtr(level));
+    answered(&format!("Failed to {} RTS", verb), rts)?;
+    answered(&format!("Failed to {} DTR", verb), dtr)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_terminal_writes_and_ends_on_its_first_loss() {
+        let options = terminal_options();
+        assert_eq!(options.access, Access::ReadWrite);
+        assert_eq!(options.reopen, None);
+    }
 }
