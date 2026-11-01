@@ -9636,7 +9636,7 @@ dependencies = [
 [[package]]
 name = "wslib-secret"
 version = "0.1.5"
-source = "git+https://github.com/Wired-Square/wslib-rs.git?rev=757b15a9e0db7667bc7ded151b7363598e587d5d#757b15a9e0db7667bc7ded151b7363598e587d5d"
+source = "git+ssh://git@github.com/Wired-Square/wslib-rs.git?rev=ce6c630#ce6c630719e2ee0a2692694da93d8c82de6933ba"
 dependencies = [
  "secret-service",
  "security-framework 3.7.0",
