@@ -4,6 +4,3 @@ members = ["crates/wiretap-analysis", "crates/wiretap-app", "crates/wiretap-can-
 
 [workspace.package]
 version = "0.15.0"
-
-[patch.wired-square]
-wslib-secret = { git = "ssh://git@github.com/Wired-Square/wslib-rs.git", rev = "ce6c630" }
