@@ -2,12 +2,12 @@
 //
 // Shared formatting helpers for dashboard panels, tooltips and measurement overlays.
 
-/** Format a numeric value for display with adaptive decimal precision.
- *  A missing or non-finite value reads "—". */
-export function formatValue(v: number | null | undefined): string {
+/** Format a numeric value to the signal's `precision`, else to places chosen by its
+ *  size. A missing or non-finite value reads "—". */
+export function formatValue(v: number | null | undefined, precision?: number): string {
   if (v == null || !Number.isFinite(v)) return "—";
   const abs = Math.abs(v);
-  const places = abs >= 10_000 ? 0 : abs >= 1_000 ? 1 : abs >= 100 ? 2 : 3;
+  const places = precision ?? (abs >= 10_000 ? 0 : abs >= 1_000 ? 1 : abs >= 100 ? 2 : 3);
   return toFixedHalfAwayFromZero(v, places);
 }
 

@@ -5,7 +5,7 @@ import { type DashboardPanel } from "../../../../../stores/dashboardStore";
 import { useSettings } from "../../../../../hooks/useSettings";
 import { formatValue } from "../../../utils/dashboardFormat";
 import { fraction } from "../../../widgets/svgArc";
-import { useSignalValues } from "../../../widgets/useSignalValues";
+import { useSignalPrecisions, useSignalValues } from "../../../widgets/useSignalValues";
 import { useSvgExportRef } from "../../../widgets/useExportRef";
 import WidgetEmpty from "../../../widgets/WidgetEmpty";
 import PanelTooltip from "../PanelTooltip";
@@ -35,6 +35,7 @@ export default function RotaryPanel({ panel, svgRef: svgRefProp }: Props) {
   useSvgExportRef(svgElRef, svgRefProp);
 
   const values = useSignalValues(panel.signals);
+  const precisions = useSignalPrecisions(panel.signals);
   const cfg = panel.widgetConfig?.rotary;
 
   if (panel.signals.length === 0) {
@@ -76,7 +77,7 @@ export default function RotaryPanel({ panel, svgRef: svgRefProp }: Props) {
             strokeWidth={2}
             paintOrder="stroke"
           >
-            {formatValue(value)}{sig.unit ? ` ${sig.unit}` : ""}
+            {formatValue(value, precisions[idx])}{sig.unit ? ` ${sig.unit}` : ""}
           </text>
         )}
       </svg>

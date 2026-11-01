@@ -1,7 +1,7 @@
 // ui/src/apps/dashboard/views/panels/list/ListPanel.tsx
 
 import { getSignalLabel, getConfidenceColour, type DashboardPanel } from "../../../../../stores/dashboardStore";
-import { useSignalValues } from "../../../widgets/useSignalValues";
+import { useSignalPrecisions, useSignalValues } from "../../../widgets/useSignalValues";
 import { useSettings } from "../../../../../hooks/useSettings";
 import { emptyStateContainer, emptyStateText } from "../../../../../styles/typography";
 import { formatValue } from "../../../utils/dashboardFormat";
@@ -15,6 +15,7 @@ export default function ListPanel({ panel }: Props) {
   const { settings } = useSettings();
 
   const values = useSignalValues(panel.signals);
+  const precisions = useSignalPrecisions(panel.signals);
 
   if (panel.signals.length === 0) {
     return (
@@ -49,7 +50,7 @@ export default function ListPanel({ panel }: Props) {
 
           {/* Value */}
           <span className="text-xs font-mono font-medium text-primary tabular-nums shrink-0">
-            {formatValue(values[i])}
+            {formatValue(values[i], precisions[i])}
           </span>
 
           {/* Unit */}

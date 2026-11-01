@@ -10,6 +10,12 @@ export function useSignalValues(signals: SignalRef[]): number[] {
   return signals.map((s) => latest.get(signalKey(s.frameId, s.signalName)) ?? NaN);
 }
 
+/** Each signal's catalogue `precision`, aligned to `signals` order. */
+export function useSignalPrecisions(signals: SignalRef[]): (number | undefined)[] {
+  const precisions = useDashboardStore((s) => s.signalPrecisions);
+  return signals.map((s) => precisions.get(signalKey(s.frameId, s.signalName)));
+}
+
 /** Latest value for one "frameId:signalName" key, or NaN. */
 export function useSignalValue(key: string | undefined): number {
   const latest = useDashboardStore((s) => s.latest);
