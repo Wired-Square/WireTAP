@@ -386,6 +386,9 @@ struct FrameTap {
     session_id: String,
     id: u64,
     rx: mpsc::UnboundedReceiver<FrameMessage>,
+    /// Wake only on Windows' timer ticks, so its timing is tested on any OS.
+    #[cfg(test)]
+    coarse: bool,
 }
 
 impl Drop for FrameTap {
@@ -404,6 +407,8 @@ impl Drop for FrameTap {
 impl FrameTap {
     /// Wait for the next tapped frame, or `None` once `deadline` has passed.
     async fn recv_until(&mut self, deadline: Instant) -> Option<FrameMessage> {
+        #[cfg(test)]
+        let deadline = if self.coarse { tests::on_coarse_tick(deadline) } else { deadline };
         let remaining = deadline.checked_duration_since(Instant::now())?;
         tokio::time::timeout(remaining, self.rx.recv()).await.ok().flatten()
     }
@@ -415,10 +420,16 @@ fn register_frame_tap(session_id: &str) -> FrameTap {
     if let Ok(mut taps) = FRAME_TAPS.lock() {
         taps.entry(session_id.to_string()).or_default().push((id, tx));
     }
-    FrameTap { session_id: session_id.to_string(), id, rx }
+    FrameTap {
+        session_id: session_id.to_string(),
+        id,
+        rx,
+        #[cfg(test)]
+        coarse: false,
+    }
 }
 
-/// Called from capture_store::append_frames_to_session to forward test frames.
+/// Called as frames reach a session's capture, to forward test frames.
 pub fn tap_test_frames(session_id: &str, frames: &[FrameMessage]) {
     let taps = match FRAME_TAPS.lock() {
         Ok(t) => t,
@@ -972,6 +983,10 @@ impl<'a> Run<'a> {
                 );
             }
 
+            while let Ok(frame) = self.tap.rx.try_recv() {
+                self.receive(&frame);
+            }
+
             let due = match &mut pacer {
                 _ if !sending => 0,
                 Some(pacer) => pacer.take(now),
@@ -1011,23 +1026,17 @@ impl<'a> Run<'a> {
                 seq = seq.wrapping_add(1);
             }
 
-            match &pacer {
-                None if sending => {
-                    while let Ok(frame) = self.tap.rx.try_recv() {
-                        self.receive(&frame);
-                    }
-                    tokio::task::yield_now().await;
-                }
+            if sending && pacer.is_none() {
+                tokio::task::yield_now().await;
+            } else {
+                let wake = match &pacer {
+                    Some(pacer) if sending => pacer.next_due().min(now + RECEIVE_POLL),
+                    _ => now + RECEIVE_POLL,
+                };
                 // Waiting on the tap rather than sleeping stamps a reply the
                 // moment it arrives, which is what a latency reading needs.
-                pacer => {
-                    let wake = match pacer {
-                        Some(pacer) if sending => pacer.next_due().min(now + RECEIVE_POLL),
-                        _ => now + RECEIVE_POLL,
-                    };
-                    if let Some(frame) = self.tap.recv_until(wake).await {
-                        self.receive(&frame);
-                    }
+                if let Some(frame) = self.tap.recv_until(wake).await {
+                    self.receive(&frame);
                 }
             }
 
@@ -1337,6 +1346,15 @@ pub(crate) mod tests {
     use crate::io::{IOBroker, IOSource, ProfileLoader, SourceConfig, TransmitResult};
     use std::sync::Arc;
 
+    static TICK_EPOCH: Lazy<Instant> = Lazy::new(Instant::now);
+
+    /// The first coarse timer tick at or after `deadline`.
+    pub(super) fn on_coarse_tick(deadline: Instant) -> Instant {
+        let tick = COARSE_TIMER_TICK.as_nanos();
+        let since = deadline.saturating_duration_since(*TICK_EPOCH).as_nanos();
+        *TICK_EPOCH + Duration::from_nanos((since.div_ceil(tick) * tick) as u64)
+    }
+
     /// The far end of a test session's bus.
     enum Wire {
         /// The crate's reply side: a peer on the far end of the bus.
@@ -1466,17 +1484,19 @@ pub(crate) mod tests {
         }
     }
 
-    async fn run_on(session_id: &str, config: &TestConfig) -> IOTestState {
+    async fn run_on(session_id: &str, config: &TestConfig, coarse: bool) -> IOTestState {
         let cancel = AtomicBool::new(false);
         let publish = Publish::new("test", config);
-        let state = Run::new(session_id, &publish, config, &cancel).initiate().await;
+        let mut run = Run::new(session_id, &publish, config, &cancel);
+        run.tap.coarse = coarse;
+        let state = run.initiate().await;
         io::destroy_session(session_id, false).await.unwrap();
         state
     }
 
     async fn run(session_id: &str, wire: Wire, config: &TestConfig) -> IOTestState {
         open_wire(session_id, wire).await;
-        run_on(session_id, config).await
+        run_on(session_id, config, false).await
     }
 
     /// The test the protocol exists for: every length code round-trips at
@@ -1549,7 +1569,7 @@ pub(crate) mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn a_loopback_echo_run_reports_no_drops() {
         open_virtual_loopback("test_echo_loop").await;
-        let state = run_on("test_echo_loop", &config(TestMode::Loopback, false)).await;
+        let state = run_on("test_echo_loop", &config(TestMode::Loopback, false), false).await;
 
         assert!(state.tx_count > 0, "nothing was transmitted");
         assert_eq!(state.rx_count, state.tx_count, "every frame came back");
@@ -1632,16 +1652,31 @@ pub(crate) mod tests {
     }
 
     /// The TX gauge's scale is the run's own `expected_tx`, so an answered run
-    /// fills it.
+    /// fills it, even waking only on Windows' timer ticks.
     #[tokio::test(flavor = "multi_thread")]
     async fn an_echo_run_reaches_its_expected_tx() {
         let mut config = config(TestMode::Echo, false);
         config.duration_sec = 1.0;
-        let state = run("test_echo_gauge", Wire::Peer(Responder::new(0, 0)), &config).await;
+        open_wire("test_echo_gauge", Wire::Peer(Responder::new(0, 0))).await;
+        let state = run_on("test_echo_gauge", &config, true).await;
 
         let expected = state.expected_tx.expect("a paced run has an expected count");
         assert!(state.tx_count <= expected, "{} > {expected}", state.tx_count);
         assert!(state.tx_count * 10 >= expected * 9, "{} of {expected}", state.tx_count);
+    }
+
+    /// Woken only on ticks, a run sends several probes per wake and every
+    /// reply still comes back and is timed.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn a_latency_run_on_a_coarse_timer_loses_nothing() {
+        let config = config(TestMode::Latency, false);
+        open_wire("test_latency_coarse", Wire::Peer(Responder::new(0, 0))).await;
+        let state = run_on("test_latency_coarse", &config, true).await;
+
+        assert!(state.tx_count * 10 >= state.expected_tx.unwrap() * 9, "{} sent", state.tx_count);
+        assert_eq!(state.rx_count, state.tx_count);
+        assert_eq!(state.drops, 0);
+        assert_eq!(state.status, TestStatus::Completed, "errors: {:?}", state.errors);
     }
 
     /// Drive a pacer for `secs` on a timer that wakes only on tick boundaries,
