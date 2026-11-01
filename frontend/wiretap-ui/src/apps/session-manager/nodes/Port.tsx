@@ -9,7 +9,6 @@ const PINNED = {
 
 interface PortProps {
   id: string;
-  /** Inputs sit on the left, outputs on the right. */
   side: "left" | "right";
   className: string;
   /** Sits on the node's border, at `top` (half way down by default), rather than in the flow of its row. */

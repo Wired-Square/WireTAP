@@ -24,7 +24,7 @@
     "@tauri-apps/plugin-dialog": "^2.7.0",
     "@tauri-apps/plugin-opener": "^2",
     "@tauri-apps/plugin-os": "^2",
-    "@wired-square/canvas": "file:/Users/alex/src/wired/wslib-ts/packages/canvas",
+    "@wired-square/canvas": "^0.2.0",
     "@wired-square/mcp-bridge": "^0.1.0",
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/addon-webgl": "^0.19.0",

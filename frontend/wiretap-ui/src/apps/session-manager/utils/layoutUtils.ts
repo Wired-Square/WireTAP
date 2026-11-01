@@ -62,7 +62,7 @@ export interface CaptureInfo {
  * @param openApps Open session-aware app instances across all windows (Rust-owned
  *   roster). Instances with `sessionId == null` become the unconnected app nodes.
  * @param profileBuses Every bus each profile declares, from profileBusStore.
- *   Drives the spare handles for buses not wired into a session.
+ *   Drives the spare ports for buses not wired into a session.
  */
 export function buildSessionGraph(
   sessions: ActiveSessionInfo[],
@@ -81,7 +81,7 @@ export function buildSessionGraph(
   });
 
   // Build a map of profileId → lowest outputBus for sorting source nodes
-  // to match the vertical order of session input handles (avoids edge crossings)
+  // to match the vertical order of session input ports (avoids edge crossings)
   const profileOutputBus = new Map<string, number>();
   sessions.forEach((session) => {
     session.broker_configs?.forEach((config) => {
@@ -92,7 +92,7 @@ export function buildSessionGraph(
     });
   });
 
-  // Build profileId → Set<deviceBus> for output handles on source nodes
+  // Build profileId → Set<deviceBus> for output ports on source nodes
   const profileDeviceBuses = new Map<string, Set<number>>();
   const profileDisabledBuses = new Map<string, Set<number>>();
   sessions.forEach((session) => {
@@ -112,8 +112,8 @@ export function buildSessionGraph(
     });
   });
 
-  // Every bus the profile declares gets a handle, wired into this session or
-  // not. An unwired one renders muted and is the drag handle for adding it.
+  // Every bus the profile declares gets a port, wired into this session or
+  // not. An unwired one renders muted, and a drag from it adds it.
   profiles.forEach((profile) => {
     if (!activeProfileIds.has(profile.id)) return;
     const enabledSet = profileDeviceBuses.get(profile.id);
@@ -183,7 +183,7 @@ export function buildSessionGraph(
   sessions.forEach((session) => {
     // Collect input buses for this session. Sets, not arrays: two sources can
     // land on the same output bus, and a duplicate would give the session node
-    // two handles sharing an id — which breaks drag-to-connect targeting.
+    // two ports sharing an id — which breaks drag-to-connect targeting.
     const inputBusSet = new Set<number>();
     const disabledInputBusSet = new Set<number>();
     session.source_profile_ids.forEach((profileId) => {
@@ -198,7 +198,7 @@ export function buildSessionGraph(
     const inputBuses = [...inputBusSet].sort((a, b) => a - b);
     const disabledInputBuses = [...disabledInputBusSet].sort((a, b) => a - b);
 
-    // Build ordered app IDs for output handles
+    // Build ordered app IDs for output ports
     const connectedAppIds = session.subscribers.map((l) => l.subscriber_id);
 
     const nodeData: SessionNodeData = {
@@ -270,7 +270,6 @@ export function buildSessionGraph(
         data: { kind: "app", ...nodeData },
       });
 
-      // Edge from session output handle to app
       edges.push({
         id: `edge-${session.session_id}::${listener.subscriber_id}`,
         source: `session-${session.session_id}`,

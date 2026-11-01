@@ -13,9 +13,9 @@ export interface SourceNodeData {
   sourceType: string;
   isRealtime: boolean;
   isActive: boolean;
-  /** Device bus numbers this source outputs (one handle per bus) */
+  /** Device bus numbers this source outputs (one port per bus) */
   outputBuses?: number[];
-  /** Device bus numbers with disabled mappings (shown as muted handles) */
+  /** Device bus numbers with disabled mappings (shown as muted ports) */
   disabledBuses?: number[];
   /** Buffer display name (when source is a buffer) */
   captureName?: string;
@@ -35,7 +35,7 @@ interface SourceNodeProps {
 function SourceNode({ data, selected }: SourceNodeProps) {
   const { t } = useTranslation("sessionManager");
   const { profileName, sourceType, isRealtime, isActive, outputBuses, disabledBuses, captureName, isPersistent, captureCount, captureKind } = data;
-  // Merge enabled + disabled buses for handle layout (disabled shown as muted)
+  // Merge enabled + disabled buses for port layout (disabled shown as muted)
   const allBuses = [
     ...(outputBuses ?? []).map((b) => ({ bus: b, enabled: true })),
     ...(disabledBuses ?? []).map((b) => ({ bus: b, enabled: false })),
@@ -83,7 +83,7 @@ function SourceNode({ data, selected }: SourceNodeProps) {
         </div>
       )}
 
-      {/* Bus handles with labels */}
+      {/* Bus ports with labels */}
       {allBuses.length > 0 ? (
         <div className="mt-2 flex flex-col gap-1">
           {allBuses.map(({ bus, enabled }) => (

@@ -69,7 +69,7 @@ export default function SessionManager() {
     [logEntryCount, t]
   );
 
-  // Rust owns which buses each profile declares; the graph draws a handle per
+  // Rust owns which buses each profile declares; the graph draws a port per
   // declared bus. SessionCanvas re-renders off the store once this lands, and
   // the store refetches itself when a profile changes.
   useEffect(() => {

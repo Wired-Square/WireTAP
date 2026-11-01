@@ -39,7 +39,6 @@ function AppNode({ data, selected }: AppNodeProps) {
     <div
       className={`px-4 py-3 rounded-lg border-2 ${borderColour} ${bgColour} min-w-30 shadow-lg ${!data.isConnected ? "opacity-40" : isActive ? "" : "opacity-50"}`}
     >
-      {/* Input handle - connects from sessions */}
       <Port id={APP_INPUT_PORT} side="left" pinned className="bg-text-green border-success" />
 
       {/* Header */}

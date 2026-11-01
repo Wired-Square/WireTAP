@@ -74,7 +74,7 @@ export default function SessionCanvas({
       .catch(console.error);
   }, [sessions]);
 
-  // Every bus each profile declares — drives the spare handles for buses not
+  // Every bus each profile declares — drives the spare ports for buses not
   // yet wired into a session.
   const profileBuses = useProfileBusStore((s) => s.mappings);
 
