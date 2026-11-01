@@ -126,7 +126,7 @@ function Trial() {
   };
 
   const onConnectAppToSession = (sessionId: string, appName: string) => {
-    report(`connect ${appName} → ${sessionId}`);
+    report(`connect ${sessionId} → ${appName}`);
     const joining = openApps.find((a) => a.app_name === appName && a.session_id === null);
     if (!joining) return;
     setOpenApps((prev) => prev.map((a) => (a === joining ? { ...a, session_id: sessionId, is_active: true } : a)));

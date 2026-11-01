@@ -1,6 +1,6 @@
 // src/apps/session-manager/views/SessionCanvas.tsx
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useCanvas } from "@wired-square/canvas/react";
 import type { Point } from "@wired-square/canvas/core";
 import "@wired-square/canvas/canvas.css";
@@ -11,6 +11,8 @@ import SessionNode from "../nodes/SessionNode";
 import AppNode from "../nodes/AppNode";
 import InterfaceEdge, { type InterfaceEdgeData } from "../edges/InterfaceEdge";
 import { buildSessionGraph, calculateFitViewPadding, type CaptureInfo, type GraphNode } from "../utils/layoutUtils";
+import { resolveConnection } from "../utils/graphConnections";
+import { forgetGone, placeDragged, type DraggedPositions } from "../utils/draggedPositions";
 import { useProfileBusStore } from "../../../stores/profileBusStore";
 import { useSessionManagerStore } from "../stores/sessionManagerStore";
 import type { ActiveSessionInfo, AppInstanceInfo } from "../../../api/io";
@@ -81,22 +83,10 @@ export default function SessionCanvas({
     [sessions, profiles, captureInfoMap, openApps, profileBuses]
   );
 
-  // Dragged positions hold until the set of nodes changes, then the layout's return.
-  const topology = useMemo(() => graphData.nodes.map((n) => n.id).sort().join("\n"), [graphData.nodes]);
-  const [dragged, setDragged] = useState({ topology, positions: new Map<string, Point>() });
-  const nodes = useMemo(() => {
-    if (dragged.topology !== topology) return graphData.nodes;
-    return graphData.nodes.map((n) => {
-      const position = dragged.positions.get(n.id);
-      return position ? { ...n, ...position } : n;
-    });
-  }, [graphData.nodes, topology, dragged]);
-
-  const onNodeDragEnd = (node: GraphNode, position: Point) =>
-    setDragged((prev) => ({
-      topology,
-      positions: new Map(prev.topology === topology ? prev.positions : []).set(node.id, position),
-    }));
+  const [dragged, setDragged] = useState<DraggedPositions>(new Map());
+  useEffect(() => setDragged((prev) => forgetGone(prev, graphData.nodes)), [graphData.nodes]);
+  const nodes = useMemo(() => placeDragged(graphData.nodes, dragged), [graphData.nodes, dragged]);
+  const onNodeDragEnd = (node: GraphNode, position: Point) => setDragged((prev) => new Map(prev).set(node.id, position));
 
   // The canvas fits the first nodes itself; refit when the count changes after that.
   const lastCount = useRef(0);
@@ -108,107 +98,20 @@ export default function SessionCanvas({
     }
   }, [canvas, nodes.length]);
 
-  // Handle drag-to-connect: re-enable a disabled bus mapping, create new mapping,
-  // or connect an app to a session
-  const onConnect = useCallback(
-    (
-      source: string,
-      target: string,
-      { sourcePort, targetPort }: { sourcePort: string | undefined; targetPort: string | undefined }
-    ) => {
-
-      // Case 1: Source → Session (bus mapping)
-      if (source.startsWith("source-") && target.startsWith("session-")) {
-        const profileId = source.replace(/^source-/, "");
-        const sessionId = target.replace(/^session-/, "");
-        const deviceBusMatch = sourcePort?.match(/^out-bus(\d+)$/);
-        const outputBusMatch = targetPort?.match(/^in-bus(\d+)$/);
-        if (!deviceBusMatch || !outputBusMatch) return;
-
-        const deviceBus = parseInt(deviceBusMatch[1], 10);
-        const outputBus = parseInt(outputBusMatch[1], 10);
-
-        // Check if this is re-enabling an existing disabled mapping
-        const session = sessions.find((s) => s.session_id === sessionId);
-        const config = session?.broker_configs?.find((c) => c.profile_id === profileId);
-        const isDisabledMapping = config?.bus_mappings.some(
-          (m) => m.device_bus === deviceBus && m.output_bus === outputBus && !m.enabled
-        );
-
-        if (isDisabledMapping && onEnableBusMapping) {
-          onEnableBusMapping(sessionId, profileId, deviceBus, outputBus);
-        } else if (onCreateBusMapping) {
-          onCreateBusMapping(sessionId, profileId, deviceBus, outputBus);
-        }
-        return;
-      }
-
-      // Case 2: Session → App (connect unconnected app to session). The node id is
-      // `app::<instanceId>`; resolve back to the app type name for the join request.
-      if (source.startsWith("session-") && target.startsWith("app::")) {
-        if (!onConnectAppToSession) return;
-        const sessionId = source.replace(/^session-/, "");
-        const instanceId = target.replace(/^app::/, "");
-        const appName = openApps?.find((a) => a.instance_id === instanceId)?.app_name ?? instanceId;
-        onConnectAppToSession(sessionId, appName);
-      }
-    },
-    [sessions, openApps, onEnableBusMapping, onCreateBusMapping, onConnectAppToSession]
-  );
-
-  // Validate connections: source→session bus mappings or session→unconnected app
-  const isValidConnection = useCallback(
-    (source: string, sourcePort: string | undefined, target: string, targetPort: string | undefined) => {
-      // Case 1: Source → Session
-      if (source.startsWith("source-") && target.startsWith("session-")) {
-        const profileId = source.replace(/^source-/, "");
-        const sessionId = target.replace(/^session-/, "");
-        const deviceBusMatch = sourcePort?.match(/^out-bus(\d+)$/);
-        const outputBusMatch = targetPort?.match(/^in-bus(\d+)$/);
-        if (!deviceBusMatch || !outputBusMatch) return false;
-
-        const deviceBus = parseInt(deviceBusMatch[1], 10);
-        const outputBus = parseInt(outputBusMatch[1], 10);
-
-        const session = sessions.find((s) => s.session_id === sessionId);
-        const config = session?.broker_configs?.find((c) => c.profile_id === profileId);
-
-        // Two sources on one output bus merge into an indistinguishable stream,
-        // and Rust's transmit routing gives the bus to whichever source was
-        // added last. Refuse the drop rather than create that.
-        const takenByOther = session?.broker_configs?.some(
-          (c) => c.profile_id !== profileId &&
-                 c.bus_mappings.some((m) => m.enabled && m.output_bus === outputBus)
-        );
-        if (takenByOther) return false;
-
-        // Allow re-enabling disabled mappings
-        if (config?.bus_mappings.some((m) => m.device_bus === deviceBus && m.output_bus === outputBus && !m.enabled)) {
-          return true;
-        }
-
-        // Allow creating new mappings (bus not already mapped)
-        if (config && !config.bus_mappings.some((m) => m.device_bus === deviceBus && m.output_bus === outputBus && m.enabled)) {
-          return true;
-        }
-
-        // Also allow if source is connected to this session but this specific bus combo is new
-        if (session?.source_profile_ids.includes(profileId)) {
-          return true;
-        }
-
-        return false;
-      }
-
-      // Case 2: Session → Unconnected app
-      if (source.startsWith("session-") && target.startsWith("app::")) {
-        return true;
-      }
-
-      return false;
-    },
-    [sessions]
-  );
+  const onConnect = (
+    source: string,
+    target: string,
+    { sourcePort, targetPort }: { sourcePort: string | undefined; targetPort: string | undefined }
+  ) => {
+    const connection = resolveConnection(sessions, source, sourcePort, target, targetPort);
+    if (connection?.kind === "bus") {
+      const { sessionId, profileId, deviceBus, outputBus } = connection;
+      (connection.reenable ? onEnableBusMapping : onCreateBusMapping)?.(sessionId, profileId, deviceBus, outputBus);
+    } else if (connection?.kind === "app") {
+      const appName = openApps?.find((a) => a.instance_id === connection.instanceId)?.app_name ?? connection.instanceId;
+      onConnectAppToSession?.(connection.sessionId, appName);
+    }
+  };
 
   return (
     <Canvas<GraphNode["data"], InterfaceEdgeData>
@@ -222,7 +125,9 @@ export default function SessionCanvas({
       onPaneClick={() => setSelectedNode(null)}
       onNodeDragEnd={onNodeDragEnd}
       onConnect={onConnect}
-      isValidConnection={isValidConnection}
+      isValidConnection={(...ends) => resolveConnection(sessions, ...ends) !== undefined}
+      connectionRadius={20}
+      fitPadding={calculateFitViewPadding(nodes.length)}
       minZoom={0.1}
       maxZoom={2}
       background={{ gap: 20, size: 1 }}

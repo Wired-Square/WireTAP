@@ -2,7 +2,7 @@
    WireTAP's theme variables so they follow the light and dark sets. */
 .session-canvas {
   --app-canvas-bg: transparent;
-  --app-canvas-dot: color-mix(in srgb, var(--text-muted) 30%, transparent);
+  --app-canvas-dot: var(--bg-tertiary);
   --app-canvas-connection: var(--text-muted);
   --app-canvas-chrome: var(--bg-surface);
   --app-canvas-chrome-text: var(--text-primary);

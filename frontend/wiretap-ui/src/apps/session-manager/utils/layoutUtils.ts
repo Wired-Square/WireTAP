@@ -9,13 +9,29 @@ import type { SessionNodeData } from "../nodes/SessionNode";
 import type { AppNodeData } from "../nodes/AppNode";
 import type { InterfaceEdgeData } from "../edges/InterfaceEdge";
 
-// Layout constants
 const COLUMN_SPACING = 300;
-const ROW_SPACING = 120;
+const NODE_GAP = 30;
+const APP_SPACING = 72;
 const START_X = 50;
 const START_Y = 50;
 const DEFAULT_CURVATURE = 0.25;
 const INTERFACE_CURVATURE = 0.4;
+
+// Expected node heights, from the nodes' padding, borders and line heights.
+const NODE_CHROME = 28;
+const BUS_ROW = 18;
+const APP_HEIGHT = NODE_CHROME + 20;
+
+function sourceHeight({ outputBuses, disabledBuses, captureCount }: SourceNodeData): number {
+  const buses = (outputBuses?.length ?? 0) + (disabledBuses?.length ?? 0);
+  return NODE_CHROME + 40 + (captureCount != null ? 16 : 0) + (buses > 0 ? 4 + buses * BUS_ROW : 0);
+}
+
+function sessionHeight({ session, inputBuses, disabledInputBuses }: SessionNodeData): number {
+  const content = 86 + (session.capture_frame_count ? 20 : 0);
+  const inputs = ((inputBuses?.length ?? 0) + (disabledInputBuses?.length ?? 0) + 1) * BUS_ROW - 4;
+  return NODE_CHROME + Math.max(content, inputs);
+}
 
 export const APP_INPUT_PORT = "in";
 
@@ -113,7 +129,12 @@ export function buildSessionGraph(
   const activeProfiles = profiles
     .filter((p) => activeProfileIds.has(p.id))
     .sort((a, b) => (profileOutputBus.get(a.id) ?? 0) - (profileOutputBus.get(b.id) ?? 0));
-  activeProfiles.forEach((profile, index) => {
+  let sourceY = START_Y;
+  const pushSource = (id: string, data: SourceNodeData) => {
+    nodes.push({ id: `source-${id}`, x: START_X, y: sourceY, data: { kind: "source", ...data } });
+    sourceY += sourceHeight(data) + NODE_GAP;
+  };
+  activeProfiles.forEach((profile) => {
     const isRealtime = isRealtimeProfile(profile);
     const deviceBusSet = profileDeviceBuses.get(profile.id);
     const outputBuses = deviceBusSet ? [...deviceBusSet].sort((a, b) => a - b) : undefined;
@@ -132,12 +153,7 @@ export function buildSessionGraph(
       disabledBuses,
     };
 
-    nodes.push({
-      id: `source-${profile.id}`,
-      x: START_X,
-      y: START_Y + index * ROW_SPACING,
-      data: { kind: "source", ...nodeData },
-    });
+    pushSource(profile.id, nodeData);
   });
 
   // Column 1b: Buffer source nodes (any source ID that isn't an IOProfile)
@@ -145,8 +161,7 @@ export function buildSessionGraph(
   const bufferSourceIds = [...activeProfileIds].filter(
     (id) => !profileIdSet.has(id)
   );
-  bufferSourceIds.forEach((captureId, i) => {
-    const index = activeProfiles.length + i;
+  bufferSourceIds.forEach((captureId) => {
     const info = captureInfoMap?.get(captureId);
     const nodeData: SourceNodeData = {
       profileId: captureId,
@@ -159,16 +174,13 @@ export function buildSessionGraph(
       captureCount: info?.count,
       captureKind: info?.captureKind,
     };
-    nodes.push({
-      id: `source-${captureId}`,
-      x: START_X,
-      y: START_Y + index * ROW_SPACING,
-      data: { kind: "source", ...nodeData },
-    });
+    pushSource(captureId, nodeData);
   });
 
-  // Column 2: Session nodes + Column 3: Connected app nodes
-  sessions.forEach((session, index) => {
+  // Column 2: Session nodes + Column 3: Connected app nodes, a row each
+  let sessionY = START_Y;
+  let appBottom: number | undefined;
+  sessions.forEach((session) => {
     // Collect input buses for this session. Sets, not arrays: two sources can
     // land on the same output bus, and a duplicate would give the session node
     // two handles sharing an id — which breaks drag-to-connect targeting.
@@ -200,7 +212,7 @@ export function buildSessionGraph(
     nodes.push({
       id: `session-${session.session_id}`,
       x: START_X + COLUMN_SPACING,
-      y: START_Y + index * ROW_SPACING,
+      y: sessionY,
       data: { kind: "session", ...nodeData },
     });
 
@@ -234,9 +246,6 @@ export function buildSessionGraph(
       }
     });
 
-    // Column 3: Connected app nodes
-    const sessionBaseY = START_Y + index * ROW_SPACING;
-
     session.subscribers.forEach((listener, appIndex) => {
       const appName = listener.app_name || listener.subscriber_id;
       // The cosmetic display id + window live in the open-app roster; match by id
@@ -257,7 +266,7 @@ export function buildSessionGraph(
       nodes.push({
         id: nodeId,
         x: START_X + COLUMN_SPACING * 2,
-        y: sessionBaseY + appIndex * (ROW_SPACING * 0.6),
+        y: sessionY + appIndex * APP_SPACING,
         data: { kind: "app", ...nodeData },
       });
 
@@ -275,6 +284,11 @@ export function buildSessionGraph(
         },
       });
     });
+
+    const apps = session.subscribers.length;
+    const appsHeight = apps > 0 ? (apps - 1) * APP_SPACING + APP_HEIGHT : 0;
+    if (apps > 0) appBottom = sessionY + appsHeight;
+    sessionY += Math.max(sessionHeight(nodeData), appsHeight) + NODE_GAP;
   });
 
   // Column 3b: Unconnected app nodes — open session-aware app instances (across ALL
@@ -283,11 +297,7 @@ export function buildSessionGraph(
   if (openApps) {
     const unconnected = openApps.filter((a) => a.session_id == null);
 
-    // Position below all connected apps
-    const maxConnectedY = nodes
-      .filter((n) => n.data.kind === "app")
-      .reduce((max, n) => Math.max(max, n.y), START_Y - ROW_SPACING * 0.6);
-    const unconnectedBaseY = maxConnectedY + ROW_SPACING;
+    const unconnectedBaseY = appBottom === undefined ? START_Y : appBottom + NODE_GAP;
 
     unconnected.forEach((inst, i) => {
       const nodeData: AppNodeData = {
@@ -300,7 +310,7 @@ export function buildSessionGraph(
       nodes.push({
         id: `app::${inst.instance_id}`,
         x: START_X + COLUMN_SPACING * 2,
-        y: unconnectedBaseY + i * (ROW_SPACING * 0.6),
+        y: unconnectedBaseY + i * APP_SPACING,
         data: { kind: "app", ...nodeData },
       });
     });
