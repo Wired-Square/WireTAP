@@ -184,7 +184,7 @@ function hexId(id: number): string {
 // Store
 // ============================================================================
 
-export const useRulesStore = create<RulesState & RulesActions>((set, get) => {
+export const useRulesStore = create<RulesState & RulesActions>()((set, get) => {
   /** Get the device_id of the connected device, or throw. */
   function deviceId(): string {
     const d = get().device;
