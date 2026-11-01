@@ -11,7 +11,7 @@ import { openPanel } from "../utils/windowCommunication";
 import { openDashboard } from "../api/dashboards";
 import { parseDashboard } from "../utils/dashboards";
 import { useDashboardStore } from "../stores/dashboardStore";
-import { DOM_OPS, runDomOp } from "./domOps";
+import { DOM_OPS, runDomOp } from "@wired-square/mcp-bridge/dom-ops";
 import { apps, isPanelId } from "../apps/registry";
 
 /** ui.openPanel — open/focus an app/panel in the running window; optionally load

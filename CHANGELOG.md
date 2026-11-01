@@ -13,6 +13,7 @@ All notable changes to WireTAP will be documented in this file.
 - **FrameLink devices need firmware that speaks protocol 4.** Devices on older firmware no longer connect; update them before moving to this version. A firmware upgrade can no longer be cancelled once the device has been asked to test the new image; Cancel then says so and the upgrade finishes. A cancel that succeeds now waits for the upgrade to stop, so the device can be upgraded again straight away.
 - **The capture database is upgraded in place the first time this version opens it.** Every capture is kept. Once it has been upgraded, don't go back to an older WireTAP with it; a capture database written by a newer WireTAP is left untouched and reported at startup rather than opened.
 - **A CAN or serial device that drops out is retried with a growing pause.** WireTAP waits 1 s before the first reopen and doubles the wait up to 30 s, so a missing adapter no longer gets hammered. A device plugged back in can take up to 30 s to resume.
+- **Refusing the Keychain prompt on macOS or iOS now says access was denied.** Saving a device password or a GitHub token after cancelling the prompt reports that access to the secret store was denied, instead of a platform error.
 
 ### Fixed
 
@@ -20,6 +21,7 @@ All notable changes to WireTAP will be documented in this file.
 - **A capture's count no longer runs ahead of what it holds.** Frames are counted once they are saved, a save refused while the database is busy is retried, and one that still fails is shown as the session's error instead of being dropped quietly. Clearing a large capture no longer shows its old frames while they are removed, and a copy appears only once it is complete.
 
 - **Firmware flashing in the Serial app.** STM32 UART read-back now handles full 256-byte chunks, and cancelling an ESP or DFU flash now stops esptool and dfu-util too. If a read-back fails or is cancelled, the existing output file is left untouched, and esptool progress no longer shows terminal control codes.
+- **Settings and dashboards survive a crash mid-save.** They are now saved whole or not at all, as catalogues and the window layout are, so a crash or power cut during a save leaves the previous version in place rather than a truncated file.
 
 ## [0.15.0] - 2026-10-14
 

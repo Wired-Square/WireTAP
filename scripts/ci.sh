@@ -135,6 +135,7 @@ if $all; then
     git archive HEAD | docker run --rm -i \
       -v wiretap-ci-linux-target:/work/target -v wiretap-ci-linux-cache:/root/.cache \
       -v "$tag_dir/vendor:/vendor:ro" -v "$tag_dir/vendor.toml:/usr/local/cargo/config.toml:ro" \
+      -v "$HOME/.npmrc:/root/.npmrc:ro" \
       wiretap-ci-linux bash -c "set -e; mkdir src; tar -x -m -C src; cd src; ln -s /work/target target
         npm ci --no-audit --no-fund >/dev/null; bash scripts/tauri.sh build --target $linux"
   fi

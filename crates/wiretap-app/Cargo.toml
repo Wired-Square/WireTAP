@@ -32,8 +32,8 @@ tauri-plugin-os = "2"
 tauri-plugin-store = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-clipboard-manager = "2"
-# Keyring has no default features - must specify platform backends explicitly
-keyring = { version = "3" }
+# Keychain on macOS and iOS; elsewhere the store is ours, over keyring.
+wslib-secret = { version = "0.1.4", registry = "wired-square", features = ["keychain"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2"
@@ -71,11 +71,12 @@ reqwest = { version = "0.12", features = ["json"] }
 sentry = { version = "0.42", features = ["logs"] }
 rumqttc = "0.24"
 # MCP server (opt-in via settings). rmcp comes through wslib-mcp's re-export.
-wslib-mcp = { version = "0.1", registry = "wired-square", features = ["http", "dom", "bridge"] }
+wslib-mcp = { version = "0.2.1", registry = "wired-square", features = ["http", "dom", "bridge"] }
 tokio-tungstenite = "0.26"
 # The transmit history database and the capture store's statements.
 sqlx = { version = "0.8.5", default-features = false, features = ["macros", "migrate", "runtime-tokio", "sqlite"] }
 wslib-db-sqlite = { version = "0.2.4", registry = "wired-square" }
+wslib-file-atomic = { version = "0.1.8", registry = "wired-square" }
 futures = "0.3"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 # The FrameLink protocol, board definitions and session: BLE scanning, mDNS
@@ -118,7 +119,6 @@ notify = "6"
 
 # MacOS
 [target.'cfg(target_os = "macos")'.dependencies]
-keyring = { version = "3", features = ["apple-native"] }
 nusb = { version = "0.2", features = ["tokio"] }
 # Same dead-weight OpenSSL as iOS, and for the same reason — see the iOS block. macOS
 # does not *fail* without this (openssl-sys finds a system OpenSSL it then ignores),
@@ -129,7 +129,6 @@ git2 = { version = "0.21", default-features = false, features = ["https", "vendo
 
 # iOS
 [target.'cfg(target_os = "ios")'.dependencies]
-keyring = { version = "3", features = ["apple-native"] }
 # libgit2 uses SecureTransport on every Apple target (libgit2-sys picks the backend
 # on `target.contains("apple")`), so OpenSSL is never called here. It is vendored
 # anyway because libgit2-sys declares openssl-sys under a blanket `cfg(unix)`, which
@@ -142,6 +141,10 @@ keyring = { version = "3", features = ["apple-native"] }
 git2 = { version = "0.21", default-features = false, features = ["https", "vendored-libgit2", "vendored-openssl"] }
 tauri-plugin-keep-screen-on = "0.1"
 tauri-plugin-safe-area-insets-css = "0.1"
+
+# Keyring has no default features: the Windows and Linux blocks pick the backends.
+[target.'cfg(not(any(target_os = "macos", target_os = "ios")))'.dependencies]
+keyring = "3"
 
 # Windows
 [target.'cfg(target_os = "windows")'.dependencies]

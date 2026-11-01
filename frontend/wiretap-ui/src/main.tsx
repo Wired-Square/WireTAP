@@ -1,5 +1,5 @@
 // First, so the MCP `console` tool keeps errors raised while the rest loads.
-import "./services/domOps";
+import "@wired-square/mcp-bridge/dom-ops";
 import * as Sentry from "@sentry/react";
 import React from "react";
 import ReactDOM from "react-dom/client";

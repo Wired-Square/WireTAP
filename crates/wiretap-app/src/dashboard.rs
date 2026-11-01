@@ -38,10 +38,11 @@ pub fn resolve_dashboard_path(decoder_dir: &str, filename: &str) -> Result<(Path
 /// Write a dashboard file, creating the dashboards dir if needed. Returns the path.
 pub fn write_dashboard(decoder_dir: &str, filename: &str, content: &str) -> Result<String, String> {
     let (path, _exists) = resolve_dashboard_path(decoder_dir, filename)?;
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent).map_err(|e| format!("Failed to create dashboards dir: {e}"))?;
-    }
-    std::fs::write(&path, content).map_err(|e| format!("Failed to write dashboard: {e}"))?;
+    wslib_file_atomic::Options::new()
+        .readers(wslib_file_atomic::Readers::Readable)
+        .create_parents(true)
+        .write(&path, content.as_bytes())
+        .map_err(|e| format!("Failed to write dashboard: {e}"))?;
     Ok(path.to_string_lossy().to_string())
 }
 

@@ -814,7 +814,8 @@ fn write_settings_file(path: &Path, settings: &AppSettings) -> Result<(), String
     initialize_directories(settings)?;
     let content = serde_json::to_string_pretty(settings)
         .map_err(|e| format!("Failed to serialize settings: {}", e))?;
-    std::fs::write(path, content).map_err(|e| format!("Failed to write settings: {}", e))
+    wslib_file_atomic::replace_readable(path, content.as_bytes())
+        .map_err(|e| format!("Failed to write settings: {}", e))
 }
 
 /// Every reader's settings: migrated, defaulted and clamped, with this run's
@@ -1554,6 +1555,7 @@ mod tests {
         assert_eq!(loaded.settings.decoder_dir, decoders.to_string_lossy());
         assert!(decoders.is_dir());
         assert_eq!(loaded.settings.install_id.len(), 36);
+        assert!(!wslib_file_atomic::beside(&scratch.file(), "new").exists());
 
         let again = scratch.load().unwrap();
         assert!(!again.written, "a migrated file is not rewritten");

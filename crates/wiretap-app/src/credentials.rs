@@ -1,9 +1,9 @@
 //! Secure credential storage using the system keyring.
 //!
-//! Uses the native OS credential store:
-//! - macOS: Keychain
-//! - Windows: Credential Manager
-//! - Linux: Secret Service (GNOME Keyring, KWallet)
+//! Uses the native OS credential store through one [`SecretStore`]:
+//! - macOS and iOS: Keychain (`wslib_secret::Keychain`)
+//! - Windows: Credential Manager, and Linux: Secret Service (GNOME Keyring,
+//!   KWallet), both through `keyring`
 //!
 //! Two live service namespaces. IO-profile secrets and catalogue-sharing tokens
 //! are kept apart so sharing tokens are out of scope of
@@ -15,11 +15,11 @@
 //!
 //! **The drain is transitional — delete it once 0.10 is well established.** The
 //! deletable unit is [`LEGACY_IO_PROFILE_SERVICE`], the "legacy namespace drain"
-//! block below, [`get_credential`]'s `None` arm, `delete_both`'s second delete,
-//! and the `discard_legacy` call in [`store_credential`]. Nothing else depends
-//! on it.
+//! block below, [`migrate_legacy_io_profile_credentials`], `get_credential`'s
+//! `None` arm, `delete_both`'s second delete, and the `discard_legacy` call in
+//! `store_credential`. Nothing else depends on it.
 
-use keyring::Entry;
+use wslib_secret::{Secret, SecretStore};
 
 use crate::settings::IOProfile;
 
@@ -55,31 +55,7 @@ pub fn has_stored_marker(profile: &IOProfile, field: &str) -> bool {
 /// the marker, otherwise from the plaintext connection value that pre-keyring
 /// profiles still hold. `None` when neither has it.
 pub fn resolve_secret(profile: &IOProfile, field: &str) -> Option<String> {
-    if !has_stored_marker(profile, field) {
-        return profile
-            .connection
-            .get(field)
-            .and_then(|v| v.as_str())
-            .map(str::to_string);
-    }
-
-    match get_credential(&profile.id, field) {
-        Ok(Some(value)) => Some(value),
-        Ok(None) => {
-            tlog!(
-                "[credentials] Profile {} is marked as storing {} in the keyring, but no entry exists",
-                profile.id, field
-            );
-            None
-        }
-        Err(e) => {
-            tlog!(
-                "[credentials] Failed to read {} for profile {}: {}",
-                field, profile.id, e
-            );
-            None
-        }
-    }
+    os().resolve(profile, field)
 }
 
 /// Move a profile's secrets out of `connection` and into `store` (the keyring,
@@ -124,97 +100,33 @@ pub fn store_io_secret(account: &str, value: &str) -> Result<(), String> {
     set_secret(IO_PROFILE_SERVICE, account, value)
 }
 
-// ── Service-parameterised core ───────────────────────────────────────────────
-
 /// Store a secret under an explicit service namespace.
 pub fn set_secret(service: &str, account: &str, value: &str) -> Result<(), String> {
-    entry(service, account)?
-        .set_password(value)
-        .map_err(|e| format!("Failed to store credential: {e}"))
+    os().set(service, account, value)
 }
 
 /// Read a secret. `Ok(None)` when no entry exists.
 pub fn get_secret(service: &str, account: &str) -> Result<Option<String>, String> {
-    match entry(service, account)?.get_password() {
-        Ok(pw) => Ok(Some(pw)),
-        Err(keyring::Error::NoEntry) => Ok(None),
-        Err(e) => Err(format!("Failed to retrieve credential: {e}")),
-    }
+    os().get(service, account)
 }
 
 /// Delete a secret. Succeeds when there was nothing to delete.
 pub fn delete_secret(service: &str, account: &str) -> Result<(), String> {
-    match entry(service, account)?.delete_credential() {
-        Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
-        Err(e) => Err(format!("Failed to delete credential: {e}")),
-    }
-}
-
-fn entry(service: &str, account: &str) -> Result<Entry, String> {
-    Entry::new(service, account).map_err(|e| format!("Failed to create keyring entry: {e}"))
-}
-
-// ── Legacy namespace drain ───────────────────────────────────────────────────
-
-/// Best-effort removal of a legacy entry. Failure is logged, never propagated —
-/// a lingering old entry is recoverable, a failed read or save is not.
-fn discard_legacy(account: &str) {
-    if let Err(e) = delete_secret(LEGACY_IO_PROFILE_SERVICE, account) {
-        tlog!("[credentials] Legacy delete failed for {}: {}", account, e);
-    }
-}
-
-/// Move one account from the legacy namespace into the live one, returning the
-/// value that was moved.
-fn drain_legacy(account: &str) -> Option<String> {
-    let value = get_secret(LEGACY_IO_PROFILE_SERVICE, account).unwrap_or_else(|e| {
-        tlog!("[credentials] Legacy read failed for {}: {}", account, e);
-        None
-    })?;
-
-    match set_secret(IO_PROFILE_SERVICE, account, &value) {
-        Ok(()) => {
-            tlog!("[credentials] Migrated {} to {}", account, IO_PROFILE_SERVICE);
-            discard_legacy(account);
-        }
-        Err(e) => tlog!("[credentials] Legacy copy failed for {}: {}", account, e),
-    }
-
-    Some(value)
+    os().delete(service, account)
 }
 
 /// Drain any legacy IO-profile secrets for the given profiles into the live
 /// namespace, so entries nothing ever reads still get moved and the old
 /// namespace empties. Call once, off the startup critical path — [`get_credential`]
 /// is what guarantees a secret is migrated before it is used.
-///
-/// Probes legacy first: once drained that is a keyring *miss*, which is far
-/// cheaper than the live *hit* the reverse order would pay on every launch.
 pub fn migrate_legacy_io_profile_credentials(profiles: &[IOProfile]) {
-    for profile in profiles {
-        for field in SECURE_FIELDS.iter().filter(|f| has_stored_marker(profile, f)) {
-            let account = account_name(&profile.id, field);
-            if get_secret(LEGACY_IO_PROFILE_SERVICE, &account).ok().flatten().is_none() {
-                continue;
-            }
-            // A live entry always wins — draining over it would restore a stale value.
-            if get_secret(IO_PROFILE_SERVICE, &account).ok().flatten().is_none() {
-                drain_legacy(&account);
-            }
-        }
-    }
+    os().migrate_legacy(profiles)
 }
-
-// ── IO-profile commands ──────────────────────────────────────────────────────
 
 /// Store a credential in the system keyring.
 #[tauri::command(rename_all = "camelCase")]
 pub fn store_credential(profile_id: &str, field: &str, value: &str) -> Result<(), String> {
-    let account = account_name(profile_id, field);
-    set_secret(IO_PROFILE_SERVICE, &account, value)?;
-    // A re-save must not leave the old entry behind for the fallback to resurrect.
-    discard_legacy(&account);
-    Ok(())
+    os().store_credential(profile_id, field, value)
 }
 
 /// Retrieve a credential from the system keyring, falling back to the legacy
@@ -222,39 +134,316 @@ pub fn store_credential(profile_id: &str, field: &str, value: &str) -> Result<()
 /// Returns Ok(None) if no credential is stored.
 #[tauri::command(rename_all = "camelCase")]
 pub fn get_credential(profile_id: &str, field: &str) -> Result<Option<String>, String> {
-    let account = account_name(profile_id, field);
-    match get_secret(IO_PROFILE_SERVICE, &account)? {
-        Some(value) => Ok(Some(value)),
-        None => Ok(drain_legacy(&account)),
-    }
+    os().get_credential(profile_id, field)
 }
 
 /// Delete a credential from the system keyring.
 /// Returns Ok(()) even if no credential was stored.
 #[tauri::command(rename_all = "camelCase")]
 pub fn delete_credential(profile_id: &str, field: &str) -> Result<(), String> {
-    delete_both(&account_name(profile_id, field))
+    os().delete_both(&account_name(profile_id, field))
 }
 
 /// Delete all credentials for a profile (password, token, etc.).
 #[tauri::command(rename_all = "camelCase")]
 pub fn delete_all_credentials(profile_id: &str) -> Result<(), String> {
-    for field in SECURE_FIELDS {
-        delete_both(&account_name(profile_id, field))?;
-    }
-    Ok(())
+    os().delete_all(profile_id)
 }
 
-/// Delete from both namespaces — leaving a legacy entry would let the read
-/// fallback resurrect a deleted secret.
-fn delete_both(account: &str) -> Result<(), String> {
-    delete_secret(IO_PROFILE_SERVICE, account)?;
-    delete_secret(LEGACY_IO_PROFILE_SERVICE, account)
+// ── Store-parameterised core ─────────────────────────────────────────────────
+
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+static PLATFORM_STORE: wslib_secret::Keychain = wslib_secret::Keychain;
+
+#[cfg(not(any(target_os = "macos", target_os = "ios")))]
+static PLATFORM_STORE: os_keyring::Keyring = os_keyring::Keyring;
+
+fn os() -> Credentials<'static> {
+    Credentials(&PLATFORM_STORE)
+}
+
+struct Credentials<'a>(&'a dyn SecretStore);
+
+impl Credentials<'_> {
+    fn set(&self, service: &str, account: &str, value: &str) -> Result<(), String> {
+        self.0
+            .save(service, account, &Secret::new(value))
+            .map_err(|e| format!("Failed to store credential: {e}"))
+    }
+
+    fn get(&self, service: &str, account: &str) -> Result<Option<String>, String> {
+        self.0
+            .load(service, account)
+            .map(|secret| secret.map(|s| s.expose().to_owned()))
+            .map_err(|e| format!("Failed to retrieve credential: {e}"))
+    }
+
+    fn delete(&self, service: &str, account: &str) -> Result<(), String> {
+        self.0
+            .delete(service, account)
+            .map_err(|e| format!("Failed to delete credential: {e}"))
+    }
+
+    fn holds(&self, service: &str, account: &str) -> bool {
+        matches!(self.get(service, account), Ok(Some(_)))
+    }
+
+    fn resolve(&self, profile: &IOProfile, field: &str) -> Option<String> {
+        if !has_stored_marker(profile, field) {
+            return profile
+                .connection
+                .get(field)
+                .and_then(|v| v.as_str())
+                .map(str::to_string);
+        }
+
+        match self.get_credential(&profile.id, field) {
+            Ok(Some(value)) => Some(value),
+            Ok(None) => {
+                tlog!(
+                    "[credentials] Profile {} is marked as storing {} in the keyring, but no entry exists",
+                    profile.id, field
+                );
+                None
+            }
+            Err(e) => {
+                tlog!(
+                    "[credentials] Failed to read {} for profile {}: {}",
+                    field, profile.id, e
+                );
+                None
+            }
+        }
+    }
+
+    fn store_credential(&self, profile_id: &str, field: &str, value: &str) -> Result<(), String> {
+        let account = account_name(profile_id, field);
+        self.set(IO_PROFILE_SERVICE, &account, value)?;
+        // A re-save must not leave the old entry behind for the fallback to resurrect.
+        self.discard_legacy(&account);
+        Ok(())
+    }
+
+    fn get_credential(&self, profile_id: &str, field: &str) -> Result<Option<String>, String> {
+        let account = account_name(profile_id, field);
+        match self.get(IO_PROFILE_SERVICE, &account)? {
+            Some(value) => Ok(Some(value)),
+            None => Ok(self.drain_legacy(&account)),
+        }
+    }
+
+    fn delete_all(&self, profile_id: &str) -> Result<(), String> {
+        for field in SECURE_FIELDS {
+            self.delete_both(&account_name(profile_id, field))?;
+        }
+        Ok(())
+    }
+
+    /// Delete from both namespaces — leaving a legacy entry would let the read
+    /// fallback resurrect a deleted secret.
+    fn delete_both(&self, account: &str) -> Result<(), String> {
+        self.delete(IO_PROFILE_SERVICE, account)?;
+        self.delete(LEGACY_IO_PROFILE_SERVICE, account)
+    }
+
+    // ── Legacy namespace drain ───────────────────────────────────────────────
+
+    /// Best-effort removal of a legacy entry. Failure is logged, never propagated —
+    /// a lingering old entry is recoverable, a failed read or save is not.
+    fn discard_legacy(&self, account: &str) {
+        if let Err(e) = self.delete(LEGACY_IO_PROFILE_SERVICE, account) {
+            tlog!("[credentials] Legacy delete failed for {}: {}", account, e);
+        }
+    }
+
+    /// Move one account from the legacy namespace into the live one, returning the
+    /// value that was moved.
+    fn drain_legacy(&self, account: &str) -> Option<String> {
+        let value = self.get(LEGACY_IO_PROFILE_SERVICE, account).unwrap_or_else(|e| {
+            tlog!("[credentials] Legacy read failed for {}: {}", account, e);
+            None
+        })?;
+
+        match self.set(IO_PROFILE_SERVICE, account, &value) {
+            Ok(()) => {
+                tlog!("[credentials] Migrated {} to {}", account, IO_PROFILE_SERVICE);
+                self.discard_legacy(account);
+            }
+            Err(e) => tlog!("[credentials] Legacy copy failed for {}: {}", account, e),
+        }
+
+        Some(value)
+    }
+
+    /// Probes legacy first: once drained that is a keyring *miss*, which is far
+    /// cheaper than the live *hit* the reverse order would pay on every launch.
+    fn migrate_legacy(&self, profiles: &[IOProfile]) {
+        for profile in profiles {
+            for field in SECURE_FIELDS.iter().filter(|f| has_stored_marker(profile, f)) {
+                let account = account_name(&profile.id, field);
+                // A live entry always wins — draining over it would restore a stale value.
+                if self.holds(LEGACY_IO_PROFILE_SERVICE, &account)
+                    && !self.holds(IO_PROFILE_SERVICE, &account)
+                {
+                    self.drain_legacy(&account);
+                }
+            }
+        }
+    }
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "ios")))]
+mod os_keyring {
+    use keyring::{Entry, Error};
+    use wslib_secret::{Secret, SecretStore, StoreError};
+
+    pub struct Keyring;
+
+    fn backend(e: Error) -> StoreError {
+        StoreError::Backend(Box::new(e))
+    }
+
+    fn entry(service: &str, account: &str) -> Result<Entry, StoreError> {
+        Entry::new(service, account).map_err(backend)
+    }
+
+    impl SecretStore for Keyring {
+        fn load(&self, service: &str, account: &str) -> Result<Option<Secret>, StoreError> {
+            match entry(service, account)?.get_password() {
+                Ok(password) => Ok(Some(Secret::new(password))),
+                Err(Error::NoEntry) => Ok(None),
+                Err(e) => Err(backend(e)),
+            }
+        }
+
+        fn save(&self, service: &str, account: &str, secret: &Secret) -> Result<(), StoreError> {
+            entry(service, account)?.set_password(secret.expose()).map_err(backend)
+        }
+
+        fn delete(&self, service: &str, account: &str) -> Result<(), StoreError> {
+            match entry(service, account)?.delete_credential() {
+                Ok(()) | Err(Error::NoEntry) => Ok(()),
+                Err(e) => Err(backend(e)),
+            }
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use wslib_secret::MemoryStore;
+
+    fn profile(connection: serde_json::Value) -> IOProfile {
+        serde_json::from_value(serde_json::json!({
+            "id": "io_1", "name": "Bench", "kind": "gvret_tcp", "connection": connection
+        }))
+        .unwrap()
+    }
+
+    fn loaded(store: &MemoryStore, service: &str, account: &str) -> Option<String> {
+        Credentials(store).get(service, account).unwrap()
+    }
+
+    fn seed(store: &MemoryStore, service: &str, account: &str, value: &str) {
+        Credentials(store).set(service, account, value).unwrap();
+    }
+
+    #[test]
+    fn an_unmarked_field_resolves_from_the_plaintext_connection() {
+        let store = MemoryStore::default();
+        seed(&store, IO_PROFILE_SERVICE, "io_1:password", "stored");
+        let p = profile(serde_json::json!({ "password": "inline" }));
+        assert_eq!(Credentials(&store).resolve(&p, "password").as_deref(), Some("inline"));
+    }
+
+    #[test]
+    fn a_marked_field_resolves_from_the_store_and_never_from_plaintext() {
+        let store = MemoryStore::default();
+        let p = profile(serde_json::json!({ "_password_stored": true, "password": "inline" }));
+        assert_eq!(Credentials(&store).resolve(&p, "password"), None);
+        seed(&store, IO_PROFILE_SERVICE, "io_1:password", "stored");
+        assert_eq!(Credentials(&store).resolve(&p, "password").as_deref(), Some("stored"));
+    }
+
+    #[test]
+    fn a_legacy_only_secret_is_drained_into_the_live_namespace_on_read() {
+        let store = MemoryStore::default();
+        seed(&store, LEGACY_IO_PROFILE_SERVICE, "io_1:token", "old");
+        let p = profile(serde_json::json!({ "_token_stored": true }));
+        assert_eq!(Credentials(&store).resolve(&p, "token").as_deref(), Some("old"));
+        assert_eq!(loaded(&store, IO_PROFILE_SERVICE, "io_1:token").as_deref(), Some("old"));
+        assert_eq!(loaded(&store, LEGACY_IO_PROFILE_SERVICE, "io_1:token"), None);
+    }
+
+    #[test]
+    fn storing_a_credential_discards_its_legacy_entry() {
+        let store = MemoryStore::default();
+        seed(&store, LEGACY_IO_PROFILE_SERVICE, "io_1:password", "old");
+        Credentials(&store).store_credential("io_1", "password", "new").unwrap();
+        assert_eq!(loaded(&store, IO_PROFILE_SERVICE, "io_1:password").as_deref(), Some("new"));
+        assert_eq!(loaded(&store, LEGACY_IO_PROFILE_SERVICE, "io_1:password"), None);
+    }
+
+    #[test]
+    fn deleting_a_profile_clears_both_namespaces_and_spares_sharing_tokens() {
+        let store = MemoryStore::default();
+        for field in SECURE_FIELDS {
+            let account = account_name("io_1", field);
+            seed(&store, IO_PROFILE_SERVICE, &account, "live");
+            seed(&store, LEGACY_IO_PROFILE_SERVICE, &account, "old");
+        }
+        seed(&store, SHARING_SERVICE, "io_1:token", "github");
+        Credentials(&store).delete_all("io_1").unwrap();
+        for field in SECURE_FIELDS {
+            let account = account_name("io_1", field);
+            assert_eq!(loaded(&store, IO_PROFILE_SERVICE, &account), None);
+            assert_eq!(loaded(&store, LEGACY_IO_PROFILE_SERVICE, &account), None);
+        }
+        assert_eq!(loaded(&store, SHARING_SERVICE, "io_1:token").as_deref(), Some("github"));
+    }
+
+    #[test]
+    fn migration_drains_marked_fields_and_never_overwrites_a_live_entry() {
+        let store = MemoryStore::default();
+        seed(&store, LEGACY_IO_PROFILE_SERVICE, "io_1:password", "old-password");
+        seed(&store, LEGACY_IO_PROFILE_SERVICE, "io_1:api_key", "old-key");
+        seed(&store, IO_PROFILE_SERVICE, "io_1:api_key", "live-key");
+        seed(&store, LEGACY_IO_PROFILE_SERVICE, "io_1:token", "unmarked");
+        let p = profile(serde_json::json!({ "_password_stored": true, "_api_key_stored": true }));
+
+        Credentials(&store).migrate_legacy(&[p]);
+
+        assert_eq!(loaded(&store, IO_PROFILE_SERVICE, "io_1:password").as_deref(), Some("old-password"));
+        assert_eq!(loaded(&store, LEGACY_IO_PROFILE_SERVICE, "io_1:password"), None);
+        assert_eq!(loaded(&store, IO_PROFILE_SERVICE, "io_1:api_key").as_deref(), Some("live-key"));
+        assert_eq!(loaded(&store, IO_PROFILE_SERVICE, "io_1:token"), None);
+        assert_eq!(loaded(&store, LEGACY_IO_PROFILE_SERVICE, "io_1:token").as_deref(), Some("unmarked"));
+    }
+
+    #[test]
+    fn splitting_stores_supplied_secrets_and_keeps_markers_for_untouched_ones() {
+        let store = MemoryStore::default();
+        let mut p = profile(serde_json::json!({
+            "_password_stored": true, "api_key": "key", "token": "  ", "host": "10.0.0.1"
+        }));
+        split_secrets(&mut p, |account, value| Credentials(&store).set(IO_PROFILE_SERVICE, account, value))
+            .unwrap();
+
+        assert_eq!(loaded(&store, IO_PROFILE_SERVICE, "io_1:api_key").as_deref(), Some("key"));
+        assert_eq!(loaded(&store, IO_PROFILE_SERVICE, "io_1:token"), None);
+        for field in SECURE_FIELDS {
+            assert!(!p.connection.contains_key(field), "{field} left in plaintext");
+        }
+        assert!(has_stored_marker(&p, "password"));
+        assert!(has_stored_marker(&p, "api_key"));
+        assert!(!has_stored_marker(&p, "token"));
+        assert_eq!(p.connection["host"], "10.0.0.1".into());
+
+        forget_stored_secrets(&mut p);
+        assert!(SECURE_FIELDS.iter().all(|f| !has_stored_marker(&p, f)));
+    }
 
     #[test]
     fn test_account_name() {
