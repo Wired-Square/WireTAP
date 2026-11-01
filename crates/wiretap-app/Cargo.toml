@@ -32,7 +32,7 @@ tauri-plugin-os = "2"
 tauri-plugin-store = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-clipboard-manager = "2"
-wslib-secret = { path = "../../../wslib-rs-secret-os/crates/wslib-secret", features = ["os"] }
+wslib-secret = { version = "0.1.5", registry = "wired-square", features = ["os"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2"
