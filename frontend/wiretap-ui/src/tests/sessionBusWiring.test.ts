@@ -79,7 +79,7 @@ describe("profileBusStore accessors", () => {
 describe("buildSessionGraph — bus wiring", () => {
   const profiles = [profile("io_a", "Josh Remote 2323")];
 
-  it("draws one edge per enabled bus, onto matching handles", () => {
+  it("draws one edge per enabled bus, onto matching ports", () => {
     const graph = buildSessionGraph(
       [session("f_1", [{ profileId: "io_a", busMappings: [mapping(0, 0), mapping(1, 1)] }])],
       profiles,
@@ -87,8 +87,8 @@ describe("buildSessionGraph — bus wiring", () => {
 
     const edges = graph.edges.filter((e) => e.source === "source-io_a");
     expect(edges).toHaveLength(2);
-    expect(edges.map((e) => e.sourceHandle)).toEqual(["out-bus0", "out-bus1"]);
-    expect(edges.map((e) => e.targetHandle)).toEqual(["in-bus0", "in-bus1"]);
+    expect(edges.map((e) => e.sourcePort)).toEqual(["out-bus0", "out-bus1"]);
+    expect(edges.map((e) => e.targetPort)).toEqual(["in-bus0", "in-bus1"]);
 
     expect(sourceData(graph, "io_a").outputBuses).toEqual([0, 1]);
     expect(sessionData(graph, "f_1").inputBuses).toEqual([0, 1]);
@@ -107,7 +107,7 @@ describe("buildSessionGraph — bus wiring", () => {
     // bus 0 is wired, bus 1 is declared but unwired
     expect(source.outputBuses).toEqual([0]);
     expect(source.disabledBuses).toEqual([1]);
-    // Only the wired bus gets an edge; the spare handle is the drop target.
+    // Only the wired bus gets an edge; the spare port is the drop target.
     expect(graph.edges.filter((e) => e.source === "source-io_a")).toHaveLength(1);
   });
 
@@ -122,9 +122,9 @@ describe("buildSessionGraph — bus wiring", () => {
     expect(graph.edges.filter((e) => e.source === "source-io_a")).toHaveLength(1);
   });
 
-  it("does not give the session two input handles with the same id", () => {
+  it("does not give the session two input ports with the same id", () => {
     // Two sources colliding on one output bus produced duplicate `in-bus0`
-    // handles, which breaks React Flow's drop targeting. Unreachable while
+    // ports, which breaks drop targeting. Unreachable while
     // every source had exactly one bus.
     const graph = buildSessionGraph(
       [

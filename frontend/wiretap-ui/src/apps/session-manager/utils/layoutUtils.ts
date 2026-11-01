@@ -1,6 +1,6 @@
 // src/apps/session-manager/utils/layoutUtils.ts
 
-import type { Edge } from "@xyflow/react";
+import type { CanvasEdge, CanvasNode } from "@wired-square/canvas/core";
 import type { ActiveSessionInfo, AppInstanceInfo, BusMapping } from "../../../api/io";
 import type { IOProfile } from "../../../hooks/useSettings";
 import { isRealtimeProfile } from "../../../stores/profileBusStore";
@@ -9,23 +9,43 @@ import type { SessionNodeData } from "../nodes/SessionNode";
 import type { AppNodeData } from "../nodes/AppNode";
 import type { InterfaceEdgeData } from "../edges/InterfaceEdge";
 
-// Layout constants
 const COLUMN_SPACING = 300;
-const ROW_SPACING = 120;
+const NODE_GAP = 30;
+const APP_SPACING = 72;
 const START_X = 50;
 const START_Y = 50;
+const DEFAULT_CURVATURE = 0.25;
+const INTERFACE_CURVATURE = 0.4;
 
-// Custom node type that allows our typed data
-interface FlowNode<T = unknown> {
-  id: string;
-  type: string;
-  position: { x: number; y: number };
-  data: T;
+// Expected node heights, from the nodes' padding, borders and line heights.
+const NODE_CHROME = 28;
+const BUS_ROW = 18;
+const APP_HEIGHT = NODE_CHROME + 20;
+
+function sourceHeight({ outputBuses, disabledBuses, captureCount }: SourceNodeData): number {
+  const buses = (outputBuses?.length ?? 0) + (disabledBuses?.length ?? 0);
+  return NODE_CHROME + 40 + (captureCount != null ? 16 : 0) + (buses > 0 ? 4 + buses * BUS_ROW : 0);
 }
 
+function sessionHeight({ session, inputBuses, disabledInputBuses }: SessionNodeData): number {
+  const content = 86 + (session.capture_frame_count ? 20 : 0);
+  const inputs = ((inputBuses?.length ?? 0) + (disabledInputBuses?.length ?? 0) + 1) * BUS_ROW - 4;
+  return NODE_CHROME + Math.max(content, inputs);
+}
+
+export const APP_INPUT_PORT = "in";
+
+export type GraphNodeData =
+  | (SourceNodeData & { kind: "source" })
+  | (SessionNodeData & { kind: "session" })
+  | (AppNodeData & { kind: "app" });
+
+export type GraphNode = CanvasNode<GraphNodeData>;
+export type GraphEdge = CanvasEdge<InterfaceEdgeData>;
+
 export interface SessionGraphData {
-  nodes: FlowNode[];
-  edges: Edge[];
+  nodes: GraphNode[];
+  edges: GraphEdge[];
 }
 
 /** Buffer metadata for source node display */
@@ -37,12 +57,12 @@ export interface CaptureInfo {
 }
 
 /**
- * Transform session data into React Flow nodes and edges.
+ * Transform session data into canvas nodes and edges.
  * @param captureInfoMap Optional map of capture_id → metadata for capture source nodes.
  * @param openApps Open session-aware app instances across all windows (Rust-owned
  *   roster). Instances with `sessionId == null` become the unconnected app nodes.
  * @param profileBuses Every bus each profile declares, from profileBusStore.
- *   Drives the spare handles for buses not wired into a session.
+ *   Drives the spare ports for buses not wired into a session.
  */
 export function buildSessionGraph(
   sessions: ActiveSessionInfo[],
@@ -51,8 +71,8 @@ export function buildSessionGraph(
   openApps?: AppInstanceInfo[],
   profileBuses?: Map<string, BusMapping[]>,
 ): SessionGraphData {
-  const nodes: FlowNode[] = [];
-  const edges: Edge[] = [];
+  const nodes: GraphNode[] = [];
+  const edges: GraphEdge[] = [];
 
   // Track which profiles are actively used by sessions
   const activeProfileIds = new Set<string>();
@@ -61,7 +81,7 @@ export function buildSessionGraph(
   });
 
   // Build a map of profileId → lowest outputBus for sorting source nodes
-  // to match the vertical order of session input handles (avoids edge crossings)
+  // to match the vertical order of session input ports (avoids edge crossings)
   const profileOutputBus = new Map<string, number>();
   sessions.forEach((session) => {
     session.broker_configs?.forEach((config) => {
@@ -72,7 +92,7 @@ export function buildSessionGraph(
     });
   });
 
-  // Build profileId → Set<deviceBus> for output handles on source nodes
+  // Build profileId → Set<deviceBus> for output ports on source nodes
   const profileDeviceBuses = new Map<string, Set<number>>();
   const profileDisabledBuses = new Map<string, Set<number>>();
   sessions.forEach((session) => {
@@ -92,8 +112,8 @@ export function buildSessionGraph(
     });
   });
 
-  // Every bus the profile declares gets a handle, wired into this session or
-  // not. An unwired one renders muted and is the drag handle for adding it.
+  // Every bus the profile declares gets a port, wired into this session or
+  // not. An unwired one renders muted, and a drag from it adds it.
   profiles.forEach((profile) => {
     if (!activeProfileIds.has(profile.id)) return;
     const enabledSet = profileDeviceBuses.get(profile.id);
@@ -109,7 +129,12 @@ export function buildSessionGraph(
   const activeProfiles = profiles
     .filter((p) => activeProfileIds.has(p.id))
     .sort((a, b) => (profileOutputBus.get(a.id) ?? 0) - (profileOutputBus.get(b.id) ?? 0));
-  activeProfiles.forEach((profile, index) => {
+  let sourceY = START_Y;
+  const pushSource = (id: string, data: SourceNodeData) => {
+    nodes.push({ id: `source-${id}`, x: START_X, y: sourceY, data: { kind: "source", ...data } });
+    sourceY += sourceHeight(data) + NODE_GAP;
+  };
+  activeProfiles.forEach((profile) => {
     const isRealtime = isRealtimeProfile(profile);
     const deviceBusSet = profileDeviceBuses.get(profile.id);
     const outputBuses = deviceBusSet ? [...deviceBusSet].sort((a, b) => a - b) : undefined;
@@ -128,12 +153,7 @@ export function buildSessionGraph(
       disabledBuses,
     };
 
-    nodes.push({
-      id: `source-${profile.id}`,
-      type: "source",
-      position: { x: START_X, y: START_Y + index * ROW_SPACING },
-      data: nodeData,
-    });
+    pushSource(profile.id, nodeData);
   });
 
   // Column 1b: Buffer source nodes (any source ID that isn't an IOProfile)
@@ -141,8 +161,7 @@ export function buildSessionGraph(
   const bufferSourceIds = [...activeProfileIds].filter(
     (id) => !profileIdSet.has(id)
   );
-  bufferSourceIds.forEach((captureId, i) => {
-    const index = activeProfiles.length + i;
+  bufferSourceIds.forEach((captureId) => {
     const info = captureInfoMap?.get(captureId);
     const nodeData: SourceNodeData = {
       profileId: captureId,
@@ -155,19 +174,16 @@ export function buildSessionGraph(
       captureCount: info?.count,
       captureKind: info?.captureKind,
     };
-    nodes.push({
-      id: `source-${captureId}`,
-      type: "source",
-      position: { x: START_X, y: START_Y + index * ROW_SPACING },
-      data: nodeData,
-    });
+    pushSource(captureId, nodeData);
   });
 
-  // Column 2: Session nodes + Column 3: Connected app nodes
-  sessions.forEach((session, index) => {
+  // Column 2: Session nodes + Column 3: Connected app nodes, a row each
+  let sessionY = START_Y;
+  let appBottom: number | undefined;
+  sessions.forEach((session) => {
     // Collect input buses for this session. Sets, not arrays: two sources can
     // land on the same output bus, and a duplicate would give the session node
-    // two handles sharing an id — which breaks drag-to-connect targeting.
+    // two ports sharing an id — which breaks drag-to-connect targeting.
     const inputBusSet = new Set<number>();
     const disabledInputBusSet = new Set<number>();
     session.source_profile_ids.forEach((profileId) => {
@@ -182,7 +198,7 @@ export function buildSessionGraph(
     const inputBuses = [...inputBusSet].sort((a, b) => a - b);
     const disabledInputBuses = [...disabledInputBusSet].sort((a, b) => a - b);
 
-    // Build ordered app IDs for output handles
+    // Build ordered app IDs for output ports
     const connectedAppIds = session.subscribers.map((l) => l.subscriber_id);
 
     const nodeData: SessionNodeData = {
@@ -195,12 +211,14 @@ export function buildSessionGraph(
 
     nodes.push({
       id: `session-${session.session_id}`,
-      type: "session",
-      position: { x: START_X + COLUMN_SPACING, y: START_Y + index * ROW_SPACING },
-      data: nodeData,
+      x: START_X + COLUMN_SPACING,
+      y: sessionY,
+      data: { kind: "session", ...nodeData },
     });
 
     // Create edges from sources to session — one edge per enabled bus mapping
+    const running = session.state.type === "Running";
+    const sourceStroke = { stroke: running ? "#a855f7" : "#6b7280", animated: running };
     session.source_profile_ids.forEach((profileId) => {
       const sourceConfig = session.broker_configs?.find((c) => c.profile_id === profileId);
       const enabledMappings = sourceConfig?.bus_mappings.filter((m) => m.enabled) ?? [];
@@ -211,12 +229,7 @@ export function buildSessionGraph(
           id: `edge-${profileId}-${session.session_id}`,
           source: `source-${profileId}`,
           target: `session-${session.session_id}`,
-          type: "default",
-          animated: session.state.type === "Running",
-          style: {
-            stroke: session.state.type === "Running" ? "#a855f7" : "#6b7280",
-            strokeWidth: 2,
-          },
+          data: { ...sourceStroke, curvature: DEFAULT_CURVATURE },
         });
         return;
       }
@@ -225,25 +238,13 @@ export function buildSessionGraph(
         edges.push({
           id: `edge-${profileId}-${session.session_id}-b${mapping.device_bus}-b${mapping.output_bus}`,
           source: `source-${profileId}`,
-          sourceHandle: `out-bus${mapping.device_bus}`,
+          sourcePort: `out-bus${mapping.device_bus}`,
           target: `session-${session.session_id}`,
-          targetHandle: `in-bus${mapping.output_bus}`,
-          type: "interface",
-          animated: session.state.type === "Running",
-          style: {
-            stroke: session.state.type === "Running" ? "#a855f7" : "#6b7280",
-            strokeWidth: 2,
-          },
-          data: {
-            sourceInterface: `bus${mapping.device_bus}`,
-            targetInterface: `bus${mapping.output_bus}`,
-          } satisfies InterfaceEdgeData as InterfaceEdgeData & Record<string, unknown>,
+          targetPort: `in-bus${mapping.output_bus}`,
+          data: { ...sourceStroke, curvature: INTERFACE_CURVATURE },
         });
       }
     });
-
-    // Column 3: Connected app nodes
-    const sessionBaseY = START_Y + index * ROW_SPACING;
 
     session.subscribers.forEach((listener, appIndex) => {
       const appName = listener.app_name || listener.subscriber_id;
@@ -264,27 +265,29 @@ export function buildSessionGraph(
 
       nodes.push({
         id: nodeId,
-        type: "app",
-        position: {
-          x: START_X + COLUMN_SPACING * 2,
-          y: sessionBaseY + appIndex * (ROW_SPACING * 0.6),
-        },
-        data: nodeData,
+        x: START_X + COLUMN_SPACING * 2,
+        y: sessionY + appIndex * APP_SPACING,
+        data: { kind: "app", ...nodeData },
       });
 
-      // Edge from session output handle to app
       edges.push({
         id: `edge-${session.session_id}::${listener.subscriber_id}`,
         source: `session-${session.session_id}`,
-        sourceHandle: `out-${appIndex}`,
+        sourcePort: `out-${appIndex}`,
         target: nodeId,
-        animated: session.state.type === "Running" && session.is_streaming && listener.is_active,
-        style: {
+        targetPort: APP_INPUT_PORT,
+        data: {
           stroke: listener.is_active && session.is_streaming ? "#22c55e" : "#6b7280",
-          strokeWidth: 2,
+          animated: session.state.type === "Running" && session.is_streaming && listener.is_active,
+          curvature: DEFAULT_CURVATURE,
         },
       });
     });
+
+    const apps = session.subscribers.length;
+    const appsHeight = apps > 0 ? (apps - 1) * APP_SPACING + APP_HEIGHT : 0;
+    if (apps > 0) appBottom = sessionY + appsHeight;
+    sessionY += Math.max(sessionHeight(nodeData), appsHeight) + NODE_GAP;
   });
 
   // Column 3b: Unconnected app nodes — open session-aware app instances (across ALL
@@ -293,11 +296,7 @@ export function buildSessionGraph(
   if (openApps) {
     const unconnected = openApps.filter((a) => a.session_id == null);
 
-    // Position below all connected apps
-    const maxConnectedY = nodes
-      .filter((n) => n.type === "app")
-      .reduce((max, n) => Math.max(max, n.position.y), START_Y - ROW_SPACING * 0.6);
-    const unconnectedBaseY = maxConnectedY + ROW_SPACING;
+    const unconnectedBaseY = appBottom === undefined ? START_Y : appBottom + NODE_GAP;
 
     unconnected.forEach((inst, i) => {
       const nodeData: AppNodeData = {
@@ -309,12 +308,9 @@ export function buildSessionGraph(
 
       nodes.push({
         id: `app::${inst.instance_id}`,
-        type: "app",
-        position: {
-          x: START_X + COLUMN_SPACING * 2,
-          y: unconnectedBaseY + i * (ROW_SPACING * 0.6),
-        },
-        data: nodeData,
+        x: START_X + COLUMN_SPACING * 2,
+        y: unconnectedBaseY + i * APP_SPACING,
+        data: { kind: "app", ...nodeData },
       });
     });
   }
@@ -322,10 +318,7 @@ export function buildSessionGraph(
   return { nodes, edges };
 }
 
-/**
- * Calculate fitView padding as a ratio (ReactFlow convention).
- * 0.2 = 20% of bounding box added as whitespace around nodes.
- */
+/** fitView padding as a fraction of the nodes' extent. */
 export function calculateFitViewPadding(nodeCount: number): number {
   if (nodeCount <= 3) return 0.3;
   if (nodeCount <= 6) return 0.2;

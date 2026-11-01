@@ -1,7 +1,8 @@
 // src/apps/session-manager/nodes/AppNode.tsx
 
 import { memo } from "react";
-import { Handle, Position } from "@xyflow/react";
+import { Port } from "./Port";
+import { APP_INPUT_PORT } from "../utils/layoutUtils";
 import { iconSm } from "../../../styles/spacing";
 import { isPanelId } from "../../../apps/registry";
 import { AppIcon } from "../../../components/AppIcon";
@@ -38,12 +39,7 @@ function AppNode({ data, selected }: AppNodeProps) {
     <div
       className={`px-4 py-3 rounded-lg border-2 ${borderColour} ${bgColour} min-w-30 shadow-lg ${!data.isConnected ? "opacity-40" : isActive ? "" : "opacity-50"}`}
     >
-      {/* Input handle - connects from sessions */}
-      <Handle
-        type="target"
-        position={Position.Left}
-        className="!w-3 !h-3 !bg-text-green !border-2 !border-success"
-      />
+      <Port id={APP_INPUT_PORT} side="left" pinned className="bg-text-green border-success" />
 
       {/* Header */}
       <div className="flex items-center gap-2 mb-1">

@@ -1,47 +1,23 @@
 // src/apps/session-manager/edges/InterfaceEdge.tsx
 //
-// Custom edge using bezier curves for smoother routing (Node-RED style).
-// Labels have been removed since bus numbers are now shown inside nodes.
+// A Node-RED style bezier between two ports, or between the node borders where
+// an end names no port.
 
-import { type EdgeProps, getBezierPath } from "@xyflow/react";
+import { bezierPath, floatingAnchors, type EdgeGeometry } from "@wired-square/canvas/core";
 
 export interface InterfaceEdgeData {
-  /** Interface ID on the source side (e.g., "bus0") */
-  sourceInterface: string;
-  /** Interface ID on the session side (e.g., "bus0") */
-  targetInterface: string;
+  stroke: string;
+  animated: boolean;
+  curvature: number;
 }
 
-export default function InterfaceEdge({
-  id,
-  sourceX,
-  sourceY,
-  targetX,
-  targetY,
-  sourcePosition,
-  targetPosition,
-  style,
-  markerEnd,
-}: EdgeProps) {
-  // Use a generous curvature for loose, Node-RED-style curves
-  const curvature = 0.4;
-  const [edgePath] = getBezierPath({
-    sourceX,
-    sourceY,
-    targetX,
-    targetY,
-    sourcePosition,
-    targetPosition,
-    curvature,
-  });
-
+export default function InterfaceEdge({ data, geometry }: { data: InterfaceEdgeData; geometry: EdgeGeometry }) {
+  const floating = floatingAnchors(geometry.source, geometry.target);
+  const d = bezierPath(geometry.sourcePort ?? floating.source, geometry.targetPort ?? floating.target, data.curvature);
   return (
-    <path
-      id={id}
-      style={style}
-      className="react-flow__edge-path"
-      d={edgePath}
-      markerEnd={markerEnd}
-    />
+    <>
+      <path className="session-edge__hit" d={d} />
+      <path className={data.animated ? "session-edge is-animated" : "session-edge"} d={d} style={{ stroke: data.stroke }} />
+    </>
   );
 }

@@ -2,7 +2,7 @@
 
 import { memo } from "react";
 import { useTranslation } from "react-i18next";
-import { Handle, Position } from "@xyflow/react";
+import { Port } from "./Port";
 import { Wifi, Database, Radio, Pin } from "lucide-react";
 import { iconSm, iconXs } from "../../../styles/spacing";
 import { textDataPurple, textDataDisabled, sourceKindColours } from "../../../styles/colourTokens";
@@ -13,9 +13,9 @@ export interface SourceNodeData {
   sourceType: string;
   isRealtime: boolean;
   isActive: boolean;
-  /** Device bus numbers this source outputs (one handle per bus) */
+  /** Device bus numbers this source outputs (one port per bus) */
   outputBuses?: number[];
-  /** Device bus numbers with disabled mappings (shown as muted handles) */
+  /** Device bus numbers with disabled mappings (shown as muted ports) */
   disabledBuses?: number[];
   /** Buffer display name (when source is a buffer) */
   captureName?: string;
@@ -35,7 +35,7 @@ interface SourceNodeProps {
 function SourceNode({ data, selected }: SourceNodeProps) {
   const { t } = useTranslation("sessionManager");
   const { profileName, sourceType, isRealtime, isActive, outputBuses, disabledBuses, captureName, isPersistent, captureCount, captureKind } = data;
-  // Merge enabled + disabled buses for handle layout (disabled shown as muted)
+  // Merge enabled + disabled buses for port layout (disabled shown as muted)
   const allBuses = [
     ...(outputBuses ?? []).map((b) => ({ bus: b, enabled: true })),
     ...(disabledBuses ?? []).map((b) => ({ bus: b, enabled: false })),
@@ -83,7 +83,7 @@ function SourceNode({ data, selected }: SourceNodeProps) {
         </div>
       )}
 
-      {/* Bus handles with labels */}
+      {/* Bus ports with labels */}
       {allBuses.length > 0 ? (
         <div className="mt-2 flex flex-col gap-1">
           {allBuses.map(({ bus, enabled }) => (
@@ -99,25 +99,16 @@ function SourceNode({ data, selected }: SourceNodeProps) {
               >
                 bus{bus}
               </span>
-              <Handle
+              <Port
                 id={`out-bus${bus}`}
-                type="source"
-                position={Position.Right}
-                className={
-                  enabled
-                    ? "!w-3 !h-3 !bg-text-purple !border-2 !border-purple !relative !transform-none !top-0 !right-0"
-                    : "!w-3 !h-3 !bg-tertiary !border-2 !border-text-muted !border-dashed !opacity-50 !relative !transform-none !top-0 !right-0"
-                }
+                side="right"
+                className={enabled ? "bg-text-purple border-purple" : "bg-tertiary border-text-muted border-dashed opacity-50"}
               />
             </div>
           ))}
         </div>
       ) : (
-        <Handle
-          type="source"
-          position={Position.Right}
-          className="!w-3 !h-3 !bg-text-purple !border-2 !border-purple"
-        />
+        <Port id="out" side="right" pinned className="bg-text-purple border-purple" />
       )}
     </div>
   );

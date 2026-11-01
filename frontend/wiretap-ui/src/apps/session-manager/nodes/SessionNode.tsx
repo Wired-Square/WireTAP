@@ -2,7 +2,7 @@
 
 import { memo } from "react";
 import { useTranslation } from "react-i18next";
-import { Handle, Position } from "@xyflow/react";
+import { Port } from "./Port";
 import { Radio, Pause, Square, AlertCircle, Users, Database } from "lucide-react";
 import { getStateType, type ActiveSessionInfo } from "../../../api/io";
 import { iconSm, iconXs } from "../../../styles/spacing";
@@ -15,7 +15,7 @@ export interface SessionNodeData {
   inputBuses?: number[];
   /** Disabled input bus numbers available for reconnection */
   disabledInputBuses?: number[];
-  /** Listener IDs connected to this session (drives output handles) */
+  /** Listener IDs connected to this session (drives output ports) */
   connectedSubscriberIds?: string[];
 }
 
@@ -28,7 +28,7 @@ function SessionNode({ data, selected }: SessionNodeProps) {
   const { t } = useTranslation("sessionManager");
   const { session, label, inputBuses, disabledInputBuses, connectedSubscriberIds } = data;
 
-  // Build input bus list: enabled + disabled + one extra empty handle
+  // Build input bus list: enabled + disabled + one extra empty port
   const allInputBuses = [
     ...(inputBuses ?? []).map((bus) => ({ bus, enabled: true })),
     ...(disabledInputBuses ?? []).map((bus) => ({ bus, enabled: false })),
@@ -38,7 +38,7 @@ function SessionNode({ data, selected }: SessionNodeProps) {
     ? Math.max(...allInputBuses.map((b) => b.bus)) + 1
     : 0;
 
-  // Output handles: one per connected listener + one extra empty
+  // Output ports: one per connected listener + one extra empty
   const subscriberIds = connectedSubscriberIds ?? [];
   const outputCount = subscriberIds.length;
 
@@ -90,43 +90,33 @@ function SessionNode({ data, selected }: SessionNodeProps) {
     ? t("node.session.states.error")
     : getStateType(session.state);
 
-  const totalOutputHandles = outputCount + 1; // connected + one empty slot
+  const totalOutputPorts = outputCount + 1; // connected + one empty slot
 
   return (
     <div
       className={`px-4 py-3 rounded-lg border-2 ${borderColour} ${bgColour} min-w-45 shadow-lg`}
     >
-      {/* Output handles on the right edge (same style as app input handle) */}
-      {Array.from({ length: totalOutputHandles }, (_, i) => (
-        <Handle
+      {Array.from({ length: totalOutputPorts }, (_, i) => (
+        <Port
           key={`out-${i}`}
           id={`out-${i}`}
-          type="source"
-          position={Position.Right}
-          className={
-            i < outputCount
-              ? "!w-3 !h-3 !bg-text-green !border-2 !border-success"
-              : "!w-3 !h-3 !bg-success !border-2 !border-dashed !border-text-green !opacity-40"
-          }
-          style={{ top: `${((i + 1) / (totalOutputHandles + 1)) * 100}%` }}
+          side="right"
+          pinned
+          top={`${((i + 1) / (totalOutputPorts + 1)) * 100}%`}
+          className={i < outputCount ? "bg-text-green border-success" : "bg-success border-dashed border-text-green opacity-40"}
         />
       ))}
 
-      {/* Main content with input handle column */}
+      {/* Main content with input port column */}
       <div className="flex gap-3">
-        {/* Input bus handles (left column) */}
+        {/* Input bus ports (left column) */}
         <div className="flex flex-col gap-1 justify-center">
           {allInputBuses.map(({ bus, enabled }) => (
             <div key={bus} className="flex items-center gap-1.5 relative">
-              <Handle
+              <Port
                 id={`in-bus${bus}`}
-                type="target"
-                position={Position.Left}
-                className={
-                  enabled
-                    ? "!w-3 !h-3 !bg-text-cyan !border-2 !border-cyan !relative !transform-none !top-0 !left-0"
-                    : "!w-3 !h-3 !bg-tertiary !border-2 !border-text-muted !border-dashed !opacity-50 !relative !transform-none !top-0 !left-0"
-                }
+                side="left"
+                className={enabled ? "bg-text-cyan border-cyan" : "bg-tertiary border-text-muted border-dashed opacity-50"}
               />
               <span
                 className={`text-2xs font-mono ${
@@ -137,13 +127,11 @@ function SessionNode({ data, selected }: SessionNodeProps) {
               </span>
             </div>
           ))}
-          {/* Extra empty handle for new connections */}
           <div className="flex items-center gap-1.5 relative">
-            <Handle
+            <Port
               id={`in-bus${nextInputBus}`}
-              type="target"
-              position={Position.Left}
-              className="!w-3 !h-3 !bg-cyan !border-2 !border-dashed !border-text-cyan !opacity-40 !relative !transform-none !top-0 !left-0"
+              side="left"
+              className="bg-cyan border-dashed border-text-cyan opacity-40"
             />
             <span className={`text-2xs font-mono ${textMuted} opacity-40`}>
               {nextInputBus}

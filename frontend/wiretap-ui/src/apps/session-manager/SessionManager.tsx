@@ -5,7 +5,7 @@
 
 import { useCallback, useEffect, useState, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { ReactFlowProvider } from "@xyflow/react";
+import { CanvasScope } from "@wired-square/canvas/react";
 import {
   listActiveSessions,
   startReaderSession,
@@ -69,7 +69,7 @@ export default function SessionManager() {
     [logEntryCount, t]
   );
 
-  // Rust owns which buses each profile declares; the graph draws a handle per
+  // Rust owns which buses each profile declares; the graph draws a port per
   // declared bus. SessionCanvas re-renders off the store once this lands, and
   // the store refetches itself when a profile changes.
   useEffect(() => {
@@ -298,7 +298,7 @@ export default function SessionManager() {
           <div className="flex flex-1 min-h-0">
             {/* Main canvas */}
             <div className="flex-1 min-h-0">
-              <ReactFlowProvider>
+              <CanvasScope>
                 <SessionCanvas
                   sessions={sessions}
                   profiles={profiles}
@@ -307,7 +307,7 @@ export default function SessionManager() {
                   onCreateBusMapping={handleCreateBusMapping}
                   onConnectAppToSession={handleConnectAppToSession}
                 />
-              </ReactFlowProvider>
+              </CanvasScope>
             </div>
 
             {/* Detail panel */}
