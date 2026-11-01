@@ -8970,7 +8970,6 @@ dependencies = [
  "sentry",
  "serde",
  "serde_json",
- "serialport",
  "sha1",
  "sqlx",
  "tauri",

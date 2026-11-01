@@ -108,7 +108,6 @@ wslib-can-socketcan = { version = "0.1", registry = "wired-square", features = [
 wslib-serial = { version = "0.1.1", registry = "wired-square", features = ["write"] }
 # Desktop-only dependencies (serial/USB/keepawake not available on iOS)
 [target.'cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))'.dependencies]
-serialport = "4.3"
 keepawake = "0.6"
 # Firmware flashers for the Serial app's flash tabs: ESP32 serial bootloader,
 # STM32 USB DFU and STM32 UART. Owns its own nusb 0.1 beside gs_usb's 0.2.
