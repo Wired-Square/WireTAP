@@ -7,6 +7,7 @@ All notable changes to WireTAP will be documented in this file.
 ### Added
 
 - **MCP `console` reads the window's errors.** Agents driving the window can now read the errors and warnings it logged, including uncaught ones and those raised while it loaded, which a release build otherwise has no way to show.
+- **A signal can fix its decimal places.** Add `precision = N` (0 to 28) beside a signal's other keys and its decoded value is rounded half away from zero and padded to N places, so `precision = 2` shows 12.3 as 12.30. Signals without it show every digit, as before.
 
 ### Changed
 
@@ -14,6 +15,7 @@ All notable changes to WireTAP will be documented in this file.
 - **The capture database is upgraded in place the first time this version opens it.** Every capture is kept. Once it has been upgraded, don't go back to an older WireTAP with it; a capture database written by a newer WireTAP is left untouched and reported at startup rather than opened.
 - **A CAN or serial device that drops out is retried with a growing pause.** WireTAP waits 1 s before the first reopen and doubles the wait up to 30 s, so a missing adapter no longer gets hammered. A device plugged back in can take up to 30 s to resume.
 - **The Session Manager graph has a new engine.** A connection dropped near a port now snaps to it, a drag can start from an input as well as an output, and a node you drag keeps its place when the graph updates. Nodes are spaced by their size, so tall sources and sessions no longer overlap. A connection that already exists, or one onto an output bus that already carries a mapping, is now refused while you drag.
+- **Dashboard values round half away from zero.** A value exactly halfway now rounds as written, so 1.0005 shows as 1.001 rather than 1.000, and a small negative value shows as 0.000 rather than -0.000.
 - **Refusing the Keychain prompt on macOS or iOS now says access was denied.** Saving a device password or a GitHub token after cancelling the prompt reports that access to the secret store was denied, instead of a platform error.
 
 ### Fixed

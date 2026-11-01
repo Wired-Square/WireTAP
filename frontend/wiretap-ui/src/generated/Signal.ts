@@ -14,7 +14,11 @@ export type Signal = { name?: string | null, startBit?: number | null, bitLength
  * Byte order (the catalogue's legacy key is `endianness`; the newer key is
  * `byte_order`). Stored here as the resolved byte order.
  */
-endianness?: Endianness | null, wordOrder?: Endianness | null, factor?: number | null, offset?: number | null, unit?: string | null, min?: number | null, max?: number | null, format?: SignalFormat | null, 
+endianness?: Endianness | null, wordOrder?: Endianness | null, factor?: number | null, offset?: number | null, unit?: string | null, 
+/**
+ * Decimal places the numeric display is fixed to; every digit when unset.
+ */
+precision?: number | null, min?: number | null, max?: number | null, format?: SignalFormat | null, 
 /**
  * Value↔label map (`enum` table in the catalogue). Keys are the numeric
  * register/field value.
