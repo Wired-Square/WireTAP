@@ -1,4 +1,4 @@
-@layer reset, components, utilities;
+@layer reset, canvas, components, utilities;
 @import "./styles/reset.css";
 @import "./styles/components.css";
 @import "./styles/utilities.css";
@@ -138,30 +138,6 @@ html, body {
 .dockview-theme-abyss .dv-split-view-container.dv-vertical > .dv-sash-container > .dv-sash {
   cursor: row-resize !important;
   height: 6px !important;
-}
-
-/* Theme the xyflow controls and minimap on the session canvas. Unlayered, so
-   these beat xyflow's own sheet on specificity alone. */
-.session-canvas .react-flow__controls {
-  background-color: var(--bg-surface);
-  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
-}
-
-.session-canvas .react-flow__controls button {
-  background-color: var(--bg-surface);
-  border-color: var(--border-default);
-}
-
-.session-canvas .react-flow__controls button:hover {
-  background-color: var(--bg-hover);
-}
-
-.session-canvas .react-flow__controls svg {
-  fill: var(--text-primary);
-}
-
-.session-canvas .react-flow__minimap {
-  background-color: var(--bg-surface);
 }
 
 .custom-svg-host > svg {

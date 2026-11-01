@@ -2,7 +2,7 @@
 
 import { memo } from "react";
 import { useTranslation } from "react-i18next";
-import { Handle, Position } from "@xyflow/react";
+import { Port } from "./Port";
 import { Wifi, Database, Radio, Pin } from "lucide-react";
 import { iconSm, iconXs } from "../../../styles/spacing";
 import { textDataPurple, textDataDisabled, sourceKindColours } from "../../../styles/colourTokens";
@@ -99,25 +99,16 @@ function SourceNode({ data, selected }: SourceNodeProps) {
               >
                 bus{bus}
               </span>
-              <Handle
+              <Port
                 id={`out-bus${bus}`}
-                type="source"
-                position={Position.Right}
-                className={
-                  enabled
-                    ? "!w-3 !h-3 !bg-text-purple !border-2 !border-purple !relative !transform-none !top-0 !right-0"
-                    : "!w-3 !h-3 !bg-tertiary !border-2 !border-text-muted !border-dashed !opacity-50 !relative !transform-none !top-0 !right-0"
-                }
+                side="right"
+                className={enabled ? "bg-text-purple border-purple" : "bg-tertiary border-text-muted border-dashed opacity-50"}
               />
             </div>
           ))}
         </div>
       ) : (
-        <Handle
-          type="source"
-          position={Position.Right}
-          className="!w-3 !h-3 !bg-text-purple !border-2 !border-purple"
-        />
+        <Port id="out" side="right" pinned className="bg-text-purple border-purple" />
       )}
     </div>
   );

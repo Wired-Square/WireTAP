@@ -2,7 +2,7 @@
 
 import { memo } from "react";
 import { useTranslation } from "react-i18next";
-import { Handle, Position } from "@xyflow/react";
+import { Port } from "./Port";
 import { Radio, Pause, Square, AlertCircle, Users, Database } from "lucide-react";
 import { getStateType, type ActiveSessionInfo } from "../../../api/io";
 import { iconSm, iconXs } from "../../../styles/spacing";
@@ -98,17 +98,13 @@ function SessionNode({ data, selected }: SessionNodeProps) {
     >
       {/* Output handles on the right edge (same style as app input handle) */}
       {Array.from({ length: totalOutputHandles }, (_, i) => (
-        <Handle
+        <Port
           key={`out-${i}`}
           id={`out-${i}`}
-          type="source"
-          position={Position.Right}
-          className={
-            i < outputCount
-              ? "!w-3 !h-3 !bg-text-green !border-2 !border-success"
-              : "!w-3 !h-3 !bg-success !border-2 !border-dashed !border-text-green !opacity-40"
-          }
-          style={{ top: `${((i + 1) / (totalOutputHandles + 1)) * 100}%` }}
+          side="right"
+          pinned
+          top={`${((i + 1) / (totalOutputHandles + 1)) * 100}%`}
+          className={i < outputCount ? "bg-text-green border-success" : "bg-success border-dashed border-text-green opacity-40"}
         />
       ))}
 
@@ -118,15 +114,10 @@ function SessionNode({ data, selected }: SessionNodeProps) {
         <div className="flex flex-col gap-1 justify-center">
           {allInputBuses.map(({ bus, enabled }) => (
             <div key={bus} className="flex items-center gap-1.5 relative">
-              <Handle
+              <Port
                 id={`in-bus${bus}`}
-                type="target"
-                position={Position.Left}
-                className={
-                  enabled
-                    ? "!w-3 !h-3 !bg-text-cyan !border-2 !border-cyan !relative !transform-none !top-0 !left-0"
-                    : "!w-3 !h-3 !bg-tertiary !border-2 !border-text-muted !border-dashed !opacity-50 !relative !transform-none !top-0 !left-0"
-                }
+                side="left"
+                className={enabled ? "bg-text-cyan border-cyan" : "bg-tertiary border-text-muted border-dashed opacity-50"}
               />
               <span
                 className={`text-2xs font-mono ${
@@ -139,11 +130,10 @@ function SessionNode({ data, selected }: SessionNodeProps) {
           ))}
           {/* Extra empty handle for new connections */}
           <div className="flex items-center gap-1.5 relative">
-            <Handle
+            <Port
               id={`in-bus${nextInputBus}`}
-              type="target"
-              position={Position.Left}
-              className="!w-3 !h-3 !bg-cyan !border-2 !border-dashed !border-text-cyan !opacity-40 !relative !transform-none !top-0 !left-0"
+              side="left"
+              className="bg-cyan border-dashed border-text-cyan opacity-40"
             />
             <span className={`text-2xs font-mono ${textMuted} opacity-40`}>
               {nextInputBus}

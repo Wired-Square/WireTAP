@@ -3,7 +3,6 @@
 @layer utilities {
   .pointer-events-none { pointer-events: none }
   .visible { visibility: visible }
-  .\!relative { position: relative !important }
   .absolute { position: absolute }
   .fixed { position: fixed }
   .relative { position: relative }
@@ -12,17 +11,14 @@
   .inset-0 { inset: 0 }
   .inset-x-0 { inset-inline: 0 }
   .inset-y-0 { inset-block: 0 }
-  .\!top-0 { top: 0 !important }
   .top-0 { top: 0 }
   .top-1 { top: 0.25rem }
   .top-1\/2 { top: 50% }
-  .\!right-0 { right: 0 !important }
   .right-0 { right: 0 }
   .right-1 { right: 0.25rem }
   .right-2 { right: 0.5rem }
   .bottom-0 { bottom: 0 }
   .bottom-5 { bottom: 1.25rem }
-  .\!left-0 { left: 0 !important }
   .left-0 { left: 0 }
   .left-2 { left: 0.5rem }
   .left-2\.5 { left: 0.625rem }
@@ -77,7 +73,6 @@
   .inline { display: inline }
   .inline-block { display: inline-block }
   .inline-flex { display: inline-flex }
-  .\!h-3 { height: 0.75rem !important }
   .h-0 { height: 0 }
   .h-0\.5 { height: 0.125rem }
   .h-1 { height: 0.25rem }
@@ -117,7 +112,6 @@
   .max-h-\[70vh\] { max-height: 70vh }
   .min-h-0 { min-height: 0 }
   .min-h-75 { min-height: 18.75rem }
-  .\!w-3 { width: 0.75rem !important }
   .w-0 { width: 0 }
   .w-0\.5 { width: 0.125rem }
   .w-1 { width: 0.25rem }
@@ -206,10 +200,10 @@
   .translate-y-px { --tw-translate-y: 1px; translate: var(--tw-translate-x) var(--tw-translate-y) }
   .scale-110 { scale: 110% 110% }
   .rotate-180 { rotate: 180deg }
-  .\!transform-none { transform: none !important }
   .animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite }
   .animate-spin { animation: spin 1s linear infinite }
   .cursor-col-resize { cursor: col-resize }
+  .cursor-crosshair { cursor: crosshair }
   .cursor-default { cursor: default }
   .cursor-grab { cursor: grab }
   .cursor-grabbing { cursor: grabbing }
@@ -281,7 +275,6 @@
   .rounded-l { border-top-left-radius: 0.25rem; border-bottom-left-radius: 0.25rem }
   .rounded-r { border-top-right-radius: 0.25rem; border-bottom-right-radius: 0.25rem }
   .rounded-b-lg { border-bottom-right-radius: 0.5rem; border-bottom-left-radius: 0.5rem }
-  .\!border-2 { border-style: solid !important; border-width: 2px !important }
   .border { border-style: solid; border-width: 1px }
   .border-2 { border-style: solid; border-width: 2px }
   .border-y { border-block-style: solid; border-block-width: 1px }
@@ -290,14 +283,7 @@
   .border-b { border-bottom-style: solid; border-bottom-width: 1px }
   .border-l { border-left-style: solid; border-left-width: 1px }
   .border-l-2 { border-left-style: solid; border-left-width: 2px }
-  .\!border-dashed { border-style: dashed !important }
   .border-dashed { border-style: dashed }
-  .\!border-cyan { border-color: var(--status-cyan-border) !important }
-  .\!border-purple { border-color: var(--status-purple-border) !important }
-  .\!border-success { border-color: var(--status-success-border) !important }
-  .\!border-text-cyan { border-color: var(--text-cyan) !important }
-  .\!border-text-green { border-color: var(--text-green) !important }
-  .\!border-text-muted { border-color: var(--text-muted) !important }
   .border-accent-primary { border-color: var(--accent-primary) }
   .border-current { border-color: currentcolor }
   .border-current\/30 { border-color: color-mix(in oklab, currentcolor 30%, transparent) }
@@ -312,18 +298,14 @@
   .border-success-text { border-color: var(--status-success-text) }
   .border-text-amber { border-color: var(--text-amber) }
   .border-text-cyan { border-color: var(--text-cyan) }
+  .border-text-green { border-color: var(--text-green) }
+  .border-text-muted { border-color: var(--text-muted) }
   .border-text-purple { border-color: var(--text-purple) }
   .border-transparent { border-color: transparent }
   .border-warning { border-color: var(--status-warning-border) }
   .border-warning-text { border-color: var(--status-warning-text) }
   .border-t-current { border-top-color: currentcolor }
   .border-t-transparent { border-top-color: transparent }
-  .\!bg-cyan { background-color: var(--status-cyan-bg) !important }
-  .\!bg-success { background-color: var(--status-success-bg) !important }
-  .\!bg-tertiary { background-color: var(--bg-tertiary) !important }
-  .\!bg-text-cyan { background-color: var(--text-cyan) !important }
-  .\!bg-text-green { background-color: var(--text-green) !important }
-  .\!bg-text-purple { background-color: var(--text-purple) !important }
   .bg-accent-danger { background-color: var(--accent-danger) }
   .bg-accent-primary { background-color: var(--accent-primary) }
   .bg-accent-primary\/5 { background-color: color-mix(in oklab, var(--accent-primary) 5%, transparent) }
@@ -363,6 +345,7 @@
   .bg-tertiary { background-color: var(--bg-tertiary) }
   .bg-tertiary\/40 { background-color: color-mix(in oklab, var(--bg-tertiary) 40%, transparent) }
   .bg-text-amber { background-color: var(--text-amber) }
+  .bg-text-cyan { background-color: var(--text-cyan) }
   .bg-text-green { background-color: var(--text-green) }
   .bg-text-muted { background-color: var(--text-muted) }
   .bg-text-purple { background-color: var(--text-purple) }
@@ -492,8 +475,6 @@
   .decoration-dotted { text-decoration-style: dotted }
   .placeholder-accent-success::placeholder { color: var(--accent-success) }
   .accent-amber { accent-color: var(--text-amber) }
-  .\!opacity-40 { opacity: 0.4 !important }
-  .\!opacity-50 { opacity: 0.5 !important }
   .opacity-0 { opacity: 0 }
   .opacity-15 { opacity: 0.15 }
   .opacity-30 { opacity: 0.3 }

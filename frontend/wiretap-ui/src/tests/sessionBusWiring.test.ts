@@ -87,8 +87,8 @@ describe("buildSessionGraph — bus wiring", () => {
 
     const edges = graph.edges.filter((e) => e.source === "source-io_a");
     expect(edges).toHaveLength(2);
-    expect(edges.map((e) => e.sourceHandle)).toEqual(["out-bus0", "out-bus1"]);
-    expect(edges.map((e) => e.targetHandle)).toEqual(["in-bus0", "in-bus1"]);
+    expect(edges.map((e) => e.sourcePort)).toEqual(["out-bus0", "out-bus1"]);
+    expect(edges.map((e) => e.targetPort)).toEqual(["in-bus0", "in-bus1"]);
 
     expect(sourceData(graph, "io_a").outputBuses).toEqual([0, 1]);
     expect(sessionData(graph, "f_1").inputBuses).toEqual([0, 1]);

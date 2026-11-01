@@ -1,46 +1,36 @@
 // src/apps/session-manager/views/SessionCanvas.tsx
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  ReactFlow,
-  Background,
-  Controls,
-  MiniMap,
-  useNodesState,
-  useEdgesState,
-  useReactFlow,
-  type Node,
-  type NodeTypes,
-  type EdgeTypes,
-  type Connection,
-  type Edge,
-  BackgroundVariant,
-} from "@xyflow/react";
-import "@xyflow/react/dist/style.css";
+import { Canvas, useCanvas } from "@wired-square/canvas/react";
+import type { Point } from "@wired-square/canvas/core";
+import "@wired-square/canvas/canvas.css";
+import "./sessionCanvas.css";
 
 import SourceNode from "../nodes/SourceNode";
 import SessionNode from "../nodes/SessionNode";
 import AppNode from "../nodes/AppNode";
-import InterfaceEdge from "../edges/InterfaceEdge";
-import { buildSessionGraph, calculateFitViewPadding, type CaptureInfo } from "../utils/layoutUtils";
+import InterfaceEdge, { type InterfaceEdgeData } from "../edges/InterfaceEdge";
+import { buildSessionGraph, calculateFitViewPadding, type CaptureInfo, type GraphNode } from "../utils/layoutUtils";
 import { useProfileBusStore } from "../../../stores/profileBusStore";
 import { useSessionManagerStore } from "../stores/sessionManagerStore";
 import type { ActiveSessionInfo, AppInstanceInfo } from "../../../api/io";
 import type { IOProfile } from "../../../hooks/useSettings";
 import { listCaptures } from "../../../api/capture";
 
-// Register custom node and edge types
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const nodeTypes: NodeTypes = {
-  source: SourceNode as any,
-  session: SessionNode as any,
-  app: AppNode as any,
+const MINIMAP_COLOURS: Record<GraphNode["data"]["kind"], string> = {
+  source: "#a855f7",
+  session: "#06b6d4",
+  app: "#22c55e",
 };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const edgeTypes: EdgeTypes = {
-  interface: InterfaceEdge as any,
-};
+function renderNode(node: GraphNode, selected: boolean) {
+  const { data } = node;
+  switch (data.kind) {
+    case "source": return <SourceNode data={data} selected={selected} />;
+    case "session": return <SessionNode data={data} selected={selected} />;
+    case "app": return <AppNode data={data} selected={selected} />;
+  }
+}
 
 interface SessionCanvasProps {
   sessions: ActiveSessionInfo[];
@@ -59,7 +49,8 @@ export default function SessionCanvas({
   onCreateBusMapping,
   onConnectAppToSession,
 }: SessionCanvasProps) {
-  const { fitView } = useReactFlow();
+  const canvas = useCanvas();
+  const selectedId = useSessionManagerStore((s) => s.selectedNode?.id);
   const setSelectedNode = useSessionManagerStore((s) => s.setSelectedNode);
 
   // Fetch capture metadata for source node display
@@ -90,83 +81,48 @@ export default function SessionCanvas({
     [sessions, profiles, captureInfoMap, openApps, profileBuses]
   );
 
-  const [nodes, setNodes, onNodesChange] = useNodesState(graphData.nodes as Node[]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(graphData.edges);
-
-  // Update nodes and edges when data changes. When topology is unchanged
-  // (same node IDs), update data in-place to preserve user-dragged positions
-  // and avoid ReactFlow re-measuring/resetting the viewport.
-  useEffect(() => {
-    setNodes((prev) => {
-      const newIds = new Set(graphData.nodes.map((n) => n.id));
-      const topologyChanged = prev.length !== graphData.nodes.length || !prev.every((n) => newIds.has(n.id));
-      if (topologyChanged) {
-        return graphData.nodes as Node[];
-      }
-      // Topology same — merge updated data into existing nodes (preserves positions)
-      const newDataMap = new Map(graphData.nodes.map((n) => [n.id, n.data as Record<string, unknown>]));
-      return prev.map((n) => {
-        const newData = newDataMap.get(n.id);
-        return newData ? { ...n, data: newData } as Node : n;
-      });
+  // Dragged positions hold until the set of nodes changes, then the layout's return.
+  const topology = useMemo(() => graphData.nodes.map((n) => n.id).sort().join("\n"), [graphData.nodes]);
+  const [dragged, setDragged] = useState({ topology, positions: new Map<string, Point>() });
+  const nodes = useMemo(() => {
+    if (dragged.topology !== topology) return graphData.nodes;
+    return graphData.nodes.map((n) => {
+      const position = dragged.positions.get(n.id);
+      return position ? { ...n, ...position } : n;
     });
-    setEdges((prev) => {
-      const newEdgeIds = new Set(graphData.edges.map((e) => e.id));
-      if (prev.length === graphData.edges.length && prev.every((e) => newEdgeIds.has(e.id))) {
-        // Update edge styles (animated, stroke colour) even when topology is same
-        const newEdgeMap = new Map(graphData.edges.map((e) => [e.id, e]));
-        return prev.map((e) => {
-          const updated = newEdgeMap.get(e.id);
-          return updated ? { ...e, style: updated.style, animated: updated.animated } : e;
-        });
-      }
-      return graphData.edges;
-    });
-  }, [graphData, setNodes, setEdges]);
+  }, [graphData.nodes, topology, dragged]);
 
-  // Fit view once on mount. Delayed because the conditionally-rendered
-  // container needs a frame to get its dimensions.
-  const fitViewRef = useRef(fitView);
-  fitViewRef.current = fitView;
+  const onNodeDragEnd = (node: GraphNode, position: Point) =>
+    setDragged((prev) => ({
+      topology,
+      positions: new Map(prev.topology === topology ? prev.positions : []).set(node.id, position),
+    }));
+
+  // The canvas fits the first nodes itself; refit when the count changes after that.
+  const lastCount = useRef(0);
   useEffect(() => {
-    const id = setTimeout(() => {
-      fitViewRef.current({ padding: calculateFitViewPadding(nodes.length), duration: 200 });
-    }, 300);
-    return () => clearTimeout(id);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const onNodeClick = useCallback(
-    (_event: React.MouseEvent, node: Node) => {
-      setSelectedNode({ id: node.id, type: node.type as "source" | "session" | "app" });
-    },
-    [setSelectedNode]
-  );
-
-  const onEdgeClick = useCallback(
-    (_event: React.MouseEvent, edge: Edge) => {
-      setSelectedNode({ id: edge.id, type: "edge" });
-    },
-    [setSelectedNode]
-  );
-
-  const onPaneClick = useCallback(() => {
-    setSelectedNode(null);
-  }, [setSelectedNode]);
+    const previous = lastCount.current;
+    lastCount.current = nodes.length;
+    if (previous > 0 && previous !== nodes.length) {
+      void canvas?.fitView({ padding: calculateFitViewPadding(nodes.length), duration: 200 });
+    }
+  }, [canvas, nodes.length]);
 
   // Handle drag-to-connect: re-enable a disabled bus mapping, create new mapping,
   // or connect an app to a session
   const onConnect = useCallback(
-    (connection: Connection) => {
-      const { source, sourceHandle, target, targetHandle } = connection;
-      if (!source || !target) return;
+    (
+      source: string,
+      target: string,
+      { sourcePort, targetPort }: { sourcePort: string | undefined; targetPort: string | undefined }
+    ) => {
 
       // Case 1: Source → Session (bus mapping)
       if (source.startsWith("source-") && target.startsWith("session-")) {
         const profileId = source.replace(/^source-/, "");
         const sessionId = target.replace(/^session-/, "");
-        const deviceBusMatch = sourceHandle?.match(/^out-bus(\d+)$/);
-        const outputBusMatch = targetHandle?.match(/^in-bus(\d+)$/);
+        const deviceBusMatch = sourcePort?.match(/^out-bus(\d+)$/);
+        const outputBusMatch = targetPort?.match(/^in-bus(\d+)$/);
         if (!deviceBusMatch || !outputBusMatch) return;
 
         const deviceBus = parseInt(deviceBusMatch[1], 10);
@@ -202,17 +158,13 @@ export default function SessionCanvas({
 
   // Validate connections: source→session bus mappings or session→unconnected app
   const isValidConnection = useCallback(
-    (connection: Edge | Connection) => {
-      const { source, target, sourceHandle, targetHandle } = connection;
-
+    (source: string, sourcePort: string | undefined, target: string, targetPort: string | undefined) => {
       // Case 1: Source → Session
-      if (source?.startsWith("source-") && target?.startsWith("session-")) {
-        if (!sourceHandle?.startsWith("out-bus") || !targetHandle?.startsWith("in-bus")) return false;
-
+      if (source.startsWith("source-") && target.startsWith("session-")) {
         const profileId = source.replace(/^source-/, "");
         const sessionId = target.replace(/^session-/, "");
-        const deviceBusMatch = sourceHandle.match(/^out-bus(\d+)$/);
-        const outputBusMatch = targetHandle.match(/^in-bus(\d+)$/);
+        const deviceBusMatch = sourcePort?.match(/^out-bus(\d+)$/);
+        const outputBusMatch = targetPort?.match(/^in-bus(\d+)$/);
         if (!deviceBusMatch || !outputBusMatch) return false;
 
         const deviceBus = parseInt(deviceBusMatch[1], 10);
@@ -249,7 +201,7 @@ export default function SessionCanvas({
       }
 
       // Case 2: Session → Unconnected app
-      if (source?.startsWith("session-") && target?.startsWith("app::")) {
+      if (source.startsWith("session-") && target.startsWith("app::")) {
         return true;
       }
 
@@ -259,44 +211,23 @@ export default function SessionCanvas({
   );
 
   return (
-    <div className="session-canvas w-full h-full">
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        onNodeClick={onNodeClick}
-        onEdgeClick={onEdgeClick}
-        onPaneClick={onPaneClick}
-        onConnect={onConnect}
-        isValidConnection={isValidConnection}
-        nodeTypes={nodeTypes}
-        edgeTypes={edgeTypes}
-        minZoom={0.1}
-        maxZoom={2}
-        defaultEdgeOptions={{ type: "default" }}
-        proOptions={{ hideAttribution: true }}
-      >
-        <Background
-          variant={BackgroundVariant.Dots}
-          gap={20}
-          size={1}
-          color="var(--text-muted)"
-          style={{ opacity: 0.3 }}
-        />
-        <Controls showInteractive={false} />
-        <MiniMap
-          nodeColor={(node) => {
-            switch (node.type) {
-              case "source": return "#a855f7";
-              case "session": return "#06b6d4";
-              case "app": return "#22c55e";
-              default: return "#6b7280";
-            }
-          }}
-          maskColor="rgba(0, 0, 0, 0.7)"
-        />
-      </ReactFlow>
-    </div>
+    <Canvas<GraphNode["data"], InterfaceEdgeData>
+      className="session-canvas"
+      nodes={nodes}
+      edges={graphData.edges}
+      node={(node) => renderNode(node, node.id === selectedId)}
+      edge={(edge, geometry) => <InterfaceEdge data={edge.data} geometry={geometry} />}
+      onNodeClick={(node) => setSelectedNode({ id: node.id, type: node.data.kind })}
+      onEdgeClick={(edge) => setSelectedNode({ id: edge.id, type: "edge" })}
+      onPaneClick={() => setSelectedNode(null)}
+      onNodeDragEnd={onNodeDragEnd}
+      onConnect={onConnect}
+      isValidConnection={isValidConnection}
+      minZoom={0.1}
+      maxZoom={2}
+      background={{ gap: 20, size: 1 }}
+      controls
+      minimap={{ nodeColour: (node) => MINIMAP_COLOURS[node.data.kind] }}
+    />
   );
 }

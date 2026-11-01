@@ -1,47 +1,44 @@
 // src/apps/session-manager/edges/InterfaceEdge.tsx
 //
-// Custom edge using bezier curves for smoother routing (Node-RED style).
-// Labels have been removed since bus numbers are now shown inside nodes.
+// A Node-RED style bezier between two ports, or between the node borders where
+// an end names no port.
 
-import { type EdgeProps, getBezierPath } from "@xyflow/react";
+import { floatingAnchors, type Anchor, type EdgeGeometry } from "@wired-square/canvas/core";
 
 export interface InterfaceEdgeData {
-  /** Interface ID on the source side (e.g., "bus0") */
-  sourceInterface: string;
-  /** Interface ID on the session side (e.g., "bus0") */
-  targetInterface: string;
+  stroke: string;
+  animated: boolean;
+  curvature: number;
 }
 
-export default function InterfaceEdge({
-  id,
-  sourceX,
-  sourceY,
-  targetX,
-  targetY,
-  sourcePosition,
-  targetPosition,
-  style,
-  markerEnd,
-}: EdgeProps) {
-  // Use a generous curvature for loose, Node-RED-style curves
-  const curvature = 0.4;
-  const [edgePath] = getBezierPath({
-    sourceX,
-    sourceY,
-    targetX,
-    targetY,
-    sourcePosition,
-    targetPosition,
-    curvature,
-  });
+function controlOffset(distance: number, curvature: number) {
+  return distance >= 0 ? 0.5 * distance : curvature * 25 * Math.sqrt(-distance);
+}
 
+function control({ x, y, side }: Anchor, towards: Anchor, curvature: number): [number, number] {
+  switch (side) {
+    case "left": return [x - controlOffset(x - towards.x, curvature), y];
+    case "right": return [x + controlOffset(towards.x - x, curvature), y];
+    case "top": return [x, y - controlOffset(y - towards.y, curvature)];
+    case "bottom": return [x, y + controlOffset(towards.y - y, curvature)];
+  }
+}
+
+export function bezierPath(geometry: EdgeGeometry, curvature: number): string {
+  const floating = floatingAnchors(geometry.source, geometry.target);
+  const source = geometry.sourcePort ?? floating.source;
+  const target = geometry.targetPort ?? floating.target;
+  const [scx, scy] = control(source, target, curvature);
+  const [tcx, tcy] = control(target, source, curvature);
+  return `M${source.x},${source.y} C${scx},${scy} ${tcx},${tcy} ${target.x},${target.y}`;
+}
+
+export default function InterfaceEdge({ data, geometry }: { data: InterfaceEdgeData; geometry: EdgeGeometry }) {
+  const d = bezierPath(geometry, data.curvature);
   return (
-    <path
-      id={id}
-      style={style}
-      className="react-flow__edge-path"
-      d={edgePath}
-      markerEnd={markerEnd}
-    />
+    <>
+      <path className="session-edge__hit" d={d} />
+      <path className={data.animated ? "session-edge is-animated" : "session-edge"} d={d} style={{ stroke: data.stroke }} />
+    </>
   );
 }

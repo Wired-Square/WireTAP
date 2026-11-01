@@ -1,0 +1,40 @@
+/* The canvas package's tokens (normally from @wired-square/kit/theme.css), on
+   WireTAP's theme variables so they follow the light and dark sets. */
+.session-canvas {
+  --app-canvas-bg: transparent;
+  --app-canvas-dot: color-mix(in srgb, var(--text-muted) 30%, transparent);
+  --app-canvas-connection: var(--text-muted);
+  --app-canvas-chrome: var(--bg-surface);
+  --app-canvas-chrome-text: var(--text-primary);
+  --app-canvas-chrome-hover: var(--bg-hover);
+  --app-canvas-chrome-border: var(--border-default);
+  --app-canvas-minimap-node: var(--text-muted);
+  --app-canvas-minimap-mask: color-mix(in srgb, var(--bg-primary) 70%, transparent);
+  --app-canvas-minimap-view: var(--border-hover);
+  --app-radius: var(--radius-control);
+  --app-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --app-focus: 0 0 0 2px var(--accent-primary);
+  --app-good: var(--status-success-text);
+  --app-bad: var(--status-danger-text);
+}
+
+.session-edge__hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 20;
+}
+
+.session-edge {
+  fill: none;
+  stroke-width: 2;
+  pointer-events: none;
+}
+
+.session-edge.is-animated {
+  stroke-dasharray: 5;
+  animation: session-edge-dash 0.5s linear infinite;
+}
+
+@keyframes session-edge-dash {
+  from { stroke-dashoffset: 10; }
+}
