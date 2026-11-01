@@ -6,6 +6,7 @@ import { useSettings } from "../../../../../hooks/useSettings";
 import { formatValue } from "../../../utils/dashboardFormat";
 import { polarToCartesian, describeArc } from "../../../widgets/svgArc";
 import WidgetEmpty from "../../../widgets/WidgetEmpty";
+import { useSignalPrecisions } from "../../../widgets/useSignalValues";
 import PanelTooltip from "../PanelTooltip";
 
 interface Props {
@@ -38,6 +39,7 @@ export default function GaugePanel({ panel, svgRef: svgRefProp }: Props) {
 
   const latest = useDashboardStore((s) => s.latest);
   const values = panel.signals.map((sig) => latest.get(signalKey(sig.frameId, sig.signalName)));
+  const precisions = useSignalPrecisions(panel.signals);
 
   const { minValue, maxValue } = panel;
   const range = maxValue - minValue;
@@ -67,7 +69,7 @@ export default function GaugePanel({ panel, svgRef: svgRefProp }: Props) {
   // Display selected signal's value in the centre
   const primaryIdx = Math.min(panel.primarySignalIndex ?? 0, Math.max(0, signalCount - 1));
   const primarySignal = panel.signals[primaryIdx];
-  const displayValue = formatValue(values[primaryIdx]);
+  const displayValue = formatValue(values[primaryIdx], precisions[primaryIdx]);
 
   if (signalCount === 0) {
     return <WidgetEmpty>Click + to add a signal</WidgetEmpty>;

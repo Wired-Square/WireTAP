@@ -7,6 +7,7 @@ import { useState, useRef, useCallback, useEffect, type ReactNode } from "react"
 import { createPortal } from "react-dom";
 import { getSignalLabel, getConfidenceColour, type SignalRef } from "../../../../stores/dashboardStore";
 import { formatValue } from "../../utils/dashboardFormat";
+import { useSignalPrecisions } from "../../widgets/useSignalValues";
 import { textSecondary, textMuted } from "../../../../styles";
 import type { AppSettings } from "../../../../hooks/useSettings";
 
@@ -32,6 +33,7 @@ export default function PanelTooltip({
   const [tip, setTip] = useState<{ x: number; y: number; visible: boolean }>({ x: 0, y: 0, visible: false });
   const tipRef = useRef<HTMLDivElement>(null);
   const hostRef = useRef<HTMLDivElement>(null);
+  const precisions = useSignalPrecisions(signals);
 
   // The panel can be switched away under a still pointer, and no mouseleave
   // fires; the next thing the pointer is over that is not this widget hides it.
@@ -111,7 +113,7 @@ export default function PanelTooltip({
                   />
                 )}
                 <span style={{ marginLeft: "auto", paddingLeft: 8, fontFamily: "ui-monospace, monospace", fontWeight: 500 }}>
-                  {formatValue(values[i])}
+                  {formatValue(values[i], precisions[i])}
                 </span>
                 {sig.unit && <span className={textMuted} style={{ fontSize: 10 }}>{sig.unit}</span>}
               </div>

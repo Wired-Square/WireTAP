@@ -7,7 +7,7 @@ All notable changes to WireTAP will be documented in this file.
 ### Added
 
 - **MCP `console` reads the window's errors.** Agents driving the window can now read the errors and warnings it logged, including uncaught ones and those raised while it loaded, which a release build otherwise has no way to show.
-- **A signal can fix its decimal places.** Add `precision = N` (0 to 28) beside a signal's other keys and its decoded value is rounded half away from zero and padded to N places, so `precision = 2` shows 12.3 as 12.30. Signals without it show every digit, as before.
+- **A signal can fix its decimal places.** Add `precision = N` (0 to 28) beside a signal's other keys and its decoded value is rounded half away from zero and padded to N places, so `precision = 2` shows 12.3 as 12.30, in the Decoder and on every Dashboard panel alike. Signals without it show every digit, as before.
 
 ### Changed
 

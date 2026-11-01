@@ -62,6 +62,18 @@ export function signalKey(frameId: number, signalName: string): string {
   return `${frameId}:${signalName}`;
 }
 
+function precisionsBySignalKey(frames: Map<number, Frame>): Map<string, number> {
+  const precisions = new Map<string, number>();
+  for (const [frameId, frame] of frames) {
+    for (const { name, precision } of allFrameSignals(frame)) {
+      if (!name || precision == null) continue;
+      const key = signalKey(frameId, name);
+      if (!precisions.has(key)) precisions.set(key, precision);
+    }
+  }
+  return precisions;
+}
+
 /** A flow panel's byte columns on its target frame. */
 export function flowSignals(panel: Pick<DashboardPanel, 'targetFrameId' | 'byteCount'>): SignalRef[] {
   if (panel.targetFrameId == null) return [];
@@ -170,6 +182,7 @@ interface DashboardState {
   // ── Catalog ──
   catalogPath: string | null;
   frames: Map<number, Frame>;
+  signalPrecisions: Map<string, number>;
   protocol: 'can' | 'serial' | 'modbus';
   serialConfig: SerialFrameConfig | null;
 
@@ -263,6 +276,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   // ── Initial state ──
   catalogPath: null,
   frames: new Map(),
+  signalPrecisions: new Map(),
   protocol: 'can',
   serialConfig: null,
 
@@ -303,8 +317,10 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   // owned by the session (Rust-authoritative, mirrored one-way via useSessionCatalog) —
   // this must NOT write `catalogPath`, or it races the mirror into a reload loop.
   applyCatalog: (catalog: Catalog) => {
+    const frames = framesById(catalog);
     set({
-      frames: framesById(catalog),
+      frames,
+      signalPrecisions: precisionsBySignalKey(frames),
       protocol: catalog.protocol,
       serialConfig: catalog.serial ? serialFrameConfigOf(catalog.serial) : null,
     });
