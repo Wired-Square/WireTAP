@@ -11,7 +11,7 @@
 
 import { useEffect, useRef, useCallback } from "react";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import { useShallow } from "zustand/react/shallow";
+import { useShallow } from "@wired-square/store/react";
 import { useSessionStore, type CreateSessionOptions, type Session, type SessionCallbacks } from "../stores/sessionStore";
 import { subscriberIdFor } from "../utils/subscriberId";
 import { tlog } from "../api/settings";

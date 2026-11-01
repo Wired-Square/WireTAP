@@ -3,7 +3,7 @@
 // Zustand store for the Query app: the form, the catalogue it reads, and this
 // window's view of the queue Rust runs.
 
-import { create } from "zustand";
+import { create } from "@wired-square/store/react";
 import { REFRESH_ACTIVITY_DELAY_MS } from "../../../constants";
 import {
   queryActivity,

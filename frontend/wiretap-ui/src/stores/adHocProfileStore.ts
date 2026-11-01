@@ -9,7 +9,7 @@
 // normalizeSettings). Anything that needs saved *and* ad-hoc devices — the
 // source picker, useIOSessionManager — should use `useAllIOProfiles()`.
 
-import { create } from "zustand";
+import { create } from "@wired-square/store/react";
 import { listEphemeralProfiles, unregisterEphemeralProfile } from "../api/ephemeralProfiles";
 import type { IOProfile } from "../settings/appSettings";
 import { useProfileBusStore } from "./profileBusStore";

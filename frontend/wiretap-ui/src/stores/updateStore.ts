@@ -1,7 +1,7 @@
 // ui/src/stores/updateStore.ts
 // Store for update checking state
 
-import { create } from "zustand";
+import { create } from "@wired-square/store/react";
 import { checkForUpdates, tlog, type UpdateInfo } from "../api/settings";
 
 interface UpdateState {

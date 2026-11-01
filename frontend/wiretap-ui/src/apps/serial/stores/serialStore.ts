@@ -6,7 +6,7 @@
 // lives in `flasherStore.ts` — that store is the single source of truth
 // for the unified Flash view.
 
-import { create } from "zustand";
+import { create } from "@wired-square/store/react";
 
 import type { DfuDeviceInfo } from "../utils/flasherTypes";
 

@@ -1,6 +1,6 @@
 // Copyright 2026 Wired Square Pty Ltd
 
-import { create } from "zustand";
+import { create } from "@wired-square/store/react";
 import type {
   FrameDefDescriptor,
   BridgeDescriptor,
@@ -184,7 +184,7 @@ function hexId(id: number): string {
 // Store
 // ============================================================================
 
-export const useRulesStore = create<RulesState & RulesActions>()((set, get) => {
+export const useRulesStore = create<RulesState & RulesActions>((set, get) => {
   /** Get the device_id of the connected device, or throw. */
   function deviceId(): string {
     const d = get().device;

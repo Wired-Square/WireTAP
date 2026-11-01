@@ -12,7 +12,7 @@
 // in the frontend drifted out of step and shipped a 2-bus GVRET as a single bus.
 
 import { useCallback, useEffect, useMemo } from "react";
-import { create } from "zustand";
+import { create } from "@wired-square/store/react";
 import { listen } from "@tauri-apps/api/event";
 import {
   getProfileBusMappings,

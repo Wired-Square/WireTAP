@@ -3,7 +3,7 @@
 // UI state and dialogs for Discovery app.
 // Handles error dialogs, save dialogs, playback, time range, etc.
 
-import { create } from 'zustand';
+import { create } from '@wired-square/store/react';
 import i18n from 'i18next';
 import { saveCatalog } from '../api';
 import {

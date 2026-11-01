@@ -1,6 +1,6 @@
 // src/apps/session-manager/stores/sessionManagerStore.ts
 
-import { create } from "zustand";
+import { create } from "@wired-square/store/react";
 
 export type SelectedNodeType = "source" | "session" | "app" | "edge" | null;
 

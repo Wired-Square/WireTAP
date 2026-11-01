@@ -1,6 +1,6 @@
 // ui/src/apps/provisioning/stores/provisioningStore.ts
 
-import { create } from "zustand";
+import { create } from "@wired-square/store/react";
 import type { BleDevice } from "../../../api/bleProvision";
 
 export type ProvisioningStep = "scan" | "credentials" | "provisioning" | "complete";

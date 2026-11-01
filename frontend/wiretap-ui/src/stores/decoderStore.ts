@@ -1,6 +1,6 @@
 // ui/src/stores/decoderStore.ts
 
-import { create } from 'zustand';
+import { create } from '@wired-square/store/react';
 import { tlog } from '../api/settings';
 import { LRUMap } from '../utils/LRUMap';
 import { useSettingsStore } from '../apps/settings/stores/settingsStore';

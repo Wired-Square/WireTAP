@@ -1,7 +1,7 @@
 // ui/src/stores/calculatorStore.ts
 // Store for Frame Calculator state and cross-panel communication
 
-import { create } from "zustand";
+import { create } from "@wired-square/store/react";
 
 interface CalculatorState {
   // Pending hex data from other panels

@@ -1,6 +1,6 @@
 // ui/src/stores/catalogEditorStore.ts
 
-import { create } from 'zustand';
+import { create } from '@wired-square/store/react';
 import { tlog } from '../api/settings';
 import { emit } from '@tauri-apps/api/event';
 import { WINDOW_EVENTS } from '../events/registry';

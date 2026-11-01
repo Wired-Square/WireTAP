@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useCallback, useRef, useState } from "react";
 import { Workflow, Loader2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { useShallow } from "zustand/react/shallow";
+import { useShallow } from "@wired-square/store/react";
 import AppLayout from "../../components/AppLayout";
 import { useSettingsStore } from "../settings/stores/settingsStore";
 import { useRulesStore, type RulesTab } from "./stores/rulesStore";

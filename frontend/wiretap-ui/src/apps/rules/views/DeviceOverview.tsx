@@ -6,7 +6,7 @@
 
 import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
-import { useShallow } from "zustand/react/shallow";
+import { useShallow } from "@wired-square/store/react";
 import { useRulesStore, type RulesTab } from "../stores/rulesStore";
 import { textPrimary, textSecondary, borderDefault } from "../../../styles";
 import { formatHexId } from "../utils/formatHex";

@@ -7,7 +7,7 @@
 // per-driver OptionsPanel can read+write its own config without leaking
 // fields between chip families.
 
-import { create } from "zustand";
+import { create } from "@wired-square/store/react";
 
 import type { DriverId, Operation } from "../flashers/types";
 import type {
