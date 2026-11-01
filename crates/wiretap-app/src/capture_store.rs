@@ -728,8 +728,11 @@ pub fn get_session_capture(session_id: &str) -> Option<(String, CaptureKind)> {
 /// capture kind == Frames. No-op if session has no frame capture.
 pub async fn append_frames_to_session(session_id: &str, new_frames: Vec<FrameMessage>) {
     if new_frames.is_empty() { return; }
-    // Tap test pattern frames for active io_test runners
     crate::io_test::tap_test_frames(session_id, &new_frames);
+    store_session_frames(session_id, new_frames).await;
+}
+
+async fn store_session_frames(session_id: &str, new_frames: Vec<FrameMessage>) {
     let capture_id = get_session_frame_capture_id(session_id);
     if let Some(id) = capture_id {
         append_frames_to_capture(&id, new_frames).await;
@@ -750,7 +753,11 @@ pub async fn append_raw_bytes_to_session(session_id: &str, new_bytes: Vec<Timest
 
 /// Appends to a session's frame capture in the order frames are handed over, batching
 /// what queues meanwhile, for a sync caller that must not wait on the database.
+///
+/// Test Pattern frames reach their taps on hand-over, so a run's replies never wait
+/// behind a slow insert.
 pub struct SessionAppender {
+    session_id: String,
     frames: tokio::sync::mpsc::UnboundedSender<Vec<FrameMessage>>,
     task: tokio::task::JoinHandle<()>,
 }
@@ -759,19 +766,26 @@ impl SessionAppender {
     /// `stored` runs after each append.
     pub fn spawn(session_id: String, mut stored: impl FnMut(&str) + Send + 'static) -> Self {
         let (frames, mut queued) = tokio::sync::mpsc::unbounded_channel::<Vec<FrameMessage>>();
-        let task = tokio::spawn(async move {
-            while let Some(mut batch) = queued.recv().await {
-                while let Ok(more) = queued.try_recv() {
-                    batch.extend(more);
+        let task = tokio::spawn({
+            let session_id = session_id.clone();
+            async move {
+                while let Some(mut batch) = queued.recv().await {
+                    while let Ok(more) = queued.try_recv() {
+                        batch.extend(more);
+                    }
+                    store_session_frames(&session_id, batch).await;
+                    stored(&session_id);
                 }
-                append_frames_to_session(&session_id, batch).await;
-                stored(&session_id);
             }
         });
-        Self { frames, task }
+        Self { session_id, frames, task }
     }
 
     pub fn append(&self, frames: Vec<FrameMessage>) {
+        if frames.is_empty() {
+            return;
+        }
+        crate::io_test::tap_test_frames(&self.session_id, &frames);
         let _ = self.frames.send(frames);
     }
 
