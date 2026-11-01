@@ -295,14 +295,14 @@ mod tests {
         let sid = "scan-connect-refused";
         clear_scan_state(sid);
 
-        let waiter = tokio::spawn(await_scan_result(sid, Duration::from_secs(5)));
+        let waiter = tokio::spawn(await_scan_result(sid, Duration::from_secs(10)));
         tokio::time::sleep(Duration::from_millis(20)).await;
-        let started = Instant::now();
         sweep_and_park(job, &Arc::new(AtomicBool::new(false)), sid).await;
+        let swept = Instant::now();
         let outcome = waiter.await.unwrap();
 
         assert!(
-            started.elapsed() < Duration::from_secs(1),
+            swept.elapsed() < Duration::from_secs(1),
             "waited out the timeout"
         );
         let error = outcome

@@ -1299,7 +1299,14 @@ pub(super) mod tests {
         origin
             .push(&["refs/heads/main:refs/heads/main"], None)
             .expect("seed push");
-        format!("file://{}", bare.to_string_lossy())
+        file_url(&bare)
+    }
+
+    /// `C:\x` must become `file:///C:/x`: libgit2 cannot resolve `file://C:\x`.
+    fn file_url(path: &Path) -> String {
+        let path = path.to_string_lossy().replace('\\', "/");
+        let root = if path.starts_with('/') { "" } else { "/" };
+        format!("file://{root}{path}")
     }
 
     /// The write path end to end: clone, commit a new file, push, and confirm the
@@ -1584,7 +1591,7 @@ pub(super) mod tests {
             &dir,
             &RepoSpec {
                 repo_id: "gh:test/lastchange".into(),
-                clone_url: format!("file://{}", root.join("remote.git").to_string_lossy()),
+                clone_url: file_url(&root.join("remote.git")),
                 git_ref: "main".into(),
                 token: None,
             },

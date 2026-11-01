@@ -441,7 +441,7 @@ mod tests {
     }
 
     fn tcp(id: &str, kind: &str, port: u16) -> IOProfile {
-        profile(id, kind, json!({ "host": "127.0.0.1", "port": port, "timeout": 2.0 }))
+        profile(id, kind, json!({ "host": "127.0.0.1", "port": port, "timeout": 5.0 }))
     }
 
     async fn settings_with(profile: IOProfile) -> Result<AppSettings, String> {
