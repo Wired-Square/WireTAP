@@ -205,9 +205,11 @@ pub(crate) fn on_run_event(_app: &AppHandle, event: tauri::RunEvent) {
 mod tests {
     #[test]
     fn quitting_saves_ui_state_still_waiting_out_its_debounce() {
-        let source = include_str!("boot.rs");
-        let run_event = &source[source.find("fn on_run_event").unwrap()..];
-        let run_event = &run_event[..run_event.find("\n}\n").unwrap()];
-        assert!(run_event.contains("store_manager::flush()"), "the exit hook does not flush the UI store");
+        let flushes = include_str!("boot.rs")
+            .lines()
+            .skip_while(|line| !line.contains("fn on_run_event"))
+            .take_while(|line| *line != "}")
+            .any(|line| line.contains("store_manager::flush()"));
+        assert!(flushes, "the exit hook does not flush the UI store");
     }
 }
