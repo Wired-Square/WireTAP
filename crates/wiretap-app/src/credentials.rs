@@ -1,9 +1,5 @@
-//! Secure credential storage using the system keyring.
-//!
-//! Uses the native OS credential store through one [`SecretStore`]:
-//! - macOS and iOS: Keychain (`wslib_secret::Keychain`)
-//! - Windows: Credential Manager, and Linux: Secret Service (GNOME Keyring,
-//!   KWallet), both through `keyring`
+//! Secure credential storage in the OS store (`wslib_secret::OsStore`): the
+//! Keychain on macOS and iOS, Credential Manager on Windows, Secret Service on Linux.
 //!
 //! Two live service namespaces. IO-profile secrets and catalogue-sharing tokens
 //! are kept apart so sharing tokens are out of scope of
@@ -19,7 +15,7 @@
 //! `None` arm, `delete_both`'s second delete, and the `discard_legacy` call in
 //! `store_credential`. Nothing else depends on it.
 
-use wslib_secret::{Secret, SecretStore};
+use wslib_secret::{OsStore, Secret, SecretStore};
 
 use crate::settings::IOProfile;
 
@@ -152,14 +148,8 @@ pub fn delete_all_credentials(profile_id: &str) -> Result<(), String> {
 
 // ── Store-parameterised core ─────────────────────────────────────────────────
 
-#[cfg(any(target_os = "macos", target_os = "ios"))]
-static PLATFORM_STORE: wslib_secret::Keychain = wslib_secret::Keychain;
-
-#[cfg(not(any(target_os = "macos", target_os = "ios")))]
-static PLATFORM_STORE: os_keyring::Keyring = os_keyring::Keyring;
-
 fn os() -> Credentials<'static> {
-    Credentials(&PLATFORM_STORE)
+    Credentials(&OsStore)
 }
 
 struct Credentials<'a>(&'a dyn SecretStore);
@@ -287,43 +277,6 @@ impl Credentials<'_> {
                 {
                     self.drain_legacy(&account);
                 }
-            }
-        }
-    }
-}
-
-#[cfg(not(any(target_os = "macos", target_os = "ios")))]
-mod os_keyring {
-    use keyring::{Entry, Error};
-    use wslib_secret::{Secret, SecretStore, StoreError};
-
-    pub struct Keyring;
-
-    fn backend(e: Error) -> StoreError {
-        StoreError::Backend(Box::new(e))
-    }
-
-    fn entry(service: &str, account: &str) -> Result<Entry, StoreError> {
-        Entry::new(service, account).map_err(backend)
-    }
-
-    impl SecretStore for Keyring {
-        fn load(&self, service: &str, account: &str) -> Result<Option<Secret>, StoreError> {
-            match entry(service, account)?.get_password() {
-                Ok(password) => Ok(Some(Secret::new(password))),
-                Err(Error::NoEntry) => Ok(None),
-                Err(e) => Err(backend(e)),
-            }
-        }
-
-        fn save(&self, service: &str, account: &str, secret: &Secret) -> Result<(), StoreError> {
-            entry(service, account)?.set_password(secret.expose()).map_err(backend)
-        }
-
-        fn delete(&self, service: &str, account: &str) -> Result<(), StoreError> {
-            match entry(service, account)?.delete_credential() {
-                Ok(()) | Err(Error::NoEntry) => Ok(()),
-                Err(e) => Err(backend(e)),
             }
         }
     }

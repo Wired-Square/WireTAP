@@ -32,8 +32,7 @@ tauri-plugin-os = "2"
 tauri-plugin-store = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-clipboard-manager = "2"
-# Keychain on macOS and iOS; elsewhere the store is ours, over keyring.
-wslib-secret = { version = "0.1.4", registry = "wired-square", features = ["keychain"] }
+wslib-secret = { path = "../../../wslib-rs-secret-os/crates/wslib-secret", features = ["os"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2"
@@ -141,20 +140,13 @@ git2 = { version = "0.21", default-features = false, features = ["https", "vendo
 tauri-plugin-keep-screen-on = "0.1"
 tauri-plugin-safe-area-insets-css = "0.1"
 
-# Keyring has no default features: the Windows and Linux blocks pick the backends.
-[target.'cfg(not(any(target_os = "macos", target_os = "ios")))'.dependencies]
-keyring = "3"
-
 # Windows
 [target.'cfg(target_os = "windows")'.dependencies]
-keyring = { version = "3", features = ["windows-native"] }
 nusb = { version = "0.2", features = ["tokio"] }
 windows-sys = { version = "0.59", features = ["Win32_UI_HiDpi", "Win32_Foundation"] }
 
 # Linux
 [target.'cfg(target_os = "linux")'.dependencies]
-# sync-secret-service uses DBus Secret Service (GNOME Keyring, KWallet)
-keyring = { version = "3", features = ["sync-secret-service"] }
 # libgit2 talks HTTPS through OpenSSL on Linux (macOS/iOS use SecureTransport,
 # Windows uses WinHTTP, neither of which needs this). Vendored so the deb/rpm/
 # AppImage carry their own libssl instead of depending on whatever the build host

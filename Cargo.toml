@@ -4,3 +4,6 @@ members = ["crates/wiretap-analysis", "crates/wiretap-app", "crates/wiretap-can-
 
 [workspace.package]
 version = "0.15.0"
+
+[patch.wired-square]
+wslib-secret = { path = "../wslib-rs-secret-os/crates/wslib-secret" }
