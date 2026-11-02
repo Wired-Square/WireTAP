@@ -33,6 +33,7 @@ All notable changes to WireTAP will be documented in this file.
 - **Settings and dashboards survive a crash mid-save.** They are now saved whole or not at all, as catalogues and the window layout are, so a crash or power cut during a save leaves the previous version in place rather than a truncated file.
 - **A window's bus labels follow its session.** After a multi-bus session, selecting another device or joining another session no longer shows the old session's bus names in Session Controls, Transmit and Discovery.
 - **Opening a large capture in Discovery queries its frame list once.** It had run the same multi-second query three or four times at once.
+- **A Modbus RTU export from a framed byte capture is named for Modbus RTU.** Its default file name had said serial.
 
 ## [0.15.0] - 2026-10-14
 

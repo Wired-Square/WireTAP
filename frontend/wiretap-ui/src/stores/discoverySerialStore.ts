@@ -126,6 +126,8 @@ interface DiscoverySerialState {
   framedCaptureId: string | null;
   /** Frame count from backend framing (updated each time framing is applied) */
   backendFrameCount: number;
+  /** Read only while `framedCaptureId` is set. */
+  framedProtocol: string | null;
   /** Minimum frame length filter (0 = no filter, independent of framing mode) */
   minFrameLength: number;
   /** Trigger counter to force FramedDataView to re-fetch (incremented after applyFraming) */
@@ -184,6 +186,7 @@ export const useDiscoverySerialStore = create<DiscoverySerialState>((set, get) =
   rawBytesPageSize: 1000, // Default page size for raw bytes view
   framedCaptureId: null, // ID of backend frame capture
   backendFrameCount: 0, // Frame count from backend framing
+  framedProtocol: null,
   minFrameLength: 0, // 0 = no filter
   framedDataTrigger: 0, // Incremented to force FramedDataView refetch
   frameIdExtractionConfig: null, // Frame ID extraction config
@@ -300,6 +303,7 @@ export const useDiscoverySerialStore = create<DiscoverySerialState>((set, get) =
       set((state) => ({
         framedCaptureId: result.capture_id,
         backendFrameCount: result.frame_count,
+        framedProtocol: result.protocol,
         filteredFrameCount: result.filtered_count,
         filteredCaptureId: result.filtered_capture_id,
         framedDataTrigger: state.framedDataTrigger + 1,
