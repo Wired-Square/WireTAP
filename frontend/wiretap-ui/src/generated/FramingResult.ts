@@ -19,4 +19,8 @@ filtered_count: number,
 /**
  * ID of the filtered frames capture (frames that were too short)
  */
-filtered_capture_id: string | null, };
+filtered_capture_id: string | null, 
+/**
+ * The protocol the framer stamped on the first frame
+ */
+protocol: string | null, };

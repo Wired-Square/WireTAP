@@ -94,6 +94,8 @@ mod desktop {
         pub filtered_count: usize,
         /// ID of the filtered frames capture (frames that were too short)
         pub filtered_capture_id: Option<String>,
+        /// The protocol the framer stamped on the first frame
+        pub protocol: Option<String>,
     }
 
     /// Build framing encoding from mode and options
@@ -199,6 +201,7 @@ mod desktop {
 
         let frame_count = frame_messages.len();
         let filtered_count = filtered_messages.len();
+        let protocol = frame_messages.first().map(|f| f.protocol.clone());
 
         if frame_count == 0 && filtered_count == 0 {
             return Err("No frames extracted".to_string());
@@ -237,6 +240,7 @@ mod desktop {
             capture_id: target_capture_id,
             filtered_count,
             filtered_capture_id,
+            protocol,
         })
     }
 

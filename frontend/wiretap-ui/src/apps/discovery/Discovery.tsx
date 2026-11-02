@@ -13,7 +13,7 @@ import { useSessionStore } from '../../stores/sessionStore';
 import { type FrameMessage, type PlaybackSpeed } from "../../stores/discoveryStore";
 import { groupKeysByProtocol } from "../../utils/frameKey";
 import { selectionSetKeys, type SelectionSet } from "../../utils/selectionSets";
-import { useDiscoveryFrameStore } from "../../stores/discoveryFrameStore";
+import { capturedFrameCount, useDiscoveryFrameStore } from "../../stores/discoveryFrameStore";
 import { useDiscoveryUIStore } from "../../stores/discoveryUIStore";
 import { useDiscoverySerialStore } from "../../stores/discoverySerialStore";
 import { isOwnScanSession, runningModbusScan, useDiscoveryToolboxStore } from "../../stores/discoveryToolboxStore";
@@ -54,6 +54,7 @@ import { useDialogManager } from "../../hooks/useDialogManager";
 import { useSessionEvents } from "../../hooks/useSessionEvents";
 import { utcToLocal } from "../../utils/timezone";
 import { exportItemCount } from "./exportItemCount";
+import { exportProtocol } from "./exportProtocol";
 
 /** The protocol these frames are, for labelling and export naming. Entries without a
  *  protocol are skipped, and no frames at all answers undefined rather than 'can' —
@@ -132,6 +133,7 @@ function DiscoveryInner() {
       framedCaptureId: s.framedCaptureId,
     })));
   const serialActiveTab = useDiscoverySerialStore((s) => s.activeTab);
+  const backendFramedProtocol = useDiscoverySerialStore((s) => s.framedProtocol);
   const setSerialMode = useDiscoverySerialStore((s) => s.setSerialMode);
   const clearSerialBytes = useDiscoverySerialStore((s) => s.clearSerialBytes);
   const resetFraming = useDiscoverySerialStore((s) => s.resetFraming);
@@ -289,7 +291,7 @@ function DiscoveryInner() {
       const meta = await getCaptureMetadata(payload.capture_id);
       if (meta) {
         setCaptureMetadata(meta);
-        enableCaptureMode(meta.count);
+        enableCaptureMode(capturedFrameCount(meta));
 
         // Fetch frame info from backend capture (populates frame picker)
         try {
@@ -393,7 +395,7 @@ function DiscoveryInner() {
       const meta = await getCaptureMetadataById(captureId);
       if (meta) {
         setCaptureMetadata(meta);
-        enableCaptureMode(meta.count);
+        enableCaptureMode(capturedFrameCount(meta));
         const frameInfoList = await getCaptureFrameInfo(captureId);
         setFrameInfoFromCapture(frameInfoList);
       }
@@ -566,7 +568,7 @@ function DiscoveryInner() {
         const frameInfoList = await getCaptureFrameInfo(sessionCaptureId);
         if (cancelled) return;
         setCaptureMetadata(meta);
-        enableCaptureMode(meta.count);
+        enableCaptureMode(capturedFrameCount(meta));
         console.log(`[Discovery] Loaded ${frameInfoList.length} unique frame IDs from capture`);
         setFrameInfoFromCapture(frameInfoList);
       } catch (err) {
@@ -752,8 +754,9 @@ function DiscoveryInner() {
   const exportDefaultFilename = useMemo(() => {
     // Not "can": this fires only when nothing said what the frames are, and naming
     // them after a protocol nobody reported is how the badge got it wrong.
-    return frameExportBasename(exportDataMode === "bytes" ? "serial" : protocolLabel);
-  }, [exportDataMode, protocolLabel]);
+    const framedProtocol = framedCaptureId ? backendFramedProtocol ?? undefined : framedData[0]?.protocol;
+    return frameExportBasename(exportProtocol(exportDataMode, framedProtocol, protocolLabel));
+  }, [exportDataMode, framedCaptureId, backendFramedProtocol, framedData, protocolLabel]);
 
   useModbusScanSync();
 
