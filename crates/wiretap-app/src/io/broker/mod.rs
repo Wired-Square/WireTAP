@@ -230,10 +230,23 @@ impl IOBroker {
         Ok(())
     }
 
+    /// The RTU settings opening this source's profile would frame with.
+    fn opening_rtu_settings(
+        &self,
+        idx: usize,
+        profiles: &[crate::settings::IOProfile],
+    ) -> Option<wslib_wiretap_catalogue::RtuSettings> {
+        let source = self.sources.get(idx)?;
+        let profile = profiles.iter().find(|p| p.id == source.profile_id)?;
+        Some(profile.rtu_settings(&source.serial))
+    }
+
     /// Change serial framing on every serial source in place (no reconnect).
     /// Records the request so `data_streams` reflects it, then signals each
     /// serial reader to swap its framer.
     pub fn set_framing(&self, req: SetFramingRequest) -> Result<(), String> {
+        let unset_rtu_profiles = (req.encoding == FramingMode::ModbusRtu && req.modbus.is_none())
+            .then(|| (self.profiles)().unwrap_or_default());
         {
             let channels = self
                 .control_channels
@@ -247,8 +260,22 @@ impl IOBroker {
                 .lock()
                 .map_err(|e| format!("Failed to lock framing overrides: {}", e))?;
             for (idx, sender) in channels.iter() {
+                let mut req = req.clone();
+                if let Some(profiles) = &unset_rtu_profiles {
+                    req.modbus = self.opening_rtu_settings(*idx, profiles);
+                }
+                // Keep the WS decode path in step with the port, stock settings included: a
+                // `modbus_rtu` frame from a session that published none reads as an archive's.
+                if let wslib_wiretap_catalogue::FramingEncoding::ModbusRtu(options) =
+                    wslib_wiretap_catalogue::FramingEncoding::from_mode(
+                        req.encoding,
+                        req.modbus.as_ref(),
+                    )
+                {
+                    crate::ws::dispatch::set_serial_rtu_options(&self.session_id, options);
+                }
                 overrides.insert(*idx, req.clone());
-                let _ = sender.try_send(req.clone());
+                let _ = sender.try_send(req);
             }
         }
 
@@ -1141,6 +1168,55 @@ mod tests {
         };
         assert_eq!(streams(&[virtual_device(Protocol::Serial)], &[]), (false, true));
         assert_eq!(streams(&[virtual_device(Protocol::Can)], &[]), (true, false));
+    }
+
+    #[test]
+    fn a_live_switch_to_rtu_frames_with_the_settings_an_open_would() {
+        let profile = crate::settings::IOProfile {
+            id: "rtu-line".into(),
+            name: "RS485".into(),
+            kind: "serial".into(),
+            connection: [
+                ("port".to_string(), "/dev/ttyUSB0".into()),
+                ("framing_encoding".to_string(), "raw".into()),
+                ("modbus_validate_crc".to_string(), false.into()),
+                ("modbus_vendor_functions".to_string(), "0x41 0x42".into()),
+            ]
+            .into(),
+            preferred_catalog: None,
+            ephemeral: false,
+        };
+        let source = SourceConfig {
+            profile_id: profile.id.clone(),
+            profile_kind: profile.kind.clone(),
+            bus_mappings: crate::sessions::profile_bus_mappings(&profile),
+            serial: SerialOverrides {
+                modbus_device_address: Some(7),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let opened = crate::io::profile::SerialSourceConfig::from_profile(
+            &profile,
+            &SerialOverrides {
+                framing_encoding: Some(FramingMode::ModbusRtu),
+                ..source.serial.clone()
+            },
+        )
+        .unwrap()
+        .framing_encoding;
+        let profiles: ProfileLoader = Arc::new(move || Ok(vec![profile.clone()]));
+        let broker = IOBroker::single_source(profiles, "live-rtu-switch".into(), source).unwrap();
+        let (control, received) = std::sync::mpsc::sync_channel(1);
+        broker.control_channels.lock().unwrap().insert(0, control);
+
+        broker.set_framing(set_framing("modbus_rtu", true)).unwrap();
+
+        let req = received.try_recv().unwrap();
+        assert_eq!(
+            wslib_wiretap_catalogue::FramingEncoding::from_mode(req.encoding, req.modbus.as_ref()),
+            opened
+        );
     }
 
     #[test]

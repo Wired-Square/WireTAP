@@ -91,6 +91,27 @@ impl IOProfile {
         )
     }
 
+    /// How the line is Modbus RTU framed: the session's override, then the profile, then stock.
+    pub fn rtu_settings(&self, overrides: &SerialOverrides) -> RtuSettings {
+        let bool_field = |set: Option<bool>, key| set.or_else(|| self.conn_bool(key));
+        RtuSettings {
+            device_address: overrides
+                .modbus_device_address
+                .or_else(|| self.conn_i64("modbus_device_address").map(|n| n as u8)),
+            validate_crc: bool_field(overrides.modbus_validate_crc, "modbus_validate_crc")
+                .unwrap_or(true),
+            vendor_functions: overrides
+                .modbus_vendor_functions
+                .clone()
+                .or_else(|| self.conn_u8_list("modbus_vendor_functions"))
+                .unwrap_or_default(),
+            allow_broadcast: bool_field(overrides.modbus_allow_broadcast, "modbus_allow_broadcast")
+                .unwrap_or(false),
+            any_function: bool_field(overrides.modbus_any_function, "modbus_any_function")
+                .unwrap_or(false),
+        }
+    }
+
     /// Where a frame id or source address is read from in a framed message: the
     /// session's override if it names a start byte, else the profile's own
     /// `{prefix}_start_byte` triple, else nothing.
@@ -133,30 +154,11 @@ impl SerialSourceConfig {
 
         let usize_field =
             |set: Option<usize>, key| set.or_else(|| profile.conn_i64(key).map(|n| n as usize));
-        let bool_field = |set: Option<bool>, key| set.or_else(|| profile.conn_bool(key));
         let max_frame_len =
             usize_field(overrides.max_frame_length, "max_frame_length").unwrap_or(1024);
         let framing_encoding = match framing_mode {
             FramingMode::Slip => FramingEncoding::Slip { max_frame_len },
-            FramingMode::ModbusRtu => FramingEncoding::ModbusRtu(RtuSettings {
-                device_address: overrides
-                    .modbus_device_address
-                    .or_else(|| profile.conn_i64("modbus_device_address").map(|n| n as u8)),
-                validate_crc: bool_field(overrides.modbus_validate_crc, "modbus_validate_crc")
-                    .unwrap_or(true),
-                vendor_functions: overrides
-                    .modbus_vendor_functions
-                    .clone()
-                    .or_else(|| profile.conn_u8_list("modbus_vendor_functions"))
-                    .unwrap_or_default(),
-                allow_broadcast: bool_field(
-                    overrides.modbus_allow_broadcast,
-                    "modbus_allow_broadcast",
-                )
-                .unwrap_or(false),
-                any_function: bool_field(overrides.modbus_any_function, "modbus_any_function")
-                    .unwrap_or(false),
-            }),
+            FramingMode::ModbusRtu => FramingEncoding::ModbusRtu(profile.rtu_settings(overrides)),
             FramingMode::Delimiter => FramingEncoding::Delimiter(DelimiterOptions {
                 delimiter: overrides
                     .delimiter
