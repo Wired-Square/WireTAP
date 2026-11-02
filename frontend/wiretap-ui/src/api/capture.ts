@@ -303,12 +303,20 @@ export async function exportByteDump(captureId: string, format: "hex" | "csv" | 
   return invoke("export_byte_dump", { capture_id: captureId, format, path });
 }
 
+const frameInfoInFlight = new Map<string, Promise<CaptureFrameInfo[]>>();
+
 /**
  * Get unique frame IDs and their metadata from the capture.
- * Used to build the frame picker after a large ingest.
+ * Used to build the frame picker after a large ingest. Callers asking while a
+ * request for the same capture is in flight share it: the query is a full scan.
  */
-export async function getCaptureFrameInfo(captureId: string): Promise<CaptureFrameInfo[]> {
-  return invoke("get_capture_frame_info", { capture_id: captureId });
+export function getCaptureFrameInfo(captureId: string): Promise<CaptureFrameInfo[]> {
+  const pending = frameInfoInFlight.get(captureId);
+  if (pending) return pending;
+  const request = invoke<CaptureFrameInfo[]>("get_capture_frame_info", { capture_id: captureId })
+    .finally(() => frameInfoInFlight.delete(captureId));
+  frameInfoInFlight.set(captureId, request);
+  return request;
 }
 
 /**
