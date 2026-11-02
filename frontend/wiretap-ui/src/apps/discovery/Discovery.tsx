@@ -53,6 +53,7 @@ import { frameExportBasename } from "../../utils/frameDump";
 import { useDialogManager } from "../../hooks/useDialogManager";
 import { useSessionEvents } from "../../hooks/useSessionEvents";
 import { utcToLocal } from "../../utils/timezone";
+import { exportItemCount } from "./exportItemCount";
 
 /** The protocol these frames are, for labelling and export naming. Entries without a
  *  protocol are skipped, and no frames at all answers undefined rather than 'can' —
@@ -737,15 +738,16 @@ function DiscoveryInner() {
     return "frames";
   }, [isSerialMode, serialActiveTab, backendFrameCount, framedData.length]);
 
-  const exportItemCount = useMemo(() => {
-    if (exportDataMode === "bytes") {
-      return watchByteCount;
-    }
-    if (captureMode.enabled) return captureMode.totalFrames;
-    if (isSerialMode && framedCaptureId && backendFrameCount > 0) return backendFrameCount;
-    if (isSerialMode && framedData.length > 0) return framedData.length;
-    return liveFrameCount;
-  }, [exportDataMode, watchByteCount, captureMode, isSerialMode, framedCaptureId, backendFrameCount, framedData.length, liveFrameCount]);
+  const exportCount = useMemo(() => exportItemCount({
+    dataMode: exportDataMode,
+    byteCount: watchByteCount,
+    captureMode,
+    isSerialMode,
+    framedCaptureId,
+    backendFrameCount,
+    clientFramedCount: framedData.length,
+    liveFrameCount,
+  }), [exportDataMode, watchByteCount, captureMode, isSerialMode, framedCaptureId, backendFrameCount, framedData.length, liveFrameCount]);
 
   const exportDefaultFilename = useMemo(() => {
     // Not "can": this fires only when nothing said what the frames are, and naming
@@ -1197,7 +1199,7 @@ function DiscoveryInner() {
 
       <ExportFramesDialog
         open={dialogs.export.isOpen}
-        itemCount={exportItemCount}
+        itemCount={exportCount}
         dataMode={exportDataMode}
         defaultFilename={exportDefaultFilename}
         onCancel={() => dialogs.export.close()}
