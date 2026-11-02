@@ -496,6 +496,16 @@ pub fn hydrate_from_db() {
             }
             Ok(count) => count,
         };
+        let inventory = match meta.kind {
+            CaptureKind::Bytes => FrameInventory::default(),
+            CaptureKind::Frames => match capture_db::wait(capture_db::get_frame_info(&meta.id)) {
+                Ok(rows) => FrameInventory::from_stored(rows),
+                Err(e) => {
+                    tlog!("[CaptureStore] Skipping capture '{}' this run — its frame ids failed: {}", meta.id, e);
+                    continue;
+                }
+            },
+        };
 
         // Auto-orphan captures whose owning session no longer exists.
         // On app restart, sessions are gone from memory but the DB still
@@ -532,7 +542,7 @@ pub fn hydrate_from_db() {
                 ..meta
             },
             None, // no owner, so no role
-            FrameInventory::default(),
+            inventory,
         );
 
         // Persist if we changed anything (backfilled buses or orphaned)
@@ -1217,8 +1227,7 @@ pub fn get_capture_count(id: &str) -> usize {
     registry.captures.get(id).map(|b| b.metadata.count).unwrap_or(0)
 }
 
-/// Distinct (bus, frame_id) count seen while streaming into this capture.
-/// O(1). Returns 0 for DB-hydrated captures that have had no live appends.
+/// Distinct (protocol, frame_id) count in this capture. O(1).
 pub fn get_capture_unique_count(id: &str) -> usize {
     let registry = registry();
     registry
@@ -1720,5 +1729,23 @@ mod tests {
         let left = capture_db::get_frame_count(&id).await.unwrap();
         assert!(left > 0 && left < WINDOWED as usize);
         assert_eq!(get_capture_count(&id), left);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn a_hydrated_capture_tail_honours_the_selection() {
+        let _db = crate::capture_db::use_own_store(crate::capture_db::scratch_store().await);
+        let id = create_standalone_capture(CaptureKind::Frames, "hydrated".into());
+        let mut stored = frames(0..4);
+        stored[1].frame_id = 0x200;
+        stored[3].frame_id = 0x200;
+        append_frames_to_capture(&id, stored).await;
+        registry_mut().captures.remove(&id);
+        hydrate_from_db();
+
+        let selection = FrameSelection::from_groups(groups(&[("can", &[0x100])]));
+        let tail = get_capture_frames_tail(&id, 10, &selection).await.unwrap();
+        assert_eq!(tail.frames.iter().map(|f| f.frame_id).collect::<Vec<_>>(), [0x100, 0x100]);
+        assert_eq!(tail.total_filtered_count, 2);
+        assert_eq!(get_capture_unique_count(&id), 2);
     }
 }
