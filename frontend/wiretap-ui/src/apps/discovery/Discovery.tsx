@@ -13,7 +13,7 @@ import { useSessionStore } from '../../stores/sessionStore';
 import { type FrameMessage, type PlaybackSpeed } from "../../stores/discoveryStore";
 import { groupKeysByProtocol } from "../../utils/frameKey";
 import { selectionSetKeys, type SelectionSet } from "../../utils/selectionSets";
-import { useDiscoveryFrameStore } from "../../stores/discoveryFrameStore";
+import { capturedFrameCount, useDiscoveryFrameStore } from "../../stores/discoveryFrameStore";
 import { useDiscoveryUIStore } from "../../stores/discoveryUIStore";
 import { useDiscoverySerialStore } from "../../stores/discoverySerialStore";
 import { isOwnScanSession, runningModbusScan, useDiscoveryToolboxStore } from "../../stores/discoveryToolboxStore";
@@ -289,7 +289,7 @@ function DiscoveryInner() {
       const meta = await getCaptureMetadata(payload.capture_id);
       if (meta) {
         setCaptureMetadata(meta);
-        enableCaptureMode(meta.count);
+        enableCaptureMode(capturedFrameCount(meta));
 
         // Fetch frame info from backend capture (populates frame picker)
         try {
@@ -393,7 +393,7 @@ function DiscoveryInner() {
       const meta = await getCaptureMetadataById(captureId);
       if (meta) {
         setCaptureMetadata(meta);
-        enableCaptureMode(meta.count);
+        enableCaptureMode(capturedFrameCount(meta));
         const frameInfoList = await getCaptureFrameInfo(captureId);
         setFrameInfoFromCapture(frameInfoList);
       }
@@ -566,7 +566,7 @@ function DiscoveryInner() {
         const frameInfoList = await getCaptureFrameInfo(sessionCaptureId);
         if (cancelled) return;
         setCaptureMetadata(meta);
-        enableCaptureMode(meta.count);
+        enableCaptureMode(capturedFrameCount(meta));
         console.log(`[Discovery] Loaded ${frameInfoList.length} unique frame IDs from capture`);
         setFrameInfoFromCapture(frameInfoList);
       } catch (err) {

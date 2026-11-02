@@ -5,7 +5,7 @@
 
 import { create } from '@wired-square/store/react';
 import { tlog } from '../api/settings';
-import type { CaptureFrameInfo } from '../api/capture';
+import type { CaptureFrameInfo, CaptureMetadata } from '../api/capture';
 import type { FrameMessage } from '../types/frame';
 import { frameKey, parseFrameKey } from '../utils/frameKey';
 import { selectionSetKeys, type SelectionSet } from '../utils/selectionSets';
@@ -23,6 +23,9 @@ function emptyPicker() {
     seenIds: new Set<string>(),
   };
 }
+
+export const capturedFrameCount = (meta: Pick<CaptureMetadata, 'kind' | 'count'>): number =>
+  meta.kind === 'bytes' ? 0 : meta.count;
 
 export type FrameInfo = {
   len: number;
