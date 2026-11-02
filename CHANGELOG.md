@@ -37,6 +37,7 @@ All notable changes to WireTAP will be documented in this file.
 - **A serial frame with no id no longer decodes under a Modbus catalogue.** It had been read as register 0 and shown with that register's signals.
 - **Switching a live serial line to Modbus RTU uses the device's RTU settings.** Its unit address, CRC check and vendor function codes now apply, as they do when the device is opened with RTU framing; the switch had used the stock settings.
 - **Frame search matches `_` and `%` literally.** They had matched any character.
+- **A batch of CSV files is named without a split number.** `run_01.csv` and `run_02.csv` now import as "run (2 files)" rather than "run_0 (2 files)".
 
 ## [0.15.0] - 2026-10-14
 
