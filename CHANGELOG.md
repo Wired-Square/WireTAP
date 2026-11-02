@@ -36,6 +36,7 @@ All notable changes to WireTAP will be documented in this file.
 - **A Modbus RTU export from a framed byte capture is named for Modbus RTU.** Its default file name had said serial.
 - **A serial frame with no id no longer decodes under a Modbus catalogue.** It had been read as register 0 and shown with that register's signals.
 - **Switching a live serial line to Modbus RTU uses the device's RTU settings.** Its unit address, CRC check and vendor function codes now apply, as they do when the device is opened with RTU framing; the switch had used the stock settings.
+- **Frame search matches `_` and `%` literally.** They had matched any character.
 
 ## [0.15.0] - 2026-10-14
 
