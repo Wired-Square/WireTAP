@@ -34,6 +34,7 @@ All notable changes to WireTAP will be documented in this file.
 - **A window's bus labels follow its session.** After a multi-bus session, selecting another device or joining another session no longer shows the old session's bus names in Session Controls, Transmit and Discovery.
 - **Opening a large capture in Discovery queries its frame list once.** It had run the same multi-second query three or four times at once.
 - **A Modbus RTU export from a framed byte capture is named for Modbus RTU.** Its default file name had said serial.
+- **A serial frame with no id no longer decodes under a Modbus catalogue.** It had been read as register 0 and shown with that register's signals.
 
 ## [0.15.0] - 2026-10-14
 

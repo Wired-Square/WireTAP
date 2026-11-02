@@ -481,8 +481,12 @@ fn unrouted_entry(kind: UnroutedKind, f: &FrameMessage) -> DecodedSignalsEntry<'
 }
 
 /// The id `catalog` knows `f` by, if any. A `modbus_rtu` row's id is its unit and
-/// function, which only a serial catalogue reads, and by its own `id` field.
+/// function, which only a serial catalogue reads, and by its own `id` field. A
+/// `serial` frame's id is its extracted field, never a register.
 fn catalogue_id(catalog: &wslib_wiretap_catalogue::Catalogue, f: &FrameMessage) -> Option<u32> {
+    if f.protocol == "serial" && catalog.protocol == wslib_wiretap_catalogue::model::Protocol::Modbus {
+        return None;
+    }
     if f.protocol != wslib_wiretap_protocol::ingest::MODBUS_RTU_PROTOCOL {
         return Some(f.frame_id);
     }
@@ -1545,6 +1549,40 @@ bit_length = 16
         for catalog in [&modbus, &can] {
             assert!(decode_entry(catalog, &request, None, &[]).is_none());
         }
+    }
+
+    #[test]
+    fn a_serial_frame_without_an_id_is_not_decoded_as_register_zero() {
+        let catalog = wslib_wiretap_catalogue::Catalogue::parse(
+            r#"
+[meta]
+name = "registers"
+
+[frame.modbus.at_zero]
+register_number = 0
+register_type = "holding"
+length = 1
+
+[[frame.modbus.at_zero.signals]]
+name = "Zero"
+start_bit = 0
+bit_length = 16
+"#,
+        )
+        .expect("catalogue parses");
+        let frame = serial_frame(rtu(&[0x01, 0x03, 0x00, 0x6B, 0x00, 0x03]));
+        assert!(decode_entry(&catalog, &frame, None, &[]).is_none());
+    }
+
+    #[test]
+    fn a_serial_catalogue_decodes_a_serial_frame_by_its_extracted_id() {
+        let catalog = wslib_wiretap_catalogue::Catalogue::parse(
+            "[meta]\nname = \"serial\"\n[meta.serial]\nencoding = \"slip\"\n[frame.serial.\"0x00\"]\nlength = 4\n[[frame.serial.\"0x00\".signals]]\nname = \"Value\"\nstart_bit = 16\nbit_length = 16\nbyte_order = \"big\"\n",
+        )
+        .expect("catalogue parses");
+        let frame = serial_frame(vec![0x00, 0x00, 0x12, 0x34]);
+        let entry = decode_entry(&catalog, &frame, None, &[]).expect("found by its id");
+        assert_eq!(serde_json::to_value(entry).unwrap()["signals"][0]["value"], f64::from(0x1234));
     }
 
     /// A serial catalogue that frames RTU keys its frames by its own `id` field,
