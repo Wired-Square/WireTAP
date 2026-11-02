@@ -222,6 +222,7 @@ fn frame_message(protocol: ArchiveProtocol, f: ArchiveFrame) -> FrameMessage {
         is_brs: f.is_brs,
         is_esi: f.is_esi,
         crc_valid: f.crc_valid,
+        direction: (!f.dir.is_empty()).then_some(f.dir),
         ..Default::default()
     }
 }
@@ -489,9 +490,8 @@ mod tests {
         assert!(streamed.elapsed >= Duration::from_millis(350), "finished in {:?}", streamed.elapsed);
     }
 
-    #[test]
-    fn an_archive_rows_crc_verdict_is_carried() {
-        let row = |crc_valid| ArchiveFrame {
+    fn modbus_row() -> ArchiveFrame {
+        ArchiveFrame {
             ts_us: 1,
             id: 0x0103,
             extended: false,
@@ -501,12 +501,25 @@ mod tests {
             is_rtr: false,
             is_brs: false,
             is_esi: false,
-            crc_valid,
+            crc_valid: None,
             bus: 0,
             dir: "rx".into(),
-        };
+        }
+    }
+
+    #[test]
+    fn an_archive_rows_crc_verdict_is_carried() {
         for crc_valid in [Some(false), Some(true), None] {
-            assert_eq!(frame_message(ArchiveProtocol::ModbusRtu, row(crc_valid)).crc_valid, crc_valid);
+            let row = ArchiveFrame { crc_valid, ..modbus_row() };
+            assert_eq!(frame_message(ArchiveProtocol::ModbusRtu, row).crc_valid, crc_valid);
+        }
+    }
+
+    #[test]
+    fn an_archive_rows_direction_is_carried() {
+        for (dir, direction) in [("rx", Some("rx")), ("tx", Some("tx")), ("", None)] {
+            let row = ArchiveFrame { dir: dir.into(), ..modbus_row() };
+            assert_eq!(frame_message(ArchiveProtocol::ModbusRtu, row).direction.as_deref(), direction);
         }
     }
 }

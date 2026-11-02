@@ -1504,7 +1504,9 @@ async function openNow(
       endTimeUs: meta.end_time_us,
       name: meta.name,
       persistent: meta.persistent,
-    }));
+    }),
+    // The subscribe's ByteCounts went out before the session owned this capture.
+    (meta, current) => (meta.kind === "bytes" && !current.byteCount ? { byteCount: meta.count, bytesCaptureId: captureId } : {}));
   }
 
   return opened;
@@ -1514,13 +1516,16 @@ async function openNow(
 function patchCaptureFromMetadata(
   sessionId: string,
   captureId: string,
-  patch: (meta: CaptureMetadata) => Partial<Session["capture"]>
+  patch: (meta: CaptureMetadata) => Partial<Session["capture"]>,
+  patchSession: (meta: CaptureMetadata, current: Session) => Partial<Session> = () => ({})
 ) {
   import("../api/capture")
     .then(({ getCaptureMetadataById }) => getCaptureMetadataById(captureId))
     .then((meta) => {
       const current = useSessionStore.getState().sessions[sessionId];
-      if (meta && current?.capture.id === captureId) updateSession(sessionId, { capture: { ...current.capture, ...patch(meta) } });
+      if (meta && current?.capture.id === captureId) {
+        updateSession(sessionId, { ...patchSession(meta, current), capture: { ...current.capture, ...patch(meta) } });
+      }
     })
     .catch(() => {});
 }

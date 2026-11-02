@@ -84,7 +84,7 @@ jobs:
       - name: Install npm dependencies
         shell: bash
         env:
-          NPM_MIRROR_TOKEN: ${{ secrets.NPM_MIRROR_TOKEN }}
+          NPM_MIRROR_TOKEN: ${{ secrets.CARGO_REGISTRIES_WIRED_SQUARE_TOKEN }}
         run: |
           npm config set "//mirror.wiredsquare.com/npm/:_authToken" "$NPM_MIRROR_TOKEN"
           npm ci

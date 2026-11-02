@@ -38,6 +38,17 @@ impl Rollup {
         }
     }
 
+    /// A stored row keeps only whether the lengths differed, so a mismatch reads as a
+    /// shortest length of 0: still a mismatch whatever is appended later.
+    fn of_stored(row: &CaptureFrameInfo) -> Self {
+        Self {
+            min_len: if row.has_dlc_mismatch { 0 } else { row.max_dlc },
+            max_len: row.max_dlc,
+            bus: row.bus,
+            is_extended: row.is_extended,
+        }
+    }
+
     fn info(&self, protocol: &str, frame_id: u32) -> CaptureFrameInfo {
         CaptureFrameInfo {
             protocol: protocol.to_string(),
@@ -95,6 +106,15 @@ impl FrameInventory {
                 }
             }
         }
+    }
+
+    pub fn from_stored(rows: Vec<CaptureFrameInfo>) -> Self {
+        let mut inventory = Self::default();
+        for row in rows {
+            let entry = Entry { rollup: Rollup::of_stored(&row), unsent: true };
+            inventory.protocols.entry(row.protocol).or_default().insert(row.frame_id, entry);
+        }
+        inventory
     }
 
     pub fn len(&self) -> usize {
@@ -212,6 +232,12 @@ mod tests {
                 (&want.bytes, want.bus, want.is_extended, want.dlc)
             );
         }
+    }
+
+    #[test]
+    fn an_inventory_loaded_from_stored_rows_reads_them_back_unchanged() {
+        let rollup = sorted(golden().rollup);
+        assert_eq!(FrameInventory::from_stored(rollup.clone()).take_unsent(true), rollup);
     }
 
     #[test]
