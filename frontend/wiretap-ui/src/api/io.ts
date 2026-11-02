@@ -636,7 +636,7 @@ export async function evictSessionSubscriber(
   sessionId: string,
   subscriberId: string
 ): Promise<string[]> {
-  return invoke("evict_session_listener_cmd", {
+  return invoke("evict_session_subscriber_cmd", {
     session_id: sessionId,
     subscriber_id: subscriberId,
   });
@@ -749,7 +749,7 @@ export async function setSessionSubscriberActive(
   subscriberId: string,
   isActive: boolean
 ): Promise<void> {
-  return invoke("set_session_listener_active", {
+  return invoke("set_session_subscriber_active", {
     session_id: sessionId,
     subscriber_id: subscriberId,
     is_active: isActive,
