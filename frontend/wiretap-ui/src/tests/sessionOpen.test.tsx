@@ -12,6 +12,7 @@ vi.mock("@tauri-apps/api/event", () => ({
 }));
 
 type Reply = Omit<OpenedSession, "session_id"> & { session_id?: string };
+let captureMetadata: unknown = null;
 let reply: (args: { session_id: string | null; subscriber_id: string }) => Reply | Promise<Reply>;
 const invoke = vi.fn(async (cmd: string, args?: Record<string, unknown>) => {
   if (cmd === "open_session") {
@@ -19,6 +20,7 @@ const invoke = vi.fn(async (cmd: string, args?: Record<string, unknown>) => {
     return { session_id: request.session_id, ...(await reply(request)) };
   }
   if (cmd === "unregister_session_subscriber") return 0;
+  if (cmd === "get_capture_metadata_by_id") return captureMetadata;
   return null;
 });
 vi.mock("@tauri-apps/api/core", () => ({ invoke, Channel: class {} }));
@@ -54,6 +56,7 @@ const open = () => useSessionStore.getState().openSession("f_open", "Bench", "di
 beforeEach(() => {
   invoke.mockClear();
   reply = () => opened();
+  captureMetadata = null;
   useSessionStore.setState({ sessions: {}, _eventListeners: {} });
   useSessionStore.getState().closeAppError();
 });
@@ -96,6 +99,16 @@ describe("opening a session", () => {
     expect(invoke.mock.calls.find(([cmd]) => cmd === "open_session")?.[1]).toMatchObject({ session_id: null, opts: { source_id: "p-dev" } });
     expect(session).toMatchObject({ id: "f_named", lifecycleState: "connected" });
     expect(useSessionStore.getState()._eventListeners.f_named?.registeredSubscribers.has("discovery_1")).toBe(true);
+  });
+
+  it("a session opened on a byte capture counts the bytes already in it", async () => {
+    reply = () => opened({ capture_id: "cap_bytes", capture_kind: "bytes", source_type: "capture", mode: "capture" });
+    captureMetadata = { id: "cap_bytes", kind: "bytes", count: 70, buses: [] };
+
+    await open();
+    await vi.waitFor(() => expect(useSessionStore.getState().sessions.f_open?.capture.available).toBe(true));
+
+    expect(useSessionStore.getState().sessions.f_open).toMatchObject({ byteCount: 70, bytesCaptureId: "cap_bytes" });
   });
 
   it("refuses an id with nothing behind it as not found, and keeps nothing for it", async () => {

@@ -14,7 +14,8 @@ use std::time::Duration;
 use crate::io::replay::{Pacer, PlaybackControl, Playout, Unlimited};
 
 use super::base::{publish_position, publish_position_now, RecordedSourceState};
-use crate::io::{emit_session_error, post_session, signal_frames_ready, FrameMessage, IOCapabilities, IOSource, IOState, PlaybackPosition, SignalThrottle, StreamEndReason, TemporalMode};
+use crate::io::{emit_session_error, post_session, signal_frames_ready, FrameMessage, IOCapabilities, IOSource, IOState, PlaybackPosition, Protocol, SignalThrottle, StreamEndReason, TemporalMode};
+use crate::capture_store::CaptureKind;
 use crate::{capture_db, capture_store};
 
 /// `source_type()` for a session replaying a capture.
@@ -42,13 +43,13 @@ pub struct CaptureSource {
     capture_id: Option<String>,
     /// Available buses in this capture (from metadata)
     buses: Vec<u8>,
+    kind: CaptureKind,
 }
 
 impl CaptureSource {
     pub fn new(session_id: String, capture_id: String, speed: f64) -> Self {
-        let buses = capture_store::get_capture_metadata(&capture_id)
-            .map(|m| m.buses)
-            .unwrap_or_default();
+        let (buses, kind) = capture_store::get_capture_metadata(&capture_id)
+            .map_or((Vec::new(), CaptureKind::Frames), |m| (m.buses, m.kind));
 
         // Claim the capture as this session's own so WS frame dispatch
         // (send_new_frames) can locate it via get_session_frame_capture_id.
@@ -73,6 +74,7 @@ impl CaptureSource {
             completed_flag: Arc::new(AtomicBool::new(false)),
             capture_id: Some(capture_id),
             buses,
+            kind,
         }
     }
 
@@ -109,11 +111,18 @@ async fn position_at_frame(capture_id: &str, frame_index: usize) -> Option<Playb
 #[async_trait]
 impl IOSource for CaptureSource {
     fn capabilities(&self) -> IOCapabilities {
-        IOCapabilities::recorded_can()
+        let caps = IOCapabilities::recorded_can()
             .with_temporal_mode(TemporalMode::Capture)
             .with_seek(true)
             .with_reverse(true)
-            .with_buses(self.buses.clone())
+            .with_buses(self.buses.clone());
+        match self.kind {
+            CaptureKind::Frames => caps,
+            CaptureKind::Bytes => IOCapabilities {
+                serial_link: true,
+                ..caps.with_data_streams(false, true).with_protocols(vec![Protocol::Serial])
+            },
+        }
     }
 
     async fn start(&mut self) -> Result<(), String> {
@@ -742,7 +751,7 @@ async fn run_capture_stream(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::capture_store::{create_standalone_capture, CaptureKind};
+    use crate::capture_store::create_standalone_capture;
     use wiretap_analysis::source::{FrameSelection, ProtocolFrames};
 
     fn capture_of(name: &str, frames: &[(u64, u32)]) -> String {
@@ -883,6 +892,16 @@ mod tests {
         })
         .await
         .map_err(|_| format!("settled at {:?}", position()))
+    }
+
+    #[test]
+    fn a_byte_capture_session_offers_its_raw_bytes_for_framing() {
+        crate::capture_db::use_in_memory_database();
+        let id = create_standalone_capture(CaptureKind::Bytes, "ingested".into());
+        let caps = CaptureSource::new("b_byte_capture_caps".into(), id, 1.0).capabilities();
+        assert!(caps.data_streams.rx_bytes && !caps.data_streams.rx_frames);
+        assert!(caps.serial_link);
+        assert_eq!(caps.traits.protocols, [Protocol::Serial]);
     }
 
     fn ten_frames() -> Vec<(u64, u32)> {
