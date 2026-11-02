@@ -37,6 +37,8 @@ function attachSessionCatalog(sessionId: string, catalogPath?: string | null): v
   if (catalogPath) useSessionStore.getState().setSessionCatalogPath(sessionId, catalogPath);
 }
 
+const NO_BUSES = new Map<number, BusSourceInfo>();
+
 const sourcesSessionId = (profileIds: string[], emitRawBytes?: boolean) =>
   generateSessionId({ purpose: "sources", profile_ids: profileIds, emit_raw_bytes: emitRawBytes });
 
@@ -304,9 +306,7 @@ export function useIOSessionManager(
 
   // ---- Multi-Bus State (per-instance, not global) ----
   const [multiBusProfiles, setMultiBusProfiles] = useState<string[]>([]);
-  const [outputBusToSource, setOutputBusToSource] = useState<Map<number, BusSourceInfo>>(
-    () => new Map()
-  );
+  const [sessionBusMap, setSessionBusMap] = useState<{ sessionId: string; buses: Map<number, BusSourceInfo> } | null>(null);
 
   const [isWatching, setIsWatching] = useState(false);
 
@@ -329,6 +329,8 @@ export function useIOSessionManager(
   // ioProfile holds the session id for every source kind, so a path that switches
   // source by setting it alone cannot leave the app on the session it left.
   const effectiveSessionId = ioProfile ?? undefined;
+  const outputBusToSource =
+    sessionBusMap?.sessionId === ioProfile ? sessionBusMap.buses : NO_BUSES;
 
   // Frame counts are Rust-authoritative — pushed live (FrameCounts 0x16) onto the
   // session in the store. Read them here so the UI renders them directly; no TS
@@ -688,11 +690,11 @@ export function useIOSessionManager(
     // useIOSession's effect will run with the new sessionId and register callbacks
     // It will see the backend already exists and join it properly
     setMultiBusProfiles(profileIds);
-    setOutputBusToSource(busToSource);
+    setSessionBusMap({ sessionId, buses: busToSource });
     setIoProfile(sessionId);
 
     attachSessionCatalog(sessionId, opts.catalogPath);
-  }, [appName, findProfile, setMultiBusProfiles, setOutputBusToSource, setIoProfile]);
+  }, [appName, findProfile, setMultiBusProfiles, setIoProfile]);
 
 
   // ---- Session Switching Methods ----

@@ -31,6 +31,7 @@ All notable changes to WireTAP will be documented in this file.
 
 - **Firmware flashing in the Serial app.** STM32 UART read-back now handles full 256-byte chunks, and cancelling an ESP or DFU flash now stops esptool and dfu-util too. If a read-back fails or is cancelled, the existing output file is left untouched, and esptool progress no longer shows terminal control codes.
 - **Settings and dashboards survive a crash mid-save.** They are now saved whole or not at all, as catalogues and the window layout are, so a crash or power cut during a save leaves the previous version in place rather than a truncated file.
+- **A window's bus labels follow its session.** After a multi-bus session, selecting another device or joining another session no longer shows the old session's bus names in Session Controls, Transmit and Discovery.
 
 ## [0.15.0] - 2026-10-14
 
