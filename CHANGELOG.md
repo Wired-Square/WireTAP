@@ -44,6 +44,7 @@ All notable changes to WireTAP will be documented in this file.
 - **A Virtual Device probes with the buses it opens with.** An empty interface list had probed as 0 buses.
 - **Playback always reports where it ended.** A capture or backend stream ending on a full batch could leave the scrubber short of its last frame.
 - **A Modbus TCP device whose host does not resolve is written to the session log.** Every other probe outcome already was.
+- **Transmit and live framing stay with their own device after another source leaves a session.** Removing a source, or editing a source's bus mappings, could send a transmit to another device's channel or credit a framing change to the wrong source; a removed source is no longer sent framing changes.
 
 ## [0.15.0] - 2026-10-14
 

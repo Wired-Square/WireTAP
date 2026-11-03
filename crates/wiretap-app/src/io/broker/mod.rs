@@ -113,13 +113,13 @@ pub struct IOBroker {
     rx: Option<mpsc::Receiver<SourceMessage>>,
     /// Sender for sub-readers to send messages (kept for cloning)
     tx: mpsc::Sender<SourceMessage>,
-    /// Transmit channels by source index (populated when sources connect)
+    /// Transmit channels by profile id (populated when sources connect)
     transmit_channels: TransmitChannels,
-    /// Control channels by source index for live framing changes (serial only)
+    /// Control channels by profile id for live framing changes (serial only)
     control_channels: ControlChannels,
-    /// Live framing changes by source index (set via `set_framing`), which
+    /// Live framing changes by profile id (set via `set_framing`), which
     /// `data_streams` reads over the static config.
-    framing_overrides: Arc<Mutex<HashMap<usize, SetFramingRequest>>>,
+    framing_overrides: Arc<Mutex<HashMap<String, SetFramingRequest>>>,
     /// Bus mappings a source revised for itself once connected, by source index.
     ///
     /// The mappings in `sources` are a pre-connect guess read off the profile.
@@ -181,10 +181,10 @@ impl Drop for IOBroker {
 /// restating the rule.
 fn data_streams(
     sources: &[SourceConfig],
-    live: &HashMap<usize, SetFramingRequest>,
+    live: &HashMap<String, SetFramingRequest>,
 ) -> SessionDataStreams {
     let mut streams = SessionDataStreams { rx_frames: false, rx_bytes: false };
-    for (idx, source) in sources.iter().enumerate() {
+    for source in sources {
         if source.is_virtual_serial() {
             streams.rx_bytes = true;
             continue;
@@ -193,7 +193,7 @@ fn data_streams(
             streams.rx_frames = true;
             continue;
         }
-        let (framing, raw_bytes) = match live.get(&idx) {
+        let (framing, raw_bytes) = match live.get(&source.profile_id) {
             Some(req) => (req.encoding, req.emit_raw_bytes),
             None => (
                 source.serial.framing_encoding.unwrap_or_default(),
@@ -259,7 +259,7 @@ impl IOBroker {
                 .framing_overrides
                 .lock()
                 .map_err(|e| format!("Failed to lock framing overrides: {}", e))?;
-            for (idx, (profile_id, sender)) in channels.iter() {
+            for (profile_id, sender) in channels.iter() {
                 let mut req = req.clone();
                 if let Some(profiles) = &unset_rtu_profiles {
                     req.modbus = self.opening_rtu_settings(profile_id, profiles);
@@ -274,7 +274,7 @@ impl IOBroker {
                 {
                     crate::ws::dispatch::set_serial_rtu_options(&self.session_id, options);
                 }
-                overrides.insert(*idx, req.clone());
+                overrides.insert(profile_id.clone(), req.clone());
                 let _ = sender.try_send(req);
             }
         }
@@ -414,14 +414,11 @@ impl IOBroker {
     /// and the last mapping wins a contested output bus.
     fn current_transmit_routes(&self) -> HashMap<u8, TransmitRoute> {
         let mut routes = HashMap::new();
-        for (source_idx, (source, mappings)) in
-            self.sources.iter().zip(self.effective_mappings()).enumerate()
-        {
+        for (source, mappings) in self.sources.iter().zip(self.effective_mappings()) {
             for mapping in mappings.into_iter().filter(|m| m.enabled) {
                 routes.insert(
                     mapping.output_bus,
                     TransmitRoute {
-                        source_idx,
                         profile_id: source.profile_id.clone(),
                         profile_kind: source.profile_kind.clone(),
                         device_bus: mapping.device_bus,
@@ -440,7 +437,7 @@ impl IOBroker {
     fn route_for_bus(&self, output_bus: u8) -> Option<TransmitRoute> {
         let resolved = self.resolved_mappings.lock().ok();
         let mut found = None;
-        for (source_idx, source) in self.sources.iter().enumerate() {
+        for source in &self.sources {
             let mappings = resolved
                 .as_ref()
                 .and_then(|r| r.get(&source.profile_id))
@@ -449,7 +446,6 @@ impl IOBroker {
                 // Last match wins, matching the table's insert semantics.
                 if mapping.output_bus == output_bus {
                     found = Some(TransmitRoute {
-                        source_idx,
                         profile_id: source.profile_id.clone(),
                         profile_kind: source.profile_kind.clone(),
                         device_bus: mapping.device_bus,
@@ -563,11 +559,11 @@ impl IOBroker {
             .map_err(|e| format!("Failed to lock transmit channels: {}", e))?;
 
         let tx = channels
-            .get(&route.source_idx)
+            .get(&route.profile_id)
             .ok_or_else(|| {
                 format!(
-                    "No transmit channel for source {} (profile '{}') - source may not support transmit or not yet connected",
-                    route.source_idx, route.profile_id
+                    "No transmit channel for profile '{}' - source may not support transmit or not yet connected",
+                    route.profile_id
                 )
             })?
             .clone();
@@ -601,7 +597,11 @@ impl IOBroker {
         let routes = self.current_transmit_routes();
         let serial_route = routes
             .values()
-            .find(|route| self.sources[route.source_idx].transmits_raw_bytes())
+            .find(|route| {
+                self.sources
+                    .iter()
+                    .any(|s| s.profile_id == route.profile_id && s.transmits_raw_bytes())
+            })
             .ok_or_else(|| "No serial or FrameLink source configured in this session".to_string())?;
 
         let channels = self
@@ -610,11 +610,11 @@ impl IOBroker {
             .map_err(|e| format!("Failed to lock transmit channels: {}", e))?;
 
         let tx = channels
-            .get(&serial_route.source_idx)
+            .get(&serial_route.profile_id)
             .ok_or_else(|| {
                 format!(
-                    "No transmit channel for serial source {} (profile '{}') - source may not be connected",
-                    serial_route.source_idx, serial_route.profile_id
+                    "No transmit channel for serial profile '{}' - source may not be connected",
+                    serial_route.profile_id
                 )
             })?
             .clone();
@@ -977,8 +977,11 @@ impl IOSource for IOBroker {
             .ok_or_else(|| "Session not running — cannot hot-remove source".to_string())?;
         tx.send(MergeCommand::RemoveSource(profile_id.to_string()))
             .map_err(|e| format!("Failed to send remove-source command: {}", e))?;
-        // Update local configs
         self.sources.retain(|c| c.profile_id != profile_id);
+        // A re-added reader opens on its config, not on a live change made to the one it replaces.
+        if let Ok(mut overrides) = self.framing_overrides.lock() {
+            overrides.remove(profile_id);
+        }
         Ok(())
     }
 
@@ -1125,8 +1128,15 @@ mod tests {
         }
     }
 
+    /// Live changes by position in `sources`, each source named for its position.
     fn streams(sources: &[SourceConfig], live: &[(usize, SetFramingRequest)]) -> (bool, bool) {
-        let s = data_streams(sources, &live.iter().cloned().collect());
+        let sources: Vec<_> = sources
+            .iter()
+            .enumerate()
+            .map(|(idx, s)| SourceConfig { profile_id: idx.to_string(), ..s.clone() })
+            .collect();
+        let live = live.iter().map(|(idx, req)| (idx.to_string(), req.clone())).collect();
+        let s = data_streams(&sources, &live);
         (s.rx_frames, s.rx_bytes)
     }
 
@@ -1209,10 +1219,10 @@ mod tests {
         (IOBroker::single_source(profiles, session_id.into(), source).unwrap(), opened)
     }
 
-    /// The framing a live switch to RTU sends down the control channel of the reader at `idx`.
-    fn live_rtu_switch(broker: &IOBroker, idx: usize) -> wslib_wiretap_catalogue::FramingEncoding {
+    /// The framing a live switch to RTU sends down the line's control channel.
+    fn live_rtu_switch(broker: &IOBroker) -> wslib_wiretap_catalogue::FramingEncoding {
         let (control, received) = std::sync::mpsc::sync_channel(1);
-        broker.control_channels.lock().unwrap().insert(idx, ("rtu-line".into(), control));
+        broker.control_channels.lock().unwrap().insert("rtu-line".into(), control);
         broker.set_framing(set_framing("modbus_rtu", true)).unwrap();
         let req = received.try_recv().unwrap();
         wslib_wiretap_catalogue::FramingEncoding::from_mode(req.encoding, req.modbus.as_ref())
@@ -1221,7 +1231,7 @@ mod tests {
     #[test]
     fn a_live_switch_to_rtu_frames_with_the_settings_an_open_would() {
         let (broker, opened) = rtu_line("live-rtu-switch");
-        assert_eq!(live_rtu_switch(&broker, 0), opened);
+        assert_eq!(live_rtu_switch(&broker), opened);
     }
 
     #[test]
@@ -1232,8 +1242,7 @@ mod tests {
         let mappings = broker.sources[0].bus_mappings.clone();
         broker.update_source_bus_mappings("rtu-line", mappings).unwrap();
 
-        // The merge task gives the re-added reader the next index, past the one it left.
-        assert_eq!(live_rtu_switch(&broker, 1), opened);
+        assert_eq!(live_rtu_switch(&broker), opened);
     }
 
     #[test]
@@ -1312,5 +1321,192 @@ mod bus_status_tests {
         settles(&broker, std::slice::from_ref(&passive)).await;
         broker.stop().await.unwrap();
         assert_eq!(broker.bus_statuses(), []);
+    }
+}
+
+#[cfg(test)]
+mod hot_remove_tests {
+    use super::*;
+    use crate::io::types::{transmit_channel, ControlSender, TransmitSender};
+    use crate::settings::IOProfile;
+    use std::time::Duration;
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn a_transmit_reaches_its_own_source_after_another_is_removed() {
+        let devices = ["a", "b", "c"].map(|id| virtual_profile(id, "can"));
+        let sources = devices
+            .iter()
+            .zip(0..)
+            .map(|(p, bus)| (p.clone(), source(p, "virtual", bus)))
+            .collect();
+        let mut broker = started("hot-remove-transmit", sources).await;
+        let ((b, _b_rx), (c, _c_rx)) = (transmit_channel(), transmit_channel());
+        broker.tx.send(SourceMessage::TransmitReady(1, b.clone())).await.unwrap();
+        broker.tx.send(SourceMessage::TransmitReady(2, c.clone())).await.unwrap();
+        let stand_ins = [("b", &b), ("c", &c)];
+        until(|| reached(&broker, 2, &stand_ins) == Ok("c")).await;
+
+        remove(&mut broker, "a").await;
+
+        assert_eq!(reached(&broker, 2, &stand_ins), Ok("c"));
+        assert_eq!(reached(&broker, 1, &stand_ins), Ok("b"));
+        broker.stop().await.unwrap();
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn a_live_framing_change_is_credited_to_its_own_source_after_another_is_removed() {
+        let other = virtual_profile("bytes", "serial");
+        let mut broker = started(
+            "hot-remove-framing",
+            vec![(other.clone(), source(&other, "virtual", 1)), serial_line("line")],
+        )
+        .await;
+        let _control = control_ready(&broker, 1).await;
+        remove(&mut broker, "bytes").await;
+
+        broker.set_framing(raw_with_bytes()).unwrap();
+
+        assert_eq!(streams(&broker), (false, true));
+        broker.stop().await.unwrap();
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn a_re_added_source_reports_the_framing_it_was_reopened_with() {
+        let mut broker = started("readd-framing", vec![serial_line("line")]).await;
+        let _control = control_ready(&broker, 0).await;
+        broker.set_framing(raw_with_bytes()).unwrap();
+
+        let mappings = broker.sources[0].bus_mappings.clone();
+        broker.update_source_bus_mappings("line", mappings).unwrap();
+
+        assert_eq!(streams(&broker), (true, false));
+        broker.stop().await.unwrap();
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn a_removed_source_is_sent_no_framing_change() {
+        let (first, second) = (serial_line("first"), serial_line("second"));
+        let mut broker = started("hot-remove-control", vec![first, second]).await;
+        let removed = control_ready(&broker, 0).await;
+        remove(&mut broker, "first").await;
+
+        let _ = broker.set_framing(raw_with_bytes());
+
+        assert!(removed.try_recv().is_err(), "the removed source's reader was sent the change");
+        assert!(broker.control_channels.lock().unwrap().is_empty());
+        broker.stop().await.unwrap();
+    }
+
+    fn virtual_profile(id: &str, traffic_type: &str) -> IOProfile {
+        IOProfile {
+            id: id.into(),
+            name: id.into(),
+            kind: "virtual".into(),
+            connection: serde_json::from_value(serde_json::json!({
+                "traffic_type": traffic_type,
+                "interfaces": [{ "bus": 0, "signal_generator": false, "frame_rate_hz": 1.0 }],
+            }))
+            .unwrap(),
+            preferred_catalog: None,
+            ephemeral: true,
+        }
+    }
+
+    fn source(profile: &IOProfile, kind: &str, output_bus: u8) -> SourceConfig {
+        let mut bus_mappings = crate::sessions::profile_bus_mappings(profile);
+        bus_mappings[0].output_bus = output_bus;
+        SourceConfig {
+            profile_id: profile.id.clone(),
+            profile_kind: kind.into(),
+            bus_mappings,
+            ..Default::default()
+        }
+    }
+
+    /// A serial line whose reader is a virtual device, so it runs without a port.
+    fn serial_line(id: &str) -> (IOProfile, SourceConfig) {
+        let profile = virtual_profile(id, "serial");
+        let mut source = source(&profile, "serial", 0);
+        source.serial.framing_encoding = Some(crate::io::types::framing_named("slip"));
+        source.serial.emit_raw_bytes = Some(false);
+        (profile, source)
+    }
+
+    async fn started(session_id: &str, sources: Vec<(IOProfile, SourceConfig)>) -> IOBroker {
+        let (profiles, sources): (Vec<_>, Vec<_>) = sources.into_iter().unzip();
+        let count = sources.len();
+        let loader: ProfileLoader = Arc::new(move || Ok(profiles.clone()));
+        let mut broker = IOBroker::new(loader, session_id.into(), sources).unwrap();
+        broker.start().await.unwrap();
+        until(|| broker.transmit_channels.lock().unwrap().len() == count).await;
+        broker
+    }
+
+    async fn until(done: impl Fn() -> bool) {
+        for _ in 0..200 {
+            if done() {
+                return;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        panic!("timed out");
+    }
+
+    async fn remove(broker: &mut IOBroker, profile_id: &str) {
+        let before = broker.transmit_channels.lock().unwrap().len();
+        broker.remove_source_hot(profile_id).unwrap();
+        until(|| broker.transmit_channels.lock().unwrap().len() == before - 1).await;
+    }
+
+    async fn control_ready(
+        broker: &IOBroker,
+        merge_idx: usize,
+    ) -> std::sync::mpsc::Receiver<SetFramingRequest> {
+        let (control, received): (ControlSender, _) = std::sync::mpsc::sync_channel(8);
+        broker.tx.send(SourceMessage::ControlReady(merge_idx, control)).await.unwrap();
+        until(|| !broker.control_channels.lock().unwrap().is_empty()).await;
+        received
+    }
+
+    fn reached<'a>(
+        broker: &IOBroker,
+        bus: u8,
+        channels: &[(&'a str, &TransmitSender)],
+    ) -> Result<&'a str, String> {
+        let frame = CanTransmitFrame {
+            frame_id: 0x100,
+            data: vec![1],
+            bus,
+            is_extended: false,
+            is_fd: false,
+            is_brs: false,
+            is_rtr: false,
+        };
+        let pending = broker.pending_can_transmit(&frame)?;
+        channels
+            .iter()
+            .find(|(_, tx)| pending.tx.same_channel(tx))
+            .map(|(name, _)| *name)
+            .ok_or_else(|| "a channel of no stand-in".into())
+    }
+
+    fn raw_with_bytes() -> SetFramingRequest {
+        SetFramingRequest {
+            encoding: FramingMode::Raw,
+            frame_id_start_byte: None,
+            frame_id_bytes: None,
+            frame_id_big_endian: true,
+            source_address_start_byte: None,
+            source_address_bytes: None,
+            source_address_big_endian: true,
+            min_frame_length: 0,
+            emit_raw_bytes: true,
+            modbus: None,
+        }
+    }
+
+    fn streams(broker: &IOBroker) -> (bool, bool) {
+        let streams = broker.capabilities().data_streams;
+        (streams.rx_frames, streams.rx_bytes)
     }
 }
