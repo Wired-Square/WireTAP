@@ -7,7 +7,7 @@ use crate::Store;
 impl Store {
     /// The 0-based offsets, among a selection's frames, of those whose lowercase hex id
     /// (`search_id`, an `0x` prefix dropped) or uppercase hex payload (`search_data`)
-    /// contains `query`. The caller strips whitespace; `LIKE` wildcards are not escaped.
+    /// contains `query` literally. The caller strips whitespace.
     pub async fn search_frames(
         &self,
         capture_id: &str,
@@ -24,14 +24,14 @@ impl Store {
             .or_else(|| query.strip_prefix("0X"))
             .unwrap_or(query);
         let mut clauses = Vec::new();
-        let mut patterns = Vec::new();
+        let mut needles = Vec::new();
         for (searched, column, text) in [
             (search_id, "printf('%x', frame_id)", q.to_lowercase()),
             (search_data, "upper(hex(payload))", q.to_uppercase()),
         ] {
             if searched {
-                clauses.push(format!("{column} LIKE ?{}", patterns.len() + 3));
-                patterns.push(format!("%{text}%"));
+                clauses.push(format!("instr({column}, ?{}) > 0", needles.len() + 3));
+                needles.push(text);
             }
         }
         let id_filter = if selection.is_empty() {
@@ -50,11 +50,11 @@ impl Store {
             clauses.join(" OR ")
         );
 
-        let statement = patterns.into_iter().fold(
+        let statement = needles.into_iter().fold(
             sqlx::query_scalar::<_, i64>(&sql)
                 .bind(capture_id)
                 .bind(selection_json(selection)),
-            |statement, pattern| statement.bind(pattern),
+            |statement, needle| statement.bind(needle),
         );
         let offsets = statement.fetch_all(self.pool()).await?;
         Ok(offsets.into_iter().map(|n| n as usize).collect())
@@ -114,10 +114,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn like_wildcards_in_a_query_are_not_escaped() {
+    async fn underscore_and_percent_in_a_query_match_only_themselves() {
         let store = capture(&[(0x100, &[0x01]), (0x200, &[0x02])]).await;
-        assert_eq!(search(&store, "_", true, false).await, [0, 1]);
-        assert_eq!(search(&store, "1%0", true, false).await, [0]);
+        assert_eq!(search(&store, "_", true, true).await, Vec::<usize>::new());
+        assert_eq!(search(&store, "1%0", true, true).await, Vec::<usize>::new());
         assert_eq!(search(&store, "'", true, true).await, Vec::<usize>::new());
     }
 

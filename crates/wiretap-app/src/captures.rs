@@ -386,10 +386,13 @@ fn build_batch_name(paths: &[String]) -> String {
             .last()
             .unwrap_or(0);
 
-        if prefix_len > 3 {
-            let prefix = &first[..prefix_len];
-            // Trim trailing separators/underscores
-            let trimmed = prefix.trim_end_matches(|c: char| c == '_' || c == '-' || c == '.');
+        let prefix = &first[..prefix_len];
+        let is_digit = |c: char| c.is_ascii_digit();
+        let splits_a_number =
+            prefix.ends_with(is_digit) && filenames.iter().any(|f| f[prefix_len..].starts_with(is_digit));
+        let whole = if splits_a_number { prefix.trim_end_matches(is_digit) } else { prefix };
+        let trimmed = whole.trim_end_matches(['_', '-', '.']);
+        if prefix_len > 3 && !trimmed.is_empty() {
             return format!("{} ({} files)", trimmed, paths.len());
         }
     }
@@ -726,7 +729,10 @@ mod tests {
     #[test]
     fn a_batch_is_named_for_the_common_prefix_of_its_filenames() {
         let paths = |names: &[&str]| names.iter().map(|n| format!("/data/{n}")).collect::<Vec<_>>();
-        assert_eq!(build_batch_name(&paths(&["run_01.csv", "run_02.csv"])), "run_0 (2 files)");
+        assert_eq!(build_batch_name(&paths(&["run_01.csv", "run_02.csv"])), "run (2 files)");
+        assert_eq!(build_batch_name(&paths(&["2026-01-05.csv", "2026-01-06.csv"])), "2026-01 (2 files)");
+        assert_eq!(build_batch_name(&paths(&["test1.csv", "test1b.csv"])), "test1 (2 files)");
+        assert_eq!(build_batch_name(&paths(&["12341.csv", "12342.csv"])), "2 files merged");
         assert_eq!(build_batch_name(&paths(&["log-a.csv", "log-b.csv"])), "log (2 files)");
         assert_eq!(build_batch_name(&paths(&["abcd1.csv", "xyz.csv"])), "2 files merged");
         assert_eq!(build_batch_name(&paths(&["only.csv"])), "only.csv (1 files)");

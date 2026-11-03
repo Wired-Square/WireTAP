@@ -1108,13 +1108,6 @@ pub async fn set_framing(
     session_id: &str,
     req: types::SetFramingRequest,
 ) -> Result<IOCapabilities, String> {
-    // Keep the WS decode path in step with the port, stock settings included: a
-    // `modbus_rtu` frame from a session that published none reads as an archive's.
-    if let wslib_wiretap_catalogue::FramingEncoding::ModbusRtu(options) =
-        wslib_wiretap_catalogue::FramingEncoding::from_mode(req.encoding, req.modbus.as_ref())
-    {
-        crate::ws::dispatch::set_serial_rtu_options(session_id, options);
-    }
     let session = lock_session(session_id).await?;
     session.source.set_framing(req)?;
     emit_transition(session_id, &session, SessionTransition::CapabilitiesChanged, None);

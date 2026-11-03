@@ -66,6 +66,9 @@ function protocolOf(frameInfoMap: Map<string, { protocol?: string }>): string | 
   return undefined;
 }
 
+const listedFrameInfo = async (meta: CaptureMetadata) =>
+  meta.kind === "bytes" ? null : getCaptureFrameInfo(meta.id);
+
 function DiscoveryInner() {
   const { t, i18n } = useTranslation("discovery");
   const { settings } = useSettings();
@@ -295,9 +298,8 @@ function DiscoveryInner() {
 
         // Fetch frame info from backend capture (populates frame picker)
         try {
-          const frameInfoList = await getCaptureFrameInfo(payload.capture_id);
-          console.log(`[Discovery] Session suspended - loaded ${frameInfoList.length} unique frame IDs from capture`);
-          setFrameInfoFromCapture(frameInfoList);
+          const frameInfoList = await listedFrameInfo(meta);
+          if (frameInfoList) setFrameInfoFromCapture(frameInfoList);
         } catch (err) {
           console.warn('[Discovery] Failed to fetch frame info after suspend:', err);
         }
@@ -396,8 +398,8 @@ function DiscoveryInner() {
       if (meta) {
         setCaptureMetadata(meta);
         enableCaptureMode(capturedFrameCount(meta));
-        const frameInfoList = await getCaptureFrameInfo(captureId);
-        setFrameInfoFromCapture(frameInfoList);
+        const frameInfoList = await listedFrameInfo(meta);
+        if (frameInfoList) setFrameInfoFromCapture(frameInfoList);
       }
     } catch (err) {
       console.warn('[Discovery] Failed to load capture after session destroyed:', err);
@@ -565,12 +567,11 @@ function DiscoveryInner() {
         const meta = await getCaptureMetadata(sessionCaptureId);
         if (!meta) return;
         // Fetch frame info from backend capture (populates frame picker)
-        const frameInfoList = await getCaptureFrameInfo(sessionCaptureId);
+        const frameInfoList = await listedFrameInfo(meta);
         if (cancelled) return;
         setCaptureMetadata(meta);
         enableCaptureMode(capturedFrameCount(meta));
-        console.log(`[Discovery] Loaded ${frameInfoList.length} unique frame IDs from capture`);
-        setFrameInfoFromCapture(frameInfoList);
+        if (frameInfoList) setFrameInfoFromCapture(frameInfoList);
       } catch (err) {
         console.warn('[Discovery] Failed to fetch capture data:', err);
       }

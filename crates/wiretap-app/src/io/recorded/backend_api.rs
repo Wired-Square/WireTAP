@@ -340,10 +340,13 @@ async fn run_api_stream(
 
     let rest = pacer.take_batch();
     let flush = !rest.is_empty();
+    if let Some(last) = rest.last() {
+        out.throttle.flush();
+        out.position(last.timestamp_us as i64, pacer.stats().emitted);
+    }
     out.appender.append(rest);
     out.appender.finish().await;
     if flush {
-        out.throttle.flush();
         signal_frames_ready(&session_id);
     }
 
@@ -472,13 +475,13 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn at_unlimited_speed_the_position_is_published_per_full_batch_only() {
+    async fn at_unlimited_speed_the_final_position_is_the_last_frames() {
         let streamed = stream("f_backend_position", two_pages(), 0.0).await;
 
         let position = streamed.position.expect("a position was published");
         assert_eq!(
             (position.timestamp_us, position.frame_index, position.frame_count),
-            (1_000 + 49 * 10, 49, Some(50))
+            (1_000 + 59 * 10, 59, Some(60))
         );
     }
 
