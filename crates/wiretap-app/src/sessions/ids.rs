@@ -105,7 +105,9 @@ pub(crate) fn session_id_prefix<'a>(
     let mut emits_bytes = false;
     for p in profiles {
         let spec = device_kinds::traits(&p.kind);
-        let proto = spec.filter(|s| s.realtime).map(|s| s.protocol);
+        let virtual_serial = p.kind == "virtual"
+            && super::source_config::profile_bus_mappings(p).iter().any(|m| m.protocol == Protocol::Serial);
+        let proto = spec.filter(|s| s.realtime).map(|s| if virtual_serial { Protocol::Serial } else { s.protocol });
         if proto == Some(Protocol::Serial) {
             emits_bytes |= crate::io::profile::resolve_serial_framing(p, None, emit_raw_bytes).1;
         }
@@ -137,6 +139,13 @@ mod tests {
         assert_eq!(session_id_prefix([&p("wiretap"), &p("gvret_tcp")], None), "t");
         assert_eq!(session_id_prefix([&p("no_such_kind")], None), "s");
         assert_eq!(session_id_prefix([], None), "s");
+    }
+
+    #[test]
+    fn a_virtual_device_generating_serial_traffic_gets_a_bytes_id() {
+        let serial = profile("virtual", json!({ "traffic_type": "serial" }));
+        assert_eq!(session_id_prefix([&serial], None), "b");
+        assert_eq!(session_id_prefix([&profile("virtual", json!({ "traffic_type": "can" }))], None), "f");
     }
 
     /// The spellings the retired frontend mints used, and where one changed:

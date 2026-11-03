@@ -34,6 +34,10 @@ All notable changes to WireTAP will be documented in this file.
 - **A capture reopened after a restart honours a frame selection.** Its live tail had shown every frame id whatever was selected, and its distinct-id count read 0.
 - **Frames played from a WireTAP backend keep their direction.** The archive records whether each frame was received or sent, and playback now carries it.
 - **A capture reversed after a pause reports the right frame.** Pausing a paced playback and then changing its direction had numbered every frame after it one off, so the reported frame and its time disagreed until the next seek.
+- **Playback resumes from where it was left.** A capture paused while playing at unlimited speed no longer sends up to a thousand frames from past the pause when it is reversed. A resume after stepping now carries on from the stepped frame instead of jumping back.
+- **The last frames from an MQTT broker or a WireTAP backend reach the apps.** Frames arriving within half a second of the previous batch waited until more came, so a backend playback paused mid-stream could hide its last batch until resumed.
+- **A second app joining a live session no longer makes the first miss frames.** Opening another view on a running session had skipped the frames not yet delivered to the views already on it.
+- **A serial Virtual Device opens as a bytes session.** Its session id now starts `b_`, from the picker and over MCP alike.
 - **Session Manager's Remove evicts the subscriber again, and a detached window's subscription is paused and resumed.** Both had failed with a missing-command error since the workspace reorganisation.
 - **A byte capture opened from the picker can be framed in Discovery.** Its Raw Bytes tab, the Framing button and Serial Framing Analysis are available again, and the session reports the capture as serial rather than CAN.
 - **Exporting a framed byte capture counts its messages.** The export dialog had offered the capture's byte count as its number of frames.

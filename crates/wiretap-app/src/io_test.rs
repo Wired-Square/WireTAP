@@ -1423,7 +1423,7 @@ pub(crate) mod tests {
 
     async fn open_wire(session_id: &str, wire: Wire) {
         let wire = StdMutex::new(wire);
-        let echoes = crate::capture_store::SessionAppender::spawn(session_id.into(), |_| {});
+        let echoes = crate::capture_store::SessionAppender::spawn(session_id.into(), |_, _| {});
         let far_end = TestSource::new(session_id).transmitting(move |_, payload| {
             let TransmitPayload::CanFrame(tx) = payload else {
                 return TransmitResult::error("Not a CAN frame".into());

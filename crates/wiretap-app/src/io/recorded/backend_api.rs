@@ -298,8 +298,8 @@ async fn run_api_stream(
         frame_queue.front().map(|f| f.timestamp_us as f64 / 1_000_000.0).unwrap_or(0.0);
     let mut pacer = Pacer::new(stream_start_secs, &control, UNLIMITED);
     let mut frames_ready = SignalThrottle::new();
-    let appender = SessionAppender::spawn(session_id.clone(), move |session_id| {
-        if frames_ready.should_signal("frames-ready") {
+    let appender = SessionAppender::spawn(session_id.clone(), move |session_id, stored| {
+        if frames_ready.ready("frames-ready", stored) {
             signal_frames_ready(session_id);
         }
     });
@@ -515,6 +515,53 @@ mod tests {
 
         assert_eq!(streamed.frames.len(), 30);
         assert!(streamed.elapsed >= Duration::from_millis(350), "finished in {:?}", streamed.elapsed);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn frames_landing_just_before_a_pause_are_signalled_while_it_holds() {
+        use crate::ws::protocol::{MsgType, ENVELOPE_HEADER_SIZE};
+        use crate::ws::server::outbox;
+        const SESSION: &str = "f_backend_paused_tail";
+        const CHANNEL: u8 = 213;
+        outbox::subscribe(SESSION, CHANNEL);
+        crate::capture_db::use_in_memory_database();
+        let (base_url, _) = fake_gateway(vec![(rows(0..10, 100_000), None)]).await;
+        let config = BackendApiConfig {
+            base_url,
+            api_key: "key".into(),
+            database: "site".into(),
+            protocol: ArchiveProtocol::Can,
+        };
+        let options = BackendApiSourceOptions { speed: 1.0, ..Default::default() };
+        let source = BackendApiSource::new(SESSION.into(), config, options);
+        crate::io::create_session(SESSION.into(), Box::new(source), None, None, None, vec![]).await;
+        crate::io::start_session(SESSION).await.unwrap();
+        tokio::time::timeout(Duration::from_secs(5), async {
+            while crate::io::get_playback_position(SESSION).is_none_or(|p| p.frame_index < 1) {
+                tokio::time::sleep(Duration::from_millis(5)).await;
+            }
+        })
+        .await
+        .expect("the second frame played");
+        crate::io::pause_session(SESSION).await.unwrap();
+        let mut sent = Vec::new();
+        let second = 1_000 + 100_000;
+        let _ = tokio::time::timeout(Duration::from_millis(1_500), async {
+            while !sent.contains(&second) {
+                tokio::time::sleep(Duration::from_millis(20)).await;
+                for (_, batch) in outbox::sent(CHANNEL, MsgType::FrameData) {
+                    let mut at = 0;
+                    while let Some(header) = batch.get(at..at + ENVELOPE_HEADER_SIZE) {
+                        sent.push(u64::from_le_bytes(header[..8].try_into().unwrap()));
+                        at += ENVELOPE_HEADER_SIZE + u32::from_le_bytes(header[11..15].try_into().unwrap()) as usize;
+                    }
+                }
+            }
+        })
+        .await;
+        crate::io::destroy_session(SESSION, false).await.ok();
+
+        assert!(sent.contains(&second), "sent while paused: {sent:?}");
     }
 
     fn modbus_row() -> ArchiveFrame {

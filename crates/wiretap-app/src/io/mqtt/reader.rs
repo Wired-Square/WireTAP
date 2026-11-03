@@ -299,6 +299,8 @@ fn spawn_mqtt_stream(
                 break;
             }
 
+            let mut appended = false;
+
             // Poll with timeout to check cancel flag periodically
             match tokio::time::timeout(Duration::from_millis(100), eventloop.poll()).await {
                 Ok(Ok(event)) => {
@@ -327,10 +329,7 @@ fn spawn_mqtt_stream(
 
                                 // Buffer frame for replay
                                 capture_store::append_frames_to_session(&session_id, vec![frame]).await;
-
-                                if throttle.should_signal("frames-ready") {
-                                    signal_frames_ready(&session_id);
-                                }
+                                appended = true;
                             }
                             Err(e) => {
                                 // Log parse error but continue (might be non-CAN message)
@@ -354,6 +353,9 @@ fn spawn_mqtt_stream(
                 Err(_) => {
                     // Timeout - continue loop to check cancel flag
                 }
+            }
+            if throttle.ready("frames-ready", appended) {
+                signal_frames_ready(&session_id);
             }
         }
 
