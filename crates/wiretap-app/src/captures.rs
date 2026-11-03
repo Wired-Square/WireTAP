@@ -156,37 +156,21 @@ pub async fn import_csv_with_mapping(
     delimiter: io::Delimiter,
     protocol: Option<io::Protocol>,
 ) -> Result<CsvImportResult, String> {
-    let filename = std::path::Path::new(&file_path)
-        .file_name()
-        .and_then(|n| n.to_str())
-        .unwrap_or("unknown")
-        .to_string();
-
     off_runtime(move || {
-        let result = io::parse_csv_with_mapping(&file_path, &mappings, skip_first_row, timestamp_unit, negate_timestamps, delimiter, protocol.unwrap_or_default())?;
-
-        if result.frames.is_empty() {
-            return Err("File contains no valid frames with the given column mapping".to_string());
-        }
-
-        let sequence_gaps = result.sequence_gaps;
-        let total_dropped = sequence_gaps.iter().map(|g| g.dropped).sum();
-        let wrap_points = detect_wrap_points(&sequence_gaps);
-
-        capture_store::create_session_capture(&session_id, capture_store::CaptureKind::Frames, filename);
-        crate::capture_db::wait(capture_store::append_frames_to_session(&session_id, result.frames));
-        let finalized = capture_store::finalize_session_captures(&session_id);
-        let metadata = finalized.into_iter().next()
-            .ok_or_else(|| "Failed to store frames in capture".to_string())?;
-
-        Ok(CsvImportResult {
-            metadata,
-            sequence_gaps,
-            total_dropped,
-            wrap_points,
-        })
+        let layout = CsvLayout {
+            mappings: &mappings,
+            timestamp_unit,
+            negate_timestamps,
+            delimiter,
+            protocol: protocol.unwrap_or_default(),
+        };
+        import_csv_file(&session_id, &file_path, skip_first_row, &layout)
     })
     .await
+}
+
+fn import_csv_file(session_id: &str, file_path: &str, skip_first_row: bool, layout: &CsvLayout) -> Result<CsvImportResult, String> {
+    import_csv_batch(session_id, &[file_path.to_owned()], &[skip_first_row], layout, |_| {})
 }
 
 /// Import multiple data files with shared column mappings into a single capture.
@@ -259,6 +243,10 @@ pub fn import_csv_batch(
 
     // Create a single capture for all files, owned by the session
     let capture_id = capture_store::create_session_capture(session_id, capture_store::CaptureKind::Frames, name);
+    let abandon = |e: String| {
+        let _ = capture_store::delete_capture(&capture_id);
+        Err(e)
+    };
 
     let total_files = file_paths.len();
     let mut total_frames: usize = 0;
@@ -273,10 +261,13 @@ pub fn import_csv_batch(
 
         let skip_row = skip_first_row_per_file.get(i).copied().unwrap_or(false);
 
-        let result = io::parse_csv_with_mapping(
+        let result = match io::parse_csv_with_mapping(
             file_path, layout.mappings, skip_row, layout.timestamp_unit, layout.negate_timestamps,
             layout.delimiter, layout.protocol,
-        )?;
+        ) {
+            Ok(result) => result,
+            Err(e) => return abandon(e),
+        };
 
         total_frames += result.frames.len();
 
@@ -313,8 +304,7 @@ pub fn import_csv_batch(
     }
 
     if total_frames == 0 {
-        let _ = capture_store::delete_capture(&capture_id);
-        return Err("No valid frames found in any of the selected files".to_string());
+        return abandon("No valid frames found in any of the selected files".to_string());
     }
 
     tlog!(
@@ -830,6 +820,32 @@ mod tests {
         let paths = csv_batch("flags", &[("one.csv", "100,1,123,01\n"), ("two.csv", "200,2,123,02\n")]);
         let result = import_csv_batch("f_csv_batch_flags", &paths, &[], &layout(&mappings), |_| {}).expect("imported");
         assert_eq!(result.metadata.count, 2);
+    }
+
+    #[test]
+    fn a_parse_error_leaves_no_empty_capture() {
+        let _db = crate::capture_db::use_own_database();
+        let mappings = sequenced();
+        let mut paths = csv_batch("unreadable", &[("unreadable_a.csv", "100,1,123,01\n")]);
+        paths.push(paths[0].replace("unreadable_a.csv", "unreadable_b.csv"));
+        let name = build_batch_name(&paths);
+
+        assert!(import_csv_batch("f_csv_batch_unreadable", &paths, &[], &layout(&mappings), |_| {}).is_err());
+        assert!(!capture_store::list_captures().iter().any(|c| c.name == name), "a capture named '{name}' was left behind");
+    }
+
+    #[test]
+    fn a_single_file_imports_as_a_batch_of_one() {
+        let _db = crate::capture_db::use_own_database();
+        let mappings = sequenced();
+        let paths = csv_batch("single", &[("single.csv", "100,1,123,01\n200,3,123,02\n"), ("single-empty.csv", "")]);
+
+        let result = import_csv_file("f_csv_single", &paths[0], false, &layout(&mappings)).expect("imported");
+        let gaps: Vec<_> = result.sequence_gaps.iter().map(|g| g.filename.clone()).collect();
+        assert_eq!(gaps, [Some("single.csv".to_string())]);
+
+        let as_batch = import_csv_batch("f_csv_single_batch", &paths[1..], &[false], &layout(&mappings), |_| {}).err();
+        assert_eq!(import_csv_file("f_csv_single_empty", &paths[1], false, &layout(&mappings)).err(), as_batch);
     }
 
     #[test]

@@ -29,6 +29,7 @@ All notable changes to WireTAP will be documented in this file.
 - **Session Manager's Remove evicts the subscriber again, and a detached window's subscription is paused and resumed.** Both had failed with a missing-command error since the workspace reorganisation.
 - **A byte capture opened from the picker can be framed in Discovery.** Its Raw Bytes tab, the Framing button and Serial Framing Analysis are available again, and the session reports the capture as serial rather than CAN.
 - **Exporting a framed byte capture counts its messages.** The export dialog had offered the capture's byte count as its number of frames.
+- **A failed CSV import leaves no empty capture behind.** A batch whose file could not be read used to leave an empty capture named for the batch. A single file now reports its errors and names its sequence gaps as a batch does.
 - **The Payload Changes report is saved as `payload-changes-report`.** Its suggested file name had said `payload-analysis-report`.
 
 - **Firmware flashing in the Serial app.** STM32 UART read-back now handles full 256-byte chunks, and cancelling an ESP or DFU flash now stops esptool and dfu-util too. If a read-back fails or is cancelled, the existing output file is left untouched, and esptool progress no longer shows terminal control codes.
