@@ -2,7 +2,7 @@
 //
 // crates/wiretap-app/src/io/signal_throttle.rs
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 
 /// Interval between throttled signals (500ms = 2Hz)
@@ -15,12 +15,14 @@ const SIGNAL_INTERVAL_MS: u64 = 500;
 /// One-shot signals bypass the throttle entirely.
 pub struct SignalThrottle {
     last_signal: HashMap<String, Instant>,
+    suppressed: HashSet<String>,
 }
 
 impl SignalThrottle {
     pub fn new() -> Self {
         Self {
             last_signal: HashMap::new(),
+            suppressed: HashSet::new(),
         }
     }
 
@@ -32,19 +34,28 @@ impl SignalThrottle {
             Some(last)
                 if now.duration_since(*last).as_millis() < SIGNAL_INTERVAL_MS as u128 =>
             {
+                self.suppressed.insert(signal_name.to_string());
                 false
             }
             _ => {
                 self.last_signal.insert(signal_name.to_string(), now);
+                self.suppressed.remove(signal_name);
                 true
             }
         }
+    }
+
+    /// Whether a signal this throttle suppressed is now due. A burst that ends
+    /// inside the interval is otherwise never signalled until more data arrives.
+    pub fn owed(&mut self, signal_name: &str) -> bool {
+        self.suppressed.contains(signal_name) && self.should_signal(signal_name)
     }
 
     /// Clear all timestamps so the next signal of any name fires immediately.
     /// Call on stream stop to ensure a final flush signal reaches the frontend.
     pub fn flush(&mut self) {
         self.last_signal.clear();
+        self.suppressed.clear();
     }
 }
 
@@ -82,6 +93,25 @@ mod tests {
         assert!(!t.should_signal("test"));
         t.flush();
         assert!(t.should_signal("test"));
+    }
+
+    #[test]
+    fn a_suppressed_signal_is_owed_once_the_interval_passes() {
+        let mut t = SignalThrottle::new();
+        assert!(t.should_signal("test"));
+        assert!(!t.should_signal("test"));
+        assert!(!t.owed("test"));
+        thread::sleep(Duration::from_millis(SIGNAL_INTERVAL_MS + 50));
+        assert!(t.owed("test"));
+        assert!(!t.owed("test"));
+    }
+
+    #[test]
+    fn nothing_is_owed_without_a_suppressed_signal() {
+        let mut t = SignalThrottle::new();
+        assert!(t.should_signal("test"));
+        thread::sleep(Duration::from_millis(SIGNAL_INTERVAL_MS + 50));
+        assert!(!t.owed("test"));
     }
 
     #[test]
