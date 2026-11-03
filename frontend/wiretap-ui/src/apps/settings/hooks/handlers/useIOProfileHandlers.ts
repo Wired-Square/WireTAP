@@ -1,10 +1,6 @@
 // ui/src/apps/settings/hooks/handlers/useIOProfileHandlers.ts
 
-import {
-  getCredential,
-  deleteAllCredentials,
-  SECURE_FIELDS,
-} from '../../../../api/credentials';
+import { getCredential, SECURE_FIELDS } from '../../../../api/credentials';
 import { useSettingsStore } from '../../stores/settingsStore';
 import type {
   IOProfile,
@@ -14,8 +10,7 @@ import type {
 } from '../../../../hooks/useSettings';
 import { addDevice, deviceWriteMessage, uniqueName } from '../../../../settings/devices';
 import type { ProfileValidationError, ValidationCode } from '../../../../api/deviceKinds';
-import { saveAdHocDevice, updateDevice } from '../../../../api/ephemeralProfiles';
-import { withProbedFields } from '../../../../components/io/useConnectionProbe';
+import { deleteDevice, reconfigureDevice, saveAdHocDevice, updateDevice } from '../../../../api/ephemeralProfiles';
 import { useSessionStore } from '../../../../stores/sessionStore';
 import { useAdHocProfileStore } from '../../../../stores/adHocProfileStore';
 import { withAppError } from '../../../../utils/appError';
@@ -100,15 +95,10 @@ export function useIOProfileHandlers() {
       return;
     }
 
-    // Delete credentials from keyring
-    try {
-      await deleteAllCredentials(profile.id);
-    } catch (error) {
-      console.error('Failed to delete credentials from keyring:', error);
-      // Continue with profile deletion even if keyring cleanup fails
-    }
-
-    removeProfile(profile.id);
+    const deleted = await withAppError('Delete Failed', 'Could not delete this device.', () =>
+      deleteDevice(profile.id)
+    );
+    if (deleted) removeProfile(profile.id);
     closeDialog('deleteIOProfile');
     setDialogPayload({ ioProfileToDelete: null });
   };
@@ -186,7 +176,10 @@ export function useIOProfileHandlers() {
     const { ui, ioProfiles } = useSettingsStore.getState();
     const id = ui.dialogPayload.editingProfileId;
     const stored = ioProfiles.profiles.find((p) => p.id === id);
-    if (id && stored) updateProfile(id, withProbedFields(stored, fields));
+    if (!id || !stored) return;
+    reconfigureDevice(id, { ...stored.connection, ...fields }).catch((e) =>
+      showWriteError('Could Not Save Probe', e)
+    );
   };
 
   // Promote an ad-hoc device to a saved profile, then drop it from the

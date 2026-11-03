@@ -30,6 +30,11 @@ export async function updateDevice(profile: IOProfile): Promise<IOProfile> {
   return invoke<IOProfile>("update_device", { profile });
 }
 
+/** Delete a saved device, its secrets and any default naming it. */
+export async function deleteDevice(profileId: string): Promise<void> {
+  return invoke<void>("delete_device", { profile_id: profileId });
+}
+
 /** Save an ad-hoc device to settings under a new id; the ad-hoc copy stays. */
 export async function saveAdHocDevice(profileId: string, name: string): Promise<IOProfile> {
   return invoke<IOProfile>("save_ad_hoc_device", { profile_id: profileId, name });

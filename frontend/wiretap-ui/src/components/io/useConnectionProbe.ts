@@ -83,11 +83,6 @@ export function framelinkProbeFields(result: FrameLinkProbeResult): Record<strin
   };
 }
 
-/** A stored profile with a probe's fields laid over its connection, and nothing else changed. */
-export function withProbedFields(stored: IOProfile, fields: Record<string, unknown>): IOProfile {
-  return { ...stored, connection: { ...stored.connection, ...fields } } as IOProfile;
-}
-
 export interface ConnectionProbe {
   slcanState: DeviceProbeState;
   slcanResult: DeviceProbeResult | null;

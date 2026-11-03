@@ -87,20 +87,6 @@ describe("FrameLink re-probe", () => {
     expect(onPersist).toHaveBeenCalledWith(probedFields);
   });
 
-  it("writes the probe into the stored profile without the form's unsaved edits", () => {
-    const form = { ...stored, name: "Renamed, unsaved", connection: { ...stored.connection, host: "10.0.0.9" } } as IOProfile;
-    useSettingsStore.setState((s) => ({
-      ioProfiles: { ...s.ioProfiles, profiles: [stored] },
-      ui: { ...s.ui, dialogPayload: { ...s.ui.dialogPayload, editingProfileId: stored.id, profileForm: form } },
-    }));
-    const harness = mount(vi.fn());
-    harness.persistProbedFields(probedFields);
-
-    expect(useSettingsStore.getState().ioProfiles.profiles).toEqual([
-      { ...stored, connection: { ...stored.connection, ...probedFields } },
-    ]);
-  });
-
   it("leaves settings alone for a profile not yet saved", () => {
     useSettingsStore.setState((s) => ({
       ioProfiles: { ...s.ioProfiles, profiles: [stored] },

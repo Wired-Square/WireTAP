@@ -39,6 +39,7 @@ All notable changes to WireTAP will be documented in this file.
 - **A Modbus RTU export from a framed byte capture is named for Modbus RTU.** Its default file name had said serial.
 - **A serial frame with no id no longer decodes under a Modbus catalogue.** It had been read as register 0 and shown with that register's signals.
 - **Switching a live serial line to Modbus RTU uses the device's RTU settings.** Its unit address, CRC check and vendor function codes now apply, as they do when the device is opened with RTU framing; the switch had used the stock settings.
+- **A deleted device's name can be reused at once.** Deleting a device in Settings now removes it straight away, so a new device under the same name is no longer refused as a duplicate for a second afterwards. A FrameLink re-probe in Settings is also saved straight away.
 - **Frame search matches `_` and `%` literally.** They had matched any character.
 - **A batch of CSV files is named without a split number.** `run_01.csv` and `run_02.csv` now import as "run (2 files)" rather than "run_0 (2 files)".
 - **A batch of CSV files counts a short sequence wrap between files.** A sequence number that steps back from one file to the next is now reported as a wrap however small the step; a step of less than half the range had been read as no gap.
