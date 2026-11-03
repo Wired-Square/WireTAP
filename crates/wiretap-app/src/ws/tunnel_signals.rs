@@ -111,7 +111,7 @@ pub fn decode_message<'a>(msg: &'a ModbusRtuMessage, catalog: &'a Catalogue) -> 
         frame: d.frame.map(|f| f.key.as_str()),
         frames: msg.frame_count,
         function: msg.function,
-        function_label: function_label(msg.function),
+        function_label: catalogue_function_label(catalog, msg.function),
         latency_us: None,
         payload: match msg.payload {
             Payload::Registers(_) => TunnelPayload::Registers,
@@ -129,6 +129,14 @@ pub fn decode_message<'a>(msg: &'a ModbusRtuMessage, catalog: &'a Catalogue) -> 
         signals: [d.header, d.values].concat(),
         transaction,
     }
+}
+
+fn catalogue_function_label(catalog: &Catalogue, function: u8) -> String {
+    catalog
+        .modbus
+        .as_ref()
+        .and_then(|m| m.function_codes.get(&function)?.name.as_deref())
+        .map_or_else(|| function_label(function), |name| format!("0x{function:02X} {name}"))
 }
 
 #[cfg(test)]
@@ -266,6 +274,20 @@ unit = "A"
             .collect();
         assert_eq!(data, vec![0x01, 0xC8, 0x03, 0x11, 0x1A, 0x00, 0x02]);
         assert_eq!(out["functionLabel"], "0x20 Unknown");
+    }
+
+    #[test]
+    fn a_vendor_function_code_reads_by_the_name_its_catalogue_declares() {
+        let named = Catalogue::parse(&format!(
+            "{CATALOG}\n[meta.modbus.function_code.0x20]\nname = \"Battery\"\n"
+        ))
+        .unwrap();
+        let mut t = ModbusRtuStream::for_address(Some(1)).with_vendor_functions(&[0x20]);
+        let msgs = t.push_bytes(&framed("012001C803111A0002"));
+        assert_eq!(transaction(&msgs[0], &named)["functionLabel"], "0x20 Battery");
+
+        let spec = messages(&["01044DE20002"]);
+        assert_eq!(transaction(&spec[0], &named)["functionLabel"], "0x04 Read Input Registers");
     }
 
     #[test]
