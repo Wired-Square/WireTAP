@@ -41,6 +41,7 @@ All notable changes to WireTAP will be documented in this file.
 - **Backend playback at unlimited speed reports its final position.** A stream ending part-way through a batch had stopped short of its last frame.
 - **A serial line keeps its RTU settings after its bus mappings change.** Editing a source's mappings, or removing another source, had left a later live switch to Modbus RTU on the stock settings.
 - **A seek during capture playback is never dropped.** One arriving while the previous seek was being handled could be lost.
+- **A Virtual Device probes with the buses it opens with.** An empty interface list had probed as 0 buses.
 
 ## [0.15.0] - 2026-10-14
 

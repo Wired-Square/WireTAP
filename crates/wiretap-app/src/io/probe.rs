@@ -341,12 +341,7 @@ pub async fn probe_profile(profile: &IOProfile) -> Result<DeviceProbeResult, Str
 
         // Virtual adapter — always succeeds, reports configured interface count and traffic type
         "virtual" => {
-            let bus_count = profile
-                .connection
-                .get("interfaces")
-                .and_then(|v| v.as_list())
-                .map(|a| a.len() as u8)
-                .unwrap_or_else(|| profile.conn_i64("bus_count").unwrap_or_default().clamp(1, 8) as u8);
+            let bus_count = u8::try_from(crate::sessions::profile_bus_mappings(profile).len()).unwrap_or(u8::MAX);
             let traffic_type = profile.conn_str("traffic_type").unwrap_or_default();
             let traffic_label = match traffic_type.as_str() {
                 "canfd" => "CAN-FD",
@@ -556,7 +551,7 @@ mod tests {
     #[tokio::test]
     async fn a_virtual_device_reports_its_buses_and_traffic() {
         let counted = profile("probe-virtual-fd", "virtual", json!({ "bus_count": 3, "traffic_type": "canfd" }));
-        let listed = profile("probe-virtual-can", "virtual", json!({ "interfaces": [{}, {}], "bus_count": 5 }));
+        let listed = profile("probe-virtual-can", "virtual", json!({ "interfaces": [{ "bus": 0 }, { "bus": 1 }], "bus_count": 5 }));
 
         let fd = probe_profile(&counted).await.expect("probed");
         let can = probe_profile(&listed).await.expect("probed");
@@ -569,6 +564,22 @@ mod tests {
         assert_eq!(fd.secondary_info.as_deref(), Some("3 interface(s)"));
         assert_eq!((can.bus_count, can.supports_fd), (2, Some(false)), "the interface list beats bus_count");
         assert_eq!(can.primary_info.as_deref(), Some("CAN"));
+    }
+
+    #[tokio::test]
+    async fn a_virtual_device_probes_the_buses_opening_it_would_give() {
+        let many: Vec<Value> = (0..10).map(|bus| json!({ "bus": bus })).collect();
+        let cases = [
+            profile("probe-virtual-empty", "virtual", json!({ "interfaces": [] })),
+            profile("probe-virtual-empty-counted", "virtual", json!({ "interfaces": [], "bus_count": 3 })),
+            profile("probe-virtual-many", "virtual", json!({ "interfaces": many })),
+        ];
+        for virtual_device in &cases {
+            let result = probe_profile(virtual_device).await.expect("probed");
+            clear_probe_cache(&virtual_device.id);
+            let opened = crate::sessions::profile_bus_mappings(virtual_device).len();
+            assert_eq!(result.bus_count as usize, opened, "{}", virtual_device.id);
+        }
     }
 
     #[tokio::test]
