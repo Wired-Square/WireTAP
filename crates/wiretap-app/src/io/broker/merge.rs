@@ -10,8 +10,8 @@ use tokio_util::sync::CancellationToken;
 use std::collections::HashMap;
 use std::sync::Mutex;
 use super::spawner::run_source_reader;
-use super::types::{ControlChannels, SourceConfig, SourcePauseFlags, TransmitChannels};
-use super::{MergeCommand, ProfileLoader, VirtualBusCommand, VirtualBusControls, VirtualCmdTx};
+use super::types::{ControlChannels, SourceConfig, SourcePauseFlags, TransmitChannels, VirtualCmdChannels};
+use super::{MergeCommand, ProfileLoader, VirtualBusCommand, VirtualBusControls};
 use crate::capture_store::{self, TimestampedByte};
 use crate::io::error::{IoError, IoFailure};
 use crate::io::bus_mapping::BusMapping;
@@ -92,7 +92,7 @@ pub(super) async fn run_merge_task(
     control_channels: ControlChannels,
     virtual_bus_controls: VirtualBusControls,
     mut merge_cmd_rx: mpsc::UnboundedReceiver<MergeCommand>,
-    virtual_cmd_txs: Arc<Mutex<HashMap<usize, VirtualCmdTx>>>,
+    virtual_cmd_txs: VirtualCmdChannels,
     fatal_error: Arc<Mutex<Option<String>>>,
     resolved_mappings: Arc<Mutex<HashMap<String, Vec<BusMapping>>>>,
     source_pause_flags: SourcePauseFlags,
@@ -204,7 +204,7 @@ pub(super) async fn run_merge_task(
                     }
                     Some(SourceMessage::Ended(source_idx, reason)) => {
                         tlog!("[IOBroker] Source {} ended: {}", source_idx, reason);
-                        forget_channels(source_idx, &source_profiles, &live, &transmit_channels, &control_channels);
+                        forget_channels(source_idx, &source_profiles, &live, &transmit_channels, &control_channels, &virtual_cmd_txs);
                         // An ending nobody asked for is a fault, and has to be
                         // reported like one — a device pulled mid-session used to
                         // finish the run as "complete".
@@ -226,7 +226,7 @@ pub(super) async fn run_merge_task(
                     }
                     Some(SourceMessage::Error(source_idx, error)) => {
                         tlog!("[IOBroker] Source {} error: {}", source_idx, error);
-                        forget_channels(source_idx, &source_profiles, &live, &transmit_channels, &control_channels);
+                        forget_channels(source_idx, &source_profiles, &live, &transmit_channels, &control_channels, &virtual_cmd_txs);
                         emit_session_error(&session_id, error.clone());
                         start.failed(source_idx, error.message.clone());
                         last_source_error = Some(error);
@@ -507,6 +507,7 @@ fn forget_channels(
     live: &LiveSources,
     transmit_channels: &TransmitChannels,
     control_channels: &ControlChannels,
+    virtual_cmd_txs: &VirtualCmdChannels,
 ) {
     let Some(profile_id) = source_profiles.get(&index).map(|s| &s.profile_id) else {
         return;
@@ -521,6 +522,9 @@ fn forget_channels(
         channels.remove(profile_id);
     }
     if let Ok(mut channels) = control_channels.lock() {
+        channels.remove(profile_id);
+    }
+    if let Ok(mut channels) = virtual_cmd_txs.lock() {
         channels.remove(profile_id);
     }
 }
@@ -542,13 +546,13 @@ fn spawn_source(
     session_id: &str,
     tx: &mpsc::Sender<SourceMessage>,
     virtual_bus_controls: &VirtualBusControls,
-    virtual_cmd_txs: &Arc<Mutex<HashMap<usize, VirtualCmdTx>>>,
+    virtual_cmd_txs: &VirtualCmdChannels,
 ) -> tokio::task::JoinHandle<()> {
     // Create virtual command channel for virtual sources
     let virtual_cmd_rx = if profile.kind == "virtual" {
         let (vtx, vrx) = mpsc::unbounded_channel::<VirtualBusCommand>();
         if let Ok(mut txs) = virtual_cmd_txs.lock() {
-            txs.insert(index, vtx);
+            txs.insert(source_config.profile_id.clone(), vtx);
         }
         Some(vrx)
     } else {
@@ -755,7 +759,7 @@ mod tests {
         let profiles = [(0, identity()), (1, identity())].into();
         let (transmit, _rx) = crate::io::types::transmit_channel();
         let transmit_channels: TransmitChannels = Arc::new(Mutex::new([("can".into(), transmit)].into()));
-        let forget = |index, live| forget_channels(index, &profiles, &live, &transmit_channels, &Default::default());
+        let forget = |index, live| forget_channels(index, &profiles, &live, &transmit_channels, &Default::default(), &Default::default());
 
         forget(0, LiveSources::new([1]));
         assert!(transmit_channels.lock().unwrap().contains_key("can"));

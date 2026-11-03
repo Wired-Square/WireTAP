@@ -39,7 +39,7 @@ use crate::capture_store::{self, CaptureKind};
 
 use merge::run_merge_task;
 pub use types::{SerialOverrides, SourceConfig};
-use types::{ControlChannels, SourcePauseFlags, TransmitChannels, TransmitRoute};
+use types::{ControlChannels, SourcePauseFlags, TransmitChannels, TransmitRoute, VirtualCmdChannels};
 
 // ============================================================================
 // Virtual Bus Control (shared with generator tasks)
@@ -146,8 +146,7 @@ pub struct IOBroker {
     virtual_bus_controls: VirtualBusControls,
     /// Command channel to the merge task for hot source add/remove
     merge_cmd_tx: MergeCmdTx,
-    /// Command channels to virtual reader tasks for hot bus add/remove (source_idx -> sender)
-    virtual_cmd_txs: Arc<Mutex<HashMap<usize, VirtualCmdTx>>>,
+    virtual_cmd_txs: VirtualCmdChannels,
     /// Set by the merge task when every source has failed. Shared rather than
     /// owned because the merge task is detached and cannot reach `state`, which
     /// is why a session whose sources all failed to connect used to keep
@@ -1401,6 +1400,18 @@ mod hot_remove_tests {
 
         assert!(removed.try_recv().is_err(), "the removed source's reader was sent the change");
         assert!(broker.control_channels.lock().unwrap().is_empty());
+        broker.stop().await.unwrap();
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn a_virtual_bus_change_with_no_virtual_source_left_is_refused() {
+        let device = virtual_profile("device", "can");
+        let mut broker = started("no-virtual-left", vec![(device.clone(), source(&device, "virtual", 0))]).await;
+        remove(&mut broker, "device").await;
+
+        let refusal = Err("No virtual sources in this session".to_string());
+        assert_eq!(broker.add_virtual_bus(1, "can".into(), 1.0), refusal);
+        assert_eq!(broker.remove_virtual_bus(0), refusal);
         broker.stop().await.unwrap();
     }
 
