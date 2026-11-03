@@ -773,18 +773,26 @@ pub struct SessionAppender {
 }
 
 impl SessionAppender {
-    /// `stored` runs after each append.
-    pub fn spawn(session_id: String, mut stored: impl FnMut(&str) + Send + 'static) -> Self {
+    /// `stored` runs after each append with `true`, and with `false` each
+    /// `IDLE_TICK` nothing arrives.
+    pub fn spawn(session_id: String, mut stored: impl FnMut(&str, bool) + Send + 'static) -> Self {
+        const IDLE_TICK: std::time::Duration = std::time::Duration::from_millis(100);
         let (frames, mut queued) = tokio::sync::mpsc::unbounded_channel::<Vec<FrameMessage>>();
         let task = tokio::spawn({
             let session_id = session_id.clone();
             async move {
-                while let Some(mut batch) = queued.recv().await {
-                    while let Ok(more) = queued.try_recv() {
-                        batch.extend(more);
+                loop {
+                    match tokio::time::timeout(IDLE_TICK, queued.recv()).await {
+                        Ok(Some(mut batch)) => {
+                            while let Ok(more) = queued.try_recv() {
+                                batch.extend(more);
+                            }
+                            store_session_frames(&session_id, batch).await;
+                            stored(&session_id, true);
+                        }
+                        Ok(None) => break,
+                        Err(_) => stored(&session_id, false),
                     }
-                    store_session_frames(&session_id, batch).await;
-                    stored(&session_id);
                 }
             }
         });

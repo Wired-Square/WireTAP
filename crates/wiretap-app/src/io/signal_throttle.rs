@@ -51,6 +51,12 @@ impl SignalThrottle {
         self.suppressed.contains(signal_name) && self.should_signal(signal_name)
     }
 
+    /// Whether to signal now, given whether new data `landed`: on the leading
+    /// edge, and once more when a suppressed signal falls due.
+    pub fn ready(&mut self, signal_name: &str, landed: bool) -> bool {
+        (landed && self.should_signal(signal_name)) || self.owed(signal_name)
+    }
+
     /// Clear all timestamps so the next signal of any name fires immediately.
     /// Call on stream stop to ensure a final flush signal reaches the frontend.
     pub fn flush(&mut self) {
@@ -112,6 +118,17 @@ mod tests {
         assert!(t.should_signal("test"));
         thread::sleep(Duration::from_millis(SIGNAL_INTERVAL_MS + 50));
         assert!(!t.owed("test"));
+    }
+
+    #[test]
+    fn data_landing_inside_the_interval_is_signalled_once_it_passes_without_more() {
+        let mut t = SignalThrottle::new();
+        assert!(t.ready("test", true));
+        assert!(!t.ready("test", true));
+        assert!(!t.ready("test", false));
+        thread::sleep(Duration::from_millis(SIGNAL_INTERVAL_MS + 50));
+        assert!(t.ready("test", false), "the held-back signal never came");
+        assert!(!t.ready("test", false));
     }
 
     #[test]
