@@ -42,7 +42,7 @@ export default function ExportAnalysisDialog({
         frameIds: results.frames.length,
         samples: results.frameCount.toLocaleString(i18n.language),
       })}
-      defaultFilename="payload-analysis-report"
+      defaultFilename="payload-changes-report"
       defaultPath={defaultPath}
       onCancel={onCancel}
       onExport={handleExport}
