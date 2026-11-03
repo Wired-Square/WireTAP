@@ -48,6 +48,8 @@ mod transmit_history;
 mod transmit_queue;
 mod replay;
 mod report;
+#[cfg(test)]
+mod scratch;
 mod io_test;
 #[cfg(all(test, unix))]
 mod sqlite_soak;
