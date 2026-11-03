@@ -38,6 +38,7 @@ All notable changes to WireTAP will be documented in this file.
 - **Firmware flashing in the Serial app.** STM32 UART read-back now handles full 256-byte chunks, and cancelling an ESP or DFU flash now stops esptool and dfu-util too. If a read-back fails or is cancelled, the existing output file is left untouched, and esptool progress no longer shows terminal control codes.
 - **Settings and dashboards survive a crash mid-save.** They are now saved whole or not at all, as catalogues and the window layout are, so a crash or power cut during a save leaves the previous version in place rather than a truncated file.
 - **A window's bus labels follow its session.** After a multi-bus session, selecting another device or joining another session no longer shows the old session's bus names in Session Controls, Transmit and Discovery.
+- **Leaving a session shows its snapshot.** After Leave, or after the Session Manager removed it from its session, an app showed the snapshot capture's name with no frames, and its Clear did nothing. It now opens the snapshot as the picker does, frames and all.
 - **Opening a large capture in Discovery queries its frame list once.** It had run the same multi-second query three or four times at once.
 - **A Modbus RTU export from a framed byte capture is named for Modbus RTU.** Its default file name had said serial.
 - **A serial frame with no id no longer decodes under a Modbus catalogue.** It had been read as register 0 and shown with that register's signals.

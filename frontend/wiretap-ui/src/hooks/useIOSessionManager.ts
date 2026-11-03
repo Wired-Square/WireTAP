@@ -459,6 +459,7 @@ export function useIOSessionManager(
   // state. Never fires for a teardown this app's own call caused — Rust names the
   // caller on `destroyed` and `useIOSession` drops it — so adopting the capture cannot
   // feed back into another teardown.
+  const selectProfileRef = useRef<(sourceId: string | null) => Promise<void>>(async () => {});
   const handleSessionDestroyed = useCallback((orphanedCaptureIds: string[], userInitiated: boolean) => {
     // A user-initiated "Destroy session" wants a clean slate, not the orphaned
     // capture the external-destroy path falls back to. The intent is carried by
@@ -478,8 +479,9 @@ export function useIOSessionManager(
       // Deliberate destroy → clean slate, skip the capture fallback.
       setIoProfile(null);
     } else {
-      // External destroy → switch to the orphaned capture if there is one.
-      setIoProfile(orphanedCaptureIds[0] ?? null);
+      // External destroy → switch to the orphaned capture if there is one. It is a
+      // source, not a session, so it is opened as the picker opens one.
+      void selectProfileRef.current(orphanedCaptureIds[0] ?? null);
       onSessionDestroyed?.(orphanedCaptureIds);
     }
   }, [appName, onBeforeWatch, setMultiBusProfiles, setIoProfile, streamCompletedRef, onSessionDestroyed]);
@@ -944,6 +946,9 @@ export function useIOSessionManager(
     const sessionId = await session.rejoin(null, sourceId);
     if (sessionId) setIoProfile(sessionId);
   }, [session, findProfile, setMultiBusProfiles, setIoProfile, setPlaybackSpeedProp]);
+  useEffect(() => {
+    selectProfileRef.current = selectProfile;
+  }, [selectProfile]);
 
   // The default source is an initial selection only: settings reload on every save
   // in any window, and reapplying it would retarget a running session.

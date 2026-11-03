@@ -7,13 +7,15 @@ import type { IOProfile } from "../hooks/useSettings";
 import type { SessionPurpose } from "../generated/SessionPurpose";
 
 const openedSessions: Array<string | undefined> = [];
+let destroyed: (orphanedCaptureIds: string[], reset: boolean) => void = () => {};
 let minted = 0;
 const mintedFor = (purpose: SessionPurpose) =>
   `${purpose.purpose === "sources" ? purpose.profile_ids.join("+") : purpose.purpose}#${++minted}`;
 
 vi.mock("../hooks/useIOSession", () => ({
-  useIOSession: (opts: { sessionId?: string }) => {
+  useIOSession: (opts: { sessionId?: string; onDestroyed: typeof destroyed }) => {
     openedSessions.push(opts.sessionId);
+    destroyed = opts.onDestroyed;
     return {
       sessionId: opts.sessionId,
       subscriberId: "discovery_1",
@@ -144,6 +146,11 @@ describe("useIOSessionManager source switching", () => {
   it("connects one device under the session Rust answers, so an open one is joined", async () => {
     await fromVirtualDevice();
     expect(createAndStartMultiSourceSession).toHaveBeenLastCalledWith(expect.objectContaining({ sessionId: null }));
+  });
+
+  it("opens the snapshot a Leave hands back as a source, never under the capture's own id", async () => {
+    await fromVirtualDevice();
+    expect(await run(async () => destroyed(["cap_snapshot"], false))).toBe("opened:cap_snapshot");
   });
 
   it("returns to no source when the picker is skipped after a multi-source session", async () => {
