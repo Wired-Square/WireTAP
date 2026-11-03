@@ -456,6 +456,21 @@ impl Playout<FrameMessage> for ToSubscribers<'_> {
     }
 }
 
+impl ToSubscribers<'_> {
+    /// Sends the frames played but held for a batch, and their position: a turn
+    /// after a pause plays back from the last of them.
+    fn send_held(&mut self, pacer: &mut Pacer<FrameMessage>) {
+        let held = pacer.take_batch();
+        let Some(timestamp_us) = held.last().map(|f| f.timestamp_us as i64) else { return };
+        self.frames(held);
+        publish_position_now(self.session_id, PlaybackPosition {
+            timestamp_us,
+            frame_index: self.frame_index,
+            frame_count: Some(self.total_frames),
+        });
+    }
+}
+
 /// The stream reached the end it was playing towards: it pauses there, alive for
 /// a step, seek or resume.
 fn pause_at_end(session_id: &str, buf_id: &str, control: &PlaybackControl, completed_flag: &AtomicBool) {
@@ -571,6 +586,7 @@ async fn run_capture_stream(
 
         // Check if paused (after seek check so seek works while paused)
         if control.is_paused() {
+            out.send_held(&mut pacer);
             tokio::time::sleep(Duration::from_millis(50)).await;
             continue;
         }
@@ -1011,6 +1027,57 @@ mod tests {
         crate::io::destroy_session(SESSION, false).await.ok();
 
         assert_eq!((sought, ended), (Ok(()), Ok(())));
+    }
+
+    fn sent_timestamps(channel: u8) -> Vec<u64> {
+        use crate::ws::protocol::{MsgType, ENVELOPE_HEADER_SIZE};
+        let mut timestamps = Vec::new();
+        for (_, batch) in crate::ws::server::outbox::sent(channel, MsgType::FrameData) {
+            let mut at = 0;
+            while at < batch.len() {
+                timestamps.push(u64::from_le_bytes(batch[at..at + 8].try_into().unwrap()));
+                at += ENVELOPE_HEADER_SIZE + u32::from_le_bytes(batch[at + 11..at + 15].try_into().unwrap()) as usize;
+            }
+        }
+        timestamps
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn after_a_pause_at_unlimited_speed_a_turn_sends_nothing_past_the_paused_position() {
+        const SESSION: &str = "f_play_unlimited_turn";
+        const CHANNEL: u8 = 212;
+        crate::ws::server::outbox::subscribe(SESSION, CHANNEL);
+        let frames: Vec<(u64, u32)> = (0..40_000).map(|i| (1_000 + i * 10, 0x100)).collect();
+        open_playback(SESSION, &frames, 1.0).await;
+        crate::ws::dispatch::reset_frame_offset(SESSION);
+        crate::io::seek_session_by_frame(SESSION, 20_000).await.unwrap();
+        // Paced batches end anywhere in a chunk; unlimited ones then straddle chunk loads.
+        tokio::time::sleep(Duration::from_millis(7)).await;
+        crate::io::update_session_speed(SESSION, 0.0).await.unwrap();
+        while crate::io::get_playback_position(SESSION).is_none_or(|p| p.frame_index < 21_000) {
+            tokio::time::sleep(Duration::from_millis(1)).await;
+        }
+        let mut beyond = Vec::new();
+        for attempt in 0..60u64 {
+            tokio::time::sleep(Duration::from_millis(1 + attempt % 13)).await;
+            crate::io::pause_session(SESSION).await.unwrap();
+            tokio::time::sleep(Duration::from_millis(40)).await;
+            let paused = crate::io::get_playback_position(SESSION).expect("a position was published").timestamp_us as u64;
+            sent_timestamps(CHANNEL);
+            let reverse = attempt % 2 == 0;
+            crate::io::update_session_direction(SESSION, reverse).await.unwrap();
+            crate::io::resume_session(SESSION).await.unwrap();
+            tokio::time::sleep(Duration::from_millis(30)).await;
+            let past = sent_timestamps(CHANNEL)
+                .into_iter()
+                .filter(|&t| if reverse { t > paused } else { t < paused })
+                .count();
+            if past > 0 {
+                beyond.push((attempt, past));
+            }
+        }
+        crate::io::destroy_session(SESSION, false).await.ok();
+        assert_eq!(beyond, [], "(attempt, frames sent from past the paused position)");
     }
 
     /// Paused in the wait before a frame, that frame is not played; a turn
