@@ -576,6 +576,7 @@ pub(crate) fn decode_entry<'a>(
         is_fd: f.is_fd,
         masked_frame_id: masked_id,
         mirror: verdict.map(DecodedMirrorVerdict::from),
+        protocol: &f.protocol,
         selectors: decoded.selectors.into_iter().map(DecodedMuxSelector::from).collect(),
         signals,
         source_address: decoded.source_address,
@@ -1524,6 +1525,18 @@ bit_length = 16
         let tunnels = Arc::new(SessionTunnels::new(HashMap::new(), false));
         let frame = serial_frame(rtu(&[0x01, 0x03, 0x00, 0x6B, 0x00, 0x03]));
         assert!(feed_tunnels(Some(&tunnels), &bare(), "test", &frame, 0).is_empty());
+    }
+
+    /// The Modbus tab renders a message's id by its carrier: a CAN id, or a
+    /// `modbus_rtu` row's unit and function.
+    #[test]
+    fn a_decoded_message_names_its_carriers_protocol() {
+        let (tunnels, catalog) = (Arc::new(modbus_session()), bare());
+        let row = archive_frame(rtu(&[0x01, 0x03, 0x00, 0x6B, 0x00, 0x03]));
+        let messages: Vec<TunnelMessage> =
+            feed_tunnels(Some(&tunnels), &catalog, "carrier", &row, 0).into_iter().map(|m| (m, None)).collect();
+        let entry = decode_entry(&catalog, &row, None, &messages).expect("the message decodes");
+        assert_eq!(serde_json::to_value(entry).unwrap()["protocol"], "modbus_rtu");
     }
 
     /// Its id is a unit and function, not a register: unit 8's read is not

@@ -34,7 +34,7 @@ import {
 } from "../../../styles";
 import { iconXs } from "../../../styles/spacing";
 import { formatHumanUs, formatDeltaUs } from "../../../utils/timeFormat";
-import { formatFrameId } from "../../../utils/frameIds";
+import { formatProtocolFrameId } from "../../../utils/frameIds";
 import { byteToHex, u16ToHex } from "../../../utils/byteUtils";
 import type { TunnelTransaction } from "../../../stores/decoderStore";
 import type { FrameIdFormat } from "../../../types/common";
@@ -94,7 +94,7 @@ const TransactionRow = memo(function TransactionRow({
       <div className="flex items-center gap-3 flex-wrap">
         <span className={`${textMuted} text-xs`}>{formatHumanUs(t.timestampUs, useLocalTimezone)}</span>
         <span className={`${textDataPurple} font-semibold`}>
-          {formatFrameId(t.frameId, displayFrameIdFormat, t.isExtended)}
+          {formatProtocolFrameId(t.carrierProtocol, t.frameId, displayFrameIdFormat, t.isExtended)}
         </span>
         <Arrow className={`${iconXs} ${isRequest ? textDataCyan : textDataGreen}`} />
         <span className={isRequest ? textDataCyan : textDataGreen}>

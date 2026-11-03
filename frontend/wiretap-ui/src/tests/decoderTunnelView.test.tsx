@@ -36,6 +36,7 @@ const base: TunnelTransaction = {
   exceptionLabel: null,
   frame: null,
   frameId: 0x1e0,
+  carrierProtocol: "can",
   isExtended: false,
   bus: 0,
   timestampUs: 1_000_000,
@@ -82,6 +83,14 @@ describe("DecoderTunnelView", () => {
 
   it("leaves a paired direction unmarked", () => {
     expect(render({ directionBasis: "pairing" })).not.toContain("guessed");
+  });
+
+  it("shows a Modbus RTU source's id as its unit and function", () => {
+    expect(render({ carrierProtocol: "modbus_rtu", frameId: 0x120 })).toContain("1/0x20");
+  });
+
+  it("shows a tunnel's id as its CAN id", () => {
+    expect(render({ frameId: 0x120 })).toContain("0x120");
   });
 });
 

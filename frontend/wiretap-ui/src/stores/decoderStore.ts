@@ -210,6 +210,8 @@ export type FilteredFrame = {
  */
 export type TunnelTransaction = DecodedTunnelMessage & {
   frameId: number;
+  /** The protocol of the frame that carried the message: how `frameId` reads. */
+  carrierProtocol: string;
   isExtended: boolean;
   bus: number;
   /** Host timestamp (µs) of the frame that completed the message. */
@@ -592,7 +594,7 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
       if (msg.mirror) nextMirrorValidation.set(id, msg.mirror);
 
       for (const t of msg.tunnel ?? []) {
-        tunnel.push({ ...t, frameId: id, isExtended: msg.isExtended, bus: msg.bus, timestampUs: msg.t });
+        tunnel.push({ ...t, frameId: id, carrierProtocol: msg.protocol, isExtended: msg.isExtended, bus: msg.bus, timestampUs: msg.t });
       }
 
       const headerFields: HeaderFieldValue[] = msg.headerFields.map((h) => ({

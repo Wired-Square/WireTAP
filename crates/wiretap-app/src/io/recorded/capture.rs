@@ -626,7 +626,7 @@ async fn run_capture_stream(
         // Get current frame from chunk
         let (rowid, frame) = chunk[chunk_idx].clone();
         chunk_idx += 1;
-        last_consumed_rowid = rowid;
+        let last_played_rowid = std::mem::replace(&mut last_consumed_rowid, rowid);
 
         // Pre-decrement for reverse so actual_index reflects the correct capture position.
         // Forward: actual_index = frame_index (then post-increment for next frame).
@@ -642,6 +642,7 @@ async fn run_capture_stream(
         pacer.keep_time(&control).await;
         if pacer.play(frame, &control, &mut out).await.is_some() {
             chunk_idx -= 1; // Re-process this frame after resume
+            last_consumed_rowid = last_played_rowid;
             // Undo the frame_index update so re-processing gets the correct index
             if is_reverse { frame_index += 1; } else { frame_index -= 1; }
         }
@@ -1007,5 +1008,40 @@ mod tests {
         crate::io::destroy_session(SESSION, false).await.ok();
 
         assert_eq!((sought, ended), (Ok(()), Ok(())));
+    }
+
+    /// Paused in the wait before a frame, that frame is not played; a turn
+    /// must count from the frame that was.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn a_turn_after_a_pause_pairs_each_frame_with_its_own_index() {
+        const SESSION: &str = "f_play_turn_after_pause";
+        const SPACING_US: u64 = 100_000;
+        let frames: Vec<(u64, u32)> = (0..50).map(|i| (1_000 + i * SPACING_US, 0x100)).collect();
+        open_playback(SESSION, &frames, 1.0).await;
+        tokio::time::sleep(Duration::from_millis(450)).await;
+        crate::io::pause_session(SESSION).await.unwrap();
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        let paused = crate::io::get_playback_position(SESSION).expect("a position was published");
+
+        crate::io::update_session_direction(SESSION, true).await.unwrap();
+        crate::io::resume_session(SESSION).await.unwrap();
+        let turned = tokio::time::timeout(Duration::from_secs(2), async {
+            loop {
+                match crate::io::get_playback_position(SESSION) {
+                    Some(p) if p.frame_index != paused.frame_index => return p,
+                    _ => tokio::time::sleep(Duration::from_millis(5)).await,
+                }
+            }
+        })
+        .await
+        .expect("reverse play published a position");
+        crate::io::destroy_session(SESSION, false).await.ok();
+
+        let index_of = |timestamp_us: i64| (timestamp_us as u64 - 1_000) / SPACING_US;
+        assert_eq!(index_of(paused.timestamp_us), paused.frame_index as u64);
+        assert_eq!(
+            (turned.frame_index as u64, turned.timestamp_us),
+            (index_of(turned.timestamp_us), turned.timestamp_us)
+        );
     }
 }

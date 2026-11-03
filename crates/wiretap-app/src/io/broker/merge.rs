@@ -78,6 +78,13 @@ const MERGE_EMIT_INTERVAL_MS: u64 = 50;
 /// Interval (s) between per-bus frame count log messages.
 const BUS_LOG_INTERVAL_SECS: u64 = 5;
 
+/// Whether one pass of the merge loop signals frames and bytes ready, given
+/// what it appended to the capture.
+fn ready_signals(throttle: &mut SignalThrottle, frames_appended: bool, bytes_appended: bool) -> (bool, bool) {
+    let mut ready = |name: &str, appended: bool| (appended && throttle.should_signal(name)) || throttle.owed(name);
+    (ready("frames-ready", frames_appended), ready("bytes-ready", bytes_appended))
+}
+
 /// Main merge task that spawns sub-readers and combines their frames/bytes
 pub(super) async fn run_merge_task(
     profiles: ProfileLoader,
@@ -439,26 +446,30 @@ pub(super) async fn run_merge_task(
             || pending_frames.len() >= FRAME_BATCH_THRESHOLD
             || pending_bytes.len() >= BYTE_BATCH_THRESHOLD;
 
+        let (mut frames_appended, mut bytes_appended) = (false, false);
         if should_emit {
             if !pending_frames.is_empty() {
                 pending_frames.sort_by_key(|f| f.timestamp_us);
                 capture_store::append_frames_to_session(&session_id, pending_frames).await;
                 pending_frames = Vec::new();
-                if throttle.should_signal("frames-ready") {
-                    signal_frames_ready(&session_id);
-                }
+                frames_appended = true;
             }
 
             if !pending_bytes.is_empty() {
                 pending_bytes.sort_by_key(|b| b.timestamp_us);
                 capture_store::append_raw_bytes_to_session(&session_id, pending_bytes).await;
                 pending_bytes = Vec::new();
-                if throttle.should_signal("bytes-ready") {
-                    signal_bytes_ready(&session_id);
-                }
+                bytes_appended = true;
             }
 
             last_emit = std::time::Instant::now();
+        }
+        let (frames_ready, bytes_ready) = ready_signals(&mut throttle, frames_appended, bytes_appended);
+        if frames_ready {
+            signal_frames_ready(&session_id);
+        }
+        if bytes_ready {
+            signal_bytes_ready(&session_id);
         }
     }
 
@@ -682,9 +693,11 @@ impl PendingReadds {
 #[cfg(test)]
 mod tests {
     use super::{
-        forget_channels, stream_ended_reason, LiveSources, PendingReadds, SourceIdentity,
+        forget_channels, ready_signals, stream_ended_reason, LiveSources, PendingReadds, SourceIdentity,
         StartReport, StreamEndReason, TransmitChannels,
     };
+    use crate::io::SignalThrottle;
+    use std::time::{Duration, Instant};
     use std::sync::{Arc, Mutex};
     use tokio::sync::oneshot;
     use crate::io::broker::types::SourceConfig;
@@ -696,6 +709,33 @@ mod tests {
     fn start_report(sources: usize) -> (StartReport, oneshot::Receiver<Result<(), String>>) {
         let (tx, rx) = oneshot::channel();
         (StartReport::new(tx, 0..sources), rx)
+    }
+
+    /// One append is signalled at once; a second inside the throttle window is
+    /// held back, and nothing more arrives. Whether each kind was signalled again
+    /// within 600 ms of that second append.
+    fn tail_signalled(frames: bool, bytes: bool) -> (bool, bool) {
+        let mut throttle = SignalThrottle::new();
+        assert_eq!(ready_signals(&mut throttle, frames, bytes), (frames, bytes));
+        assert_eq!(ready_signals(&mut throttle, frames, bytes), (false, false));
+        let deadline = Instant::now() + Duration::from_millis(600);
+        let mut signalled = (false, false);
+        while Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(50));
+            let (f, b) = ready_signals(&mut throttle, false, false);
+            signalled = (signalled.0 || f, signalled.1 || b);
+        }
+        signalled
+    }
+
+    #[test]
+    fn frames_at_the_end_of_a_burst_are_signalled_without_more_arriving() {
+        assert!(tail_signalled(true, false).0, "no frames-ready within 600 ms of the burst's last frames");
+    }
+
+    #[test]
+    fn bytes_at_the_end_of_a_burst_are_signalled_without_more_arriving() {
+        assert!(tail_signalled(false, true).1, "no bytes-ready within 600 ms of the burst's last bytes");
     }
 
     #[test]
