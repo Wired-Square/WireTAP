@@ -803,6 +803,13 @@ impl IOSource for IOBroker {
                 if let Ok(mut slot) = self.fatal_error.lock() {
                     *slot = Some(error.clone());
                 }
+                let run_captures = [
+                    capture_store::get_session_frame_capture_id(&self.session_id),
+                    capture_store::get_session_bytes_capture_id(&self.session_id),
+                ];
+                for capture_id in run_captures.into_iter().flatten() {
+                    let _ = capture_store::delete_capture(&capture_id);
+                }
                 return Err(error);
             }
             Ok(_) => {}
@@ -1508,5 +1515,41 @@ mod hot_remove_tests {
     fn streams(broker: &IOBroker) -> (bool, bool) {
         let streams = broker.capabilities().data_streams;
         (streams.rx_frames, streams.rx_bytes)
+    }
+}
+
+#[cfg(test)]
+mod failed_start_tests {
+    use super::*;
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn a_failed_modbus_tcp_open_leaves_no_capture() {
+        let closed_port = std::net::TcpListener::bind("127.0.0.1:0").unwrap().local_addr().unwrap().port();
+        let profile = crate::settings::IOProfile {
+            id: "unreachable-modbus".into(),
+            name: "Unreachable".into(),
+            kind: "modbus_tcp".into(),
+            connection: serde_json::from_value(serde_json::json!({ "host": "127.0.0.1", "port": closed_port, "unit_id": 1 }))
+                .unwrap(),
+            preferred_catalog: None,
+            ephemeral: true,
+        };
+        let poll = serde_json::from_value(serde_json::json!({
+            "register_type": "holding", "start_register": 0, "count": 1, "interval_ms": 1000, "frame_id": 1,
+        }))
+        .unwrap();
+        let config = SourceConfig {
+            profile_id: profile.id.clone(),
+            profile_kind: profile.kind.clone(),
+            bus_mappings: crate::sessions::profile_bus_mappings(&profile),
+            modbus_polls: Some(vec![poll]),
+            ..Default::default()
+        };
+        let session_id = "failed-modbus-open";
+        let profiles: ProfileLoader = Arc::new(move || Ok(vec![profile.clone()]));
+        let mut broker = IOBroker::single_source(profiles, session_id.into(), config).unwrap();
+
+        assert!(broker.start().await.is_err());
+        assert_eq!(capture_store::list_captures().iter().filter(|c| c.name == session_id).count(), 0);
     }
 }

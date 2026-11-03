@@ -21,6 +21,7 @@ All notable changes to WireTAP will be documented in this file.
 ### Fixed
 
 - **Test Pattern holds its configured send rate on Windows.** Echo, Latency and Reliability runs above about 60 frames/s used to fall well short of their rate there, so a run looked like it had under-sent. A run now keeps its average rate on any system timer, and Throughput reports accurately on a busy adapter instead of pausing each time its send queue fills.
+- **A device that fails to open leaves no empty capture behind.** A Modbus TCP device whose host could not be reached used to leave a 0-frame capture named for the session in the picker.
 - **CAN FD and remote frames from a FrameLink device are marked correctly.** An FD frame had shown as a remote frame, and remote frames were not marked at all.
 - **A capture's count no longer runs ahead of what it holds.** Frames are counted once they are saved, a save refused while the database is busy is retried, and one that still fails is shown as the session's error instead of being dropped quietly. Clearing a large capture no longer shows its old frames while they are removed, and a copy appears only once it is complete.
 - **A capture reopened after a restart honours a frame selection.** Its live tail had shown every frame id whatever was selected, and its distinct-id count read 0.
