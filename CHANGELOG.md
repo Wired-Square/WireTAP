@@ -39,6 +39,7 @@ All notable changes to WireTAP will be documented in this file.
 - **Switching a live serial line to Modbus RTU uses the device's RTU settings.** Its unit address, CRC check and vendor function codes now apply, as they do when the device is opened with RTU framing; the switch had used the stock settings.
 - **Frame search matches `_` and `%` literally.** They had matched any character.
 - **A batch of CSV files is named without a split number.** `run_01.csv` and `run_02.csv` now import as "run (2 files)" rather than "run_0 (2 files)".
+- **A batch of CSV files counts a short sequence wrap between files.** A sequence number that steps back from one file to the next is now reported as a wrap however small the step; a step of less than half the range had been read as no gap.
 - **Backend playback at unlimited speed reports its final position.** A stream ending part-way through a batch had stopped short of its last frame.
 - **A serial line keeps its RTU settings after its bus mappings change.** Editing a source's mappings, or removing another source, had left a later live switch to Modbus RTU on the stock settings.
 - **A seek during capture playback is never dropped.** One arriving while the previous seek was being handled could be lost.
