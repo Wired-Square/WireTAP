@@ -9,7 +9,6 @@ use tokio_util::sync::CancellationToken;
 use tokio::time::{Duration, interval};
 
 use super::types::{SerialOverrides, SourceConfig};
-use crate::io::device_kinds;
 use crate::io::bus_mapping::{apply_bus_mapping, BusMapping};
 use crate::io::can_task::received_frame;
 use crate::io::gvret::run_gvret_tcp_source;
@@ -320,7 +319,7 @@ async fn run_framelink_reader(
 /// Virtual CAN source for multi-source sessions: generates synthetic frames and sends
 /// them via the merge channel (merge task handles emission).
 ///
-/// Spawns one generator task per entry of the profile's `interfaces` array, each
+/// Spawns one generator task per bus of `IOProfile::virtual_interfaces`, each
 /// with its own frame rate and patterns.
 async fn run_virtual_reader(
     source_idx: usize,
@@ -335,58 +334,7 @@ async fn run_virtual_reader(
 
     let traffic = VirtualTrafficType::from_setting(profile.conn_str("traffic_type").as_deref());
 
-    // Parse per-bus interface configs from connection.interfaces array.
-    // Falls back to legacy bus_count / frame_rate_hz / signal_generator fields.
-    struct IfaceConfig {
-        bus: u8,
-        signal_generator: bool,
-        frame_rate_hz: f64,
-    }
-
-    // Clamps are validation, not defaults, so they live with the reader — but
-    // the values they clamp towards come from the one table.
-    let (rate_min, rate_max) = device_kinds::VIRTUAL_FRAME_RATE_RANGE;
-    let (bus_min, bus_max) = device_kinds::VIRTUAL_BUS_COUNT_RANGE;
-
-    let interfaces: Vec<IfaceConfig> = profile
-        .connection
-        .get("interfaces")
-        .and_then(|v| v.as_list())
-        .map(|arr| {
-            arr.iter()
-                .map(|item| {
-                    let bus = item
-                        .get("bus")
-                        .and_then(|v| v.as_i64().map(|n| n as u8).or_else(|| v.as_str().and_then(|s| s.parse().ok())))
-                        .unwrap_or(0);
-                    let signal_generator = item
-                        .get("signal_generator")
-                        .and_then(|v| v.as_bool().or_else(|| v.as_str().map(|s| s != "false")))
-                        .unwrap_or(crate::io::profile::VIRTUAL_SIGNAL_GENERATOR);
-                    let frame_rate_hz = item
-                        .get("frame_rate_hz")
-                        .and_then(|v| v.as_f64().or_else(|| v.as_str().and_then(|s| s.parse().ok())))
-                        .unwrap_or(crate::io::profile::VIRTUAL_FRAME_RATE_HZ)
-                        .clamp(rate_min, rate_max);
-                    IfaceConfig { bus, signal_generator, frame_rate_hz }
-                })
-                .collect()
-        })
-        .unwrap_or_else(|| {
-            // Legacy fallback: one interface per bus, from the top-level fields,
-            // which the table declares.
-            let frame_rate_hz = profile.conn_f64("frame_rate_hz")
-                .unwrap_or(crate::io::profile::VIRTUAL_FRAME_RATE_HZ)
-                .clamp(rate_min, rate_max);
-            let signal_generator = profile.conn_bool("signal_generator")
-                .unwrap_or(crate::io::profile::VIRTUAL_SIGNAL_GENERATOR);
-            let bus_count = profile.conn_i64("bus_count")
-                .unwrap_or(1)
-                .clamp(bus_min as i64, bus_max as i64) as u8;
-            (0..bus_count)
-                .map(|bus| IfaceConfig { bus, signal_generator, frame_rate_hz })
-                .collect()
-        });
+    let interfaces = profile.virtual_interfaces();
 
     // Loopback: transmitted frames are echoed back as received. Offered before
     // `Connected`, since `start` returns on the first and a transmit may follow at once.
@@ -952,6 +900,30 @@ mod tests {
 
         let [frame] = echoed.as_slice() else { panic!("echoed {echoed:?}") };
         assert_eq!((frame.frame_id, frame.bus), (ECHO_ID, 3), "echoed on the output bus");
+    }
+
+    #[tokio::test]
+    async fn a_virtual_device_generates_on_every_bus_opening_it_gives() {
+        for connection in [
+            serde_json::json!({ "interfaces": [] }),
+            serde_json::json!({ "interfaces": [], "bus_count": 3 }),
+        ] {
+            let mut profile = loopback_profile();
+            profile.connection = serde_json::from_value(connection.clone()).unwrap();
+            let mappings = crate::sessions::profile_bus_mappings(&profile);
+            let controls = VirtualBusControls::default();
+            let stop = CancellationToken::new();
+            let (tx, mut rx) = mpsc::channel(64);
+            let reader = tokio::spawn({
+                let (stop, controls, mappings) = (stop.clone(), controls.clone(), mappings.clone());
+                async move { run_virtual_reader(0, &profile, mappings, stop, tx, controls, None).await }
+            });
+            while !matches!(rx.recv().await, Some(SourceMessage::Connected(..))) {}
+            stop.cancel();
+            reader.await.expect("the reader task").expect("the reader ends cleanly");
+
+            assert_eq!(controls.lock().unwrap().len(), mappings.len(), "{connection}");
+        }
     }
 
     #[test]

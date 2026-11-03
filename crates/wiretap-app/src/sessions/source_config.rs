@@ -10,7 +10,7 @@ use crate::{
 };
 #[cfg(not(target_os = "ios"))]
 use crate::io::device_kinds;
-use crate::io::profile::ConnValue;
+use crate::io::profile::{ConnValue, VirtualInterface};
 use crate::io::traits::supported_protocols_for_kind;
 
 use crate::io::probe::get_cached_probe;
@@ -198,13 +198,7 @@ fn parse_gvret_probed_bus_count(
     })
 }
 
-/// Virtual adaptor buses: `interfaces: [{ bus, .. }]`, else the legacy
-/// `bus_count`. Protocol comes from `traffic_type`.
-///
-/// The `bus` / `bus_count` coercions match the two other readers of this same
-/// config (`open_session` and `broker::spawner::run_virtual_reader`) —
-/// the settings form writes these as strings, so a number-only parse silently
-/// yields no buses.
+/// Virtual adaptor buses, as its reader opens them. Protocol comes from `traffic_type`.
 fn parse_virtual_interfaces(
     profile: &IOProfile,
     bus_override: Option<u8>,
@@ -213,28 +207,11 @@ fn parse_virtual_interfaces(
     let protocol = protocol_from_str(traffic_type.as_deref());
     let prefix = interface_prefix(protocol);
 
-    let buses: Vec<u8> = match profile
-        .connection
-        .get("interfaces")
-        .and_then(|v| v.as_list())
-        .filter(|a| !a.is_empty())
-    {
-        Some(interfaces) => interfaces
-            .iter()
-            .filter_map(|item| coerce_u8(item.get("bus")?))
-            .collect(),
-        // Legacy profile: a bus count instead of an interface list
-        None => {
-            let (min, max) = device_kinds::VIRTUAL_BUS_COUNT_RANGE;
-            let count = (profile.conn_i64("bus_count").unwrap_or(1) as u8).clamp(min, max);
-            (0..count).collect()
-        }
-    };
-
-    let mappings: Vec<BusMapping> = buses
+    let mappings: Vec<BusMapping> = profile
+        .virtual_interfaces()
         .into_iter()
         .enumerate()
-        .map(|(idx, device_bus)| BusMapping {
+        .map(|(idx, VirtualInterface { bus: device_bus, .. })| BusMapping {
             device_bus,
             enabled: true,
             output_bus: bus_override.map(|b| b + idx as u8).unwrap_or(device_bus),
@@ -257,17 +234,6 @@ fn interface_prefix(protocol: Protocol) -> &'static str {
         Protocol::Serial => "serial",
         Protocol::Can | Protocol::CanFd => "can",
     }
-}
-
-/// Settings values arrive as either JSON numbers or strings, depending on
-/// which form wrote them. For whole-profile fields prefer `IOProfile::conn_*`,
-/// which also consult the kind table's declared default; this is for values
-/// inside an `interfaces[]` entry, which those helpers cannot address.
-fn coerce_u8(value: &ConnValue) -> Option<u8> {
-    value
-        .as_u64()
-        .or_else(|| value.as_str().and_then(|s| s.parse().ok()))
-        .map(|n| n as u8)
 }
 
 /// Whether the profile itself says which buses it has.
