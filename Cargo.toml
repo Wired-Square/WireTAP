@@ -3,4 +3,4 @@ resolver = "2"
 members = ["crates/wiretap-analysis", "crates/wiretap-app", "crates/wiretap-can-cli", "crates/wiretap-capture-store"]
 
 [workspace.package]
-version = "0.15.0"
+version = "0.16.0"
