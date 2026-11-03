@@ -183,6 +183,28 @@ pub async fn update_device(app: AppHandle, profile: IOProfile) -> Result<IOProfi
     rewrite(&app, &id, |_| profile).await
 }
 
+fn forget_device(settings: &mut AppSettings, profile_id: &str) {
+    settings.io_profiles.retain(|p| p.id != profile_id);
+    if settings.default_read_profile.as_deref() == Some(profile_id) {
+        settings.default_read_profile = None;
+    }
+    settings.default_write_profiles.retain(|id| id != profile_id);
+}
+
+/// Delete a saved device, its secrets and any default naming it.
+#[tauri::command(rename_all = "snake_case")]
+pub async fn delete_device(app: AppHandle, profile_id: String) -> Result<(), String> {
+    let _writing = DEVICE_WRITES.lock().await;
+    let mut settings = crate::settings::load_settings(app.clone()).await?;
+    forget_device(&mut settings, &profile_id);
+    crate::settings::save_settings(app, settings).await?;
+    crate::io::probe::clear_probe_cache(&profile_id);
+    if let Err(e) = credentials::delete_all_credentials(&profile_id) {
+        tlog!("[profiles] Deleted {profile_id}, but not its secrets: {e}");
+    }
+    Ok(())
+}
+
 /// Change a device's connection parameters, and reconnect anything using it.
 ///
 /// One command rather than a frontend sequence, because the steps are
@@ -321,6 +343,21 @@ mod tests {
             serde_json::to_value(&err).unwrap(),
             json!({ "code": "nameDuplicate", "field": "name" })
         );
+    }
+
+    #[test]
+    fn a_deleted_device_takes_its_defaults_with_it() {
+        let device = |id: &str| IOProfile { id: id.into(), name: id.into(), ..Default::default() };
+        let mut settings = AppSettings {
+            io_profiles: vec![device("io_1"), device("io_2")],
+            default_read_profile: Some("io_1".into()),
+            default_write_profiles: vec!["io_2".into(), "io_1".into()],
+            ..Default::default()
+        };
+        forget_device(&mut settings, "io_1");
+        assert_eq!(settings.io_profiles.iter().map(|p| p.id.as_str()).collect::<Vec<_>>(), ["io_2"]);
+        assert_eq!(settings.default_read_profile, None);
+        assert_eq!(settings.default_write_profiles, ["io_2"]);
     }
 
     #[test]

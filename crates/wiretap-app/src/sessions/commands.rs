@@ -729,9 +729,8 @@ pub async fn create_modbus_scan_session(
     app_name: Option<String>,
     allow_contention: Option<bool>,
 ) -> Result<IOCapabilities, String> {
-    let settings = crate::settings::load_settings_sync(&app)?;
-    let pollers = (!allow_contention.unwrap_or(false)).then_some(&settings);
-    super::scan::create_scan_session(session_id, job, profile_id, subscriber_id, app_name, pollers).await
+    let pollers = super::scan::sweep_pollers(allow_contention, || crate::settings::load_settings_sync(&app))?;
+    super::scan::create_scan_session(session_id, job, profile_id, subscriber_id, app_name, pollers.as_ref()).await
 }
 
 /// Build Modbus poll groups from an address range instead of a catalogue, so a

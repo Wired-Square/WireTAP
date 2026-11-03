@@ -29,15 +29,6 @@ export async function deleteCredential(
 }
 
 /**
- * Delete all credentials for a profile (password, token, api_key, secret).
- * Use this when deleting an IO profile.
- * @param profileId - The IO profile ID
- */
-export async function deleteAllCredentials(profileId: string): Promise<void> {
-  await invoke("delete_all_credentials", { profileId });
-}
-
-/**
  * Fields that should be stored securely in the keyring.
  * When saving a profile, these fields are extracted and stored separately.
  * Mirrored by `SECURE_FIELDS` in `crates/wiretap-app/src/credentials.rs`, which sweeps

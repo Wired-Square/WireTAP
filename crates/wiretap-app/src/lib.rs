@@ -272,6 +272,7 @@ pub fn run() {
             io::profiles::update_device,
             io::profiles::save_ad_hoc_device,
             io::profiles::reconfigure_device,
+            io::profiles::delete_device,
             sessions::clear_profile_probe_cache,
             // Per-kind connection defaults — one declaration, which the form
             // seeds from and the readers consume.

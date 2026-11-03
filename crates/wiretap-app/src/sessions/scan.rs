@@ -33,6 +33,18 @@ pub async fn create_scan_session(
     Ok(result.capabilities)
 }
 
+/// The settings a sweep looks for pollers in, read only when contention is refused.
+pub(super) fn sweep_pollers(
+    allow_contention: Option<bool>,
+    load: impl FnOnce() -> Result<AppSettings, String>,
+) -> Result<Option<AppSettings>, String> {
+    if allow_contention.unwrap_or(false) {
+        Ok(None)
+    } else {
+        load().map(Some)
+    }
+}
+
 /// A sweep opens its own connection. Devices that serve one Modbus
 /// conversation at a time — the cheap stacks this feature exists for — break
 /// when a second one arrives, and pausing a poller doesn't help because it
@@ -154,6 +166,13 @@ mod tests {
         assert_eq!((allowed, itself), (Ok(()), Ok(())));
         assert!(paused.is_err(), "a paused poller keeps its socket");
         assert_eq!(stopped, Ok(()));
+    }
+
+    #[test]
+    fn a_sweep_allowing_contention_reads_no_settings() {
+        let unreadable = || Err("Failed to read settings".to_string());
+        assert_eq!(sweep_pollers(Some(true), unreadable).map(|s| s.is_none()), Ok(true));
+        assert_eq!(sweep_pollers(None, unreadable).err(), Some("Failed to read settings".into()));
     }
 
     #[tokio::test]
