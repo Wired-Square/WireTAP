@@ -126,7 +126,7 @@ if $all; then
     skip "Linux builds: Docker is not running"
   fi
   if [[ -n $linux ]]; then
-    # The host fetches every source with its own keys; the container builds offline.
+    # The host fetches every source with its own keys and registry token; the container builds offline.
     step "Vendor sources for $linux"
     (cd "$src" && cargo vendor --locked "$tag_dir/vendor") | sed "s|directory = .*|directory = \"/vendor\"|" >"$tag_dir/vendor.toml"
     { sed -n '/^\[registries.wired-square\]/,/^$/p' .cargo/mirror.toml; printf '[net]\noffline = true\n'; } >>"$tag_dir/vendor.toml"
