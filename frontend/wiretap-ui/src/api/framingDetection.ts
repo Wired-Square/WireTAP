@@ -2,7 +2,7 @@
 //
 // Which framing a captured serial byte stream is using.
 //
-// The analysis runs in Rust, framing as the port and `apply_framing_to_capture`
+// The analysis runs in Rust, framing as the port and `set_capture_framing`
 // do, reading the bytes straight out of the capture store. It used to be a
 // brute-force CRC scan in TypeScript over a 100 KB copy fetched to the frontend
 // for the purpose.

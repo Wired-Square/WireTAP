@@ -241,7 +241,6 @@ pub fn run() {
             captures::get_capture_frames_by_id,
             captures::get_capture_bytes_by_id,
             captures::set_active_capture,
-            captures::create_frame_capture_from_frames,
             // Byte capture API (Serial Discovery)
             captures::get_capture_bytes_tail,
             captures::get_capture_bytes_paginated,
