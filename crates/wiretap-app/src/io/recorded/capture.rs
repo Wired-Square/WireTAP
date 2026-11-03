@@ -302,6 +302,9 @@ pub async fn step_frame(
                 frame_count: Some(total_frames),
             };
             publish_position_now(session_id, position);
+            if let Err(e) = crate::io::seek_session_by_frame(session_id, new_idx as i64).await {
+                tlog!("[Capture:{}] Step not followed by playback: {}", session_id, e);
+            }
 
             Ok(Some(StepResult {
                 frame_index: new_idx,
@@ -1043,5 +1046,40 @@ mod tests {
             (turned.frame_index as u64, turned.timestamp_us),
             (index_of(turned.timestamp_us), turned.timestamp_us)
         );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn a_resume_after_a_step_continues_from_the_stepped_frame() {
+        const SESSION: &str = "f_play_step_resume";
+        let frames: Vec<(u64, u32)> = (0..200).map(|i| (1_000 + i * 10_000, 0x100)).collect();
+        open_playback(SESSION, &frames, 1.0).await;
+        tokio::time::sleep(Duration::from_millis(150)).await;
+        crate::io::pause_session(SESSION).await.unwrap();
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        let capture = capture_store::get_session_frame_capture_id(SESSION).unwrap();
+        let mut stepped = crate::io::get_playback_position(SESSION).expect("a position was published").frame_index;
+        for _ in 0..3 {
+            stepped = step_frame(SESSION, &capture, Some(stepped), None, true, &FrameSelection::default())
+                .await
+                .unwrap()
+                .expect("a frame before")
+                .frame_index;
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        crate::io::resume_session(SESSION).await.unwrap();
+        let resumed = tokio::time::timeout(Duration::from_secs(2), async {
+            loop {
+                match crate::io::get_playback_position(SESSION) {
+                    Some(p) if p.frame_index != stepped => return p.frame_index,
+                    _ => tokio::time::sleep(Duration::from_millis(2)).await,
+                }
+            }
+        })
+        .await
+        .expect("playback moved on");
+        crate::io::destroy_session(SESSION, false).await.ok();
+
+        assert_eq!(resumed, stepped + 1);
     }
 }
