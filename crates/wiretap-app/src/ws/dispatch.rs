@@ -729,8 +729,9 @@ fn send_frame_inventory(server: &WsServer, channel: u8, capture_id: &str, reset:
     server.send_to_channel(channel, protocol::encode_message(MsgType::FrameInventory, channel, &payload));
 }
 
-/// Reset frame offset for a session to the current capture length, and send its whole
-/// inventory. Called on subscribe so that only frames arriving after subscription are sent.
+/// Start a session's frame offset at the current capture length, unless a subscriber
+/// already holds one, and send its whole inventory. Called on subscribe so that only frames
+/// arriving after the first subscription are sent; the offset is shared by every subscriber.
 pub fn reset_frame_offset(session_id: &str) {
     let capture_id = crate::capture_store::get_session_frame_capture_id(session_id);
     let count = capture_id.as_deref().map(crate::capture_store::get_capture_count).unwrap_or(0);
@@ -738,7 +739,7 @@ pub fn reset_frame_offset(session_id: &str) {
     let lock = delivery_lock(session_id);
     let _delivering = lock.lock();
     if let Ok(mut offsets) = FRAME_OFFSETS.write() {
-        offsets.insert(session_id.to_string(), count);
+        offsets.entry(session_id.to_string()).or_insert(count);
     }
     if let (Some(server), Some(capture_id)) = (ws_server(), capture_id) {
         if let Some(channel) = server.channel_for_session(session_id) {
@@ -2107,6 +2108,24 @@ bit_length = 8
 
         assert_eq!(rendered.len(), MAX_RENDERED_TUNNEL_MESSAGES);
         assert_eq!(rendered[0], Some(REQUESTS - MAX_RENDERED_TUNNEL_MESSAGES as u64 + 1));
+    }
+
+    #[test]
+    fn a_second_subscriber_does_not_skip_frames_the_first_has_not_been_sent() {
+        use crate::ws::server::outbox;
+        const CHANNEL: u8 = 214;
+        let session = "second-subscriber-offset";
+        let _db = crate::capture_db::use_own_database();
+        crate::capture_store::create_session_capture(session, CaptureKind::Frames, session.to_string());
+        crate::capture_db::wait(crate::capture_store::append_frames_to_session(session, vec![can(0x100, 1, vec![0; 8])]));
+        outbox::subscribe(session, CHANNEL);
+        reset_frame_offset(session);
+
+        crate::capture_db::wait(crate::capture_store::append_frames_to_session(session, vec![can(0x100, 2, vec![0; 8])]));
+        reset_frame_offset(session);
+        send_new_frames(session);
+
+        assert_eq!(outbox::sent(CHANNEL, MsgType::FrameData).len(), 1, "the frame after the first subscribe was sent");
     }
 
     #[test]
