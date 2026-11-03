@@ -204,9 +204,7 @@ pub(super) async fn run_merge_task(
                     }
                     Some(SourceMessage::Ended(source_idx, reason)) => {
                         tlog!("[IOBroker] Source {} ended: {}", source_idx, reason);
-                        if let Ok(mut channels) = transmit_channels.lock() {
-                            channels.remove(&source_idx);
-                        }
+                        forget_channels(source_idx, &source_profiles, &live, &transmit_channels, &control_channels);
                         // An ending nobody asked for is a fault, and has to be
                         // reported like one — a device pulled mid-session used to
                         // finish the run as "complete".
@@ -228,9 +226,7 @@ pub(super) async fn run_merge_task(
                     }
                     Some(SourceMessage::Error(source_idx, error)) => {
                         tlog!("[IOBroker] Source {} error: {}", source_idx, error);
-                        if let Ok(mut channels) = transmit_channels.lock() {
-                            channels.remove(&source_idx);
-                        }
+                        forget_channels(source_idx, &source_profiles, &live, &transmit_channels, &control_channels);
                         emit_session_error(&session_id, error.clone());
                         start.failed(source_idx, error.message.clone());
                         last_source_error = Some(error);
@@ -246,8 +242,10 @@ pub(super) async fn run_merge_task(
                     }
                     Some(SourceMessage::TransmitReady(source_idx, tx_sender)) => {
                         tlog!("[IOBroker] Source {} transmit channel ready", source_idx);
-                        if let Ok(mut channels) = transmit_channels.lock() {
-                            channels.insert(source_idx, tx_sender);
+                        if let (Some(source), Ok(mut channels)) =
+                            (source_profiles.get(&source_idx), transmit_channels.lock())
+                        {
+                            channels.insert(source.profile_id.clone(), tx_sender);
                         }
                         start.ready(source_idx);
                     }
@@ -256,7 +254,7 @@ pub(super) async fn run_merge_task(
                         if let (Some(source), Ok(mut channels)) =
                             (source_profiles.get(&source_idx), control_channels.lock())
                         {
-                            channels.insert(source_idx, (source.profile_id.clone(), control_sender));
+                            channels.insert(source.profile_id.clone(), control_sender);
                         }
                     }
                     Some(SourceMessage::Connected(source_idx, device_type, address, bus_number)) => {
@@ -502,6 +500,31 @@ pub(super) async fn run_merge_task(
     emit_stream_ended(&session_id, reason, "IOBroker");
 }
 
+/// Drop an ended reader's channels, unless a re-added reader of its profile is already running.
+fn forget_channels(
+    index: usize,
+    source_profiles: &HashMap<usize, SourceIdentity>,
+    live: &LiveSources,
+    transmit_channels: &TransmitChannels,
+    control_channels: &ControlChannels,
+) {
+    let Some(profile_id) = source_profiles.get(&index).map(|s| &s.profile_id) else {
+        return;
+    };
+    let succeeded = source_profiles
+        .iter()
+        .any(|(i, s)| *i != index && live.contains(*i) && s.profile_id == *profile_id);
+    if succeeded {
+        return;
+    }
+    if let Ok(mut channels) = transmit_channels.lock() {
+        channels.remove(profile_id);
+    }
+    if let Ok(mut channels) = control_channels.lock() {
+        channels.remove(profile_id);
+    }
+}
+
 fn send_bus_status(session_id: &str, msg: Option<BusStatusMsg>) {
     if let Some(msg) = msg {
         crate::ws::dispatch::send_session_json(session_id, crate::ws::protocol::MsgType::BusStatus, &msg);
@@ -654,7 +677,11 @@ impl PendingReadds {
 
 #[cfg(test)]
 mod tests {
-    use super::{stream_ended_reason, LiveSources, PendingReadds, StartReport, StreamEndReason};
+    use super::{
+        forget_channels, stream_ended_reason, LiveSources, PendingReadds, SourceIdentity,
+        StartReport, StreamEndReason, TransmitChannels,
+    };
+    use std::sync::{Arc, Mutex};
     use tokio::sync::oneshot;
     use crate::io::broker::types::SourceConfig;
 
@@ -720,6 +747,21 @@ mod tests {
         pending.add(config("can"));
         pending.removing(0, "can".into());
         assert!(pending.source_ended(0).is_none());
+    }
+
+    #[test]
+    fn a_reader_ending_after_its_re_add_started_leaves_the_re_added_channels() {
+        let identity = || SourceIdentity { profile_id: "can".into(), display_name: String::new() };
+        let profiles = [(0, identity()), (1, identity())].into();
+        let (transmit, _rx) = crate::io::types::transmit_channel();
+        let transmit_channels: TransmitChannels = Arc::new(Mutex::new([("can".into(), transmit)].into()));
+        let forget = |index, live| forget_channels(index, &profiles, &live, &transmit_channels, &Default::default());
+
+        forget(0, LiveSources::new([1]));
+        assert!(transmit_channels.lock().unwrap().contains_key("can"));
+
+        forget(1, LiveSources::new([]));
+        assert!(transmit_channels.lock().unwrap().is_empty());
     }
 
     #[test]

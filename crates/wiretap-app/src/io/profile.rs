@@ -37,6 +37,14 @@ pub struct IOProfile {
     pub ephemeral: bool,
 }
 
+/// One bus of a virtual device and its generator's settings.
+#[derive(Debug, Clone, PartialEq)]
+pub struct VirtualInterface {
+    pub bus: u8,
+    pub signal_generator: bool,
+    pub frame_rate_hz: f64,
+}
+
 /// A required field the profile doesn't carry.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 #[error("{kind} profile is missing '{key}'")]
@@ -112,6 +120,50 @@ impl IOProfile {
     pub fn conn_framing(&self) -> FramingMode {
         self.conn("framing_encoding", |v| v.as_str()?.parse().ok())
             .unwrap_or_default()
+    }
+
+    /// A virtual device's buses: its `interfaces` list, or the legacy top-level
+    /// fields when the list is missing or empty. An entry without a bus drops out.
+    pub fn virtual_interfaces(&self) -> Vec<VirtualInterface> {
+        let (rate_min, rate_max) = crate::io::device_kinds::VIRTUAL_FRAME_RATE_RANGE;
+        let listed = self
+            .connection
+            .get("interfaces")
+            .and_then(ConnValue::as_list)
+            .filter(|list| !list.is_empty());
+        let Some(list) = listed else {
+            let (bus_min, bus_max) = crate::io::device_kinds::VIRTUAL_BUS_COUNT_RANGE;
+            let bus_count = self
+                .conn_i64("bus_count")
+                .unwrap_or(1)
+                .clamp(bus_min.into(), bus_max.into());
+            let signal_generator = self
+                .conn_bool("signal_generator")
+                .unwrap_or(VIRTUAL_SIGNAL_GENERATOR);
+            let frame_rate_hz = self
+                .conn_f64("frame_rate_hz")
+                .unwrap_or(VIRTUAL_FRAME_RATE_HZ)
+                .clamp(rate_min, rate_max);
+            return (0..bus_count as u8)
+                .map(|bus| VirtualInterface { bus, signal_generator, frame_rate_hz })
+                .collect();
+        };
+        list.iter()
+            .filter_map(|item| {
+                let bus = item.get("bus")?;
+                let bus = bus.as_u64().or_else(|| bus.as_str()?.parse().ok())? as u8;
+                let signal_generator = item
+                    .get("signal_generator")
+                    .and_then(|v| v.as_bool().or_else(|| v.as_str().map(|s| s != "false")))
+                    .unwrap_or(VIRTUAL_SIGNAL_GENERATOR);
+                let frame_rate_hz = item
+                    .get("frame_rate_hz")
+                    .and_then(|v| v.as_f64().or_else(|| v.as_str()?.parse().ok()))
+                    .unwrap_or(VIRTUAL_FRAME_RATE_HZ)
+                    .clamp(rate_min, rate_max);
+                Some(VirtualInterface { bus, signal_generator, frame_rate_hz })
+            })
+            .collect()
     }
 
     fn missing(&self, key: &str) -> MissingField {

@@ -52,9 +52,6 @@ impl SourceConfig {
 /// Transmit routing info: maps output bus to source and device bus
 #[derive(Clone, Debug)]
 pub(super) struct TransmitRoute {
-    /// Source index in the sources array
-    pub source_idx: usize,
-    /// Profile ID for logging
     pub profile_id: String,
     /// Profile kind for frame encoding (gvret_tcp, gvret_usb, gs_usb, socketcan, slcan)
     pub profile_kind: String,
@@ -67,9 +64,8 @@ pub(super) struct TransmitRoute {
 /// hands each source its own).
 pub(super) type SourcePauseFlags = Arc<Mutex<HashMap<String, Arc<std::sync::atomic::AtomicBool>>>>;
 
-/// Shared transmit channels by source index
-pub(super) type TransmitChannels = Arc<Mutex<HashMap<usize, TransmitSender>>>;
+/// Shared transmit channels by profile id
+pub(super) type TransmitChannels = Arc<Mutex<HashMap<String, TransmitSender>>>;
 
-/// Shared control channels by source index, each with its source's profile id (live framing
-/// changes; serial only)
-pub(super) type ControlChannels = Arc<Mutex<HashMap<usize, (String, ControlSender)>>>;
+/// Shared control channels by profile id, for live framing changes (serial only)
+pub(super) type ControlChannels = Arc<Mutex<HashMap<String, ControlSender>>>;
