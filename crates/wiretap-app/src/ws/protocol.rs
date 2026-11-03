@@ -139,6 +139,9 @@ wire_enum! {
         // The rest of a DecodedBacklog, in order and laid out the same; the subscriber adds
         // it to what the first replaced.
         DecodedBacklogMore = 0x24,
+        // A session's framing of its byte capture as JSON (`FramingStateMsg`, `null` once
+        // framing is off), on the byte cadence while it moves.
+        FramingState     = 0x25,
         // Reverse RPC: server (Rust/MCP) → frontend request, frontend → server reply.
         BridgeRequest    = 0x30,
         BridgeResponse   = 0x31,

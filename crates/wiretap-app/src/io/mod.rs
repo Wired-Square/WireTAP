@@ -880,6 +880,7 @@ pub fn emit_stream_ended(
     use crate::capture_store::{self, CaptureKind};
 
     let finalized = capture_store::finalize_session_captures(session_id);
+    crate::framing::finish(session_id);
     // Frames first, same precedence as `get_session_capture` — but read off what was
     // just finalised rather than the registry, which no longer lists these as streaming.
     let metadata = finalized.iter()
