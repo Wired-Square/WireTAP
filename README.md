@@ -124,8 +124,8 @@ recorded per clean commit, so a rerun there returns at once.
 
 It needs `node_modules` from `npm ci`, the `x86_64-pc-windows-msvc`,
 `aarch64-apple-darwin` and `x86_64-apple-darwin` targets (`rustup target add`),
-and for Linux, Docker running. The host fetches the registry sources with its
-own registry token; the container builds offline.
+and for Linux, Docker running. The host fetches the registry sources; the
+container builds offline.
 
 Run it before every push, once per clone:
 
