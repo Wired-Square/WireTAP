@@ -281,7 +281,7 @@ pub async fn probe_profile(profile: &IOProfile) -> Result<DeviceProbeResult, Str
             // reports a DNS failure as a connection one.
             let sock_addr = match crate::io::net::resolve_host_port(&host, port).await {
                 Ok(a) => a,
-                Err(e) => return Ok(failure(e.user_message())),
+                Err(e) => return log_and_cache(profile, Ok(failure(e.user_message()))),
             };
 
             match tokio::time::timeout(
@@ -369,12 +369,14 @@ pub async fn probe_profile(profile: &IOProfile) -> Result<DeviceProbeResult, Str
         )),
     };
 
-    // Emit probe result event (fresh probe, not cached)
+    log_and_cache(profile, result)
+}
+
+fn log_and_cache(profile: &IOProfile, result: Result<DeviceProbeResult, String>) -> Result<DeviceProbeResult, String> {
     if let Ok(ref probe_result) = result {
         log_probe(&profile.id, probe_result, false);
         cache_probe_result(&profile.id, probe_result);
     }
-
     result
 }
 
@@ -546,6 +548,20 @@ mod tests {
         assert_eq!(result.bus_count, 0);
         assert_eq!(result.secondary_info, Some(format!("127.0.0.1:{port}")));
         assert!(result.error.as_deref().is_some_and(|e| e.starts_with("Connection failed:")), "{:?}", result.error);
+    }
+
+    #[tokio::test]
+    async fn a_modbus_host_that_does_not_resolve_is_logged_like_any_other_probe() {
+        let unresolvable = profile("probe-modbus-dns", "modbus_tcp", json!({ "host": "wiretap-probe.invalid", "port": 502, "timeout": 1.0 }));
+        let bound = crate::io::net::DNS_TIMEOUT + std::time::Duration::from_secs(5);
+        let result = tokio::time::timeout(bound, probe_profile(&unresolvable)).await.expect("bounded").expect("a result");
+        assert!(!result.success);
+
+        let logged = session_log::read(None, None).into_iter().any(|e| {
+            e.profile_ids == ["probe-modbus-dns"]
+                && matches!(e.event, SessionLogEvent::DeviceProbe { success: false, .. })
+        });
+        assert!(logged, "the DNS failure was not written to the session log");
     }
 
     #[tokio::test]
