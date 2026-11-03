@@ -9,5 +9,5 @@ registry = "sparse+https://forge.wiredsquare.com/api/packages/wired-square/cargo
 replace-with = "wired-square-mirror"
 
 [registries.wired-square-mirror]
-index = "sparse+https://crates.wiredsquare.com/"
+index = "sparse+https://mirror.wiredsquare.com/cargo/"
 credential-provider = "cargo:token"
