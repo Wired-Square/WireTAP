@@ -348,9 +348,9 @@ mod desktop {
         /// when `flush`. A cleared or replaced byte capture, or bytes after a
         /// flush (a reconnect), restart the framing.
         async fn catch_up(&mut self, session_id: &str, flush: bool) {
-            let Some(bytes_capture_id) = capture_store::get_session_bytes_capture_id(session_id) else {
-                return;
-            };
+            // A destroyed session has orphaned its capture; the finish still owes it the residue.
+            let bytes_capture_id = capture_store::get_session_bytes_capture_id(session_id)
+                .unwrap_or_else(|| self.bytes_capture_id.clone());
             let total = capture_store::get_capture_count(&bytes_capture_id);
             if bytes_capture_id != self.bytes_capture_id
                 || total < self.consumed
@@ -418,8 +418,9 @@ mod desktop {
         followers().get(session_id).cloned()
     }
 
-    async fn step(session_id: &str, flush: bool) {
-        let Some(slot) = follower_slot(session_id) else { return };
+    /// The slot is taken before the task runs, so a finish spawned at stream end
+    /// still frames the tail when the session is destroyed before it gets the lock.
+    async fn step(slot: FollowerSlot, session_id: &str, flush: bool) {
         let mut held = slot.lock().await;
         let Some(follower) = held.as_mut() else { return };
         let before = follower.state.clone();
@@ -434,7 +435,7 @@ mod desktop {
         let following = slot.try_lock().map_or(true, |follower| follower.is_some());
         if following {
             let session_id = session_id.to_string();
-            tauri::async_runtime::spawn(async move { step(&session_id, flush).await });
+            tauri::async_runtime::spawn(async move { step(slot, &session_id, flush).await });
         }
     }
 
@@ -687,8 +688,8 @@ mod desktop {
             assert_eq!(stored(&state.framed_capture_id), [(b"AB".to_vec(), None), (b"CD".to_vec(), Some(true))]);
 
             wait(capture_store::append_raw_bytes_to_capture(&bytes, stamped(b"E\n")));
-            wait(step(session, false));
             let slot = follower_slot(session).unwrap();
+            wait(step(slot.clone(), session, false));
             let after = slot.try_lock().unwrap().as_ref().unwrap().state.clone();
             assert_eq!((after.framed_capture_id.as_str(), after.frame_count), (state.framed_capture_id.as_str(), 2));
             assert_eq!(stored(&after.framed_capture_id), [(b"AB".to_vec(), None), (b"CDE".to_vec(), None)]);
@@ -697,6 +698,27 @@ mod desktop {
             assert!(slot.try_lock().unwrap().is_none());
             assert_eq!(capture_store::get_capture_kind(&after.framed_capture_id), None);
             drop_follower(session);
+        }
+
+        #[test]
+        fn a_finish_spawned_before_the_session_is_destroyed_still_frames_the_tail() {
+            let _db = crate::capture_db::use_own_database();
+            let session = "s_framing_destroyed";
+            let bytes = capture_store::create_session_capture(session, CaptureKind::Bytes, "raw".into());
+            wait(capture_store::append_raw_bytes_to_capture(&bytes, stamped(b"AB\n")));
+            let state = wait(set_capture_framing(session.into(), Some(config("delimiter")))).unwrap().unwrap();
+
+            let slot = follower_slot(session).unwrap();
+            // As on a live line, where the stream end is the first flush.
+            slot.try_lock().unwrap().as_mut().unwrap().flushed = false;
+            wait(capture_store::append_raw_bytes_to_capture(&bytes, stamped(b"CD\nE")));
+            capture_store::orphan_captures_for_session(session);
+            drop_follower(session);
+            wait(step(slot, session, true));
+            assert_eq!(
+                stored(&state.framed_capture_id),
+                [(b"AB".to_vec(), None), (b"CD".to_vec(), None), (b"E".to_vec(), Some(true))]
+            );
         }
 
         #[test]
@@ -711,8 +733,8 @@ mod desktop {
             assert_eq!((state.frame_count, state.filtered_capture_id.as_deref()), (1, None));
 
             wait(capture_store::append_raw_bytes_to_capture(&bytes, stamped(b"D\n")));
-            wait(step(session, false));
             let slot = follower_slot(session).unwrap();
+            wait(step(slot.clone(), session, false));
             let after = slot.try_lock().unwrap().as_ref().unwrap().state.clone();
             assert_eq!((after.frame_count, after.filtered_count), (1, 1));
             assert_eq!(stored(after.filtered_capture_id.as_deref().unwrap()), [(b"D".to_vec(), None)]);
