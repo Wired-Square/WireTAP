@@ -8,6 +8,7 @@ import { useDiscoveryStore } from '../../../../stores/discoveryStore';
 import { useDiscoverySerialStore, withSerialIds } from '../../../../stores/discoverySerialStore';
 import { tlog } from '../../../../api/settings';
 import { useDiscoveryUIStore } from '../../../../stores/discoveryUIStore';
+import { useSessionStore } from '../../../../stores/sessionStore';
 import { useCaptureFrameView } from '../../hooks/useCaptureFrameView';
 import type { ProtocolFrames } from '../../../../utils/frameKey';
 import type { SerialFrameConfig } from '../../../../utils/frameExport';
@@ -203,8 +204,8 @@ export default function FramedDataView({ captureId, sessionId, onAccept, onApply
   const setPageSize = useDiscoverySerialStore((s) => s.setFramedPageSize);
   const [autoRows, setAutoRows] = useState<number | null>(null);
   const pageSize = resolvePageSize(pageSizeSetting, autoRows);
-  // Re-framing refills the derived capture under the same id.
-  const framedDataTrigger = useDiscoverySerialStore((s) => s.framedDataTrigger);
+  // Rust frames into the derived capture under one id; its count moving is the refetch signal.
+  const framedCount = useSessionStore((s) => (sessionId ? s.sessions[sessionId]?.framing?.frame_count : undefined) ?? 0);
 
   const {
     frames,
@@ -226,7 +227,7 @@ export default function FramedDataView({ captureId, sessionId, onAccept, onApply
     selectedFrames: ALL_FRAMES,
     pageSize,
     tailSize: pageSize,
-    revision: framedDataTrigger,
+    revision: framedCount,
   });
 
   // Extraction configurations - read directly from serial store

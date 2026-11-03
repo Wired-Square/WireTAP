@@ -977,6 +977,7 @@ pub async fn destroy_session_by(session_id: &str, reset: bool, by: Option<&str>)
         Err(_) => {
             detach_all_from_session(session_id);
             crate::ws::dispatch::detach_catalog(session_id);
+            crate::framing::drop_follower(session_id);
             forget_session(session_id);
         }
     }
@@ -1001,6 +1002,10 @@ async fn tear_down(session_id: &str, mut session: SessionGuard, how: Teardown<'_
         crate::ws::dispatch::detach_catalog(session_id);
     }
     let _ = session.source.stop().await;
+    // After the stop: the stream end spawns the framing finish, which must find its follower.
+    if destroying {
+        crate::framing::drop_follower(session_id);
+    }
     session_states().remove(session_id);
     session.retired = true;
     if destroying {

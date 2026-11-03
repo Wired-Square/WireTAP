@@ -253,7 +253,7 @@ pub fn run() {
             // Session-aware capture API
             captures::list_orphaned_captures,
             // Backend framing
-            framing::apply_framing_to_capture,
+            framing::set_capture_framing,
             framing::extract_serial_ids,
             framing_detect::detect_serial_framing,
             // Serial port API (platform-aware: real on desktop, stub on iOS)

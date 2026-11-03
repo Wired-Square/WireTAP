@@ -128,7 +128,7 @@ fn render() -> BTreeMap<PathBuf, String> {
     r.visit::<crate::io::CsvPreview>();
     r.visit::<crate::io::CsvTimestampPreview>();
     r.visit::<crate::framing::BackendFramingConfig>();
-    r.visit::<crate::framing::FramingResult>();
+    r.visit::<crate::framing::FramingStateMsg>();
     r.visit::<crate::framing::SerialIds>();
     r.visit::<crate::catalog_share::CatalogSourcesView>();
     r.visit::<crate::catalog_share::ImportRequest>();

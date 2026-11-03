@@ -52,6 +52,7 @@ import type { BusStatus } from "../generated/BusStatus";
 import type { BusStatusMsg } from "../generated/BusStatusMsg";
 import type { CaptureFrameInfo } from "../generated/CaptureFrameInfo";
 import type { FrameInventoryMsg } from "../generated/FrameInventoryMsg";
+import type { FramingStateMsg } from "../generated/FramingStateMsg";
 import { frameKey } from "../utils/frameKey";
 import type { CaptureMetadata } from "../api/capture";
 import { tlog } from "../api/settings";
@@ -159,6 +160,8 @@ export interface Session {
   catalogPath: string | null;
   /** Capture ID for raw byte streams (Rust-authoritative, arrives with the byte count) */
   bytesCaptureId: string | null;
+  /** Rust's framing of the byte capture (FramingState 0x25); null while none is set. */
+  framing: FramingStateMsg | null;
   /**
    * What kind of source is behind this session ("modbus_scan", "gvret_tcp", …),
    * as registration and the roster report it.
@@ -424,6 +427,7 @@ export function sessionTransitionEffect(msg: SessionTransitionMsg, session: Sess
         uniqueFrameCount: 0,
         byteCount: 0,
         bytesCaptureId: null,
+        framing: null,
         capture: emptyCapture(null, sessionId),
         frameInventory: undefined,
       });
@@ -666,6 +670,12 @@ function setupSessionEventSubscribers(sessionId: string, eventListeners: Session
     wsTransport.onSessionMessage(sessionId, MsgType.FrameInventory, (_payload, raw) => {
       const held = useSessionStore.getState().sessions[sessionId]?.frameInventory;
       updateSession(sessionId, { frameInventory: applyFrameInventory(held, decodeWsJson<FrameInventoryMsg>(raw)) });
+    })
+  );
+
+  eventListeners.wsUnlistenFunctions.push(
+    wsTransport.onSessionMessage(sessionId, MsgType.FramingState, (_payload, raw) => {
+      updateSession(sessionId, { framing: decodeWsJson<FramingStateMsg | null>(raw) });
     })
   );
 
@@ -1480,7 +1490,7 @@ async function openNow(
     errorMessage: opened.start_error,
     // A push may have counted subscribers past the snapshot already.
     subscriberCount: Math.max(opened.subscriber_count, existing?.subscriberCount ?? 0),
-    ...(fresh ? { frameCount: 0, uniqueFrameCount: 0, byteCount: 0 } : {}),
+    ...(fresh ? { frameCount: 0, uniqueFrameCount: 0, byteCount: 0, framing: null } : {}),
     capture: {
       ...emptyCapture(),
       ...(existing && { startTimeUs: existing.capture.startTimeUs, endTimeUs: existing.capture.endTimeUs, name: existing.capture.name, persistent: existing.capture.persistent }),
@@ -1557,6 +1567,7 @@ function newSession({ id, profileId, profileName }: Pick<Session, "id" | "profil
     playbackPosition: null,
     catalogPath: null,
     bytesCaptureId: null,
+    framing: null,
     pausedSourceProfileIds: [],
     busStatuses: [],
     originProfileIds: [],

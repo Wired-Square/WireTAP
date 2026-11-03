@@ -34,15 +34,16 @@ describe("framedSource", () => {
   const session = { captureId: "cap_session", frameCount: 795 };
 
   it("reads a reader-framed session's own capture and its count together", () => {
-    expect(framedSource({ framedCaptureId: null, backendFrameCount: 231 }, session)).toEqual({
+    expect(framedSource(null, session)).toEqual({
       captureId: "cap_session",
       frameCount: 795,
       readerFramed: true,
     });
   });
 
-  it("prefers client-side framing's derived capture, with the count framing returned", () => {
-    expect(framedSource({ framedCaptureId: "cap_framed", backendFrameCount: 40 }, session)).toEqual({
+  it("prefers the capture Rust frames the bytes into, with the count it pushed", () => {
+    const framing = { framed_capture_id: "cap_framed", frame_count: 40, filtered_capture_id: null, filtered_count: 0, protocol: "serial" };
+    expect(framedSource(framing, session)).toEqual({
       captureId: "cap_framed",
       frameCount: 40,
       readerFramed: false,
@@ -51,7 +52,7 @@ describe("framedSource", () => {
 
   it("has nothing to page on a byte session before framing", () => {
     expect(
-      framedSource({ framedCaptureId: null, backendFrameCount: 0 }, { captureId: null, frameCount: 12 }),
+      framedSource(null, { captureId: null, frameCount: 12 }),
     ).toEqual({ captureId: null, frameCount: 0, readerFramed: false });
   });
 });

@@ -709,6 +709,12 @@ pub fn send_new_bytes(session_id: &str) {
 
     let counts = protocol::encode_byte_counts(total as u64, &capture_id);
     server.send_to_channel(channel, protocol::encode_message(MsgType::ByteCounts, channel, &counts));
+    crate::framing::follow(session_id);
+}
+
+/// Push a session's framing state; `None` once its framing is off.
+pub fn send_framing_state(session_id: &str, state: Option<&crate::framing::FramingStateMsg>) {
+    send_to_session(session_id, MsgType::FramingState, || serde_json::to_vec(&state).ok());
 }
 
 /// Push the capture's inventory rows that changed since the last push; `reset` sends

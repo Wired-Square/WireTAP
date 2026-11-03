@@ -21,7 +21,7 @@ import type { CsvPreview } from "../generated/CsvPreview";
 import type { CsvTimestampPreview } from "../generated/CsvTimestampPreview";
 import type { Delimiter } from "../generated/Delimiter";
 import type { FrameIdConfig } from "../generated/FrameIdConfig";
-import type { FramingResult } from "../generated/FramingResult";
+import type { FramingStateMsg } from "../generated/FramingStateMsg";
 import type { InterfaceFramingConfig } from "../generated/InterfaceFramingConfig";
 import type { ModbusRtuOptions } from "../generated/ModbusRtuOptions";
 import type { PaginatedBytesResponse } from "../generated/PaginatedBytesResponse";
@@ -49,7 +49,7 @@ export type {
   CsvTimestampPreview,
   Delimiter,
   FrameIdConfig,
-  FramingResult,
+  FramingStateMsg,
   InterfaceFramingConfig,
   ModbusRtuOptions,
   PaginatedBytesResponse,
@@ -444,22 +444,6 @@ export async function setActiveCapture(captureId: string): Promise<void> {
   return invoke("set_active_capture", { capture_id: captureId });
 }
 
-/**
- * Create a new frame capture from frames passed from the frontend.
- * Used when accepting client-side framing to persist the framed data.
- *
- * @param name - Display name for the capture
- * @param frames - Array of frames to store
- * @returns Metadata of the created capture
- */
-export async function createFrameCaptureFromFrames(
-  sessionId: string,
-  name: string,
-  frames: FrameMessage[]
-): Promise<CaptureMetadata> {
-  return invoke("create_frame_capture_from_frames", { session_id: sessionId, name, frames });
-}
-
 // ============================================================================
 // Byte Capture API (Serial Discovery)
 // ============================================================================
@@ -507,29 +491,15 @@ export async function getCaptureBytesPaginatedById(
 // ============================================================================
 
 /**
- * Apply framing to the active byte capture.
- * If reuseCaptureId is provided and valid, that capture is cleared and reused.
- * Otherwise, a new frame capture is created.
- * This avoids capture proliferation during live framing.
- *
- * @param config - Framing configuration
- * @param reuseCaptureId - Optional ID of existing framing capture to reuse (avoids proliferation)
- * @param reuseFilteredCaptureId - Same, for the too-short frames the min-length
- *   filter sets aside. Pass it or each re-frame leaves the previous one behind.
- * @returns Result with frame count and capture ID (same as reuseCaptureId if reused, or new ID)
+ * Frame the session's byte capture with `config` and keep framing it as bytes
+ * arrive; Rust pushes the state as it moves (FramingState). `null` stops framing
+ * and deletes the derived captures.
  */
-export async function applyFramingToCapture(
+export async function setCaptureFraming(
   sessionId: string,
-  config: BackendFramingConfig,
-  reuseCaptureId?: string | null,
-  reuseFilteredCaptureId?: string | null
-): Promise<FramingResult> {
-  return invoke("apply_framing_to_capture", {
-    session_id: sessionId,
-    config,
-    reuse_capture_id: reuseCaptureId ?? null,
-    reuse_filtered_capture_id: reuseFilteredCaptureId ?? null,
-  });
+  config: BackendFramingConfig | null,
+): Promise<FramingStateMsg | null> {
+  return invoke("set_capture_framing", { session_id: sessionId, config });
 }
 
 export function toFrameIdConfig(

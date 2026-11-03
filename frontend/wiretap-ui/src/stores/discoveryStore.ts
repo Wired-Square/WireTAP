@@ -88,15 +88,12 @@ type CombinedDiscoveryState = {
   // Serial store
   isSerialMode: boolean;
   framingConfig: import('./discoverySerialStore').FramingConfig | null;
-  framedData: FrameMessage[];
   framingAccepted: boolean;
   rawBytesViewConfig: import('./discoverySerialStore').RawBytesViewConfig;
   serialViewConfig: import('./discoverySerialStore').SerialViewConfig;
   serialActiveTab: import('./discoverySerialStore').SerialTabId;
-  backendFrameCount: number;
   framedPageSize: PageSize;
   rawBytesPageSize: number;
-  framedCaptureId: string | null;
   minFrameLength: number;
 
   // Toolbox store
@@ -137,8 +134,7 @@ type CombinedDiscoveryState = {
   setSerialMode: (enabled: boolean) => void;
   clearSerialBytes: () => void;
   setFramingConfig: (config: import('./discoverySerialStore').FramingConfig | null) => void;
-  applyFraming: () => Promise<FrameMessage[]>;
-  acceptFraming: (captureName?: string) => Promise<FrameMessage[]>;
+  acceptFraming: () => Promise<void>;
   resetFraming: () => void;
   undoAcceptFraming: () => void;
   applyFrameIdMapping: (config: import('./discoverySerialStore').ByteExtractionConfig) => void;
@@ -149,8 +145,6 @@ type CombinedDiscoveryState = {
   setSerialViewConfig: (config: import('./discoverySerialStore').SerialViewConfig) => void;
   toggleShowAscii: () => void;
   setSerialActiveTab: (tab: import('./discoverySerialStore').SerialTabId) => void;
-  setBackendFrameCount: (count: number) => void;
-  incrementBackendFrameCount: (delta: number) => void;
   setFramedPageSize: (size: PageSize) => void;
   setRawBytesPageSize: (size: number) => void;
   setMinFrameLength: (length: number) => void;
@@ -227,15 +221,12 @@ export function useDiscoveryStore<T>(selector: (state: CombinedDiscoveryState) =
     // Serial store state
     isSerialMode: serialStore.isSerialMode,
     framingConfig: serialStore.framingConfig,
-    framedData: serialStore.framedData,
     framingAccepted: serialStore.framingAccepted,
     rawBytesViewConfig: serialStore.rawBytesViewConfig,
     serialViewConfig: serialStore.serialViewConfig,
     serialActiveTab: serialStore.activeTab,
-    backendFrameCount: serialStore.backendFrameCount,
     framedPageSize: serialStore.framedPageSize,
     rawBytesPageSize: serialStore.rawBytesPageSize,
-    framedCaptureId: serialStore.framedCaptureId,
     minFrameLength: serialStore.minFrameLength,
 
     // Toolbox store state
@@ -325,49 +316,25 @@ export function useDiscoveryStore<T>(selector: (state: CombinedDiscoveryState) =
     setSerialMode: serialStore.setSerialMode,
     clearSerialBytes: serialStore.clearSerialBytes,
     setFramingConfig: serialStore.setFramingConfig,
-    applyFraming: () => serialStore.applyFraming(frameStore.streamStartTimeUs, uiStore.ioProfile ?? undefined),
-    acceptFraming: async (captureName?: string) => {
-      // Read the framing result before acceptFraming resets it.
-      const { framedCaptureId, backendFrameCount } = serialStore;
-      const hasBackendFrames = framedCaptureId !== null && backendFrameCount > 0;
-      // Streaming mode: frames go directly to mainFrames (framedCaptureId is null)
-      const hasStreamingFrames = framedCaptureId === null && backendFrameCount > 0;
-
-      const frames = serialStore.acceptFraming();
+    acceptFraming: async () => {
+      const { useSessionStore } = await import('./sessionStore');
       const { getCaptureFrameInfo } = await import('../api/capture');
-
-      if (hasBackendFrames) {
-        // Backend framing mode: frames are stored in backend buffer
-        // Load frame info from the backend buffer for the frame picker
-        try {
-          const frameInfoList = await getCaptureFrameInfo(framedCaptureId);
-          frameStore.setFrameInfoFromCapture(frameInfoList);
-          frameStore.enableCaptureMode(backendFrameCount);
-          tlog.debug(`[discoveryStore] Loaded ${frameInfoList.length} unique frame IDs from backend buffer`);
-        } catch (e) {
-          tlog.info(`[discoveryStore] Failed to load frame info from backend buffer: ${e}`);
-        }
-      } else if (hasStreamingFrames) {
-        // A reader that frames on the wire wrote them into the session's own capture.
-        const { useSessionStore } = await import('./sessionStore');
-        const sessionCaptureId = useSessionStore.getState().sessions[uiStore.ioProfile ?? '']?.capture?.id;
-        if (sessionCaptureId) {
-          frameStore.setFrameInfoFromCapture(await getCaptureFrameInfo(sessionCaptureId));
-        }
-      } else if (frames.length > 0) {
-        const { createFrameCaptureFromFrames } = await import('../api/capture');
-        const name = captureName || `Framed Serial ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-        const completeFrames = frames.filter(f => !f.incomplete);
-        if (completeFrames.length > 0) {
-          try {
-            const capture = await createFrameCaptureFromFrames(uiStore.ioProfile ?? '', name, completeFrames);
-            frameStore.setFrameInfoFromCapture(await getCaptureFrameInfo(capture.id));
-          } catch (e) {
-            tlog.info(`[discoveryStore] Failed to create frame buffer: ${e}`);
-          }
-        }
+      const session = useSessionStore.getState().sessions[uiStore.ioProfile ?? ''];
+      const framing = session?.framing;
+      // Rust framed the stored bytes into a derived capture, or a reader that frames
+      // on the wire wrote into the session's own.
+      const captureId = framing ? framing.framed_capture_id : session?.capture?.id;
+      const frameCount = framing ? framing.frame_count : session?.frameCount ?? 0;
+      if (!captureId || frameCount === 0) return;
+      serialStore.acceptFraming();
+      try {
+        const frameInfoList = await getCaptureFrameInfo(captureId);
+        frameStore.setFrameInfoFromCapture(frameInfoList);
+        if (framing) frameStore.enableCaptureMode(frameCount);
+        tlog.debug(`[discoveryStore] Loaded ${frameInfoList.length} unique frame IDs from capture ${captureId}`);
+      } catch (e) {
+        tlog.info(`[discoveryStore] Failed to load frame info from capture ${captureId}: ${e}`);
       }
-      return frames;
     },
     resetFraming: serialStore.resetFraming,
     undoAcceptFraming: serialStore.undoAcceptFraming,
@@ -379,8 +346,6 @@ export function useDiscoveryStore<T>(selector: (state: CombinedDiscoveryState) =
     setSerialViewConfig: serialStore.setSerialViewConfig,
     toggleShowAscii: serialStore.toggleShowAscii,
     setSerialActiveTab: serialStore.setActiveTab,
-    setBackendFrameCount: serialStore.setBackendFrameCount,
-    incrementBackendFrameCount: serialStore.incrementBackendFrameCount,
     setFramedPageSize: serialStore.setFramedPageSize,
     setRawBytesPageSize: serialStore.setRawBytesPageSize,
     setMinFrameLength: serialStore.setMinFrameLength,
@@ -403,11 +368,11 @@ export function useDiscoveryStore<T>(selector: (state: CombinedDiscoveryState) =
       const { selectedFrames, captureMode } = frameStore;
       const { isSerialMode } = serialStore;
       const { useSessionStore } = await import('./sessionStore');
-      const sessionCaptureId =
-        useSessionStore.getState().sessions[uiStore.ioProfile ?? '']?.capture?.id ?? null;
-      // Framing applied on the client is held here; a reader that frames on the wire
-      // wrote into the session's capture.
-      const serialCaptureId = serialStore.framedCaptureId ?? sessionCaptureId;
+      const session = useSessionStore.getState().sessions[uiStore.ioProfile ?? ''];
+      const sessionCaptureId = session?.capture?.id ?? null;
+      // Rust frames stored bytes into a derived capture; a reader that frames on the
+      // wire wrote into the session's own.
+      const serialCaptureId = session?.framing?.framed_capture_id ?? sessionCaptureId;
 
       if (toolbox.activeView === 'serial-framing') {
         if (!bytesCaptureId) return;
