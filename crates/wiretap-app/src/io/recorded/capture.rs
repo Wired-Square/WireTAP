@@ -346,6 +346,10 @@ async fn load_chunk(
     result.unwrap_or_default()
 }
 
+fn take_seek(target: &AtomicI64, none: i64) -> Option<i64> {
+    Some(target.swap(none, Ordering::Relaxed)).filter(|&pending| pending != none)
+}
+
 /// The seek asked for, if any, and where it lands: a rowid, its frame index, and its
 /// time when already read; `Some(None)` when it lands nowhere.
 async fn seek_target(
@@ -357,9 +361,7 @@ async fn seek_target(
     control: &PlaybackControl,
 ) -> Option<Option<(i64, usize, Option<u64>)>> {
     // Check for frame-based seek (takes priority)
-    let seek_frame = seek_target_frame.load(Ordering::Relaxed);
-    if seek_frame != NO_SEEK_FRAME {
-        seek_target_frame.store(NO_SEEK_FRAME, Ordering::Relaxed);
+    if let Some(seek_frame) = take_seek(seek_target_frame, NO_SEEK_FRAME) {
         let target_idx = (seek_frame as usize).min(total_frames.saturating_sub(1));
         tlog!(
             "[Capture:{}] Seeking to frame {} (by index, paused={})",
@@ -370,11 +372,7 @@ async fn seek_target(
     }
 
     // Check for timestamp-based seek
-    let seek_target = seek_target_us.load(Ordering::Relaxed);
-    if seek_target == NO_SEEK {
-        return None;
-    }
-    seek_target_us.store(NO_SEEK, Ordering::Relaxed);
+    let seek_target = take_seek(seek_target_us, NO_SEEK)?;
     let Ok(Some(rowid)) = capture_db::find_rowid_for_timestamp(buf_id, seek_target as u64).await else {
         return Some(None);
     };
@@ -920,6 +918,44 @@ mod tests {
         crate::io::destroy_session(SESSION, false).await.ok();
 
         assert_eq!((ended, by_frame, by_time), (Ok(()), Ok(()), Ok(())));
+    }
+
+    #[test]
+    fn a_seek_landing_while_another_is_taken_is_not_lost() {
+        use std::sync::atomic::AtomicUsize;
+        const ROUNDS: usize = 200_000;
+        let target = Arc::new(AtomicI64::new(NO_SEEK));
+        let go = Arc::new(AtomicUsize::new(0));
+        let seeker = {
+            let (target, go) = (target.clone(), go.clone());
+            std::thread::spawn(move || {
+                for round in 1..=ROUNDS {
+                    while go.load(Ordering::Acquire) != round {
+                        std::hint::spin_loop();
+                    }
+                    target.store(round as i64 * 2 + 1, Ordering::Relaxed);
+                    go.store(0, Ordering::Release);
+                }
+            })
+        };
+        let mut lost = 0;
+        for round in 1..=ROUNDS {
+            target.store(round as i64 * 2, Ordering::Relaxed);
+            go.store(round, Ordering::Release);
+            for _ in 0..round % 32 {
+                std::hint::spin_loop();
+            }
+            let first = take_seek(&target, NO_SEEK);
+            while go.load(Ordering::Acquire) != 0 {
+                std::hint::spin_loop();
+            }
+            let later = Some(round as i64 * 2 + 1);
+            if first != later && take_seek(&target, NO_SEEK) != later {
+                lost += 1;
+            }
+        }
+        seeker.join().unwrap();
+        assert_eq!(lost, 0, "seeks lost in {ROUNDS} rounds");
     }
 
     #[tokio::test(flavor = "multi_thread")]
