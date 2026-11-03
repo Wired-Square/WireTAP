@@ -338,26 +338,19 @@ pub fn import_csv_batch(
 }
 
 fn inter_file_gap(prev_last: u64, cur_first: u64) -> u64 {
-    if cur_first > prev_last {
-        cur_first - prev_last - 1
-    } else if prev_last > 0 && cur_first < prev_last / 2 {
-        // Wraparound
-        cur_first
-    } else {
-        0
+    match cur_first.cmp(&prev_last) {
+        std::cmp::Ordering::Greater => cur_first - prev_last - 1,
+        std::cmp::Ordering::Less => cur_first,
+        std::cmp::Ordering::Equal => 0,
     }
 }
 
-/// Detect sequence wraparound points from gaps.
-/// A wrap is when `to_seq` is much smaller than `from_seq` (large backward jump).
+/// The sequence values at which a recorded gap stepped back, each once.
 fn detect_wrap_points(gaps: &[io::SequenceGap]) -> Vec<u64> {
     let mut wraps = Vec::new();
     for gap in gaps {
-        if gap.from_seq > 0 && gap.to_seq < gap.from_seq / 2 {
-            // This gap is a wraparound — the sequence wrapped at from_seq
-            if !wraps.contains(&gap.from_seq) {
-                wraps.push(gap.from_seq);
-            }
+        if gap.to_seq < gap.from_seq && !wraps.contains(&gap.from_seq) {
+            wraps.push(gap.from_seq);
         }
     }
     wraps
@@ -709,9 +702,9 @@ mod tests {
     }
 
     #[test]
-    fn a_short_step_back_between_files_is_no_gap() {
-        assert_eq!(inter_file_gap(1000, 600), 0);
-        assert_eq!(inter_file_gap(1000, 500), 0);
+    fn any_step_back_between_files_is_a_wrap() {
+        assert_eq!(inter_file_gap(1000, 999), 999);
+        assert_eq!(inter_file_gap(1000, 600), 600);
         assert_eq!(inter_file_gap(1000, 499), 499);
     }
 
@@ -720,9 +713,9 @@ mod tests {
     }
 
     #[test]
-    fn a_wrap_point_is_a_jump_back_below_half_listed_once() {
-        let gaps = [gap(10, 15), gap(1000, 3), gap(1000, 400), gap(1000, 600), gap(255, 2)];
-        assert_eq!(detect_wrap_points(&gaps), vec![1000, 255]);
+    fn a_wrap_point_is_any_jump_back_listed_once() {
+        let gaps = [gap(10, 15), gap(1000, 3), gap(1000, 400), gap(600, 599), gap(255, 2)];
+        assert_eq!(detect_wrap_points(&gaps), vec![1000, 600, 255]);
         assert!(detect_wrap_points(&[gap(0, 0)]).is_empty());
     }
 

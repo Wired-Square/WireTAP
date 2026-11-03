@@ -21,6 +21,7 @@ All notable changes to WireTAP will be documented in this file.
 ### Fixed
 
 - **Test Pattern holds its configured send rate on Windows.** Echo, Latency and Reliability runs above about 60 frames/s used to fall well short of their rate there, so a run looked like it had under-sent. A run now keeps its average rate on any system timer, and Throughput reports accurately on a busy adapter instead of pausing each time its send queue fills.
+- **A device that fails to open leaves no empty capture behind.** A Modbus TCP device whose host could not be reached used to leave a 0-frame capture named for the session in the picker.
 - **CAN FD and remote frames from a FrameLink device are marked correctly.** An FD frame had shown as a remote frame, and remote frames were not marked at all.
 - **A capture's count no longer runs ahead of what it holds.** Frames are counted once they are saved, a save refused while the database is busy is retried, and one that still fails is shown as the session's error instead of being dropped quietly. Clearing a large capture no longer shows its old frames while they are removed, and a copy appears only once it is complete.
 - **A capture reopened after a restart honours a frame selection.** Its live tail had shown every frame id whatever was selected, and its distinct-id count read 0.
@@ -28,6 +29,7 @@ All notable changes to WireTAP will be documented in this file.
 - **Session Manager's Remove evicts the subscriber again, and a detached window's subscription is paused and resumed.** Both had failed with a missing-command error since the workspace reorganisation.
 - **A byte capture opened from the picker can be framed in Discovery.** Its Raw Bytes tab, the Framing button and Serial Framing Analysis are available again, and the session reports the capture as serial rather than CAN.
 - **Exporting a framed byte capture counts its messages.** The export dialog had offered the capture's byte count as its number of frames.
+- **The Payload Changes report is saved as `payload-changes-report`.** Its suggested file name had said `payload-analysis-report`.
 
 - **Firmware flashing in the Serial app.** STM32 UART read-back now handles full 256-byte chunks, and cancelling an ESP or DFU flash now stops esptool and dfu-util too. If a read-back fails or is cancelled, the existing output file is left untouched, and esptool progress no longer shows terminal control codes.
 - **Settings and dashboards survive a crash mid-save.** They are now saved whole or not at all, as catalogues and the window layout are, so a crash or power cut during a save leaves the previous version in place rather than a truncated file.
@@ -38,6 +40,7 @@ All notable changes to WireTAP will be documented in this file.
 - **Switching a live serial line to Modbus RTU uses the device's RTU settings.** Its unit address, CRC check and vendor function codes now apply, as they do when the device is opened with RTU framing; the switch had used the stock settings.
 - **Frame search matches `_` and `%` literally.** They had matched any character.
 - **A batch of CSV files is named without a split number.** `run_01.csv` and `run_02.csv` now import as "run (2 files)" rather than "run_0 (2 files)".
+- **A batch of CSV files counts a short sequence wrap between files.** A sequence number that steps back from one file to the next is now reported as a wrap however small the step; a step of less than half the range had been read as no gap.
 - **Backend playback at unlimited speed reports its final position.** A stream ending part-way through a batch had stopped short of its last frame.
 - **A serial line keeps its RTU settings after its bus mappings change.** Editing a source's mappings, or removing another source, had left a later live switch to Modbus RTU on the stock settings.
 - **A seek during capture playback is never dropped.** One arriving while the previous seek was being handled could be lost.

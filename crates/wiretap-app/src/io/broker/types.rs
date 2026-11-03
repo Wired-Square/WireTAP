@@ -69,3 +69,6 @@ pub(super) type TransmitChannels = Arc<Mutex<HashMap<String, TransmitSender>>>;
 
 /// Shared control channels by profile id, for live framing changes (serial only)
 pub(super) type ControlChannels = Arc<Mutex<HashMap<String, ControlSender>>>;
+
+/// Shared virtual reader command channels by profile id, for hot bus add/remove
+pub(super) type VirtualCmdChannels = Arc<Mutex<HashMap<String, super::VirtualCmdTx>>>;
