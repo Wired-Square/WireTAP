@@ -28,6 +28,7 @@ All notable changes to WireTAP will be documented in this file.
 - **A capture's count no longer runs ahead of what it holds.** Frames are counted once they are saved, a save refused while the database is busy is retried, and one that still fails is shown as the session's error instead of being dropped quietly. Clearing a large capture no longer shows its old frames while they are removed, and a copy appears only once it is complete.
 - **A capture reopened after a restart honours a frame selection.** Its live tail had shown every frame id whatever was selected, and its distinct-id count read 0.
 - **Frames played from a WireTAP backend keep their direction.** The archive records whether each frame was received or sent, and playback now carries it.
+- **A capture reversed after a pause reports the right frame.** Pausing a paced playback and then changing its direction had numbered every frame after it one off, so the reported frame and its time disagreed until the next seek.
 - **Session Manager's Remove evicts the subscriber again, and a detached window's subscription is paused and resumed.** Both had failed with a missing-command error since the workspace reorganisation.
 - **A byte capture opened from the picker can be framed in Discovery.** Its Raw Bytes tab, the Framing button and Serial Framing Analysis are available again, and the session reports the capture as serial rather than CAN.
 - **Exporting a framed byte capture counts its messages.** The export dialog had offered the capture's byte count as its number of frames.
