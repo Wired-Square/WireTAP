@@ -22,8 +22,8 @@ use crate::apiclient::{frame_tag, gateway};
 use crate::capture_store::{self, CaptureKind, SessionAppender};
 use crate::io::{
     emit_capture_changed, emit_session_error, emit_stream_ended, signal_frames_ready,
-    FrameMessage, IOCapabilities, IOSource, IOState, PlaybackPosition, Protocol, SignalThrottle,
-    StreamEndReason,
+    signal_playback_position, FrameMessage, IOCapabilities, IOSource, IOState, PlaybackPosition,
+    Protocol, SignalThrottle, StreamEndReason,
 };
 
 /// Connection details for a backend-API source.
@@ -340,9 +340,10 @@ async fn run_api_stream(
 
     let rest = pacer.take_batch();
     let flush = !rest.is_empty();
-    if let Some(last) = rest.last() {
-        out.throttle.flush();
-        out.position(last.timestamp_us as i64, pacer.stats().emitted);
+    out.throttle.flush();
+    match rest.last() {
+        Some(last) => out.position(last.timestamp_us as i64, pacer.stats().emitted),
+        None => signal_playback_position(&session_id),
     }
     out.appender.append(rest);
     out.appender.finish().await;
@@ -482,6 +483,29 @@ mod tests {
         assert_eq!(
             (position.timestamp_us, position.frame_index, position.frame_count),
             (1_000 + 59 * 10, 59, Some(60))
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn a_stream_ending_on_a_full_batch_still_signals_its_last_position() {
+        use crate::ws::protocol::{decode_playback_position, MsgType};
+        use crate::ws::server::outbox;
+        const SESSION: &str = "f_backend_full_batch";
+        const CHANNEL: u8 = 210;
+        outbox::subscribe(SESSION, CHANNEL);
+        let pages = vec![
+            (rows(0..40, 10), Some("p2")),
+            (rows(40..80, 10), Some("p3")),
+            (rows(80..100, 10), None),
+        ];
+        stream(SESSION, pages, 0.0).await;
+
+        let sent = outbox::sent(CHANNEL, MsgType::PlaybackPosition);
+        let (_, last) = sent.last().expect("a position was signalled");
+        let last = decode_playback_position(last).unwrap();
+        assert_eq!(
+            (last.timestamp_us, last.frame_index, last.frame_count),
+            (1_000 + 99 * 10, 99, 100)
         );
     }
 

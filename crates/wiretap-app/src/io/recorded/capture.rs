@@ -651,21 +651,20 @@ async fn run_capture_stream(
     let rest = pacer.take_batch();
     if !rest.is_empty() {
         out.frames(rest);
-        out.throttle.flush();
+    }
+    out.throttle.flush();
 
-        // Emit final position so frontend highlights the last frame.
-        // Forward: frame_index is one-past-end (post-increment), subtract 1.
-        // Reverse: frame_index IS the last consumed position (pre-decrement), use directly.
-        if let Some(last_time) = pacer.last_frame_secs() {
-            let is_reverse = control.is_reverse();
-            let final_index = if is_reverse { frame_index } else { frame_index.saturating_sub(1) };
-            // throttle already flushed above; always signal final position
-            publish_position_now(&session_id, PlaybackPosition {
-                timestamp_us: (last_time * 1_000_000.0) as i64,
-                frame_index: final_index,
-                frame_count: Some(total_frames),
-            });
-        }
+    // Emit final position so frontend highlights the last frame.
+    // Forward: frame_index is one-past-end (post-increment), subtract 1.
+    // Reverse: frame_index IS the last consumed position (pre-decrement), use directly.
+    if let Some(last_time) = pacer.last_frame_secs() {
+        let is_reverse = control.is_reverse();
+        let final_index = if is_reverse { frame_index } else { frame_index.saturating_sub(1) };
+        publish_position_now(&session_id, PlaybackPosition {
+            timestamp_us: (last_time * 1_000_000.0) as i64,
+            frame_index: final_index,
+            frame_count: Some(total_frames),
+        });
     }
 
     // If cancelled, exit the outer loop entirely
@@ -956,6 +955,29 @@ mod tests {
         }
         seeker.join().unwrap();
         assert_eq!(lost, 0, "seeks lost in {ROUNDS} rounds");
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn playback_ending_on_a_full_batch_still_signals_its_last_position() {
+        use crate::ws::protocol::{decode_playback_position, MsgType};
+        use crate::ws::server::outbox;
+        const SESSION: &str = "f_play_full_batch";
+        const CHANNEL: u8 = 211;
+        outbox::subscribe(SESSION, CHANNEL);
+        let frames: Vec<(u64, u32)> = (0..2000).map(|i| (10 + i * 10, 0x100)).collect();
+        open_playback(SESSION, &frames, 0.0).await;
+        let ended = settles_at(SESSION, IOState::Paused, (1999, 20_000)).await;
+        crate::io::destroy_session(SESSION, false).await.ok();
+
+        let sent = outbox::sent(CHANNEL, MsgType::PlaybackPosition);
+        let last = sent
+            .last()
+            .map(|(_, p)| decode_playback_position(p).unwrap());
+        assert_eq!(ended, Ok(()));
+        assert_eq!(
+            last.map(|p| (p.frame_index, p.timestamp_us)),
+            Some((1999, 20_000))
+        );
     }
 
     #[tokio::test(flavor = "multi_thread")]
