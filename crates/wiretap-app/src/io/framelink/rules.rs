@@ -3,13 +3,14 @@
 // FrameLink rule operations dispatched via WS commands.
 // All operations route through the shared connection pool (one TCP connection per device).
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use super::shared::{get_device_id, IntoStringErr};
 
+use wslib_framelink::FrameLinkSession;
 use wslib_framelink_protocol::bridge::{self, BridgeInfo};
 use wslib_framelink_protocol::dsig;
 use wslib_framelink_protocol::frame_def::{self, FrameDefInfo};
@@ -23,7 +24,7 @@ use wslib_framelink_board::{
     INDICATOR_XFORM_ID_BASE,
 };
 use wslib_framelink_board::display::{resolve_frame_def_display, resolve_iface_display, resolve_signal_name};
-use wslib_framelink_board::editable::{EditableBoardDef, EditableSignal};
+use wslib_framelink_board::editable::{ActiveRuleIds, EditableBoardDef, EditableSignal};
 
 use super::shared;
 
@@ -42,6 +43,8 @@ pub struct FrameDefDescriptor {
     pub can_id: Option<u32>,
     pub dlc: Option<u8>,
     pub extended: Option<bool>,
+    pub can_flags: Option<u8>,
+    pub framing_mode: Option<u8>,
     pub signals: Vec<SignalDefDescriptor>,
 }
 
@@ -54,6 +57,7 @@ pub struct SignalDefDescriptor {
     pub bit_length: u16,
     pub byte_order: u8,
     pub value_type: u8,
+    pub quantity: u8,
     pub scale: f32,
     pub offset: f32,
 }
@@ -165,11 +169,10 @@ fn frame_def_to_descriptor(
     board_def: Option<&BoardDef>,
     editable: Option<&EditableBoardDef>,
 ) -> FrameDefDescriptor {
-    let (can_id, dlc, extended) = match &info.header {
-        frame_def::FrameHeader::Can { can_id, dlc, flags } => {
-            (Some(*can_id), Some(*dlc), Some(*flags & frame_def::CAN_FLAG_EXTENDED != 0))
-        }
-        _ => (None, None, None),
+    let (can_id, dlc, can_flags, framing_mode) = match &info.header {
+        frame_def::FrameHeader::Can { can_id, dlc, flags } => (Some(*can_id), Some(*dlc), Some(*flags), None),
+        frame_def::FrameHeader::Rs485 { framing_mode } => (None, None, None, Some(*framing_mode)),
+        _ => (None, None, None, None),
     };
 
     let (name, description) = if let Some(ed) = editable {
@@ -189,7 +192,9 @@ fn frame_def_to_descriptor(
         interface_type_name: interface_name(info.interface_type).to_string(),
         can_id,
         dlc,
-        extended,
+        extended: can_flags.map(|f| f & frame_def::CAN_FLAG_EXTENDED != 0),
+        can_flags,
+        framing_mode,
         signals: info
             .signals
             .iter()
@@ -202,6 +207,7 @@ fn frame_def_to_descriptor(
                 bit_length: s.bit_length,
                 byte_order: s.byte_order,
                 value_type: s.value_type,
+                quantity: s.quantity,
                 scale: s.scale,
                 offset: s.offset,
             })
@@ -344,10 +350,10 @@ fn check_signal_type(bit_length: u16, value_type: u8) -> Result<(), String> {
     match value_type {
         VALUE_TYPE_BOOL if bit_length != 1 => Err("Bool requires exactly 1 bit".into()),
         VALUE_TYPE_FLOAT if bit_length != 32 => Err("Float requires exactly 32 bits".into()),
-        VALUE_TYPE_ARRAY if !bit_length.is_multiple_of(8) => Err("Array requires a multiple of 8 bits".into()),
-        VALUE_TYPE_UNSIGNED | VALUE_TYPE_SIGNED if bit_length > 64 => {
-            Err("Maximum 64 bits for integer signals".into())
+        VALUE_TYPE_UNSIGNED..=VALUE_TYPE_ARRAY if !(1..=SIGNAL_MAX_BITS).contains(&bit_length) => {
+            Err(format!("A signal is 1 to {SIGNAL_MAX_BITS} bits"))
         }
+        VALUE_TYPE_ARRAY if !bit_length.is_multiple_of(8) => Err("Array requires a multiple of 8 bits".into()),
         VALUE_TYPE_UNSIGNED..=VALUE_TYPE_ARRAY => Ok(()),
         unknown => Err(format!("Unknown value type {unknown}")),
     }
@@ -363,12 +369,11 @@ fn parse_frame_def_info(v: &Value) -> Result<FrameDefInfo, String> {
     } else {
         let can_id = v["can_id"].as_u64().ok_or("Missing can_id")? as u32;
         let dlc = v["dlc"].as_u64().ok_or("Missing dlc")? as u8;
-        let extended = v["extended"].as_bool().unwrap_or(false);
-        frame_def::FrameHeader::Can {
-            can_id,
-            dlc,
-            flags: if extended { frame_def::CAN_FLAG_EXTENDED } else { 0 },
+        let mut flags = v["can_flags"].as_u64().unwrap_or(0) as u8;
+        if let Some(extended) = v["extended"].as_bool() {
+            flags = if extended { flags | frame_def::CAN_FLAG_EXTENDED } else { flags & !frame_def::CAN_FLAG_EXTENDED };
         }
+        frame_def::FrameHeader::Can { can_id, dlc, flags }
     };
 
     let signals: Vec<frame_def::FrameSignalDef> = v["signals"]
@@ -382,6 +387,7 @@ fn parse_frame_def_info(v: &Value) -> Result<FrameDefInfo, String> {
                         bit_length: s["bit_length"].as_u64()? as u16,
                         byte_order: s["byte_order"].as_u64().unwrap_or(0) as u8,
                         value_type: s["value_type"].as_u64().unwrap_or(0) as u8,
+                        quantity: s["quantity"].as_u64().map_or(QTY_RAW, |q| q as u8),
                         scale: s["scale"].as_f64().unwrap_or(1.0) as f32,
                         offset: s["offset"].as_f64().unwrap_or(0.0) as f32,
                     })
@@ -619,58 +625,28 @@ async fn cmd_frame_def_list(params: Value) -> Result<Value, String> {
     serde_json::to_value(&descriptors).map_err(|e| e.to_string())
 }
 
+fn signal_names(frame_def: &Value) -> HashMap<u16, String> {
+    frame_def["signals"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|s| Some((s["signal_id"].as_u64()? as u16, s["name"].as_str()?.to_string())))
+        .collect()
+}
+
 async fn cmd_frame_def_add(params: Value) -> Result<Value, String> {
     let device_id = get_device_id(&params)?;
     let timeout = get_timeout(&params);
     let conn = shared::get_connection(&device_id, timeout).await?;
     let fd = &params["frame_def"];
     let info = parse_frame_def_info(fd)?;
-    let payload = frame_def::build_frame_def_add(&info);
+    let payload = frame_def::build_frame_def_add(&info).str_err()?;
     conn.session.request(MSG_FRAME_DEF_ADD, FLAG_ACK_REQ, &payload).await.str_err()?;
 
-    // Sync signal display names from the UI into the EditableBoardDef.
-    // The protocol doesn't carry signal names — they're TOML-only metadata.
-    let signal_names: Vec<(u16, String)> = fd["signals"]
-        .as_array()
-        .map(|arr| {
-            arr.iter()
-                .filter_map(|s| {
-                    let id = s["signal_id"].as_u64()? as u16;
-                    let name = s["name"].as_str()?.to_string();
-                    Some((id, name))
-                })
-                .collect()
-        })
-        .unwrap_or_default();
-
-    if !signal_names.is_empty() {
-        use wslib_framelink_board::editable::EditableFrameSignal;
-
-        let frame_def_id = info.frame_def_id;
-        let signals_from_ui: Vec<EditableFrameSignal> = info.signals.iter().zip(signal_names.iter())
-            .map(|(proto_sig, (_sig_id, name))| {
-                let byte_order = if proto_sig.byte_order == 0 { "le" } else { "be" };
-                EditableFrameSignal {
-                    slug: format!("0x{:04X}", proto_sig.signal_id),
-                    name: name.clone(),
-                    start_bit: proto_sig.start_bit,
-                    bit_length: proto_sig.bit_length,
-                    byte_order: byte_order.to_string(),
-                    value_type: frame_def::value_type_name(proto_sig.value_type).to_string(),
-                    scale: proto_sig.scale,
-                    offset: proto_sig.offset,
-                    unit: String::new(),
-                }
-            })
-            .collect();
-
-        let _ = shared::with_editable_board_def(&device_id, timeout, |ed| {
-            if let Some(fd_entry) = ed.frame_defs.get_mut(&frame_def_id) {
-                fd_entry.signals = signals_from_ui;
-            }
-        })
-        .await;
-    }
+    let names = signal_names(fd);
+    shared::with_editable_board_def(&device_id, timeout, |ed| ed.put_frame_def(&info, &names))
+        .await
+        .map_err(board_not_updated)?;
 
     Ok(Value::Null)
 }
@@ -684,6 +660,12 @@ async fn cmd_frame_def_remove(params: Value) -> Result<Value, String> {
         .ok_or("Missing 'frame_def_id'")? as u16;
     let payload = frame_def::build_frame_def_remove(frame_def_id);
     conn.session.request(MSG_FRAME_DEF_REMOVE, FLAG_ACK_REQ, &payload).await.str_err()?;
+    shared::with_editable_board_def(&device_id, timeout, |ed| {
+        ed.frame_defs.remove(&frame_def_id);
+        ed.remove_pending_frame_def(frame_def_id);
+    })
+    .await
+    .map_err(board_not_updated)?;
     Ok(Value::Null)
 }
 
@@ -790,6 +772,12 @@ async fn cmd_xform_remove(params: Value) -> Result<Value, String> {
         .ok_or("Missing 'transformer_id'")? as u16;
     let payload = xform::build_xform_remove(transformer_id);
     conn.session.request(MSG_XFORM_REMOVE, FLAG_ACK_REQ, &payload).await.str_err()?;
+    shared::with_editable_board_def(&device_id, timeout, |ed| {
+        ed.transformers.remove(&transformer_id);
+        ed.remove_pending_transformer(transformer_id);
+    })
+    .await
+    .map_err(board_not_updated)?;
     Ok(Value::Null)
 }
 
@@ -851,6 +839,12 @@ async fn cmd_gen_remove(params: Value) -> Result<Value, String> {
         .ok_or("Missing 'generator_id'")? as u16;
     let payload = generator::build_gen_remove(generator_id);
     conn.session.request(MSG_GEN_REMOVE, FLAG_ACK_REQ, &payload).await.str_err()?;
+    shared::with_editable_board_def(&device_id, timeout, |ed| {
+        ed.generators.remove(&generator_id);
+        ed.remove_pending_generator(generator_id);
+    })
+    .await
+    .map_err(board_not_updated)?;
     Ok(Value::Null)
 }
 
@@ -873,6 +867,28 @@ async fn cmd_gen_enable(params: Value) -> Result<Value, String> {
 // Persistence operations
 // ============================================================================
 
+async fn device_rules(session: &FrameLinkSession) -> Result<(Vec<FrameDefInfo>, ActiveRuleIds), String> {
+    let frame_defs = session.list_frame_defs().await.str_err()?;
+    let active = ActiveRuleIds {
+        frame_defs: frame_defs.iter().map(|f| f.frame_def_id).collect(),
+        generators: session.list_generators().await.str_err()?.iter().map(|g| g.generator_id).collect(),
+        transformers: session.list_transformers().await.str_err()?.iter().map(|t| t.transformer_id).collect(),
+    };
+    Ok((frame_defs, active))
+}
+
+fn match_device(ed: &mut EditableBoardDef, frame_defs: &[FrameDefInfo], active: &ActiveRuleIds) {
+    ed.merge_pending(active);
+    ed.retain_active(active);
+    for def in frame_defs {
+        ed.put_frame_def(def, &HashMap::new());
+    }
+}
+
+fn board_not_updated(e: String) -> String {
+    format!("the device took the change, but its board description was not updated: {e}")
+}
+
 async fn cmd_persist_save(params: Value) -> Result<Value, String> {
     let device_id = get_device_id(&params)?;
     let timeout = get_timeout(&params);
@@ -883,14 +899,14 @@ async fn cmd_persist_save(params: Value) -> Result<Value, String> {
     conn.session.request(MSG_PERSIST_SAVE, FLAG_ACK_REQ, &payload).await.str_err()?;
 
     // Step 2: Collect active rule IDs from the device
-    let active = conn.session.collect_active_rule_ids().await.str_err()?;
+    let (frame_defs, active) = device_rules(&conn.session).await?;
 
     // Step 3: Build merged TOML from a cloned EditableBoardDef
     let merged_toml = {
         let editable = shared::clone_editable_board_def(&device_id).await;
         match editable {
             Some(mut ed) => {
-                ed.merge_pending(&active);
+                match_device(&mut ed, &frame_defs, &active);
                 Some(ed.to_toml())
             }
             None => None,
@@ -906,10 +922,9 @@ async fn cmd_persist_save(params: Value) -> Result<Value, String> {
     }
 
     // Step 5: Merge pending on the real EditableBoardDef (clearing pending state)
-    let _ = shared::with_editable_board_def(&device_id, timeout, |ed| {
-        ed.merge_pending(&active);
-    })
-    .await;
+    shared::with_editable_board_def(&device_id, timeout, |ed| match_device(ed, &frame_defs, &active))
+        .await
+        .map_err(board_not_updated)?;
 
     Ok(Value::Null)
 }
@@ -921,6 +936,11 @@ async fn cmd_persist_load(params: Value) -> Result<Value, String> {
     let conn = shared::get_connection(&device_id, timeout).await?;
     let payload = persist::build_persist_load();
     conn.session.request(MSG_PERSIST_LOAD, FLAG_ACK_REQ, &payload).await.str_err()?;
+    shared::reload_editable_board_def(&device_id, timeout).await.map_err(board_not_updated)?;
+    let (frame_defs, active) = device_rules(&conn.session).await.map_err(board_not_updated)?;
+    shared::with_editable_board_def(&device_id, timeout, |ed| match_device(ed, &frame_defs, &active))
+        .await
+        .map_err(board_not_updated)?;
     Ok(Value::Null)
 }
 
@@ -966,9 +986,7 @@ async fn cmd_user_signal_add(params: Value) -> Result<Value, String> {
         })
         .unwrap_or_default();
 
-    // Best-effort: the signal is already created on-device. A missing board def
-    // must not fail the add — a retry would duplicate the signal.
-    let _ = shared::with_editable_board_def(&device_id, timeout, |ed| {
+    shared::with_editable_board_def(&device_id, timeout, |ed| {
         ed.user_signals.insert(signal_id, EditableSignal {
             name,
             description: String::new(),
@@ -979,7 +997,8 @@ async fn cmd_user_signal_add(params: Value) -> Result<Value, String> {
         });
         ed.dirty = true;
     })
-    .await;
+    .await
+    .map_err(board_not_updated)?;
 
     Ok(Value::Null)
 }
@@ -995,12 +1014,13 @@ async fn cmd_user_signal_remove(params: Value) -> Result<Value, String> {
     let payload = dsig::build_user_signal_remove(signal_id);
     conn.session.request(MSG_USER_SIGNAL_REMOVE, FLAG_ACK_REQ, &payload).await.str_err()?;
 
-    let _ = shared::with_editable_board_def(&device_id, timeout, |ed| {
+    shared::with_editable_board_def(&device_id, timeout, |ed| {
         if ed.user_signals.remove(&signal_id).is_some() {
             ed.dirty = true;
         }
     })
-    .await;
+    .await
+    .map_err(board_not_updated)?;
 
     Ok(Value::Null)
 }
@@ -1333,7 +1353,8 @@ async fn cmd_label_set(params: Value) -> Result<Value, String> {
         }
         Ok(())
     })
-    .await??;
+    .await?
+    .ok_or("No board definition available for this device")??;
 
     Ok(Value::Null)
 }
@@ -1354,7 +1375,8 @@ async fn cmd_label_remove(params: Value) -> Result<Value, String> {
         }
         Ok(())
     })
-    .await??;
+    .await?
+    .ok_or("No board definition available for this device")??;
 
     Ok(Value::Null)
 }
@@ -1498,5 +1520,135 @@ mod tests {
             "signals": [{ "signal_id": 2, "start_bit": 0, "bit_length": 8, "value_type": 2 }],
         });
         assert_eq!(parse_frame_def_info(&def).unwrap_err(), "Signal 0x0002: Float requires exactly 32 bits");
+    }
+
+    #[test]
+    fn a_signal_sent_without_a_quantity_is_raw() {
+        let def = serde_json::json!({
+            "frame_def_id": 1, "interface_type": 1, "can_id": 0x100, "dlc": 8,
+            "signals": [{ "signal_id": 2, "start_bit": 0, "bit_length": 8 }],
+        });
+        assert_eq!(parse_frame_def_info(&def).unwrap().signals[0].quantity, QTY_RAW);
+    }
+
+    #[test]
+    fn a_listed_definition_sent_back_keeps_its_quantity() {
+        let listed = FrameDefInfo {
+            frame_def_id: 1,
+            interface_type: frame_def::IFACE_TYPE_CAN,
+            header: frame_def::FrameHeader::Can { can_id: 0x100, dlc: 8, flags: 0 },
+            signals: vec![frame_def::FrameSignalDef {
+                signal_id: 2,
+                start_bit: 0,
+                bit_length: 32,
+                byte_order: 0,
+                value_type: frame_def::VALUE_TYPE_UNSIGNED,
+                quantity: QTY_DATARATE,
+                scale: 1.0,
+                offset: 0.0,
+            }],
+        };
+        let descriptor = serde_json::to_value(frame_def_to_descriptor(&listed, None, None)).unwrap();
+        let resent = parse_frame_def_info(&descriptor).unwrap();
+        assert_eq!(resent.signals[0].quantity, QTY_DATARATE);
+        frame_def::build_frame_def_add(&resent).unwrap();
+    }
+
+    #[test]
+    fn a_new_definition_reaches_the_board_with_its_names_and_quantities() {
+        let def = serde_json::json!({
+            "frame_def_id": 7, "interface_type": 1, "can_id": 0x100, "dlc": 8,
+            "signals": [
+                { "signal_id": 1, "start_bit": 0, "bit_length": 32, "quantity": QTY_DATARATE, "name": "Bitrate" },
+                { "signal_id": 2, "start_bit": 32, "bit_length": 8 },
+            ],
+        });
+        let mut ed = EditableBoardDef::new_empty();
+        ed.put_frame_def(&parse_frame_def_info(&def).unwrap(), &signal_names(&def));
+        let signals = &ed.frame_defs[&7].signals;
+        assert_eq!(signals[0].name, "Bitrate");
+        assert_eq!(signals[0].quantity, QTY_DATARATE);
+        assert_eq!(signals[1].quantity, QTY_RAW);
+        assert!(ed.frame_defs[&7].can.is_some());
+    }
+
+    fn can_def(id: u16, signals: serde_json::Value) -> serde_json::Value {
+        serde_json::json!({
+            "frame_def_id": id, "interface_type": 1, "can_id": 0x100 + u32::from(id), "dlc": 8,
+            "signals": signals,
+        })
+    }
+
+    fn active(frame_defs: &[u16]) -> ActiveRuleIds {
+        ActiveRuleIds {
+            frame_defs: frame_defs.iter().copied().collect(),
+            generators: Default::default(),
+            transformers: Default::default(),
+        }
+    }
+
+    #[test]
+    fn a_board_matched_to_the_device_holds_only_its_rules_and_keeps_their_labels() {
+        let mut ed = EditableBoardDef::new_empty();
+        for id in [1, 2] {
+            let def = can_def(id, serde_json::json!([{ "signal_id": id, "start_bit": 0, "bit_length": 8, "name": "Kept" }]));
+            ed.put_frame_def(&parse_frame_def_info(&def).unwrap(), &signal_names(&def));
+        }
+        ed.set_pending_frame_def(1, Some("Engine".into()), None);
+        let device = parse_frame_def_info(&can_def(1, serde_json::json!([{ "signal_id": 1, "start_bit": 0, "bit_length": 8 }]))).unwrap();
+        match_device(&mut ed, &[device], &active(&[1]));
+        assert_eq!(ed.frame_defs.keys().copied().collect::<Vec<_>>(), [1]);
+        assert_eq!(ed.frame_defs[&1].name, "Engine");
+        assert_eq!(ed.frame_defs[&1].signals[0].name, "Kept");
+    }
+
+    #[test]
+    fn a_board_matched_to_reverted_rules_drops_the_unsaved_signals() {
+        let edited = can_def(1, serde_json::json!([
+            { "signal_id": 1, "start_bit": 0, "bit_length": 8, "name": "A" },
+            { "signal_id": 2, "start_bit": 8, "bit_length": 8, "name": "B" },
+            { "signal_id": 3, "start_bit": 16, "bit_length": 8, "name": "C" },
+        ]));
+        let mut ed = EditableBoardDef::new_empty();
+        ed.put_frame_def(&parse_frame_def_info(&edited).unwrap(), &signal_names(&edited));
+        let persisted = parse_frame_def_info(&can_def(1, serde_json::json!([
+            { "signal_id": 1, "start_bit": 0, "bit_length": 8 },
+            { "signal_id": 2, "start_bit": 8, "bit_length": 8 },
+        ]))).unwrap();
+        match_device(&mut ed, &[persisted], &active(&[1]));
+        let names: Vec<&str> = ed.frame_defs[&1].signals.iter().map(|s| s.name.as_str()).collect();
+        assert_eq!(names, ["A", "B"]);
+    }
+
+    const CHUNK_FRAMING: u8 = 2;
+
+    #[test]
+    fn an_edited_definition_keeps_every_can_flag_and_its_framing_mode() {
+        let flags = frame_def::CAN_FLAG_EXTENDED | frame_def::CAN_FLAG_MATCH_ANY;
+        let can = FrameDefInfo {
+            frame_def_id: 1,
+            interface_type: frame_def::IFACE_TYPE_CAN,
+            header: frame_def::FrameHeader::Can { can_id: 0x100, dlc: 8, flags },
+            signals: vec![],
+        };
+        let resent = parse_frame_def_info(&serde_json::to_value(frame_def_to_descriptor(&can, None, None)).unwrap()).unwrap();
+        assert!(matches!(resent.header, frame_def::FrameHeader::Can { flags: f, .. } if f == flags));
+
+        let serial = FrameDefInfo {
+            frame_def_id: 2,
+            interface_type: IFACE_RS485,
+            header: frame_def::FrameHeader::Rs485 { framing_mode: CHUNK_FRAMING },
+            signals: vec![],
+        };
+        let resent = parse_frame_def_info(&serde_json::to_value(frame_def_to_descriptor(&serial, None, None)).unwrap()).unwrap();
+        assert!(matches!(resent.header, frame_def::FrameHeader::Rs485 { framing_mode } if framing_mode == CHUNK_FRAMING));
+    }
+
+    #[test]
+    fn a_new_definition_sets_extended_from_its_checkbox() {
+        let mut def = can_def(1, serde_json::json!([]));
+        def["extended"] = serde_json::json!(true);
+        let info = parse_frame_def_info(&def).unwrap();
+        assert!(matches!(info.header, frame_def::FrameHeader::Can { flags, .. } if flags == frame_def::CAN_FLAG_EXTENDED));
     }
 }

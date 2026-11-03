@@ -64,7 +64,7 @@ export default function FrameDefDialog({
       if (isNaN(canIdNum)) return;
     }
     const header: FrameHeader = isCan
-      ? { type: "can", canId: parseInt(canId, 16) || 0, dlc, extended }
+      ? { type: "can", canId: parseInt(canId, 16) || 0, dlc, extended, flags: 0 }
       : { type: "serial", framingMode: 0 };
     onSubmit({
       frameDefId,

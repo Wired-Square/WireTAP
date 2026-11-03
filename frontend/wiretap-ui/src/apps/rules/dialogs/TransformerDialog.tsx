@@ -29,7 +29,7 @@ interface MappingRow {
 interface TransformerDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (transformer: Record<string, unknown> & { name?: string; description?: string }) => void;
+  onSubmit: (transformer: Record<string, unknown> & { name?: string; description?: string }) => Promise<boolean>;
   interfaces: { index: number; iface_type: number; name: string }[];
   frameDefs: FrameDefDescriptor[];
   usedIds: Set<number>;
@@ -96,13 +96,13 @@ export default function TransformerDialog({
     [],
   );
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (usedIds.has(transformerId)) {
       setValidationError(t("transformerDialog.errors.idInUse", { id: formatHexId(transformerId) }));
       return;
     }
     setValidationError(null);
-    onSubmit({
+    const added = await onSubmit({
       transformer_id: transformerId,
       source_frame_def_id: sourceFrameDefId,
       source_interface: sourceInterface,
@@ -119,7 +119,7 @@ export default function TransformerDialog({
       name: name || undefined,
       description: description || undefined,
     });
-    onClose();
+    if (added) onClose();
   };
 
   return (

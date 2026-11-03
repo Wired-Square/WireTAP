@@ -425,6 +425,7 @@ mod tests {
         };
 
         for (name, expected) in [
+            ("QTY_RAW", types::QTY_RAW),
             ("QTY_BOOL", types::QTY_BOOL),
             ("QTY_ENUM", types::QTY_ENUM),
             ("QTY_DATARATE", types::QTY_DATARATE),

@@ -47,15 +47,12 @@ export default function TransformersView() {
 
   const handleAdd = useCallback(
     async (transformer: Record<string, unknown> & { name?: string; description?: string }) => {
-      try {
-        const { name, description, ...payload } = transformer;
-        await addTransformer(payload);
-        if (name || description) {
-          await setLabel("transformer", payload.transformer_id as number, name || null, description || null);
-        }
-      } catch {
-        // Error handled by store
+      const { name, description, ...payload } = transformer;
+      const added = await addTransformer(payload);
+      if (added && (name || description)) {
+        await setLabel("transformer", payload.transformer_id as number, name || null, description || null);
       }
+      return added;
     },
     [addTransformer, setLabel],
   );

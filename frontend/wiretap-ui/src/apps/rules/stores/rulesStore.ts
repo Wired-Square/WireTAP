@@ -109,25 +109,25 @@ interface RulesActions {
   disconnectDevice: () => void;
   setActiveTab: (tab: RulesTab) => void;
   refreshTab: (tab?: RulesTab) => Promise<void>;
-  addFrameDef: (frameDef: Record<string, unknown>) => Promise<void>;
-  removeFrameDef: (frameDefId: number) => Promise<void>;
-  addBridge: (bridge: Record<string, unknown>) => Promise<void>;
-  removeBridge: (bridgeId: number) => Promise<void>;
-  enableBridge: (bridgeId: number, enabled: boolean) => Promise<void>;
-  addTransformer: (transformer: Record<string, unknown>) => Promise<void>;
-  removeTransformer: (transformerId: number) => Promise<void>;
-  enableTransformer: (transformerId: number, enabled: boolean) => Promise<void>;
-  addGenerator: (generator: Record<string, unknown>) => Promise<void>;
-  removeGenerator: (generatorId: number) => Promise<void>;
-  enableGenerator: (generatorId: number, enabled: boolean) => Promise<void>;
-  persistSave: () => Promise<void>;
-  persistLoad: () => Promise<void>;
-  persistClear: () => Promise<void>;
+  addFrameDef: (frameDef: Record<string, unknown>) => Promise<boolean>;
+  removeFrameDef: (frameDefId: number) => Promise<boolean>;
+  addBridge: (bridge: Record<string, unknown>) => Promise<boolean>;
+  removeBridge: (bridgeId: number) => Promise<boolean>;
+  enableBridge: (bridgeId: number, enabled: boolean) => Promise<boolean>;
+  addTransformer: (transformer: Record<string, unknown>) => Promise<boolean>;
+  removeTransformer: (transformerId: number) => Promise<boolean>;
+  enableTransformer: (transformerId: number, enabled: boolean) => Promise<boolean>;
+  addGenerator: (generator: Record<string, unknown>) => Promise<boolean>;
+  removeGenerator: (generatorId: number) => Promise<boolean>;
+  enableGenerator: (generatorId: number, enabled: boolean) => Promise<boolean>;
+  persistSave: () => Promise<boolean>;
+  persistLoad: () => Promise<boolean>;
+  persistClear: () => Promise<boolean>;
   refreshIndicators: () => Promise<void>;
   loadSelectableSignals: () => Promise<void>;
-  addUserSignal: (signalId: number, metadata?: { name: string; group: string; format: string; unit: string; enum_values?: Record<string, string> }) => Promise<void>;
-  removeUserSignal: (signalId: number) => Promise<void>;
-  setLabel: (entityType: LabelEntityType, id: number, name: string | null, description: string | null) => Promise<void>;
+  addUserSignal: (signalId: number, metadata?: { name: string; group: string; format: string; unit: string; enum_values?: Record<string, string> }) => Promise<boolean>;
+  removeUserSignal: (signalId: number) => Promise<boolean>;
+  setLabel: (entityType: LabelEntityType, id: number, name: string | null, description: string | null) => Promise<boolean>;
   selectItem: (id: string | null) => void;
   clearError: () => void;
   setStatusBar: (entry: StatusBarEntry | null) => void;
@@ -175,6 +175,16 @@ function statusInfo(text: string): StatusBarEntry {
   return { text, type: "info", timestamp: Date.now() };
 }
 
+function liveRules(s: RulesState): Set<string> {
+  return new Set([
+    ...s.frameDefs.map((f) => `framedef:${f.frame_def_id}`),
+    ...s.bridges.map((b) => `bridge:${b.bridge_id}`),
+    ...s.transformers.map((t) => `xform:${t.transformer_id}`),
+    ...s.generators.map((g) => `gen:${g.generator_id}`),
+    ...s.selectableSignals.filter((sig) => sig.tier === "user").map((sig) => `usersig:${sig.signal_id}`),
+  ]);
+}
+
 /** Format a numeric ID as 0xNNNN for log readability. */
 function hexId(id: number): string {
   return `0x${id.toString(16).toUpperCase().padStart(4, "0")}`;
@@ -190,6 +200,17 @@ export const useRulesStore = create<RulesState & RulesActions>()((set, get) => {
     const d = get().device;
     if (!d || !d.connected) throw new Error("Not connected to device");
     return d.deviceId;
+  }
+
+  async function reported(what: string, op: () => Promise<void>): Promise<boolean> {
+    try {
+      await op();
+      return true;
+    } catch (e) {
+      const text = `${what} failed: ${e}`;
+      set({ error: text, statusBar: statusError(text) });
+      return false;
+    }
   }
 
   async function loadTab(tab: RulesTab) {
@@ -312,161 +333,163 @@ export const useRulesStore = create<RulesState & RulesActions>()((set, get) => {
       if (get().device?.connected) await loadTab(target);
     },
 
-    addFrameDef: async (frameDef) => {
-      await framelinkFrameDefAdd(deviceId(), frameDef);
-      const id = hexId(Number(frameDef.frame_def_id));
-      set((s) => {
-        const temp = new Set(s.temporaryRules);
-        temp.add(`framedef:${frameDef.frame_def_id}`);
-        return { temporaryRules: temp, statusBar: statusSuccess(`Frame def ${id} added`) };
-      });
-      await loadTab("frame-defs");
-      await get().loadSelectableSignals();
-    },
+    addFrameDef: (frameDef) =>
+      reported(`Adding frame def ${hexId(Number(frameDef.frame_def_id))}`, async () => {
+        await framelinkFrameDefAdd(deviceId(), frameDef);
+        const id = hexId(Number(frameDef.frame_def_id));
+        set((s) => {
+          const temp = new Set(s.temporaryRules);
+          temp.add(`framedef:${frameDef.frame_def_id}`);
+          return { temporaryRules: temp, statusBar: statusSuccess(`Frame def ${id} added`) };
+        });
+        await loadTab("frame-defs");
+        await get().loadSelectableSignals();
+      }),
 
-    removeFrameDef: async (frameDefId) => {
-      await framelinkFrameDefRemove(deviceId(), frameDefId);
-      const id = hexId(frameDefId);
-      set((s) => {
-        const temp = new Set(s.temporaryRules);
-        temp.delete(`framedef:${frameDefId}`);
-        return { temporaryRules: temp, statusBar: statusSuccess(`Frame def ${id} removed`) };
-      });
-      await loadTab("frame-defs");
-      await get().loadSelectableSignals();
-    },
+    removeFrameDef: (frameDefId) =>
+      reported(`Removing frame def ${hexId(frameDefId)}`, async () => {
+        await framelinkFrameDefRemove(deviceId(), frameDefId);
+        const id = hexId(frameDefId);
+        set((s) => {
+          const temp = new Set(s.temporaryRules);
+          temp.delete(`framedef:${frameDefId}`);
+          return { temporaryRules: temp, statusBar: statusSuccess(`Frame def ${id} removed`) };
+        });
+        await loadTab("frame-defs");
+        await get().loadSelectableSignals();
+      }),
 
-    addBridge: async (bridge) => {
-      await framelinkBridgeAdd(deviceId(), bridge);
-      const id = hexId(Number(bridge.bridge_id));
-      set((s) => {
-        const temp = new Set(s.temporaryRules);
-        temp.add(`bridge:${bridge.bridge_id}`);
-        return { temporaryRules: temp, statusBar: statusSuccess(`Bridge ${id} added`) };
-      });
-      await loadTab("bridges");
-    },
+    addBridge: (bridge) =>
+      reported(`Adding bridge ${hexId(Number(bridge.bridge_id))}`, async () => {
+        await framelinkBridgeAdd(deviceId(), bridge);
+        const id = hexId(Number(bridge.bridge_id));
+        set((s) => {
+          const temp = new Set(s.temporaryRules);
+          temp.add(`bridge:${bridge.bridge_id}`);
+          return { temporaryRules: temp, statusBar: statusSuccess(`Bridge ${id} added`) };
+        });
+        await loadTab("bridges");
+      }),
 
-    removeBridge: async (bridgeId) => {
-      await framelinkBridgeRemove(deviceId(), bridgeId);
-      const id = hexId(bridgeId);
-      set((s) => {
-        const temp = new Set(s.temporaryRules);
-        temp.delete(`bridge:${bridgeId}`);
-        return { temporaryRules: temp, statusBar: statusSuccess(`Bridge ${id} removed`) };
-      });
-      await loadTab("bridges");
-    },
+    removeBridge: (bridgeId) =>
+      reported(`Removing bridge ${hexId(bridgeId)}`, async () => {
+        await framelinkBridgeRemove(deviceId(), bridgeId);
+        const id = hexId(bridgeId);
+        set((s) => {
+          const temp = new Set(s.temporaryRules);
+          temp.delete(`bridge:${bridgeId}`);
+          return { temporaryRules: temp, statusBar: statusSuccess(`Bridge ${id} removed`) };
+        });
+        await loadTab("bridges");
+      }),
 
-    enableBridge: async (bridgeId, enabled) => {
-      await framelinkBridgeEnable(deviceId(), bridgeId, enabled);
-      set({
-        statusBar: statusSuccess(
-          `Bridge ${hexId(bridgeId)} ${enabled ? "enabled" : "disabled"}`,
-        ),
-      });
-      await loadTab("bridges");
-    },
+    enableBridge: (bridgeId, enabled) =>
+      reported(`${enabled ? "Enabling" : "Disabling"} bridge ${hexId(bridgeId)}`, async () => {
+        await framelinkBridgeEnable(deviceId(), bridgeId, enabled);
+        set({
+          statusBar: statusSuccess(
+            `Bridge ${hexId(bridgeId)} ${enabled ? "enabled" : "disabled"}`,
+          ),
+        });
+        await loadTab("bridges");
+      }),
 
-    addTransformer: async (transformer) => {
-      await framelinkXformAdd(deviceId(), transformer);
-      const id = hexId(Number(transformer.transformer_id));
-      set((s) => {
-        const temp = new Set(s.temporaryRules);
-        temp.add(`xform:${transformer.transformer_id}`);
-        return { temporaryRules: temp, statusBar: statusSuccess(`Transformer ${id} added`) };
-      });
-      await loadTab("transformers");
-    },
+    addTransformer: (transformer) =>
+      reported(`Adding transformer ${hexId(Number(transformer.transformer_id))}`, async () => {
+        await framelinkXformAdd(deviceId(), transformer);
+        const id = hexId(Number(transformer.transformer_id));
+        set((s) => {
+          const temp = new Set(s.temporaryRules);
+          temp.add(`xform:${transformer.transformer_id}`);
+          return { temporaryRules: temp, statusBar: statusSuccess(`Transformer ${id} added`) };
+        });
+        await loadTab("transformers");
+      }),
 
-    removeTransformer: async (transformerId) => {
-      await framelinkXformRemove(deviceId(), transformerId);
-      const id = hexId(transformerId);
-      set((s) => {
-        const temp = new Set(s.temporaryRules);
-        temp.delete(`xform:${transformerId}`);
-        return { temporaryRules: temp, statusBar: statusSuccess(`Transformer ${id} removed`) };
-      });
-      await loadTab("transformers");
-    },
+    removeTransformer: (transformerId) =>
+      reported(`Removing transformer ${hexId(transformerId)}`, async () => {
+        await framelinkXformRemove(deviceId(), transformerId);
+        const id = hexId(transformerId);
+        set((s) => {
+          const temp = new Set(s.temporaryRules);
+          temp.delete(`xform:${transformerId}`);
+          return { temporaryRules: temp, statusBar: statusSuccess(`Transformer ${id} removed`) };
+        });
+        await loadTab("transformers");
+      }),
 
-    enableTransformer: async (transformerId, enabled) => {
-      await framelinkXformEnable(deviceId(), transformerId, enabled);
-      set({
-        statusBar: statusSuccess(
-          `Transformer ${hexId(transformerId)} ${enabled ? "enabled" : "disabled"}`,
-        ),
-      });
-      await loadTab("transformers");
-    },
+    enableTransformer: (transformerId, enabled) =>
+      reported(`${enabled ? "Enabling" : "Disabling"} transformer ${hexId(transformerId)}`, async () => {
+        await framelinkXformEnable(deviceId(), transformerId, enabled);
+        set({
+          statusBar: statusSuccess(
+            `Transformer ${hexId(transformerId)} ${enabled ? "enabled" : "disabled"}`,
+          ),
+        });
+        await loadTab("transformers");
+      }),
 
-    addGenerator: async (generator) => {
-      await framelinkGenAdd(deviceId(), generator);
-      const id = hexId(Number(generator.generator_id));
-      set((s) => {
-        const temp = new Set(s.temporaryRules);
-        temp.add(`gen:${generator.generator_id}`);
-        return { temporaryRules: temp, statusBar: statusSuccess(`Generator ${id} added`) };
-      });
-      await loadTab("generators");
-    },
+    addGenerator: (generator) =>
+      reported(`Adding generator ${hexId(Number(generator.generator_id))}`, async () => {
+        await framelinkGenAdd(deviceId(), generator);
+        const id = hexId(Number(generator.generator_id));
+        set((s) => {
+          const temp = new Set(s.temporaryRules);
+          temp.add(`gen:${generator.generator_id}`);
+          return { temporaryRules: temp, statusBar: statusSuccess(`Generator ${id} added`) };
+        });
+        await loadTab("generators");
+      }),
 
-    removeGenerator: async (generatorId) => {
-      await framelinkGenRemove(deviceId(), generatorId);
-      const id = hexId(generatorId);
-      set((s) => {
-        const temp = new Set(s.temporaryRules);
-        temp.delete(`gen:${generatorId}`);
-        return { temporaryRules: temp, statusBar: statusSuccess(`Generator ${id} removed`) };
-      });
-      await loadTab("generators");
-    },
+    removeGenerator: (generatorId) =>
+      reported(`Removing generator ${hexId(generatorId)}`, async () => {
+        await framelinkGenRemove(deviceId(), generatorId);
+        const id = hexId(generatorId);
+        set((s) => {
+          const temp = new Set(s.temporaryRules);
+          temp.delete(`gen:${generatorId}`);
+          return { temporaryRules: temp, statusBar: statusSuccess(`Generator ${id} removed`) };
+        });
+        await loadTab("generators");
+      }),
 
-    enableGenerator: async (generatorId, enabled) => {
-      await framelinkGenEnable(deviceId(), generatorId, enabled);
-      set({
-        statusBar: statusSuccess(
-          `Generator ${hexId(generatorId)} ${enabled ? "enabled" : "disabled"}`,
-        ),
-      });
-      await loadTab("generators");
-    },
+    enableGenerator: (generatorId, enabled) =>
+      reported(`${enabled ? "Enabling" : "Disabling"} generator ${hexId(generatorId)}`, async () => {
+        await framelinkGenEnable(deviceId(), generatorId, enabled);
+        set({
+          statusBar: statusSuccess(
+            `Generator ${hexId(generatorId)} ${enabled ? "enabled" : "disabled"}`,
+          ),
+        });
+        await loadTab("generators");
+      }),
 
     persistSave: async () => {
       set({ statusBar: statusInfo("Saving configuration to NVS...") });
-      try {
+      return reported("Persist", async () => {
         await framelinkPersistSave(deviceId());
         set({ temporaryRules: new Set(), statusBar: statusSuccess("Configuration saved to NVS") });
-      } catch (e) {
-        set({ statusBar: statusError(`Persist failed: ${e}`) });
-        throw e;
-      }
+      });
     },
 
     persistLoad: async () => {
       set({ statusBar: statusInfo("Loading persisted configuration...") });
-      try {
+      return reported("Load", async () => {
         await framelinkPersistLoad(deviceId());
         set({ temporaryRules: new Set(), statusBar: statusSuccess("Persisted configuration loaded") });
         await loadAllTabs();
         await get().loadSelectableSignals();
-      } catch (e) {
-        set({ statusBar: statusError(`Load failed: ${e}`) });
-        throw e;
-      }
+      });
     },
 
     persistClear: async () => {
       set({ statusBar: statusInfo("Clearing persisted rules...") });
-      try {
+      return reported("Clear", async () => {
         await framelinkPersistClear(deviceId());
-        set({ temporaryRules: new Set(), statusBar: statusSuccess("Persisted rules cleared") });
         await loadAllTabs();
         await get().loadSelectableSignals();
-      } catch (e) {
-        set({ statusBar: statusError(`Clear failed: ${e}`) });
-        throw e;
-      }
+        set((s) => ({ temporaryRules: liveRules(s), statusBar: statusSuccess("Persisted rules cleared") }));
+      });
     },
 
     loadSelectableSignals: async () => {
@@ -484,43 +507,40 @@ export const useRulesStore = create<RulesState & RulesActions>()((set, get) => {
       if (get().device?.connected) await loadTab("indicators");
     },
 
-    addUserSignal: async (signalId, metadata) => {
-      await framelinkUserSignalAdd(deviceId(), signalId, metadata);
-      const id = hexId(signalId);
-      const namePart = metadata?.name ? ` (${metadata.name})` : "";
-      set((s) => {
-        const temp = new Set(s.temporaryRules);
-        temp.add(`usersig:${signalId}`);
-        return {
-          temporaryRules: temp,
-          statusBar: statusSuccess(`User signal ${id}${namePart} added`),
-        };
-      });
-      await get().loadSelectableSignals();
-    },
+    addUserSignal: (signalId, metadata) =>
+      reported(`Adding user signal ${hexId(signalId)}`, async () => {
+        await framelinkUserSignalAdd(deviceId(), signalId, metadata);
+        const id = hexId(signalId);
+        const namePart = metadata?.name ? ` (${metadata.name})` : "";
+        set((s) => {
+          const temp = new Set(s.temporaryRules);
+          temp.add(`usersig:${signalId}`);
+          return {
+            temporaryRules: temp,
+            statusBar: statusSuccess(`User signal ${id}${namePart} added`),
+          };
+        });
+        await get().loadSelectableSignals();
+      }),
 
-    removeUserSignal: async (signalId) => {
-      await framelinkUserSignalRemove(deviceId(), signalId);
-      const id = hexId(signalId);
-      set((s) => {
-        const temp = new Set(s.temporaryRules);
-        temp.delete(`usersig:${signalId}`);
-        return { temporaryRules: temp, statusBar: statusSuccess(`User signal ${id} removed`) };
-      });
-      await get().loadSelectableSignals();
-    },
+    removeUserSignal: (signalId) =>
+      reported(`Removing user signal ${hexId(signalId)}`, async () => {
+        await framelinkUserSignalRemove(deviceId(), signalId);
+        const id = hexId(signalId);
+        set((s) => {
+          const temp = new Set(s.temporaryRules);
+          temp.delete(`usersig:${signalId}`);
+          return { temporaryRules: temp, statusBar: statusSuccess(`User signal ${id} removed`) };
+        });
+        await get().loadSelectableSignals();
+      }),
 
-    setLabel: async (entityType, id, name, description) => {
-      const did = deviceId();
-      try {
-        await framelinkLabelSet(did, entityType, id, name, description);
-        // Refresh the relevant tab to pick up resolved names
+    setLabel: (entityType, id, name, description) =>
+      reported(`Setting the label of ${entityType.replace("_", " ")} ${hexId(id)}`, async () => {
+        await framelinkLabelSet(deviceId(), entityType, id, name, description);
         const tabMap = { frame_def: "frame-defs", generator: "generators", transformer: "transformers" } as const;
         await loadTab(tabMap[entityType]);
-      } catch (e) {
-        set({ error: `Failed to set label: ${e}` });
-      }
-    },
+      }),
 
     selectItem: (id) => set({ selectedItemId: id }),
     clearError: () => set({ error: null }),

@@ -8,6 +8,7 @@ import { useReducer, useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ArrowLeft } from "lucide-react";
 import type { SignalDefDescriptor } from "../../../api/framelinkRules";
+import { QTY_RAW } from "../../../api/framelinkAxes";
 import { textPrimary, textSecondary } from "../../../styles";
 import { iconMd } from "../../../styles/spacing";
 import {
@@ -75,6 +76,7 @@ function editorReducer(state: EditorState, action: EditorAction): EditorState {
         bitLength: action.bitLength,
         byteOrder: BYTE_ORDER_LE,
         valueType: VALUE_TYPE_UNSIGNED,
+        quantity: QTY_RAW,
         scale: 1.0,
         offset: 0.0,
         colour: nextSignalColour(state.signals),
@@ -126,8 +128,7 @@ interface FrameDefEditorProps {
   header: FrameHeader;
   payloadBytes: number;
   existingSignals: SignalDefDescriptor[];
-  isNew: boolean;
-  onSave: (payload: FrameDefPayload, isNew: boolean) => Promise<void>;
+  onSave: (payload: FrameDefPayload) => Promise<void>;
   onCancel: () => void;
 }
 
@@ -141,7 +142,6 @@ export default function FrameDefEditor({
   header,
   payloadBytes,
   existingSignals,
-  isNew,
   onSave,
   onCancel,
 }: FrameDefEditorProps) {
@@ -155,6 +155,7 @@ export default function FrameDefEditor({
       bitLength: sd.bit_length,
       byteOrder: sd.byte_order,
       valueType: sd.value_type,
+      quantity: sd.quantity,
       scale: sd.scale,
       offset: sd.offset,
       colour: colours[i % colours.length],
@@ -259,8 +260,8 @@ export default function FrameDefEditor({
   // --- Save handler ---
   const handleSave = useCallback(async () => {
     const payload = serialiseFrameDef(frameDefId, interfaceType, header, state.signals);
-    await onSave(payload, isNew);
-  }, [frameDefId, interfaceType, header, state.signals, onSave, isNew]);
+    await onSave(payload);
+  }, [frameDefId, interfaceType, header, state.signals, onSave]);
 
   // --- Cancel with dirty guard ---
   const handleCancel = useCallback(() => {

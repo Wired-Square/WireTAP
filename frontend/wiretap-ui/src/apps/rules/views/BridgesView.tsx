@@ -35,13 +35,10 @@ export default function BridgesView() {
 
   const handleAdd = useCallback(
     async (bridgeDefs: Record<string, unknown>[]) => {
-      try {
-        for (const b of bridgeDefs) {
-          await addBridge(b);
-        }
-      } catch {
-        // Error handled by store
+      for (const b of bridgeDefs) {
+        if (!(await addBridge(b))) return false;
       }
+      return true;
     },
     [addBridge],
   );

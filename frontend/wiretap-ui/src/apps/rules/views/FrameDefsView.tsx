@@ -39,7 +39,6 @@ export default function FrameDefsView() {
     header: FrameHeader;
     payloadBytes: number;
     signals: SignalDefDescriptor[];
-    isNew: boolean;
     pendingName?: string;
     pendingDescription?: string;
   } | null>(null);
@@ -58,7 +57,6 @@ export default function FrameDefsView() {
       setEditingFrameDef({
         ...headerInfo,
         signals: [],
-        isNew: true,
         pendingName: headerInfo.name,
         pendingDescription: headerInfo.description,
       });
@@ -70,8 +68,8 @@ export default function FrameDefsView() {
   const handleEditFrameDef = (fd: FrameDefDescriptor) => {
     const isCan = fd.can_id != null;
     const header: FrameHeader = isCan
-      ? { type: "can", canId: fd.can_id!, dlc: fd.dlc!, extended: fd.extended ?? false }
-      : { type: "serial", framingMode: 0 };
+      ? { type: "can", canId: fd.can_id!, dlc: fd.dlc!, extended: fd.extended ?? false, flags: fd.can_flags ?? 0 }
+      : { type: "serial", framingMode: fd.framing_mode ?? 0 };
     const payloadBytes = isCan
       ? fd.dlc!
       : Math.max(64, Math.ceil(
@@ -83,24 +81,19 @@ export default function FrameDefsView() {
       header,
       payloadBytes,
       signals: fd.signals,
-      isNew: false,
     });
   };
 
   const handleSave = useCallback(
-    async (payload: FrameDefPayload, isNew: boolean) => {
-      if (!isNew) {
-        await removeFrameDef(payload.frame_def_id);
-      }
-      await addFrameDef(payload as unknown as Record<string, unknown>);
-      // Apply pending label from the creation dialog
+    async (payload: FrameDefPayload) => {
+      if (!(await addFrameDef(payload as unknown as Record<string, unknown>))) return;
       const pending = editingFrameDef;
+      setEditingFrameDef(null);
       if (pending && (pending.pendingName || pending.pendingDescription)) {
         await setLabel("frame_def", payload.frame_def_id, pending.pendingName || null, pending.pendingDescription || null);
       }
-      setEditingFrameDef(null);
     },
-    [addFrameDef, removeFrameDef, editingFrameDef, setLabel],
+    [addFrameDef, editingFrameDef, setLabel],
   );
 
   if (editingFrameDef) {
@@ -112,7 +105,6 @@ export default function FrameDefsView() {
         header={editingFrameDef.header}
         payloadBytes={editingFrameDef.payloadBytes}
         existingSignals={editingFrameDef.signals}
-        isNew={editingFrameDef.isNew}
         onSave={handleSave}
         onCancel={() => setEditingFrameDef(null)}
       />

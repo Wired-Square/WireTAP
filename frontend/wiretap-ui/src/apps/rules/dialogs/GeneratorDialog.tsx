@@ -29,7 +29,7 @@ interface MappingRow {
 interface GeneratorDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (generator: Record<string, unknown> & { name?: string; description?: string }) => void;
+  onSubmit: (generator: Record<string, unknown> & { name?: string; description?: string }) => Promise<boolean>;
   interfaces: { index: number; iface_type: number; name: string }[];
   frameDefs: FrameDefDescriptor[];
   usedIds: Set<number>;
@@ -99,13 +99,13 @@ export default function GeneratorDialog({
     [],
   );
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (usedIds.has(generatorId)) {
       setValidationError(t("generatorDialog.errors.idInUse", { id: formatHexId(generatorId) }));
       return;
     }
     setValidationError(null);
-    onSubmit({
+    const added = await onSubmit({
       generator_id: generatorId,
       frame_def_id: frameDefId,
       interface_index: interfaceIndex,
@@ -122,7 +122,7 @@ export default function GeneratorDialog({
       name: name || undefined,
       description: description || undefined,
     });
-    onClose();
+    if (added) onClose();
   };
 
   return (

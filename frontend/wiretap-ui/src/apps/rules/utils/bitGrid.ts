@@ -28,13 +28,14 @@ export interface PlacedSignal {
   bitLength: number;
   byteOrder: number;
   valueType: number;
+  quantity: number;
   scale: number;
   offset: number;
   colour: string;
 }
 
 export type FrameHeader =
-  | { type: "can"; canId: number; dlc: number; extended: boolean }
+  | { type: "can"; canId: number; dlc: number; extended: boolean; flags: number }
   | { type: "serial"; framingMode: number };
 
 export function nextSignalColour(signals: PlacedSignal[]): string {
@@ -61,6 +62,7 @@ export interface FrameDefPayload {
   can_id?: number;
   dlc?: number;
   extended?: boolean;
+  can_flags?: number;
   framing_mode?: number;
   signals: {
     signal_id: number;
@@ -68,6 +70,7 @@ export interface FrameDefPayload {
     bit_length: number;
     byte_order: number;
     value_type: number;
+    quantity: number;
     scale: number;
     offset: number;
   }[];
@@ -89,6 +92,7 @@ export function serialiseFrameDef(
       bit_length: s.bitLength,
       byte_order: s.byteOrder,
       value_type: s.valueType,
+      quantity: s.quantity,
       scale: s.scale,
       offset: s.offset,
     })),
@@ -97,6 +101,7 @@ export function serialiseFrameDef(
     payload.can_id = header.canId;
     payload.dlc = header.dlc;
     payload.extended = header.extended;
+    payload.can_flags = header.flags;
   } else {
     payload.framing_mode = header.framingMode;
   }

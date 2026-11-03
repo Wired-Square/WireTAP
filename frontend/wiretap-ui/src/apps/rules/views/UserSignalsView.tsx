@@ -49,12 +49,9 @@ export default function UserSignalsView() {
 
   const handleAdd = useCallback(
     async (signalId: number, metadata: UserSignalMetadata) => {
-      try {
-        await addUserSignal(signalId, metadata);
-        setDialogOpen(false);
-      } catch {
-        // Error handled by store
-      }
+      const added = await addUserSignal(signalId, metadata);
+      if (added) setDialogOpen(false);
+      return added;
     },
     [addUserSignal],
   );

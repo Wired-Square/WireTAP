@@ -143,12 +143,10 @@ export default function Rules() {
   }, []);
   const handlePersist = useCallback(async () => {
     setPersistState("saving");
-    try {
-      await persistSave();
+    if (await persistSave()) {
       setPersistState("saved");
       resetPersistStateAfter(2000);
-    } catch {
-      // statusBar carries the detail; the button flags the failure.
+    } else {
       setPersistState("error");
       resetPersistStateAfter(3000);
     }
@@ -162,11 +160,7 @@ export default function Rules() {
       return;
     }
     setConfirmClear(false);
-    try {
-      await persistClear();
-    } catch {
-      // Inline statusBar / banner already reflect the failure.
-    }
+    await persistClear();
   }, [confirmClear, persistClear]);
 
   const isAnyLoading = Object.values(loading).some(Boolean);

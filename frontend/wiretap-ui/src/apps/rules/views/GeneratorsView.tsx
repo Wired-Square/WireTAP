@@ -50,15 +50,12 @@ export default function GeneratorsView() {
 
   const handleAdd = useCallback(
     async (generator: Record<string, unknown> & { name?: string; description?: string }) => {
-      try {
-        const { name, description, ...payload } = generator;
-        await addGenerator(payload);
-        if (name || description) {
-          await setLabel("generator", payload.generator_id as number, name || null, description || null);
-        }
-      } catch {
-        // Error handled by store
+      const { name, description, ...payload } = generator;
+      const added = await addGenerator(payload);
+      if (added && (name || description)) {
+        await setLabel("generator", payload.generator_id as number, name || null, description || null);
       }
+      return added;
     },
     [addGenerator, setLabel],
   );

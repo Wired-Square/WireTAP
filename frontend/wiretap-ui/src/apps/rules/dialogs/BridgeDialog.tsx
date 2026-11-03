@@ -29,7 +29,7 @@ interface FilterRow {
 interface BridgeDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (bridges: Record<string, unknown>[]) => void;
+  onSubmit: (bridges: Record<string, unknown>[]) => Promise<boolean>;
   interfaces: { index: number; iface_type: number; name: string }[];
   usedIds: Set<number>;
 }
@@ -100,7 +100,7 @@ export default function BridgeDialog({
     [],
   );
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (usedIds.has(bridgeId)) {
       setValidationError(t("bridgeDialog.errors.idInUse", { id: formatHexId(bridgeId) }));
       return;
@@ -153,8 +153,7 @@ export default function BridgeDialog({
       });
     }
 
-    onSubmit(bridges);
-    onClose();
+    if (await onSubmit(bridges)) onClose();
   };
 
   return (

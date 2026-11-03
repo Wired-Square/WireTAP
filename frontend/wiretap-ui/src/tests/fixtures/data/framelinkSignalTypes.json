@@ -39,12 +39,32 @@
     {
       "bit_length": 65,
       "value_type": 1,
-      "error": "Maximum 64 bits for integer signals"
+      "error": "A signal is 1 to 64 bits"
     },
     {
       "bit_length": 65,
       "value_type": 0,
-      "error": "Maximum 64 bits for integer signals"
+      "error": "A signal is 1 to 64 bits"
+    },
+    {
+      "bit_length": 72,
+      "value_type": 4,
+      "error": "A signal is 1 to 64 bits"
+    },
+    {
+      "bit_length": 0,
+      "value_type": 0,
+      "error": "A signal is 1 to 64 bits"
+    },
+    {
+      "bit_length": 65,
+      "value_type": 3,
+      "error": "Bool requires exactly 1 bit"
+    },
+    {
+      "bit_length": 0,
+      "value_type": 5,
+      "error": "Unknown value type 5"
     },
     {
       "bit_length": 8,

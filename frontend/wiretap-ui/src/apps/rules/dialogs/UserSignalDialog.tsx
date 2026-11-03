@@ -44,7 +44,7 @@ export interface UserSignalMetadata {
 interface UserSignalDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onAdd: (signalId: number, metadata: UserSignalMetadata) => void;
+  onAdd: (signalId: number, metadata: UserSignalMetadata) => Promise<boolean>;
   /** Set of signal IDs already in use (across all tiers) */
   usedSignalIds: Set<number>;
 }
@@ -125,7 +125,7 @@ export default function UserSignalDialog({
     [],
   );
 
-  const handleSubmit = useCallback(() => {
+  const handleSubmit = useCallback(async () => {
     // Validate signal ID
     const parsedId = parseHexSignalId(signalIdHex);
     if (parsedId === null) {
@@ -170,8 +170,7 @@ export default function UserSignalDialog({
     }
 
     setValidationError(null);
-    onAdd(parsedId, metadata);
-    resetForm();
+    if (await onAdd(parsedId, metadata)) resetForm();
   }, [signalIdHex, name, group, format, unit, enumRows, onAdd, resetForm, t, usedSignalIds]);
 
   return (

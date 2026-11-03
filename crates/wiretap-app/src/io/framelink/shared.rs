@@ -338,6 +338,57 @@ pub(crate) async fn connect_to_addr(
 // Internal — fetch capabilities
 // ============================================================================
 
+async fn device_board(
+    session: &FrameLinkSession,
+    key: &str,
+    board_name: &Option<String>,
+    board_revision: &Option<String>,
+) -> (
+    Option<wslib_framelink_board::BoardDef>,
+    Option<wslib_framelink_board::editable::EditableBoardDef>,
+) {
+    match wslib_framelink::board::download_board_def(session)
+        .await
+    {
+        Ok(Some(toml_str)) => {
+            tlog!(
+                "[framelink:{}] Downloaded device TOML ({} bytes)",
+                key,
+                toml_str.len()
+            );
+            let ed = wslib_framelink_board::editable::EditableBoardDef::from_toml(&toml_str).ok();
+            let bd = wslib_framelink_board::parse_board_def(&toml_str).ok();
+            if ed.is_none() && bd.is_none() {
+                // A poisoned/unparseable device TOML would otherwise leave no
+                // board def and no way to recover. Fall back to embedded so the
+                // next persist-save re-uploads clean TOML.
+                tlog!(
+                    "[framelink:{}] Device TOML unparseable; using embedded board def",
+                    key
+                );
+                embedded_board_def_fallback(board_name, board_revision)
+            } else {
+                (bd, ed)
+            }
+        }
+        Ok(None) => {
+            tlog!(
+                "[framelink:{}] No device TOML stored, using embedded board def",
+                key
+            );
+            embedded_board_def_fallback(board_name, board_revision)
+        }
+        Err(e) => {
+            tlog!(
+                "[framelink:{}] Board def download failed ({}), using embedded board def",
+                key,
+                e
+            );
+            embedded_board_def_fallback(board_name, board_revision)
+        }
+    }
+}
+
 /// Load the embedded board def by name and revision as a fallback.
 fn embedded_board_def_fallback(
     board_name: &Option<String>,
@@ -461,47 +512,7 @@ async fn fetch_capabilities(
     let board_name = caps.board_name().map(|s| s.to_string());
     let board_revision = caps.board_revision().map(|s| s.to_string());
 
-    // Try downloading the device TOML first; fall back to embedded board def
-    let (board_def, editable) = match wslib_framelink::board::download_board_def(session)
-        .await
-    {
-        Ok(Some(toml_str)) => {
-            tlog!(
-                "[framelink:{}] Downloaded device TOML ({} bytes)",
-                key,
-                toml_str.len()
-            );
-            let ed = wslib_framelink_board::editable::EditableBoardDef::from_toml(&toml_str).ok();
-            let bd = wslib_framelink_board::parse_board_def(&toml_str).ok();
-            if ed.is_none() && bd.is_none() {
-                // A poisoned/unparseable device TOML would otherwise leave no
-                // board def and no way to recover. Fall back to embedded so the
-                // next persist-save re-uploads clean TOML.
-                tlog!(
-                    "[framelink:{}] Device TOML unparseable; using embedded board def",
-                    key
-                );
-                embedded_board_def_fallback(&board_name, &board_revision)
-            } else {
-                (bd, ed)
-            }
-        }
-        Ok(None) => {
-            tlog!(
-                "[framelink:{}] No device TOML stored, using embedded board def",
-                key
-            );
-            embedded_board_def_fallback(&board_name, &board_revision)
-        }
-        Err(e) => {
-            tlog!(
-                "[framelink:{}] Board def download failed ({}), using embedded board def",
-                key,
-                e
-            );
-            embedded_board_def_fallback(&board_name, &board_revision)
-        }
-    };
+    let (board_def, editable) = device_board(session, key, &board_name, &board_revision).await;
 
     let interfaces: Vec<ProbeInterface> = caps
         .interfaces
@@ -668,7 +679,7 @@ pub(crate) async fn with_editable_board_def<F, R>(
     device_id: &str,
     timeout_sec: f64,
     f: F,
-) -> Result<R, String>
+) -> Result<Option<R>, String>
 where
     F: FnOnce(&mut wslib_framelink_board::editable::EditableBoardDef) -> R,
 {
@@ -677,10 +688,23 @@ where
         .editable_board_def
         .lock()
         .map_err(|e| format!("editable_board_def mutex poisoned: {}", e))?;
-    match guard.as_mut() {
-        Some(board_def) => Ok(f(board_def)),
-        None => Err("No board definition available for this device".to_string()),
-    }
+    Ok(guard.as_mut().map(f))
+}
+
+pub(crate) async fn reload_editable_board_def(device_id: &str, timeout_sec: f64) -> Result<(), String> {
+    let conn = get_connection(device_id, timeout_sec).await?;
+    let (_, editable) = device_board(
+        &conn.session,
+        device_id,
+        &conn.probe_cache.board_name,
+        &conn.probe_cache.board_revision,
+    )
+    .await;
+    *conn
+        .editable_board_def
+        .lock()
+        .map_err(|e| format!("editable_board_def mutex poisoned: {}", e))? = editable;
+    Ok(())
 }
 
 #[cfg(test)]

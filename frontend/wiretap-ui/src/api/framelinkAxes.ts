@@ -5,6 +5,7 @@
 // (role/quantity/aspect), never from its display name or unit string.
 
 /** Quantity codes (`QTY_*`). Only the values WireTAP dispatches on are mirrored. */
+export const QTY_RAW = 0x00;
 export const QTY_BOOL = 0x01;
 export const QTY_ENUM = 0x02;
 export const QTY_DATARATE = 0x0e;
