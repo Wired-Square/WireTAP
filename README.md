@@ -83,6 +83,9 @@ WireTAP-Server repository.
 
 ## Development
 
+[CONTRIBUTING.md](CONTRIBUTING.md) covers building from source, working
+against local checkouts of wslib-rs and wslib-ts, and adding a CAN adapter.
+
 ```bash
 # Install dependencies
 npm install
