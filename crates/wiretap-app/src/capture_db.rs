@@ -190,11 +190,11 @@ pub fn initialise(app_data_dir: &Path, clear_on_start: bool) -> Result<(), Strin
 /// it, so tests on many runtimes can lose one, and an in-memory database dies with it.
 #[cfg(test)]
 pub(crate) async fn scratch_store() -> Store {
+    static DIR: std::sync::LazyLock<std::path::PathBuf> =
+        std::sync::LazyLock::new(|| crate::scratch::fresh_dir("wiretap-capture-store-tests"));
     static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
-    let dir = std::env::temp_dir().join(format!("wiretap-capture-store-tests-{}", std::process::id()));
-    std::fs::create_dir_all(&dir).unwrap();
     let n = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-    Store::open(dir.join(format!("{n}.db"))).await.unwrap().0
+    Store::open(DIR.join(format!("{n}.db"))).await.unwrap().0
 }
 
 /// The one database every test shares; for a test whose work leaves its thread.

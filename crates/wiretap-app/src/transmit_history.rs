@@ -99,11 +99,11 @@ pub async fn write_entry(
 
 #[cfg(test)]
 async fn scratch_database() -> Database {
+    static DIR: std::sync::LazyLock<std::path::PathBuf> =
+        std::sync::LazyLock::new(|| crate::scratch::fresh_dir("wiretap-transmit-tests"));
     static NEXT: AtomicI64 = AtomicI64::new(0);
-    let dir = std::env::temp_dir().join(format!("wiretap-transmit-tests-{}", std::process::id()));
-    std::fs::create_dir_all(&dir).unwrap();
     let n = NEXT.fetch_add(1, Ordering::Relaxed);
-    Database::open(dir.join(format!("{n}.db")), &[chain()]).await.unwrap()
+    Database::open(DIR.join(format!("{n}.db")), &[chain()]).await.unwrap()
 }
 
 #[cfg(test)]
