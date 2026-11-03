@@ -15,7 +15,7 @@ import { groupKeysByProtocol } from "../../utils/frameKey";
 import { selectionSetKeys, type SelectionSet } from "../../utils/selectionSets";
 import { capturedFrameCount, useDiscoveryFrameStore } from "../../stores/discoveryFrameStore";
 import { useDiscoveryUIStore } from "../../stores/discoveryUIStore";
-import { useDiscoverySerialStore } from "../../stores/discoverySerialStore";
+import { framedSource, useDiscoverySerialStore } from "../../stores/discoverySerialStore";
 import { isOwnScanSession, runningModbusScan, useDiscoveryToolboxStore } from "../../stores/discoveryToolboxStore";
 import { useShallow } from "@wired-square/store/react";
 import { useDiscoveryHandlers } from "./hooks/useDiscoveryHandlers";
@@ -127,22 +127,16 @@ function DiscoveryInner() {
   const setSelectionSetDirty = useDiscoveryUIStore((s) => s.setSelectionSetDirty);
 
   // ── Serial store ──
-  const { isSerialMode, framedData, framingAccepted, backendFrameCount, framedCaptureId } =
+  const { isSerialMode, framingAccepted } =
     useDiscoverySerialStore(useShallow((s) => ({
       isSerialMode: s.isSerialMode,
-      framedData: s.framedData,
       framingAccepted: s.framingAccepted,
-      backendFrameCount: s.backendFrameCount,
-      framedCaptureId: s.framedCaptureId,
     })));
   const serialActiveTab = useDiscoverySerialStore((s) => s.activeTab);
-  const backendFramedProtocol = useDiscoverySerialStore((s) => s.framedProtocol);
   const setSerialMode = useDiscoverySerialStore((s) => s.setSerialMode);
   const clearSerialBytes = useDiscoverySerialStore((s) => s.clearSerialBytes);
   const resetFraming = useDiscoverySerialStore((s) => s.resetFraming);
   const undoAcceptFraming = useDiscoverySerialStore((s) => s.undoAcceptFraming);
-  const incrementBackendFrameCount = useDiscoverySerialStore((s) => s.incrementBackendFrameCount);
-  const setBackendFrameCount = useDiscoverySerialStore((s) => s.setBackendFrameCount);
 
   // ── Toolbox store ──
   const toolboxIsRunning = useDiscoveryToolboxStore((s) => s.toolbox.isRunning);
@@ -271,8 +265,7 @@ function DiscoveryInner() {
     if (isPausedRef.current) return;
     if (inCaptureModeRef.current) return;
     useDiscoveryFrameStore.getState().noteStreamStart(receivedFrames);
-    incrementBackendFrameCount(receivedFrames.length);
-  }, [incrementBackendFrameCount]);
+  }, []);
 
   const handleError = useCallback((error: string) => {
     // Stream errors are shown centrally via sessionStore's global IO error dialog
@@ -382,12 +375,11 @@ function DiscoveryInner() {
     setCaptureMetadata(null); // Clear stale metadata so effectiveStartTimeUs doesn't use old values
     clearSerialBytes();
     resetFraming();
-    setBackendFrameCount(0);
     // Reset refs checked by handleFrames — prevents stale values from a previous
     // session (e.g., capture mode after stop) from silently dropping frames
     isPausedRef.current = false;
     inCaptureModeRef.current = false;
-  }, [clearAll, clearAnalysisResults, disableCaptureMode, clearSerialBytes, resetFraming, setBackendFrameCount]);
+  }, [clearAll, clearAnalysisResults, disableCaptureMode, clearSerialBytes, resetFraming]);
 
   // Handle session destroyed — switch to orphaned capture if available
   const handleSessionDestroyed = useCallback(async (orphanedCaptureIds: string[]) => {
@@ -593,6 +585,8 @@ function DiscoveryInner() {
   // session's picker waits for framing to be accepted, which fills it from the framed
   // capture.
   const frameInventory = useSessionStore((s) => (sessionId ? s.sessions[sessionId]?.frameInventory : undefined));
+  const framing = useSessionStore((s) => (sessionId ? s.sessions[sessionId]?.framing : undefined) ?? null);
+  const framedCaptureId = framing?.framed_capture_id ?? null;
   const mergedInventoryRef = useRef<typeof frameInventory>(undefined);
   useEffect(() => {
     if (!frameInventory || isCaptureMode || captureMode.enabled || (isSerialMode && !framingAccepted)) {
@@ -724,6 +718,7 @@ function DiscoveryInner() {
   const activeCaptureId = captureMetadata?.id ?? sessionCaptureId;
   /** Frames in it. `captureCount` is the capture-mode counter and reads 0 live. */
   const liveFrameCount = isCaptureMode ? captureCount : watchFrameCount;
+  const serialFrameCount = framedSource(framing, { captureId: captureKind === "bytes" ? null : activeCaptureId, frameCount: liveFrameCount }).frameCount;
 
   // Merged capture metadata using session values for cross-app timeline sync
   const effectiveCaptureMetadata = useEffectiveCaptureMetadata(
@@ -735,29 +730,26 @@ function DiscoveryInner() {
   const exportDataMode: ExportDataMode = useMemo(() => {
     if (isSerialMode) {
       if (serialActiveTab === 'raw') return "bytes";
-      if (serialActiveTab === 'framed' && (backendFrameCount > 0 || framedData.length > 0)) return "frames";
+      if (serialActiveTab === 'framed' && serialFrameCount > 0) return "frames";
       return "bytes";
     }
     return "frames";
-  }, [isSerialMode, serialActiveTab, backendFrameCount, framedData.length]);
+  }, [isSerialMode, serialActiveTab, serialFrameCount]);
 
   const exportCount = useMemo(() => exportItemCount({
     dataMode: exportDataMode,
     byteCount: watchByteCount,
     captureMode,
     isSerialMode,
-    framedCaptureId,
-    backendFrameCount,
-    clientFramedCount: framedData.length,
+    framing,
     liveFrameCount,
-  }), [exportDataMode, watchByteCount, captureMode, isSerialMode, framedCaptureId, backendFrameCount, framedData.length, liveFrameCount]);
+  }), [exportDataMode, watchByteCount, captureMode, isSerialMode, framing, liveFrameCount]);
 
   const exportDefaultFilename = useMemo(() => {
     // Not "can": this fires only when nothing said what the frames are, and naming
     // them after a protocol nobody reported is how the badge got it wrong.
-    const framedProtocol = framedCaptureId ? backendFramedProtocol ?? undefined : framedData[0]?.protocol;
-    return frameExportBasename(exportProtocol(exportDataMode, framedProtocol, protocolLabel));
-  }, [exportDataMode, framedCaptureId, backendFramedProtocol, framedData, protocolLabel]);
+    return frameExportBasename(exportProtocol(exportDataMode, framing?.protocol ?? undefined, protocolLabel));
+  }, [exportDataMode, framing, protocolLabel]);
 
   useModbusScanSync();
 
@@ -860,15 +852,13 @@ function DiscoveryInner() {
     captureModeEnabled: captureMode.enabled,
 
     // Frame state
-    framedData,
-    framedCaptureId,
+    framing,
     frameInfoMap,
     selectedFrames,
 
     // Serial state
     isSerialMode,
     bytesCaptureId: sessionBytesCaptureId,
-    backendFrameCount,
 
     // Time state
     startTime,
@@ -917,7 +907,6 @@ function DiscoveryInner() {
     resetView: resetDiscoveryView,
     enableCaptureMode,
     setFrameInfoFromCapture,
-    setBackendFrameCount,
     openSaveDialog,
     saveFrames,
     setActiveSelectionSet,
@@ -1265,7 +1254,7 @@ function DiscoveryInner() {
         isSerialMode={isSerialMode}
         isSerialProtocol={capabilities?.traits?.protocols?.includes("serial") ?? false}
         isFilteredView={framesViewActiveTab === 'filtered'}
-        serialFrameCount={backendFrameCount || framedData.length}
+        serialFrameCount={serialFrameCount}
         serialBytesCount={watchByteCount}
         serialBytesCaptureId={sessionBytesCaptureId}
         hasSource={hasSource}

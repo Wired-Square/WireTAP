@@ -20,7 +20,8 @@ import {
   type SelectionSetHandlers,
 } from "../../../hooks/useSelectionSetHandlers";
 import { useTimeHandlers, type TimeHandlers } from "../../../hooks/useTimeHandlers";
-import type { PlaybackSpeed, FrameMessage } from "../../../stores/discoveryStore";
+import type { PlaybackSpeed } from "../../../stores/discoveryStore";
+import type { FramingStateMsg } from "../../../generated/FramingStateMsg";
 import type { CaptureFrameInfo, CaptureMetadata } from "../../../api/capture";
 import type { ExportDataMode } from "../../../dialogs/ExportFramesDialog";
 import type { SelectionSet } from "../../../utils/selectionSets";
@@ -39,16 +40,13 @@ export interface UseDiscoveryHandlersParams {
   captureModeEnabled: boolean;
 
   // Frame state
-  /** Frames in the capture being shown. */
-  framedData: FrameMessage[];
-  framedCaptureId: string | null;
+  framing: FramingStateMsg | null;
   frameInfoMap: Map<string, any>;
   selectedFrames: Set<string>;
 
   // Serial state
   isSerialMode: boolean;
   bytesCaptureId: string | null;
-  backendFrameCount: number;
 
   // Time state
   startTime: string;
@@ -100,7 +98,6 @@ export interface UseDiscoveryHandlersParams {
   resetView: () => void;
   enableCaptureMode: (count: number) => void;
   setFrameInfoFromCapture: (frameInfo: CaptureFrameInfo[]) => void;
-  setBackendFrameCount: (count: number) => void;
   openSaveDialog: () => void;
   saveFrames: (decoderDir: string, format: 'hex' | 'decimal') => Promise<void>;
   setActiveSelectionSet: (id: string | null) => void;
@@ -183,11 +180,9 @@ export function useDiscoveryHandlers(params: UseDiscoveryHandlersParams): Discov
 
   // Export handlers
   const exportHandlers = useDiscoveryExportHandlers({
-    framedData: params.framedData,
-    framedCaptureId: params.framedCaptureId,
+    framing: params.framing,
     activeCaptureId: params.activeCaptureId,
     bytesCaptureId: params.bytesCaptureId,
-    backendFrameCount: params.backendFrameCount,
     exportDataMode: params.exportDataMode,
     captureModeEnabled: params.captureModeEnabled,
     isSerialMode: params.isSerialMode,

@@ -122,6 +122,7 @@ export function reconcileKnownSessions(
       // Adopted from the roster, which reports frame counts only. Rust re-pushes the byte
       // total on its next signal if this session has a byte capture.
       byteCount: 0,
+      framing: null,
       capture: { ...emptyCapture(), id: info.capture_id, kind: info.capture_kind, count: info.capture_frame_count ?? 0 },
       createdAt: Date.now(),
       hasQueuedMessages: false,

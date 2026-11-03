@@ -16,6 +16,7 @@ All notable changes to WireTAP will be documented in this file.
 - **A CAN or serial device that drops out is retried with a growing pause.** WireTAP waits 1 s before the first reopen and doubles the wait up to 30 s, so a missing adapter no longer gets hammered. A device plugged back in can take up to 30 s to resume.
 - **The Session Manager graph has a new engine.** A connection dropped near a port now snaps to it, a drag can start from an input as well as an output, and a node you drag keeps its place when the graph updates. Nodes are spaced by their size, so tall sources and sessions no longer overlap. A connection that already exists, or one onto an output bus that already carries a mapping, is now refused while you drag.
 - **Dashboard values round half away from zero.** A value exactly halfway now rounds as written, so 1.0005 shows as 1.001 rather than 1.000, and a small negative value shows as 0.000 rather than -0.000.
+- **Discovery's serial framing follows a live stream.** Framing set on a serial session now keeps up as bytes arrive, so the Framed tab and its counts fill while the port runs instead of waiting for Stop. Changing the framing, the minimum length or an id extraction re-frames everything captured so far.
 - **Refusing the Keychain prompt on macOS or iOS now says access was denied.** Saving a device password or a GitHub token after cancelling the prompt reports that access to the secret store was denied, instead of a platform error.
 
 ### Fixed

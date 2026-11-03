@@ -3,7 +3,7 @@
 // Export and save handlers for Discovery: export frames, save frames, export formats.
 
 import { useCallback } from "react";
-import type { FrameMessage } from "../../../../stores/discoveryStore";
+import type { FramingStateMsg } from "../../../../generated/FramingStateMsg";
 import type { ExportFormat, ExportDataMode } from "../../../../dialogs/ExportFramesDialog";
 import { exportByteDump, exportFrameDump } from "../../../../api/capture";
 import { useSessionStore } from "../../../../stores/sessionStore";
@@ -11,11 +11,9 @@ import { withAppError } from "../../../../utils/appError";
 
 export interface UseDiscoveryExportHandlersParams {
   // State
-  framedData: FrameMessage[];
-  framedCaptureId: string | null;
+  framing: FramingStateMsg | null;
   activeCaptureId: string | null;
   bytesCaptureId: string | null;
-  backendFrameCount: number;
   exportDataMode: ExportDataMode;
   captureModeEnabled: boolean;
   isSerialMode: boolean;
@@ -35,11 +33,9 @@ export interface UseDiscoveryExportHandlersParams {
 }
 
 export function useDiscoveryExportHandlers({
-  framedData,
-  framedCaptureId,
+  framing,
   activeCaptureId,
   bytesCaptureId,
-  backendFrameCount,
   exportDataMode,
   captureModeEnabled,
   isSerialMode,
@@ -82,13 +78,11 @@ export function useDiscoveryExportHandlers({
         const source =
           captureModeEnabled && activeCaptureId
             ? { captureId: activeCaptureId }
-            : isSerialMode && framedCaptureId && backendFrameCount > 0
-              ? { captureId: framedCaptureId }
-              : isSerialMode && framedData.length > 0
-                ? { frames: framedData }
-                : activeCaptureId
-                  ? { captureId: activeCaptureId }
-                  : null;
+            : isSerialMode && framing && framing.frame_count > 0
+              ? { captureId: framing.framed_capture_id }
+              : activeCaptureId
+                ? { captureId: activeCaptureId }
+                : null;
         if (!source) return;
         await exportFrameDump(source, format === "candump" || format === "json" ? format : "csv", selectedPath);
       }
@@ -100,10 +94,8 @@ export function useDiscoveryExportHandlers({
     bytesCaptureId,
     captureModeEnabled,
     isSerialMode,
-    framedCaptureId,
+    framing,
     activeCaptureId,
-    backendFrameCount,
-    framedData,
     pickFileToSave,
     closeExportDialog,
   ]);
