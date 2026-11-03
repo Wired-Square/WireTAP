@@ -18,7 +18,7 @@ maskedFrameId: number,
 /**
  * Present only on a mirror frame, so absence means "not a mirror".
  */
-mirror?: DecodedMirrorVerdict, selectors: Array<DecodedMuxSelector>, signals: Array<DecodedSignalValue>, sourceAddress: number | null, 
+mirror?: DecodedMirrorVerdict, protocol: string, selectors: Array<DecodedMuxSelector>, signals: Array<DecodedSignalValue>, sourceAddress: number | null, 
 /**
  * Host timestamp (µs).
  */

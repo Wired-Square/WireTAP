@@ -42,6 +42,7 @@ All notable changes to WireTAP will be documented in this file.
 - **Leaving a session shows its snapshot.** After Leave, or after the Session Manager removed it from its session, an app showed the snapshot capture's name with no frames, and its Clear did nothing. It now opens the snapshot as the picker does, frames and all.
 - **Opening a large capture in Discovery queries its frame list once.** It had run the same multi-second query three or four times at once.
 - **A Modbus RTU export from a framed byte capture is named for Modbus RTU.** Its default file name had said serial.
+- **The Decoder's Modbus tab shows a Modbus RTU source's id as unit and function.** A message read from a Modbus RTU line shows as `1/0x20`, as it does in Discovery, rather than as a CAN id such as `0x120`. Messages tunnelled in CAN frames still show their CAN id.
 - **A serial frame with no id no longer decodes under a Modbus catalogue.** It had been read as register 0 and shown with that register's signals.
 - **Switching a live serial line to Modbus RTU uses the device's RTU settings.** Its unit address, CRC check and vendor function codes now apply, as they do when the device is opened with RTU framing; the switch had used the stock settings.
 - **A deleted device's name can be reused at once.** Deleting a device in Settings now removes it straight away, so a new device under the same name is no longer refused as a duplicate for a second afterwards. A FrameLink re-probe in Settings is also saved straight away.

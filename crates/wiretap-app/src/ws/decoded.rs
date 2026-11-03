@@ -146,6 +146,7 @@ pub struct DecodedFrameMsg<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[cfg_attr(test, ts(optional))]
     pub mirror: Option<DecodedMirrorVerdict<'a>>,
+    pub protocol: &'a str,
     pub selectors: Vec<DecodedMuxSelector>,
     pub signals: Vec<DecodedSignalValue>,
     pub source_address: Option<u64>,

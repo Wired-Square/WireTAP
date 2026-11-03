@@ -31,6 +31,7 @@ const decoded = (over: Partial<DecodedFrameMsg> = {}): DecodedFrameMsg => ({
   isFd: false,
   isBrs: false,
   isEsi: false,
+  protocol: "can",
   ...over,
 });
 
@@ -142,6 +143,11 @@ describe("decoderStore.applyDecodedBatch", () => {
     expect(getTunnelTransactions()).toMatchObject([
       { frameId: 0x100, bus: 0, timestampUs: 2_000_000, latencyUs: 4_000 },
     ]);
+  });
+
+  it("keeps the protocol of the frame that carried a transaction", () => {
+    apply([decoded({ protocol: "modbus_rtu", tunnel: [tunnelMessage] })]);
+    expect(getTunnelTransactions()).toMatchObject([{ carrierProtocol: "modbus_rtu", protocol: "modbus_rtu" }]);
   });
 
   it("replaces the Modbus rows with an attach's backlog rather than adding to them", () => {
