@@ -253,8 +253,10 @@ pub(super) async fn run_merge_task(
                     }
                     Some(SourceMessage::ControlReady(source_idx, control_sender)) => {
                         tlog!("[IOBroker] Source {} control channel ready", source_idx);
-                        if let Ok(mut channels) = control_channels.lock() {
-                            channels.insert(source_idx, control_sender);
+                        if let (Some(source), Ok(mut channels)) =
+                            (source_profiles.get(&source_idx), control_channels.lock())
+                        {
+                            channels.insert(source_idx, (source.profile_id.clone(), control_sender));
                         }
                     }
                     Some(SourceMessage::Connected(source_idx, device_type, address, bus_number)) => {

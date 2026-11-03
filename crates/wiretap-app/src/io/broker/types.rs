@@ -70,5 +70,6 @@ pub(super) type SourcePauseFlags = Arc<Mutex<HashMap<String, Arc<std::sync::atom
 /// Shared transmit channels by source index
 pub(super) type TransmitChannels = Arc<Mutex<HashMap<usize, TransmitSender>>>;
 
-/// Shared control channels by source index (live framing changes; serial only)
-pub(super) type ControlChannels = Arc<Mutex<HashMap<usize, ControlSender>>>;
+/// Shared control channels by source index, each with its source's profile id (live framing
+/// changes; serial only)
+pub(super) type ControlChannels = Arc<Mutex<HashMap<usize, (String, ControlSender)>>>;

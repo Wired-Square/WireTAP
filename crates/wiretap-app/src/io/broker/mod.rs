@@ -233,11 +233,11 @@ impl IOBroker {
     /// The RTU settings opening this source's profile would frame with.
     fn opening_rtu_settings(
         &self,
-        idx: usize,
+        profile_id: &str,
         profiles: &[crate::settings::IOProfile],
     ) -> Option<wslib_wiretap_catalogue::RtuSettings> {
-        let source = self.sources.get(idx)?;
-        let profile = profiles.iter().find(|p| p.id == source.profile_id)?;
+        let source = self.sources.iter().find(|s| s.profile_id == profile_id)?;
+        let profile = profiles.iter().find(|p| p.id == profile_id)?;
         Some(profile.rtu_settings(&source.serial))
     }
 
@@ -259,10 +259,10 @@ impl IOBroker {
                 .framing_overrides
                 .lock()
                 .map_err(|e| format!("Failed to lock framing overrides: {}", e))?;
-            for (idx, sender) in channels.iter() {
+            for (idx, (profile_id, sender)) in channels.iter() {
                 let mut req = req.clone();
                 if let Some(profiles) = &unset_rtu_profiles {
-                    req.modbus = self.opening_rtu_settings(*idx, profiles);
+                    req.modbus = self.opening_rtu_settings(profile_id, profiles);
                 }
                 // Keep the WS decode path in step with the port, stock settings included: a
                 // `modbus_rtu` frame from a session that published none reads as an archive's.
@@ -1170,8 +1170,8 @@ mod tests {
         assert_eq!(streams(&[virtual_device(Protocol::Can)], &[]), (true, false));
     }
 
-    #[test]
-    fn a_live_switch_to_rtu_frames_with_the_settings_an_open_would() {
+    /// A broker on one RS485 line with non-stock RTU settings, and the framing an open would use.
+    fn rtu_line(session_id: &str) -> (IOBroker, wslib_wiretap_catalogue::FramingEncoding) {
         let profile = crate::settings::IOProfile {
             id: "rtu-line".into(),
             name: "RS485".into(),
@@ -1206,17 +1206,34 @@ mod tests {
         .unwrap()
         .framing_encoding;
         let profiles: ProfileLoader = Arc::new(move || Ok(vec![profile.clone()]));
-        let broker = IOBroker::single_source(profiles, "live-rtu-switch".into(), source).unwrap();
+        (IOBroker::single_source(profiles, session_id.into(), source).unwrap(), opened)
+    }
+
+    /// The framing a live switch to RTU sends down the control channel of the reader at `idx`.
+    fn live_rtu_switch(broker: &IOBroker, idx: usize) -> wslib_wiretap_catalogue::FramingEncoding {
         let (control, received) = std::sync::mpsc::sync_channel(1);
-        broker.control_channels.lock().unwrap().insert(0, control);
-
+        broker.control_channels.lock().unwrap().insert(idx, ("rtu-line".into(), control));
         broker.set_framing(set_framing("modbus_rtu", true)).unwrap();
-
         let req = received.try_recv().unwrap();
-        assert_eq!(
-            wslib_wiretap_catalogue::FramingEncoding::from_mode(req.encoding, req.modbus.as_ref()),
-            opened
-        );
+        wslib_wiretap_catalogue::FramingEncoding::from_mode(req.encoding, req.modbus.as_ref())
+    }
+
+    #[test]
+    fn a_live_switch_to_rtu_frames_with_the_settings_an_open_would() {
+        let (broker, opened) = rtu_line("live-rtu-switch");
+        assert_eq!(live_rtu_switch(&broker, 0), opened);
+    }
+
+    #[test]
+    fn a_re_added_source_switches_to_rtu_with_its_own_settings() {
+        let (mut broker, opened) = rtu_line("live-rtu-switch-readded");
+        let (merge_cmd_tx, _merge_cmds) = mpsc::unbounded_channel();
+        *broker.merge_cmd_tx.lock().unwrap() = Some(merge_cmd_tx);
+        let mappings = broker.sources[0].bus_mappings.clone();
+        broker.update_source_bus_mappings("rtu-line", mappings).unwrap();
+
+        // The merge task gives the re-added reader the next index, past the one it left.
+        assert_eq!(live_rtu_switch(&broker, 1), opened);
     }
 
     #[test]

@@ -39,6 +39,7 @@ All notable changes to WireTAP will be documented in this file.
 - **Frame search matches `_` and `%` literally.** They had matched any character.
 - **A batch of CSV files is named without a split number.** `run_01.csv` and `run_02.csv` now import as "run (2 files)" rather than "run_0 (2 files)".
 - **Backend playback at unlimited speed reports its final position.** A stream ending part-way through a batch had stopped short of its last frame.
+- **A serial line keeps its RTU settings after its bus mappings change.** Editing a source's mappings, or removing another source, had left a later live switch to Modbus RTU on the stock settings.
 
 ## [0.15.0] - 2026-10-14
 
