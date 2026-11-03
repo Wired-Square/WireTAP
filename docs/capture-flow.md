@@ -76,12 +76,12 @@ The two sets are **independent**:
 A capture can be in both (a live capture being rendered), either, or neither
 (e.g. an orphaned capture that nothing is viewing).
 
-**A session owns captures it never streamed into.** `apply_framing_to_capture`
+**A session owns captures it never streamed into.** `set_capture_framing`
 derives a `Frames` capture from a `Bytes` one and assigns it to the session so it
 is cleaned up with it, but it is a result, not a write target. So ownership alone
 cannot answer "what is this session's capture?": choosing by it picks the derived
-capture, and a raw serial session looks like a frames session the moment
-client-side framing runs.
+capture, and a raw serial session looks like a frames session the moment framing
+is set.
 
 `CaptureRole` is what separates the two. It sits on `NamedCapture` beside
 `owning_session_id`, is written whenever an owner is written, and is cleared with
@@ -306,8 +306,7 @@ Imports are session-scoped end-to-end. The Tauri command accepts a
 | `import_csv_to_capture` | [crates/wiretap-app/src/captures.rs](../crates/wiretap-app/src/captures.rs) |
 | `import_csv_with_mapping` | [crates/wiretap-app/src/captures.rs](../crates/wiretap-app/src/captures.rs) |
 | `import_csv_batch_with_mapping` | [crates/wiretap-app/src/captures.rs](../crates/wiretap-app/src/captures.rs) |
-| `create_frame_capture_from_frames` | [crates/wiretap-app/src/captures.rs](../crates/wiretap-app/src/captures.rs) |
-| `apply_framing_to_capture` | [crates/wiretap-app/src/framing.rs](../crates/wiretap-app/src/framing.rs) |
+| `set_capture_framing` | [crates/wiretap-app/src/framing.rs](../crates/wiretap-app/src/framing.rs) |
 
 Each import follows the same pattern:
 
@@ -317,16 +316,16 @@ capture_store::append_frames_to_session(&session_id, frames);
 capture_store::finalize_session_captures(&session_id);
 ```
 
-`apply_framing_to_capture` reads the source byte capture via
+`set_capture_framing` reads the source byte capture via
 `get_session_bytes_capture_id` and makes its output with `create_derived_capture`
 — owned for cleanup, never mistaken for the session's own, and the only kind of
-capture it will clear and refill on a re-frame.
+capture its follower will clear and refill on a re-frame.
 
 **The Framed tab reads whichever capture holds the frames.** `FramedDataView`
-pages from `framedCaptureId ?? sessionFramesCaptureId`: client-side framing
-derives a capture and puts its id in the serial store, while a reader that frames
-on the wire (SLIP, Modbus RTU) writes straight into the session's own capture and
-derives nothing. Discovery passes the session capture only when its kind is
+pages from `Session.framing?.framed_capture_id ?? sessionFramesCaptureId`: framing
+set on the session derives a capture whose id Rust pushes in `FramingState`, while
+a reader that frames on the wire (SLIP, Modbus RTU) writes straight into the
+session's own capture and derives nothing. Discovery passes the session capture only when its kind is
 `frames` — a raw serial session's own capture is *bytes*, and handing that to a
 frame pager would be a fresh bug — and passes the **live** count
 (`liveFrameCount`), because the pager gives up on a zero count and `captureCount`
@@ -347,13 +346,12 @@ Until then this path carries its own copy of that guard: the frame count moves a
 fetches must neither queue on the capture-store mutex nor land out of order and
 overwrite newer rows with older.
 
-`apply_framing_to_capture` produces **two** captures when a minimum frame length
-is set: the framed result and the too-short frames the filter set aside. Both are refilled in place
-(`refill_or_derive`), and the caller passes both previous ids back. The filtered
-one used to be created fresh every call and never reused or deleted, so with a
-filter set each re-frame left another session-owned capture behind — and framing
-runs on every stop. A run that filters nothing deletes the previous filtered
-capture rather than leaving it showing the last run's rows.
+A session's framing follower produces **two** captures when a minimum frame length
+is set: the framed result and the too-short frames the filter set aside. The
+follower keeps both ids itself; a re-set clears the framed capture in place and
+drops the filtered one, which is derived again on the first short frame. The
+follower frames the bytes stored so far, then the rest on the byte cadence, and
+flushes the residue at stream end, so the Framed tab follows a live port.
 
 ---
 
@@ -435,8 +433,7 @@ TypeScript wrappers mirror the session-scoped API:
 | `setCapturePersistent(id, pinned)` | `set_capture_persistent` |
 | `deleteCapture(id)` / `clearCaptureData(id)` | `delete_capture` / `clear_capture` |
 | `importCsvToCapture(sessionId, …)` | `import_csv_to_capture` |
-| `createFrameCaptureFromFrames(sessionId, …)` | `create_frame_capture_from_frames` |
-| `applyFramingToCapture(sessionId, …)` | `apply_framing_to_capture` |
+| `setCaptureFraming(sessionId, config)` | `set_capture_framing` |
 
 See [src/api/capture.ts](../frontend/wiretap-ui/src/api/capture.ts) for the full list.
 
@@ -529,7 +526,7 @@ cannot go infinite even where a size is legitimately unresolved.
 | [crates/wiretap-app/src/capture_db.rs](../crates/wiretap-app/src/capture_db.rs) | The app's `Store`; the store itself is [crates/wiretap-capture-store](../crates/wiretap-capture-store) |
 | [crates/wiretap-app/src/captures.rs](../crates/wiretap-app/src/captures.rs) | Tauri commands (list/read/import/delete) |
 | [crates/wiretap-app/src/capture_events.rs](../crates/wiretap-app/src/capture_events.rs) | Events — owner dispatch between `capture_db` and the gateway |
-| [crates/wiretap-app/src/framing.rs](../crates/wiretap-app/src/framing.rs) | `apply_framing_to_capture` — byte capture → frame capture |
+| [crates/wiretap-app/src/framing.rs](../crates/wiretap-app/src/framing.rs) | `set_capture_framing` and the per-session follower — byte capture → frame capture |
 | [crates/wiretap-app/src/io/recorded/capture.rs](../crates/wiretap-app/src/io/recorded/capture.rs) | `CaptureSource` timeline device |
 | [src/api/capture.ts](../frontend/wiretap-ui/src/api/capture.ts) | TypeScript wrappers |
 | [src/api/captureEvents.ts](../frontend/wiretap-ui/src/api/captureEvents.ts) | Events wrappers; `src/apps/events/` is the app |

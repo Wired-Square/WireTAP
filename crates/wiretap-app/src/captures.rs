@@ -527,25 +527,6 @@ pub async fn set_active_capture(capture_id: String) -> Result<(), String> {
     capture_store::mark_capture_active(&capture_id)
 }
 
-/// Create a new frame capture from frames passed from the frontend.
-/// Used when accepting client-side framing to persist the framed data.
-#[tauri::command(rename_all = "snake_case")]
-pub async fn create_frame_capture_from_frames(
-    session_id: String,
-    name: String,
-    frames: Vec<FrameMessage>,
-) -> Result<CaptureMetadata, String> {
-    if frames.is_empty() {
-        return Err("No frames to create capture from".to_string());
-    }
-
-    let capture_id = capture_store::create_session_capture(&session_id, capture_store::CaptureKind::Frames, name);
-    capture_store::append_frames_to_session(&session_id, frames).await;
-    let finalized = capture_store::finalize_session_captures(&session_id);
-    finalized.into_iter().next()
-        .ok_or_else(|| format!("Failed to finalize capture '{}'", capture_id))
-}
-
 /// Get a page of frames from a specific capture by ID
 #[tauri::command(rename_all = "snake_case")]
 pub async fn get_capture_frames_paginated_by_id(
