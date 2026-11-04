@@ -380,5 +380,9 @@
   "connectionProbe": {
     "interfaceMismatch": "⟦Device reports {{reported}} interface(s), but {{configured}} configured. Delete interfaces field in settings to re-probe.⟧"
   },
-  "busNumber": "⟦Bus {{bus}}⟧"
+  "busNumber": "⟦Bus {{bus}}⟧",
+  "sidebar": {
+    "expand": "⟦Expand sidebar⟧",
+    "collapse": "⟦Collapse sidebar⟧"
+  }
 }

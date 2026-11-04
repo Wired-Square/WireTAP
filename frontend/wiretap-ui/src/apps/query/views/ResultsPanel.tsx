@@ -6,7 +6,7 @@
 import { useCallback, useState, useMemo, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { PlayCircle, Download, AlertCircle, Database, Flag, FileDown, ChevronRight, ChevronDown } from "lucide-react";
-import { QUERY_TYPE_INFO } from "../stores/queryStore";
+import { queryTypeLabel } from "../stores/queryStore";
 import type {
   ByteChangeResult,
   FrameChangeResult,
@@ -115,7 +115,7 @@ function ResultsBody({
   const isRunning = selectedQuery?.status === "running";
   const error = selectedQuery?.error ?? null;
 
-  const queryInfo = QUERY_TYPE_INFO[queryType];
+  const typeLabel = queryTypeLabel(queryType).toLowerCase();
 
   // Calculate paginated results (only for array-based query types)
   const { paginatedResults, totalPages, pageStart } = useMemo(() => {
@@ -230,7 +230,7 @@ function ResultsBody({
         <div className={emptyStateText}>
           <p className={emptyStateHeading}>{t("results.runningHeading")}</p>
           <p className={emptyStateDescription}>
-            {t("results.runningDescription", { label: queryInfo.label.toLowerCase() })}
+            {t("results.runningDescription", { label: typeLabel })}
           </p>
         </div>
       </div>
@@ -258,7 +258,7 @@ function ResultsBody({
         <div className={emptyStateText}>
           <p className={emptyStateHeading}>{t("results.noMatchesHeading")}</p>
           <p className={`${emptyStateDescription} mb-3`}>
-            {t("results.noMatchesDescription", { label: queryInfo.label.toLowerCase() })}
+            {t("results.noMatchesDescription", { label: typeLabel })}
           </p>
           {lastQueryStats && (
             <p className={`text-xs ${textMuted}`}>
@@ -367,7 +367,7 @@ function ResultsBody({
             {selectedQuery.label}
           </h2>
           <p className={`text-xs ${textSecondary}`}>
-            {t("results.foundCount", { count: resultCount.toLocaleString(), label: queryInfo.label.toLowerCase() })}
+            {t("results.foundCount", { count: resultCount.toLocaleString(), label: typeLabel })}
             {outcome?.truncated && <span className={textWarning}>{t("results.truncated")}</span>}
             {lastQueryStats && (
               <span className={textMuted}>
@@ -753,10 +753,10 @@ function ResultRow({
       <Button
         onClick={handleIngestClick}
         className="opacity-0 group-hover:opacity-100 transition-opacity"
-        title="Ingest frames around this event"
+        title={t("results.ingestAroundEvent")}
       >
         <PlayCircle className={iconSm} />
-        <span className="text-xs">Ingest</span>
+        <span className="text-xs">{t("results.ingest")}</span>
       </Button>
     </div>
   );

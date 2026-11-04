@@ -211,7 +211,7 @@ export default function CanFrameEditor() {
             >
               {availableBuses.map((bus) => (
                 <option key={bus} value={bus}>
-                  {t("canEditor.busLabel", { bus })}
+                  {t("common:busNumber", { bus })}
                 </option>
               ))}
             </Select>

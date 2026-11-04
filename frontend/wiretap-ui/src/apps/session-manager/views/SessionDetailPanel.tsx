@@ -102,9 +102,7 @@ export default function SessionDetailPanel({
     <div className="w-64 h-full min-h-0 border-l border-default bg-surface flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-default">
-        <span className="text-sm font-medium text-primary capitalize">
-          {selectedNode.type === "edge" ? t("detail.connectionHeader") : selectedNode.type} {t("detail.headerSuffix")}
-        </span>
+        <span className="text-sm font-medium text-primary">{t(`detail.headers.${selectedNode.type}`)}</span>
         <IconButton
           onClick={() => setSelectedNode(null)}
           size="sm"
@@ -684,7 +682,7 @@ function VirtualSignalGenControls({ profile, sessionId, sessionState }: { profil
                 onChange={(e) => handleToggle(bs.bus, e.target.checked)}
                 size="sm"
               />
-              <span className="text-xs text-primary w-10">{t("detail.signalGen.busLabel", { bus: bs.bus })}</span>
+              <span className="text-xs text-primary w-10">{t("common:busNumber", { bus: bs.bus })}</span>
             </label>
             <Input
               type="number"

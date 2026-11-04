@@ -122,11 +122,11 @@ export default function TransmitHistoryView({ sessionId }: TransmitHistoryViewPr
       return <Check size={12} className={textDataGreen} />;
     }
     return (
-      <span title={row.error_msg ?? "Transmit failed"}>
+      <span title={row.error_msg ?? t("history.transmitFailed")}>
         <X size={12} className={textDanger} />
       </span>
     );
-  }, [rows]);
+  }, [rows, t]);
 
   const handleExport = useCallback(async () => {
     if (!sessionId || totalCount === 0) return;
@@ -182,9 +182,7 @@ export default function TransmitHistoryView({ sessionId }: TransmitHistoryViewPr
         <div className={emptyStateContainer}>
           <div className={emptyStateText}>
             <p className={emptyStateHeading}>{t("history.emptyHeading")}</p>
-            <p className={emptyStateDescription}>
-              Transmitted frames will appear here.
-            </p>
+            <p className={emptyStateDescription}>{t("history.emptyDescription")}</p>
           </div>
         </div>
       )}
@@ -227,7 +225,7 @@ export default function TransmitHistoryView({ sessionId }: TransmitHistoryViewPr
                   title={t("history.exportCsvTooltip")}
                 >
                   <Download size={14} />
-                  <span className="text-sm ml-1">{isExporting ? "Exporting…" : "Export"}</span>
+                  <span className="text-sm ml-1">{isExporting ? t("history.exporting") : t("common:actions.export")}</span>
                 </Button>
                 <Button
                   onClick={clear}
@@ -263,7 +261,7 @@ export default function TransmitHistoryView({ sessionId }: TransmitHistoryViewPr
             autoScroll={isLive}
             autoFit={pageSizeSetting === "auto"}
             onFitChange={setAutoRows}
-            emptyMessage={isLoading ? "Loading…" : "No frames to display"}
+            emptyMessage={isLoading ? t("common:states.loading") : t("history.noFrames")}
             renderRowStatus={renderRowStatus}
             useLocalTimezone={useLocalTimezone}
           />

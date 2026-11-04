@@ -235,7 +235,7 @@ function TransmitInner() {
             banner
             action={
               <Button onClick={clearError} variant="link" tone="danger" size="sm">
-                Dismiss
+                {t("common:actions.dismiss")}
               </Button>
             }
           >

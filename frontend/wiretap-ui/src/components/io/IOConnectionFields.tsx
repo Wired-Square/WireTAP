@@ -616,7 +616,7 @@ export default function IOConnectionFields({
             className={`flex items-center gap-3 py-1.5 ${idx > 0 ? `border-t ${borderDefault}` : ""}`}
           >
             <span className={`${textMedium} w-14 shrink-0`}>
-              {t("ioProfileDialog.virtual.busLabel", { bus: iface.bus })}
+              {t("common:busNumber", { bus: iface.bus })}
             </span>
             <Input
               size="lg"

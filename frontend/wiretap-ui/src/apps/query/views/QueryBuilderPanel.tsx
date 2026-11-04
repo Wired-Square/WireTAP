@@ -10,7 +10,8 @@ import { useTranslation } from "react-i18next";
 import { ListPlus, ChevronRight, ChevronDown } from "lucide-react";
 import {
   useQueryStore,
-  QUERY_TYPE_INFO,
+  QUERY_TYPES,
+  queryTypeLabel,
   CONTEXT_PRESETS,
   type QueryType,
   type SelectedSignal,
@@ -312,7 +313,6 @@ export default function QueryBuilderPanel({
     [contextWindow, setContextWindow]
   );
 
-  const queryInfo = QUERY_TYPE_INFO[queryType];
   const showByteIndex = queryType === "byte_changes" || queryType === "distribution";
   const showMirrorValidation = queryType === "mirror_validation";
   const showMuxStatistics = queryType === "mux_statistics";
@@ -566,13 +566,13 @@ export default function QueryBuilderPanel({
             disabled={disabled}
             className="mt-1"
           >
-            {Object.entries(QUERY_TYPE_INFO).map(([key, info]) => (
-              <option key={key} value={key}>
-                {info.label}
+            {QUERY_TYPES.map((type) => (
+              <option key={type} value={type}>
+                {queryTypeLabel(type)}
               </option>
             ))}
           </Select>
-          <p className={`text-xs ${textSecondary} mt-1`}>{queryInfo.description}</p>
+          <p className={`text-xs ${textSecondary} mt-1`}>{t(`types.${queryType}.description`)}</p>
         </div>
 
         {/* Parameters — vary by query type */}

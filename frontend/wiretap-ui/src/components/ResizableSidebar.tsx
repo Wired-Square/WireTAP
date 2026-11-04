@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect, type ReactNode } from "react";
 import { PanelLeftClose, PanelLeft } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { iconMd } from "../styles/spacing";
 import {
   bgPrimary,
@@ -36,6 +37,7 @@ export default function ResizableSidebar({
 }: Props) {
   const [width, setWidth] = useState(defaultWidth);
   const [isResizing, setIsResizing] = useState(false);
+  const { t } = useTranslation();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
 
@@ -111,7 +113,7 @@ export default function ResizableSidebar({
           <IconButton
             onClick={handleToggleCollapse}
             size="sm"
-            title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            title={isCollapsed ? t("sidebar.expand") : t("sidebar.collapse")}
           >
             {isCollapsed ? (
               <PanelLeft className={iconMd} />

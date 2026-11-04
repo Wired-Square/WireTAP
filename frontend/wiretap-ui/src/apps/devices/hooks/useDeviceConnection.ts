@@ -14,6 +14,7 @@
 // open requests at wslib-framelink.
 
 import { useCallback } from "react";
+import i18n from "i18next";
 import { useDevicesStore } from "../stores/devicesStore";
 import { useProvisioningStore } from "../../provisioning/stores/provisioningStore";
 import {
@@ -70,7 +71,7 @@ export function useDeviceConnection(): DeviceConnection {
         const { ui, data } = useDevicesStore.getState();
         if (ui.transports.bleProv) return;
         if (!data.selectedBleId) {
-          throw new Error("BLE not available for this device");
+          throw new Error(i18n.t("devices:connection.noBle"));
         }
         const deviceId = data.selectedBleId;
 
@@ -110,7 +111,7 @@ export function useDeviceConnection(): DeviceConnection {
         const { ui, data } = useDevicesStore.getState();
         if (ui.transports.ipFrameLink) return;
         if (!data.selectedAddress) {
-          throw new Error("No FrameLink address for this device");
+          throw new Error(i18n.t("devices:connection.noFrameLinkAddress"));
         }
         useDevicesStore.getState().setTransport("ipFrameLink", true);
       },

@@ -2,6 +2,7 @@
 // tab strip of icon-and-label rows, and a toggle that folds it to the icons.
 
 import { type LucideIcon, PanelLeftClose, PanelLeft } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { iconMd } from "../styles/spacing";
 import { bgPrimary, borderDefault } from "../styles";
 import { IconButton } from "./Button";
@@ -28,6 +29,7 @@ export default function AppSideBar({
   collapsed = false,
   onToggleCollapsed,
 }: AppSideBarProps) {
+  const { t } = useTranslation();
   return (
     <aside
       className={`${collapsed ? "w-14" : "w-64"} ${bgPrimary} border-r ${borderDefault} flex flex-col overflow-hidden transition-all duration-200`}
@@ -37,7 +39,7 @@ export default function AppSideBar({
           <IconButton
             onClick={onToggleCollapsed}
             size="sm"
-            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            title={collapsed ? t("sidebar.expand") : t("sidebar.collapse")}
           >
             {collapsed ? (
               <PanelLeft className={iconMd} />

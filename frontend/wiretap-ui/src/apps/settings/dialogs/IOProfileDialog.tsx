@@ -111,7 +111,7 @@ export default function IOProfileDialog({
     const { device_id, timeout: timeoutStr, interfaces } = profileForm.connection;
     const timeout = Number(timeoutStr) || 5;
     if (!device_id || !interfaces?.length) {
-      setFlError("Device ID and interfaces are required");
+      setFlError(t("ioProfileDialog.framelink.deviceIdRequired"));
       return;
     }
     setFlLoading(true);
@@ -140,7 +140,7 @@ export default function IOProfileDialog({
     } finally {
       setFlLoading(false);
     }
-  }, [profileForm]);
+  }, [profileForm, t]);
 
   // Auto-fetch signals when dialog opens for a framelink profile with valid connection
   useEffect(() => {

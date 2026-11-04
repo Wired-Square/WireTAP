@@ -18,8 +18,6 @@
   },
   "detail": {
     "emptyPrompt": "Select a node or edge to view details",
-    "headerSuffix": "Details",
-    "connectionHeader": "Connection",
     "sessionNotFound": "Session not found",
     "profileNotFound": "Profile not found",
     "appNotFound": "App not found",
@@ -83,13 +81,18 @@
       "addBus": "Add bus",
       "removeBus": "Remove bus {{bus}}",
       "removeMapping": "Remove bus{{bus}} mapping",
-      "busLabel": "Bus {{bus}}",
       "hz": "Hz"
     },
     "uptime": {
       "secondsAgo": "{{count}}s ago",
       "minutesAgo": "{{count}}m ago",
       "hoursMinutesAgo": "{{hours}}h {{minutes}}m ago"
+    },
+    "headers": {
+      "session": "Session Details",
+      "source": "Source Details",
+      "app": "App Details",
+      "edge": "Connection Details"
     }
   },
   "node": {
@@ -140,6 +143,70 @@
       "profile": "Profile",
       "details": "Details"
     },
-    "profileTitle": "Profile: {{name}}"
+    "profileTitle": "Profile: {{name}}",
+    "events": {
+      "modes": {
+        "live": "Live",
+        "recorded": "Playback",
+        "capture": "Capture",
+        "replaying": "Replaying"
+      },
+      "transitions": {
+        "suspended": "Suspended",
+        "switched_to_capture": "Switched to capture",
+        "resuming": "Resuming",
+        "returned_to_live": "Returned to live",
+        "capabilities_changed": "Capabilities changed"
+      },
+      "listener": "Listener",
+      "listeners_one": "{{count}} listener",
+      "listeners_other": "{{count}} listeners",
+      "created": "Session created ({{mode}})",
+      "joined": "{{who}} joined ({{listeners}})",
+      "left": "{{who}} left ({{listeners}})",
+      "destroyed": "Session destroyed",
+      "destroyedReset": "Session destroyed (reset)",
+      "state": "State: {{state}}",
+      "transitioned": "{{transition}} ({{mode}})",
+      "speed": "Speed: {{speed}}x",
+      "reconfigured": "Session reconfigured",
+      "captureChanged": "Session captures changed",
+      "streamCompleted": "Stream completed",
+      "streamEnded": "Reason: {{reason}}, capture: {{capture}}",
+      "noCapture": "none",
+      "captureItems_one": "{{count}} item",
+      "captureItems_other": "{{count}} items",
+      "deviceConnected": "{{source}} connected: {{address}}",
+      "deviceConnectedOnBus": "{{source}} connected: {{address}} (bus {{bus}})",
+      "busCount_one": "{{count}} bus",
+      "busCount_other": "{{count}} buses",
+      "probeFailed": "failed",
+      "probe": "{{source}} at {{address}}: {{outcome}}",
+      "probeCached": "{{source}} at {{address}}: {{outcome}} (cached)",
+      "mcpConnected": "MCP client connected ({{client}})",
+      "mcpDisconnected": "MCP client disconnected ({{client}})",
+      "stats": "State: {{state}}, Listeners: {{listeners}}, Frames: {{frames}}",
+      "cleared": "Log cleared"
+    },
+    "kinds": {
+      "created": "Created",
+      "joined": "Joined",
+      "left": "Left",
+      "destroyed": "Destroyed",
+      "state": "State",
+      "transitioned": "Transition",
+      "stream_ended": "Ended",
+      "stream_complete": "Complete",
+      "error": "Error",
+      "speed": "Speed",
+      "reconfigured": "Reconfigured",
+      "capture_changed": "Capture",
+      "stats": "Stats",
+      "device_connected": "Connected",
+      "device_probe": "Probe",
+      "mcp_connected": "MCP Connect",
+      "mcp_disconnected": "MCP Disconnect",
+      "cleared": "Cleared"
+    }
   }
 }

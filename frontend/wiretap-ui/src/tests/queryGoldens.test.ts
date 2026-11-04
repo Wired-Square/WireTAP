@@ -7,6 +7,7 @@ import { describe, it, expect, vi } from "vitest";
 
 vi.stubEnv("TZ", "Australia/Melbourne");
 
+import "../i18n";
 import { buildQuerySpec, type QueryParams, type QueryType } from "../apps/query/stores/queryStore";
 import type { TimeBounds } from "../components/TimeBoundsInput";
 import { datetimeLocalToMicros } from "../utils/timeFormat";

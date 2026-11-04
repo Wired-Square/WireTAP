@@ -10,7 +10,8 @@
   },
   "errors": {
     "queryTitle": "Query Error",
-    "generic": "An error occurred"
+    "generic": "An error occurred",
+    "patternRequired": "Enter a pattern to search for"
   },
   "topBar": {
     "noProfile": "No WireTAP backend profile selected",
@@ -186,5 +187,53 @@
     "boundedBy": "Bounded: {{start}} → {{end}}",
     "cancelTooltip": "Cancel and remove query",
     "removeTooltip": "Remove from queue"
+  },
+  "types": {
+    "byte_changes": {
+      "label": "Byte Changes",
+      "description": "Find when a specific byte in a frame changed value"
+    },
+    "frame_changes": {
+      "label": "Frame Changes",
+      "description": "Find when any byte in a frame's payload changed"
+    },
+    "mirror_validation": {
+      "label": "Mirror Validation",
+      "description": "Find timestamps where mirror frames don't match their source"
+    },
+    "mux_statistics": {
+      "label": "Mux Statistics",
+      "description": "Per-mux-case MIN/MAX/AVG statistics for each byte position"
+    },
+    "first_last": {
+      "label": "First/Last Occurrence",
+      "description": "Find the first or last occurrence of a frame matching a pattern"
+    },
+    "frequency": {
+      "label": "Frame Frequency",
+      "description": "Analyse transmission frequency over time"
+    },
+    "distribution": {
+      "label": "Value Distribution",
+      "description": "Find all unique values for a byte range"
+    },
+    "gap_analysis": {
+      "label": "Gap Analysis",
+      "description": "Find transmission gaps longer than a threshold"
+    },
+    "pattern_search": {
+      "label": "Pattern Search",
+      "description": "Search for a byte pattern across all frame IDs"
+    },
+    "frame_inventory": {
+      "label": "Frame Inventory",
+      "description": "Every frame id in the source with its count, first and last sighting"
+    }
+  },
+  "queryName": {
+    "byte": "[byte {{index}}]",
+    "muxByte": "[mux byte {{index}}]",
+    "buckets": "[{{ms}}ms buckets]",
+    "extended": "(ext)"
   }
 }

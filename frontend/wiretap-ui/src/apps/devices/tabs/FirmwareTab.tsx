@@ -96,7 +96,7 @@ function UploadProgressBar({
           {pctStr}% — {sentKBStr} / {totalKBStr} KB
         </span>
         <span className={textSecondary}>
-          {kbpsStr} kB/s · ETA {etaText}
+          {t("firmware.rate", { rate: kbpsStr, eta: etaText })}
         </span>
       </div>
       <div className="h-2 w-full bg-tertiary rounded overflow-hidden">

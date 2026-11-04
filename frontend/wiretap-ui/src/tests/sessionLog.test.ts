@@ -18,6 +18,7 @@ const invoke = vi.fn(async (cmd: string, args?: { after_id: number | null }) => 
 vi.mock("@tauri-apps/api/core", () => ({ invoke, Channel: class {} }));
 vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn(async () => () => {}), emit: vi.fn(async () => {}) }));
 
+await import("../i18n");
 const { useSessionLogStore, describeEntry, displayKind, profileNames } = await import(
   "../apps/session-manager/stores/sessionLogStore"
 );
@@ -161,6 +162,9 @@ describe("the ring's entries against the old subscription's golden", () => {
           return { ...row, kind: "transitioned", details: "Switched to capture (Replaying)" };
         case "Session buffers changed":
           return { ...row, details: "Session captures changed" };
+        // A probe's bus count is a plural, where the old one wrote "bus(es)".
+        case "gvret_tcp at 10.0.0.2:23: 2 bus(es)":
+          return { ...row, sessionId: null, details: "gvret_tcp at 10.0.0.2:23: 2 buses" };
         default:
           // A probe is about a profile, not a session.
           return row.kind === "device_probe" ? { ...row, sessionId: null } : row;

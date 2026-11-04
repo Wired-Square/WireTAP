@@ -7,6 +7,7 @@
 
 import { useEffect } from "react";
 import { listen } from "@tauri-apps/api/event";
+import i18n from "i18next";
 import { useDevicesStore } from "./stores/devicesStore";
 import { useProvisioningStore } from "../provisioning/stores/provisioningStore";
 import { deviceScanStop, releaseDevice } from "../../api/deviceScan";
@@ -45,13 +46,13 @@ export default function Devices() {
 
       listen<ProvisioningStatus>("ble-provision-status", (event) => {
         const { status, status_code } = event.payload;
-        setStatusMessage(`Device status: ${status}`);
+        setStatusMessage(i18n.t("devices:provisioning.deviceStatus", { status }));
 
         if (status_code === STATUS_CONNECTED) {
           setProvisionState("connected");
         } else if (status_code === STATUS_ERROR) {
           setProvisionState("error");
-          setProvisionError("Device reported an error while connecting to WiFi");
+          setProvisionError(i18n.t("devices:provisioning.wifiError"));
         }
       }),
       listen<string>("ble-provision-ip", (event) => {

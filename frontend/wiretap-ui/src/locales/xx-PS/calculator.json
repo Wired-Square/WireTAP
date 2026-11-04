@@ -21,22 +21,43 @@
     "setActive": "⟦Set as active value⟧",
     "deleteFromMemory": "⟦Delete from memory⟧",
     "copyAllHistory": "⟦Copy all history items⟧",
-    "copyScaleFactor": "⟦Copy scale factor⟧"
+    "copyScaleFactor": "⟦Copy scale factor⟧",
+    "stopRotation": "⟦Stop auto-rotation⟧",
+    "startRotation": "⟦Start auto-rotation⟧",
+    "memoryCount": "⟦Memory ({{count}})⟧",
+    "memoryEmpty": "⟦Memory empty⟧"
   },
   "labels": {
     "hex": "⟦Hex⟧",
     "unsigned": "⟦Unsigned⟧",
     "text": "⟦Text⟧",
-    "binary": "⟦Binary⟧"
+    "binary": "⟦Binary⟧",
+    "stringPlaceholder": "⟦Hello⟧",
+    "group": "⟦Group {{index}}⟧",
+    "bitCount_one": "⟦{{count}} bit⟧",
+    "bitCount_other": "⟦{{count}} bits⟧",
+    "signedTwos": "⟦Signed (2's)⟧",
+    "signedOnes": "⟦Signed (1's)⟧",
+    "signMagnitude": "⟦Sign-Magnitude⟧"
   },
   "dialogs": {
     "groupingMode": {
       "title": "⟦Grouping Mode⟧",
       "customPlaceholderBits": "⟦8,8,16,2,2⟧",
-      "customPlaceholderBytes": "⟦1,1,2,2⟧"
+      "customPlaceholderBytes": "⟦1,1,2,2⟧",
+      "preset": "⟦Preset⟧",
+      "orCustom": "⟦or custom⟧",
+      "unit": "⟦Unit⟧",
+      "bits": "⟦Bits⟧",
+      "bytes": "⟦Bytes⟧",
+      "groupSizes": "⟦Group Sizes⟧",
+      "bitSizesHint": "⟦Comma-separated list of bit sizes⟧",
+      "byteSizesHint": "⟦Comma-separated list of byte sizes⟧",
+      "applyCustom": "⟦Apply Custom⟧"
     },
     "memory": {
-      "title": "⟦Memory⟧"
+      "title": "⟦Memory⟧",
+      "copyAll": "⟦Copy All⟧"
     },
     "byteOrder": {
       "title": "⟦Byte Order⟧"
@@ -46,7 +67,17 @@
     },
     "scale": {
       "title": "⟦Scale Calculator⟧",
-      "valuePlaceholder": "⟦e.g. 92647⟧"
+      "valuePlaceholder": "⟦e.g. 92647⟧",
+      "rawValue": "⟦Raw Value (from hex)⟧",
+      "targetValue": "⟦Target Value (desired result)⟧",
+      "scaleFactor": "⟦Scale Factor (DBC)⟧",
+      "formula": "⟦raw × {{scale}} = physical⟧"
     }
+  },
+  "byteOrder": {
+    "little": "⟦Little⟧",
+    "big": "⟦Big⟧",
+    "midLittle": "⟦Mid-Little⟧",
+    "midBig": "⟦Mid-Big⟧"
   }
 }
