@@ -1,5 +1,6 @@
 // ui/src/apps/settings/components/SecurePasswordField.tsx
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Shield, ShieldAlert, Eye, EyeOff } from "lucide-react";
 import { iconMd, iconXs } from "../../styles/spacing";
 import { Input } from "../../components/forms";
@@ -28,9 +29,10 @@ export default function SecurePasswordField({
   hasLegacyPassword,
   onMigrate,
   placeholder = "",
-  label = "Password",
+  label,
   optional = false,
 }: Props) {
+  const { t } = useTranslation("common");
   const [showPassword, setShowPassword] = useState(false);
 
   // Determine the display state
@@ -40,11 +42,11 @@ export default function SecurePasswordField({
   return (
     <div>
       <label className={`${labelDefault} mb-2`}>
-        {label} {optional && <span className="text-muted">(optional)</span>}
+        {label ?? t("securePassword.label")} {optional && <span className="text-muted">{t("securePassword.optional")}</span>}
         {isSecurelyStored && (
           <span className="ml-2 inline-flex items-center gap-1 text-xs text-accent-success">
             <Shield className={iconXs} />
-            Secure
+            {t("securePassword.secure")}
           </span>
         )}
       </label>
@@ -58,12 +60,12 @@ export default function SecurePasswordField({
           action={
             onMigrate && (
               <Button onClick={onMigrate} variant="solid" tone="warning" size="sm">
-                Migrate
+                {t("securePassword.migrate")}
               </Button>
             )
           }
         >
-          Password stored in plain text. Migrate to secure storage.
+          {t("securePassword.plainTextWarning")}
         </Alert>
       )}
 
@@ -84,7 +86,7 @@ export default function SecurePasswordField({
           onClick={() => setShowPassword(!showPassword)}
           size="sm"
           className="absolute right-2 top-1/2 -translate-y-1/2"
-          title={showPassword ? "Hide password" : "Show password"}
+          title={showPassword ? t("securePassword.hide") : t("securePassword.show")}
         >
           {showPassword ? (
             <EyeOff className={iconMd} />
@@ -96,7 +98,7 @@ export default function SecurePasswordField({
 
       {hasStoredPassword && (
         <p className={`mt-1 ${helpText} text-accent-success`}>
-          Password stored in system keychain. Leave empty to keep current password.
+          {t("securePassword.storedHint")}
         </p>
       )}
     </div>

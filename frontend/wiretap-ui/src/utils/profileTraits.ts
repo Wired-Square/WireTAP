@@ -3,6 +3,7 @@
 // How protocols and profile kinds are drawn. What a kind or profile can do is
 // Rust's answer, served through `profileBusStore`.
 
+import i18n from "i18next";
 import type { IOProfile } from "../hooks/useSettings";
 import type { BadgeTone } from "../components/Badge";
 import type { RegisterType } from "../api/io";
@@ -11,21 +12,18 @@ import type { FrameProtocol as Protocol } from "../generated/FrameProtocol";
 export type { Protocol };
 
 /**
- * How each protocol is spelled on screen. One map so the source picker's per-bus
+ * How each protocol is spelled on screen. One function so the source picker's per-bus
  * dropdown and the Data IO list agree — they read "CAN FD" and "CAN-FD" for the
- * same bus before this existed.
+ * same bus before this existed. The CAN names are tokens; the rest are translated.
  */
-export const PROTOCOL_LABELS: Record<Protocol, string> = {
+const PROTOCOL_TOKENS: Partial<Record<Protocol, string>> = {
   can: "CAN",
   canfd: "CAN-FD",
-  modbus: "Modbus",
-  modbus_rtu: "Modbus RTU",
-  serial: "Serial",
 };
 
 /** A protocol's display label, falling back to the raw value for an unknown one. */
 export function protocolLabel(protocol: string): string {
-  return PROTOCOL_LABELS[protocol as Protocol] ?? protocol;
+  return PROTOCOL_TOKENS[protocol as Protocol] ?? i18n.t(`common:protocols.${protocol}`, { defaultValue: protocol });
 }
 
 /** The hue a protocol's badge wears, the same on every screen that tags one. */

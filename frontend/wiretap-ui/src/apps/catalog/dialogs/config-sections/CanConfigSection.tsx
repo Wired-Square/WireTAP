@@ -2,6 +2,7 @@
 // CAN protocol configuration section for unified config dialog
 
 import { useState, useCallback, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { Network, Plus, Trash2, ChevronDown, ChevronRight } from "lucide-react";
 import { iconMd, iconXs, flexRowGap2 } from "../../../../styles/spacing";
 import { caption, textMedium } from "../../../../styles";
@@ -98,6 +99,7 @@ export default function CanConfigSection({
   headerFields,
   setHeaderFields,
 }: CanConfigSectionProps) {
+  const { t } = useTranslation("catalog");
   // State for inline add form
   const [isAddingField, setIsAddingField] = useState(false);
   const [newFieldType, setNewFieldType] = useState<CanFieldType>("source_address");
@@ -222,8 +224,8 @@ export default function CanConfigSection({
               onChange={(e) => setDefaultEndianness(e.target.value as "little" | "big")}
               size="lg"
             >
-              <option value="little">Little Endian</option>
-              <option value="big">Big Endian</option>
+              <option value="little">{t("shared.littleEndian")}</option>
+              <option value="big">{t("shared.bigEndian")}</option>
             </Select>
             <p className={`mt-1 ${caption}`}>
               Byte order used for multi-byte signals
@@ -311,7 +313,7 @@ export default function CanConfigSection({
                 className="text-xs"
               >
                 {showFrameIdMaskPicker ? <ChevronDown className={iconXs} /> : <ChevronRight className={iconXs} />}
-                {showFrameIdMaskPicker ? "Hide" : "Show"} bit picker
+                {showFrameIdMaskPicker ? t("shared.hideBitPicker") : t("shared.showBitPicker")}
               </Button>
             </div>
             <div className={flexRowGap2}>
@@ -372,7 +374,7 @@ export default function CanConfigSection({
                   tone="success"
                 >
                   <Plus className={iconMd} />
-                  Add Field
+                  {t("shared.addField")}
                 </Button>
               )}
             </div>
@@ -395,7 +397,7 @@ export default function CanConfigSection({
                         <IconButton
                           onClick={() => toggleFieldPicker(index)}
                           size="sm"
-                          title={isFieldExpanded ? "Hide bit picker" : "Show bit picker"}
+                          title={isFieldExpanded ? t("shared.hideBitPicker") : t("shared.showBitPicker")}
                         >
                           {isFieldExpanded ? (
                             <ChevronDown className={iconMd} />
@@ -451,8 +453,8 @@ export default function CanConfigSection({
                           size="sm"
                           className="w-16"
                         >
-                          <option value="hex">Hex</option>
-                          <option value="decimal">Dec</option>
+                          <option value="hex">{t("common:frameIdFormat.hex")}</option>
+                          <option value="decimal">{t("common:frameIdFormat.dec")}</option>
                         </Select>
 
                         {/* Remove button */}
@@ -508,7 +510,7 @@ export default function CanConfigSection({
                       value={newFieldCustomName}
                       onChange={(e) => setNewFieldCustomName(e.target.value)}
                       className="flex-1"
-                      placeholder="Field name"
+                      placeholder={t("shared.fieldName")}
                       autoFocus
                     />
                   )}
@@ -519,8 +521,8 @@ export default function CanConfigSection({
                     onChange={(e) => setNewFieldFormat(e.target.value as HeaderFieldFormat)}
                     className="w-16"
                   >
-                    <option value="hex">Hex</option>
-                    <option value="decimal">Dec</option>
+                    <option value="hex">{t("common:frameIdFormat.hex")}</option>
+                    <option value="decimal">{t("common:frameIdFormat.dec")}</option>
                   </Select>
                 </div>
 
@@ -533,7 +535,7 @@ export default function CanConfigSection({
                       onClick={resetAddForm}
                       variant="ghost"
                     >
-                      Cancel
+                      {t("common:actions.cancel")}
                     </Button>
                     <Button
                       onClick={handleAddField}

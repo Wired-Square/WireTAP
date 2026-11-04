@@ -262,7 +262,7 @@ function FramePicker({
                 {buses.map((bus) => (
                   <div key={bus} className="flex items-center gap-0.5 text-2xs">
                     <span className="px-1.5 py-0.5 rounded bg-surface border border-default text-secondary">
-                      Bus {bus}
+                      {t("busNumber", { bus })}
                     </span>
                     <Button
                       onClick={() => onBulkSelect(bus, true)}

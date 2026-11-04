@@ -4,6 +4,7 @@
 // Provides a copy button for easy use.
 
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { Copy, Check } from "lucide-react";
 import { iconMd, flexRowGap2 } from "../../styles/spacing";
 import { getCanSetupCommand } from "../../api/gs_usb";
@@ -19,6 +20,7 @@ interface Props {
 }
 
 export default function LinuxCanSetupHelper({ interfaceName, bitrate }: Props) {
+  const { t } = useTranslation("common");
   const [setupCommand, setSetupCommand] = useState("");
   const [copied, setCopied] = useState(false);
 
@@ -58,10 +60,8 @@ export default function LinuxCanSetupHelper({ interfaceName, bitrate }: Props) {
 
   return (
     <Alert tone="warning">
-      <p className="font-medium mb-2">Linux setup required</p>
-      <p className="text-xs mb-2">
-        Run this command in your terminal to configure the CAN interface:
-      </p>
+      <p className="font-medium mb-2">{t("linuxCanSetup.title")}</p>
+      <p className="text-xs mb-2">{t("linuxCanSetup.instruction")}</p>
       <div className={flexRowGap2}>
         <code className="flex-1 p-2 bg-warning rounded text-xs font-mono break-all">
           {setupCommand}
@@ -70,7 +70,7 @@ export default function LinuxCanSetupHelper({ interfaceName, bitrate }: Props) {
           onClick={handleCopy}
           tone="warning"
           size="sm"
-          title={copied ? "Copied!" : "Copy to clipboard"}
+          title={copied ? t("states.copied") : t("actions.copyToClipboard")}
         >
           {copied ? (
             <Check className={`${iconMd} text-accent-success`} />
@@ -79,9 +79,7 @@ export default function LinuxCanSetupHelper({ interfaceName, bitrate }: Props) {
           )}
         </IconButton>
       </div>
-      <p className="text-xs mt-2">
-        Note: You may need to adjust udev rules for non-root access, or run WireTAP with elevated privileges.
-      </p>
+      <p className="text-xs mt-2">{t("linuxCanSetup.note")}</p>
     </Alert>
   );
 }

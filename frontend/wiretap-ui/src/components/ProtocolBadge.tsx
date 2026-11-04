@@ -4,6 +4,7 @@
 // optional recorded indicator. Used in Decoder, Discovery, and Transmit top bars.
 
 import { History } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { iconXs } from "../styles/spacing";
 import { Badge } from "./Badge";
 
@@ -20,10 +21,10 @@ export interface ProtocolBadgeProps {
   isRecorded?: boolean;
 }
 
-const LIGHT: Record<StreamingStatus, { colour: string; title: string }> = {
-  live: { colour: "bg-accent-success", title: "Live" },
-  paused: { colour: "bg-accent-warning", title: "Paused" },
-  stopped: { colour: "bg-accent-danger", title: "Stopped" },
+const LIGHT_COLOURS: Record<StreamingStatus, string> = {
+  live: "bg-accent-success",
+  paused: "bg-accent-warning",
+  stopped: "bg-accent-danger",
 };
 
 export default function ProtocolBadge({
@@ -32,11 +33,12 @@ export default function ProtocolBadge({
   isStreaming,
   isRecorded = false,
 }: ProtocolBadgeProps) {
-  const light = LIGHT[status ?? (isStreaming ? "live" : "stopped")];
+  const { t } = useTranslation("common");
+  const light = status ?? (isStreaming ? "live" : "stopped");
 
   return (
-    <Badge size="lg" className="gap-1.5" title={isRecorded ? "Recorded data source" : "Live data source"}>
-      <span className={`w-2 h-2 rounded-full ${light.colour}`} title={light.title} />
+    <Badge size="lg" className="gap-1.5" title={isRecorded ? t("dataSource.recorded") : t("dataSource.live")}>
+      <span className={`w-2 h-2 rounded-full ${LIGHT_COLOURS[light]}`} title={t(`status.${light}`)} />
       {label ?? "—"}
       {isRecorded && <History className={iconXs} />}
     </Badge>

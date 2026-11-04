@@ -3,6 +3,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
+import i18n from "../i18n";
 
 const invoke = vi.fn(async (_cmd: string, _args?: unknown) => null);
 vi.mock("@tauri-apps/api/core", () => ({ invoke, Channel: class {} }));
@@ -92,7 +93,7 @@ describe("Discovery's Modbus poll switch", () => {
     root = createRoot(host);
     await act(async () => root.render(<Discovery />));
 
-    const resume = [...host.querySelectorAll("button")].find((b) => b.textContent === "modbusPoll.resume")!;
+    const resume = [...host.querySelectorAll("button")].find((b) => b.textContent === i18n.t("discovery:modbusPoll.resume"))!;
     await act(async () => resume.click());
 
     expect(resumeWithNewCapture).toHaveBeenCalledOnce();

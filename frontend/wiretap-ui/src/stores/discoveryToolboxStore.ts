@@ -74,16 +74,16 @@ export type ToolResultKey =
  */
 export const TOOL_TAB_CONFIG: Record<
   string,
-  { tabId: string; label: string; resultKey: ToolResultKey; ownsData?: boolean; protocol?: Protocol }
+  { tabId: string; labelKey: string; resultKey: ToolResultKey; ownsData?: boolean; protocol?: Protocol }
 > = {
-  'message-order':        { tabId: 'tool:message-order',        label: 'Frame Order',     resultKey: 'messageOrderResults' },
-  'changes':              { tabId: 'tool:changes',              label: 'Payload Changes', resultKey: 'changesResults' },
-  'checksum-discovery':   { tabId: 'tool:checksum-discovery',   label: 'Checksums',       resultKey: 'checksumDiscoveryResults' },
-  'serial-framing':       { tabId: 'tool:serial-framing',       label: 'Serial Framing',  resultKey: 'serialFramingResults' },
-  'serial-payload':       { tabId: 'tool:serial-payload',       label: 'Serial Payload',  resultKey: 'serialPayloadResults' },
-  'modbus-register-scan': { tabId: 'tool:modbus-register-scan', label: 'Register Scan',   resultKey: 'modbusRegisterScanResults', ownsData: true, protocol: 'modbus' },
-  'modbus-unit-scan':     { tabId: 'tool:modbus-unit-scan',     label: 'Unit ID Scan',    resultKey: 'modbusUnitIdScanResults',   ownsData: true, protocol: 'modbus' },
-  'modbus-function-codes':{ tabId: 'tool:modbus-function-codes',label: 'Function Codes',  resultKey: 'modbusFcProbeResults',      ownsData: true, protocol: 'modbus' },
+  'message-order':        { tabId: 'tool:message-order',        labelKey: 'tabs.frameOrder',      resultKey: 'messageOrderResults' },
+  'changes':              { tabId: 'tool:changes',              labelKey: 'tabs.payloadChanges',  resultKey: 'changesResults' },
+  'checksum-discovery':   { tabId: 'tool:checksum-discovery',   labelKey: 'tabs.checksums',       resultKey: 'checksumDiscoveryResults' },
+  'serial-framing':       { tabId: 'tool:serial-framing',       labelKey: 'tabs.serialFraming',   resultKey: 'serialFramingResults' },
+  'serial-payload':       { tabId: 'tool:serial-payload',       labelKey: 'tabs.serialPayload',   resultKey: 'serialPayloadResults' },
+  'modbus-register-scan': { tabId: 'tool:modbus-register-scan', labelKey: 'tabs.modbusScan',      resultKey: 'modbusRegisterScanResults', ownsData: true, protocol: 'modbus' },
+  'modbus-unit-scan':     { tabId: 'tool:modbus-unit-scan',     labelKey: 'tabs.modbusUnitScan',  resultKey: 'modbusUnitIdScanResults',   ownsData: true, protocol: 'modbus' },
+  'modbus-function-codes':{ tabId: 'tool:modbus-function-codes',labelKey: 'tabs.functionCodes',   resultKey: 'modbusFcProbeResults',      ownsData: true, protocol: 'modbus' },
 };
 
 /** The table read the other way round. One index, so a third per-tab fact needs no fourth. */

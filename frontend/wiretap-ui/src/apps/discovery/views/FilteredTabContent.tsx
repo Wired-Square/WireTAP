@@ -16,7 +16,7 @@ import ContextMenu, { type ContextMenuItem } from "../../../components/ContextMe
 import { bgDataView } from "../../../styles";
 import { emptyStateText } from "../../../styles/typography";
 import { formatFrameId } from "../../../utils/frameIds";
-import { frameCopyMenuItems, frameInspectMenuItem, menuSeparator } from "../components/frameContextMenuItems";
+import { frameCopyMenuItems, frameInspectMenuItem, menuSeparator, useColumnVisibilityMenuItems } from "../components/frameContextMenuItems";
 import type { FrameRow } from "../components";
 import type { CaptureMetadata } from "../../../api/capture";
 import { formatIsoUs, formatHumanUs, renderDeltaNode } from "../../../utils/timeFormat";
@@ -59,10 +59,6 @@ export default function FilteredTabContent({
   const showAsciiColumn = useDiscoveryUIStore((s) => s.showAsciiColumn);
   const showBusColumn = useDiscoveryUIStore((s) => s.showBusColumn);
   const showSourceColumn = useDiscoveryUIStore((s) => s.showSourceColumn);
-  const toggleShowRefColumn = useDiscoveryUIStore((s) => s.toggleShowRefColumn);
-  const toggleShowAsciiColumn = useDiscoveryUIStore((s) => s.toggleShowAsciiColumn);
-  const toggleShowSourceColumn = useDiscoveryUIStore((s) => s.toggleShowSourceColumn);
-  const toggleShowBusColumn = useDiscoveryUIStore((s) => s.toggleShowBusColumn);
 
   // Auto by default; the table measures itself and reports how many rows fit.
   const [pageSizeSetting, setPageSizeSetting] = useState<PageSize>("auto");
@@ -180,7 +176,7 @@ export default function FilteredTabContent({
       ...frameCopyMenuItems({ frame, t, formatId }),
       menuSeparator,
       {
-        label: 'Unfilter',
+        label: t('contextMenu.unfilter'),
         icon: <Filter />,
         onClick: () => toggleFrameSelection(keyOf(frame)),
       },
@@ -189,13 +185,7 @@ export default function FilteredTabContent({
     ];
   }, [contextMenu, toggleFrameSelection, displayFrameIdFormat, t]);
 
-  // Header context menu items
-  const headerContextMenuItems: ContextMenuItem[] = useMemo(() => [
-    { label: '# Column', checked: showRefColumn, onClick: toggleShowRefColumn },
-    { label: 'Bus Column', checked: showBusColumn, onClick: toggleShowBusColumn },
-    { label: 'ASCII Column', checked: showAsciiColumn, onClick: toggleShowAsciiColumn },
-    { label: 'Source Column', checked: showSourceColumn, onClick: toggleShowSourceColumn },
-  ], [showRefColumn, showBusColumn, showAsciiColumn, showSourceColumn, toggleShowRefColumn, toggleShowBusColumn, toggleShowAsciiColumn]);
+  const headerContextMenuItems = useColumnVisibilityMenuItems();
 
   if (filteredOutKeys.size === 0) {
     return (

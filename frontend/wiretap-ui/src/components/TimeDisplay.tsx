@@ -1,6 +1,7 @@
 // src/components/TimeDisplay.tsx
 
 import { useState, useMemo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useSettingsStore } from '../apps/settings/stores/settingsStore';
 import { LOCALE_TIME_24H } from '../constants';
 import { Button } from './Button';
@@ -39,6 +40,7 @@ export default function TimeDisplay({
   className = '',
   allowOverride = true,
 }: TimeDisplayProps) {
+  const { t } = useTranslation('common');
   const settingsTimezone = useSettingsStore((s) => s.display.timezone);
   const [override, setOverride] = useState<TimezoneMode | null>(null);
 
@@ -90,7 +92,7 @@ export default function TimeDisplay({
     return { formattedTime: time, formattedDate: dateStr };
   }, [timestamp, effectiveTimezone]);
 
-  const badgeLabel = effectiveTimezone === 'utc' ? 'UTC' : 'Local';
+  const badgeLabel = effectiveTimezone === 'utc' ? 'UTC' : t('timezone.local');
   const isOverridden = override !== null;
 
   const handleBadgeClick = useCallback(() => {
@@ -148,9 +150,7 @@ export default function TimeDisplay({
           size="xs"
           pressed={isOverridden}
           onClick={handleBadgeClick}
-          title={`Click to cycle timezone. Currently: ${badgeLabel}${
-            isOverridden ? ' (override)' : ' (default)'
-          }`}
+          title={t(isOverridden ? 'timezone.cycleOverride' : 'timezone.cycleDefault', { zone: badgeLabel })}
         >
           {badgeLabel}
         </Button>

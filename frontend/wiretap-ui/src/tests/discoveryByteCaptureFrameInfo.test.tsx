@@ -3,6 +3,7 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
+import "../i18n";
 
 const CAPTURE = { id: "cap_bytes", kind: "bytes", name: "bytes", count: 4096, start_time_us: 0, end_time_us: 1, persistent: true };
 const invoke = vi.fn(async (cmd: string, _args?: unknown): Promise<unknown> => {

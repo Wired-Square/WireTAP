@@ -1,6 +1,6 @@
 // ui/src/apps/discovery/views/DiscoveryFramesView.tsx
 import React, { useEffect, useRef, useMemo, memo, useState, useCallback } from "react";
-import { FileText, Hash, Network, Filter, Snowflake, RefreshCw, Target, Send, Gauge, Flag, Search, Play } from "lucide-react";
+import { FileText, Hash, Network, Snowflake, RefreshCw, Send, Gauge, Search, Play } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { iconSm, flexRowGap2 } from "../../../styles/spacing";
 import { formatIsoUs, formatHumanUs, renderDeltaNode } from "../../../utils/timeFormat";
@@ -35,7 +35,7 @@ import ContextMenu, { type ContextMenuItem } from "../../../components/ContextMe
 import { formatFrameId } from "../../../utils/frameIds";
 import { protocolLabel } from "../../../utils/profileTraits";
 import { openPanel } from "../../../utils/windowCommunication";
-import { canEditorFromFrame, frameCopyMenuItems, frameInspectMenuItem, menuSeparator } from "../components/frameContextMenuItems";
+import { addEventMenuItem, canEditorFromFrame, frameCopyMenuItems, frameInspectMenuItem, menuSeparator, selectionMenuItems, sendToTransmitMenuItem, useColumnVisibilityMenuItems } from "../components/frameContextMenuItems";
 import { useTransmitStore } from "../../../stores/transmitStore";
 import { useDashboardStore } from "../../../stores/dashboardStore";
 import { useSessionStore } from "../../../stores/sessionStore";
@@ -311,7 +311,6 @@ function DiscoveryFramesView({
 
   // Source address column toggle (J1939 and similar embed a sender ID in the frame)
   const showSourceColumn = useDiscoveryUIStore((s) => s.showSourceColumn);
-  const toggleShowSourceColumn = useDiscoveryUIStore((s) => s.toggleShowSourceColumn);
 
   // Auto-unfreeze when streaming stops
   React.useEffect(() => {
@@ -421,41 +420,31 @@ function DiscoveryFramesView({
     const items: ContextMenuItem[] = [
       ...frameCopyMenuItems({ frame, t, formatId }),
       menuSeparator,
-      {
-        label: 'Filter',
-        icon: <Filter />,
-        onClick: () => toggleFrameSelection(keyOf(frame as FrameMessage)),
-      },
-      {
-        label: 'Solo',
-        icon: <Target />,
-        onClick: () => { deselectAllFrames(); toggleFrameSelection(keyOf(frame as FrameMessage)); },
-      },
+      ...selectionMenuItems(t, {
+        onFilter: () => toggleFrameSelection(keyOf(frame as FrameMessage)),
+        onSolo: () => { deselectAllFrames(); toggleFrameSelection(keyOf(frame as FrameMessage)); },
+      }),
       menuSeparator,
       frameInspectMenuItem(frame, t),
+      sendToTransmitMenuItem(t, () => {
+        const sourceSessionId = useDiscoveryUIStore.getState().ioProfile;
+        useTransmitStore.getState().updateCanEditor(canEditorFromFrame(frame));
+        if (sourceSessionId) useSessionStore.getState().requestSessionJoin("transmit", sourceSessionId);
+        useTransmitStore.getState().setActiveTab("frame");
+        openPanel("transmit");
+      }),
       {
-        label: 'Send to Transmit',
-        icon: <Send />,
-        onClick: () => {
-          const sourceSessionId = useDiscoveryUIStore.getState().ioProfile;
-          useTransmitStore.getState().updateCanEditor(canEditorFromFrame(frame));
-          if (sourceSessionId) useSessionStore.getState().requestSessionJoin("transmit", sourceSessionId);
-          useTransmitStore.getState().setActiveTab("frame");
-          openPanel("transmit");
-        },
-      },
-      {
-        label: 'Add to Transmit queue',
+        label: t('contextMenu.addToTransmitQueue'),
         icon: <Send />,
         onClick: () => setShowBulkAddDialog(true),
       },
       {
-        label: 'Replay frames',
+        label: t('framesView.actions.replay'),
         icon: <Play />,
         onClick: () => setShowReplayDialog(true),
       },
       {
-        label: 'Dashboard',
+        label: t('contextMenu.dashboard'),
         icon: <Gauge />,
         onClick: () => {
           const sourceSessionId = useDiscoveryUIStore.getState().ioProfile;
@@ -468,17 +457,12 @@ function DiscoveryFramesView({
       },
     ];
     if (onAddEvent) {
-      items.push(menuSeparator, { label: 'Add event here', icon: <Flag />, onClick: () => onAddEvent(frame.timestamp_us) });
+      items.push(menuSeparator, addEventMenuItem(t, () => onAddEvent(frame.timestamp_us)));
     }
     return items;
   }, [contextMenu, toggleFrameSelection, deselectAllFrames, displayFrameIdFormat, onAddEvent, t]);
 
-  const headerContextMenuItems: ContextMenuItem[] = useMemo(() => [
-    { label: '# Column', checked: showRefColumn, onClick: toggleShowRefColumn },
-    { label: 'Bus Column', checked: showBusColumn, onClick: toggleShowBusColumn },
-    { label: 'ASCII Column', checked: showAsciiColumn, onClick: toggleShowAsciiColumn },
-    { label: 'Source Column', checked: showSourceColumn, onClick: toggleShowSourceColumn },
-  ], [showRefColumn, showBusColumn, showAsciiColumn, showSourceColumn, toggleShowRefColumn, toggleShowBusColumn, toggleShowAsciiColumn, toggleShowSourceColumn]);
+  const headerContextMenuItems = useColumnVisibilityMenuItems();
 
   // Compute count of filtered-out frame IDs (seen but not selected)
   const filteredOutCount = useMemo(() => {
@@ -507,13 +491,13 @@ function DiscoveryFramesView({
     }
     result.push({ id: 'filtered', label: 'Filtered', count: filteredOutCount, countTone: "warning" as const });
     if (toolboxResults.messageOrderResults) {
-      result.push({ id: TOOL_TAB_CONFIG['message-order'].tabId, label: TOOL_TAB_CONFIG['message-order'].label, closeable: true });
+      result.push({ id: TOOL_TAB_CONFIG['message-order'].tabId, label: t(TOOL_TAB_CONFIG['message-order'].labelKey), closeable: true });
     }
     if (toolboxResults.changesResults) {
-      result.push({ id: TOOL_TAB_CONFIG['changes'].tabId, label: TOOL_TAB_CONFIG['changes'].label, closeable: true });
+      result.push({ id: TOOL_TAB_CONFIG['changes'].tabId, label: t(TOOL_TAB_CONFIG['changes'].labelKey), closeable: true });
     }
     if (toolboxResults.checksumDiscoveryResults) {
-      result.push({ id: TOOL_TAB_CONFIG['checksum-discovery'].tabId, label: TOOL_TAB_CONFIG['checksum-discovery'].label, closeable: true });
+      result.push({ id: TOOL_TAB_CONFIG['checksum-discovery'].tabId, label: t(TOOL_TAB_CONFIG['checksum-discovery'].labelKey), closeable: true });
     }
     // Scan tabs count what the sweep found, which the progress payload reports —
     // the frames themselves live in the scan session's capture, not here.
@@ -524,7 +508,7 @@ function DiscoveryFramesView({
       if (!scan) continue;
       result.push({
         id: TOOL_TAB_CONFIG[key].tabId,
-        label: TOOL_TAB_CONFIG[key].label,
+        label: t(TOOL_TAB_CONFIG[key].labelKey),
         count: scan.isScanning ? undefined : scan.progress?.found_count,
         countTone: "purple" as const,
         closeable: !scan.isScanning,
@@ -534,7 +518,7 @@ function DiscoveryFramesView({
       const probe = toolboxResults.modbusFcProbeResults;
       result.push({
         id: TOOL_TAB_CONFIG['modbus-function-codes'].tabId,
-        label: TOOL_TAB_CONFIG['modbus-function-codes'].label,
+        label: t(TOOL_TAB_CONFIG['modbus-function-codes'].labelKey),
         count: probe.isProbing ? undefined : probe.entries.filter((e) => e.responded).length,
         countTone: "purple" as const,
         closeable: !probe.isProbing,
@@ -780,7 +764,7 @@ function DiscoveryFramesView({
         variant="surface"
         size="sm"
         pressed={showRefColumn}
-        title={showRefColumn ? 'Hide # column' : 'Show # column'}
+        title={t(showRefColumn ? 'framesView.actions.hideColumn' : 'framesView.actions.showColumn', { column: '#' })}
       >
         <Hash className={iconSm} />
       </IconButton>
@@ -790,7 +774,7 @@ function DiscoveryFramesView({
         tone="cyan"
         size="sm"
         pressed={showBusColumn}
-        title={showBusColumn ? 'Hide Bus column' : 'Show Bus column'}
+        title={t(showBusColumn ? 'framesView.actions.hideColumn' : 'framesView.actions.showColumn', { column: t('frameTable.bus') })}
       >
         <Network className={iconSm} />
       </IconButton>
@@ -800,7 +784,7 @@ function DiscoveryFramesView({
         tone="warning"
         size="sm"
         pressed={showAsciiColumn}
-        title={showAsciiColumn ? 'Hide ASCII column' : 'Show ASCII column'}
+        title={t(showAsciiColumn ? 'framesView.actions.hideColumn' : 'framesView.actions.showColumn', { column: 'ASCII' })}
       >
         <FileText className={iconSm} />
       </IconButton>
@@ -820,7 +804,7 @@ function DiscoveryFramesView({
             variant="surface"
             size="sm"
             pressed={findOpen}
-            title={findOpen ? 'Close find (Escape)' : 'Find in frames (⌘F)'}
+            title={findOpen ? t('framesView.actions.closeFind') : t('framesView.actions.find')}
           >
             <Search className={iconSm} />
           </IconButton>

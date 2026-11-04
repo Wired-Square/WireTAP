@@ -1,6 +1,7 @@
 // ui/src/apps/catalog/dialogs/ChecksumEditDialog.tsx
 
 import Dialog, { DialogBody, DialogFooter } from "../../../components/Dialog";
+import { useTranslation } from "react-i18next";
 import { Input, Select, Textarea, FormField, SecondaryButton, PrimaryButton } from "../../../components/forms";
 import { h3, helpText } from "../../../styles";
 import type { TomlNode, ChecksumAlgorithm } from "../types";
@@ -39,6 +40,7 @@ export default function ChecksumEditDialog({
   onCancel,
   onSave,
 }: ChecksumEditDialogProps) {
+  const { t } = useTranslation("catalog");
   const frameLength = useCatalogEditorStore((s) => (selectedNode && frameAt(s.tree.catalog, selectedNode.path)?.length) || 8);
   const resolve = useResolvedByteIndices([fields.start_byte, fields.calc_start_byte, fields.calc_end_byte], [frameLength]);
 
@@ -149,8 +151,8 @@ export default function ChecksumEditDialog({
                 }
                 disabled={fields.byte_length === 1}
               >
-                <option value="big">Big Endian</option>
-                <option value="little">Little Endian</option>
+                <option value="big">{t("shared.bigEndian")}</option>
+                <option value="little">{t("shared.littleEndian")}</option>
               </Select>
             </FormField>
           </div>
@@ -262,18 +264,18 @@ export default function ChecksumEditDialog({
         </div>
 
         {/* Notes */}
-        <FormField label="Notes" variant="default">
+        <FormField label={t("shared.notes")} variant="default">
           <Textarea
             size="lg"
             value={fields.notes || ""}
             onChange={(e) => setFields({ ...fields, notes: e.target.value || undefined })}
-            placeholder="Optional notes about this checksum..."
+            placeholder={t("shared.notesPlaceholderChecksum")}
             rows={2}
           />
         </FormField>
       </DialogBody>
       <DialogFooter>
-        <SecondaryButton onClick={onCancel}>Cancel</SecondaryButton>
+        <SecondaryButton onClick={onCancel}>{t("common:actions.cancel")}</SecondaryButton>
         <PrimaryButton
           onClick={onSave}
           disabled={

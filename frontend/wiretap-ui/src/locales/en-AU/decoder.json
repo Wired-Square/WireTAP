@@ -48,5 +48,13 @@
     "crcInvalid": "CRC failed",
     "crcInvalidHint": "The trailing CRC-16 does not match. This message was framed from the Modbus length rules alone, so its boundaries may be wrong.",
     "empty": "No Modbus messages yet."
+  },
+  "contextMenu": {
+    "dashboardFrame": "Dashboard Frame",
+    "dashboardAllSignals": "Dashboard All Signals",
+    "editInCatalog": "Edit in Catalog",
+    "dashboardSignal": "Dashboard Signal",
+    "copySignalName": "Copy Signal Name",
+    "copyValue": "Copy Value"
   }
 }

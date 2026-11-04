@@ -52,14 +52,8 @@ export type TransmitTab = "frame" | "queue" | "history" | "replay";
 export { CAN_FD_DLC_VALUES };
 export type CanFdDlc = (typeof CAN_FD_DLC_VALUES)[number];
 
-/** GVRET bus types - generic names since bus meanings vary by device */
-export const GVRET_BUSES = [
-  { value: 0, label: "Bus 0" },
-  { value: 1, label: "Bus 1" },
-  { value: 2, label: "Bus 2" },
-  { value: 3, label: "Bus 3" },
-  { value: 4, label: "Bus 4" },
-] as const;
+/** GVRET bus numbers; what each carries varies by device. */
+export const GVRET_BUSES = [0, 1, 2, 3, 4] as const;
 
 /** Progress info for an active replay */
 export interface ReplayProgressInfo {

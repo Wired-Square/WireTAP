@@ -2,6 +2,7 @@
 // Serial protocol configuration section for unified config dialog
 
 import { useState, useCallback, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { Cable, Plus, Trash2, ChevronDown, ChevronRight } from "lucide-react";
 import { iconMd, flexRowGap2 } from "../../../../styles/spacing";
 import { caption, textMedium } from "../../../../styles";
@@ -93,6 +94,7 @@ export default function SerialConfigSection({
   checksum,
   setChecksum,
 }: SerialConfigSectionProps) {
+  const { t } = useTranslation("catalog");
   // State for inline add form
   const [isAddingField, setIsAddingField] = useState(false);
   const [newFieldType, setNewFieldType] = useState<FieldType>("id");
@@ -302,7 +304,7 @@ export default function SerialConfigSection({
                   tone="purple"
                 >
                   <Plus className={iconMd} />
-                  Add Field
+                  {t("shared.addField")}
                 </Button>
               )}
             </div>
@@ -318,7 +320,7 @@ export default function SerialConfigSection({
                         onClick={() => toggleFieldPicker(index)}
                         size="sm"
                         disabled={field.mask === undefined}
-                        title={expandedFieldPickers[index] ? "Hide bit picker" : "Show bit picker"}
+                        title={expandedFieldPickers[index] ? t("shared.hideBitPicker") : t("shared.showBitPicker")}
                       >
                         {expandedFieldPickers[index] ? (
                           <ChevronDown className={iconMd} />
@@ -383,8 +385,8 @@ export default function SerialConfigSection({
                         size="sm"
                         className="w-16"
                       >
-                        <option value="hex">Hex</option>
-                        <option value="decimal">Dec</option>
+                        <option value="hex">{t("common:frameIdFormat.hex")}</option>
+                        <option value="decimal">{t("common:frameIdFormat.dec")}</option>
                       </Select>
 
                       {/* Remove button */}
@@ -438,7 +440,7 @@ export default function SerialConfigSection({
                       value={newFieldCustomName}
                       onChange={(e) => setNewFieldCustomName(e.target.value)}
                       className="flex-1"
-                      placeholder="Field name"
+                      placeholder={t("shared.fieldName")}
                       autoFocus
                     />
                   )}
@@ -460,8 +462,8 @@ export default function SerialConfigSection({
                     onChange={(e) => setNewFieldFormat(e.target.value as HeaderFieldFormat)}
                     className="w-16"
                   >
-                    <option value="hex">Hex</option>
-                    <option value="decimal">Dec</option>
+                    <option value="hex">{t("common:frameIdFormat.hex")}</option>
+                    <option value="decimal">{t("common:frameIdFormat.dec")}</option>
                   </Select>
                 </div>
 
@@ -474,7 +476,7 @@ export default function SerialConfigSection({
                       onClick={resetAddForm}
                       variant="ghost"
                     >
-                      Cancel
+                      {t("common:actions.cancel")}
                     </Button>
                     <Button
                       onClick={handleAddField}
