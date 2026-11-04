@@ -2,7 +2,10 @@
 
 The Query panel searches recorded CAN data for specific events and lets you ingest the results into other apps for visualisation.
 
-![Query results for a byte-changes query](images/query.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/query-dark.png">
+  <img alt="Query results for a byte-changes query" src="images/query.png">
+</picture>
 
 ## Overview
 

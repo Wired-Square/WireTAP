@@ -2,7 +2,10 @@
 
 The Sessions app (the Session Manager) provides real-time visualisation and control of all active IO sessions across WireTAP.
 
-![Sessions Visual tab showing a source, its session and three apps](images/sessions.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/sessions-dark.png">
+  <img alt="Sessions Visual tab showing a source, its session and three apps" src="images/sessions.png">
+</picture>
 
 ## Overview
 

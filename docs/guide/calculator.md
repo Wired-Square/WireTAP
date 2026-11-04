@@ -2,7 +2,10 @@
 
 The Calculator is a binary and hex analysis tool for format conversion, byte order exploration, and signal reverse-engineering.
 
-![Calculator showing a hex value](images/calculator.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/calculator-dark.png">
+  <img alt="Calculator showing a hex value" src="images/calculator.png">
+</picture>
 
 ## Overview
 

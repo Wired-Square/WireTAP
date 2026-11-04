@@ -2,7 +2,10 @@
 
 The Discovery panel is your primary tool for capturing and exploring raw CAN, serial or Modbus data from any connected source.
 
-![Discovery showing live CAN frames](images/discovery.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/discovery-dark.png">
+  <img alt="Discovery showing live CAN frames" src="images/discovery.png">
+</picture>
 
 ## Overview
 
@@ -39,7 +42,10 @@ A Modbus source's messages appear in a **Modbus** tab, shown by unit and functio
 
 Click the session button at the left of the top bar to open the **Data Source** picker. Its **Sessions**, **Captures** and **Devices** tabs let you join a session another app already has open, open a stored capture, or connect to a device. Devices are configured in [Settings](settings.md#io-profiles).
 
-![The Data Source picker on its Devices tab](images/source-picker.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/source-picker-dark.png">
+  <img alt="The Data Source picker on its Devices tab" src="images/source-picker.png">
+</picture>
 
 ### 2. Start Streaming
 

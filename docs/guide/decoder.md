@@ -2,7 +2,10 @@
 
 The Decoder panel turns raw frames into named signals using a TOML decoder catalogue.
 
-![Decoder showing decoded signals](images/decoder.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/decoder-dark.png">
+  <img alt="Decoder showing decoded signals" src="images/decoder.png">
+</picture>
 
 ## Overview
 

@@ -2,7 +2,10 @@
 
 The Dashboard panel (formerly Graph) visualises CAN data as interactive charts, gauges, instruments and live value lists.
 
-![Dashboard with gauges, level bars, a line chart and a list](images/dashboard.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/dashboard-dark.png">
+  <img alt="Dashboard with gauges, level bars, a line chart and a list" src="images/dashboard.png">
+</picture>
 
 ## Overview
 

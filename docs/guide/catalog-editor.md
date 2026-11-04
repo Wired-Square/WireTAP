@@ -2,7 +2,10 @@
 
 The Catalog Editor provides a visual interface for creating and editing the signal catalogues used by the Decoder.
 
-![Catalog Editor in GUI mode](images/catalog-editor.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/catalog-editor-dark.png">
+  <img alt="Catalog Editor in GUI mode" src="images/catalog-editor.png">
+</picture>
 
 ## Overview
 
