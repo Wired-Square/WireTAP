@@ -11,6 +11,7 @@
 // re-detecting the same one. Skipped while the Terminal owns the port.
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import i18n from "i18next";
 
 import { flasherSerialDetect } from "../../../api/flashers";
 import { tlog } from "../../../api/settings";
@@ -69,7 +70,7 @@ export function useChipDetection({
     (device: DfuDeviceInfo) => {
       const driverId = driverIdForDfu(device.manufacturer);
       if (!driverId) {
-        setError(`No driver for DFU device "${device.manufacturer}"`);
+        setError(i18n.t("serial:flash.noDfuDriver", { manufacturer: device.manufacturer }));
         setActiveDriver(null);
         setChip(null);
         return;

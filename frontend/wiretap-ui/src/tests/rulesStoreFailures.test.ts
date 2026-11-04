@@ -7,6 +7,7 @@ vi.mock("../api/framelinkRules", async (importOriginal) => ({
   framelinkPersistSave: vi.fn(),
 }));
 
+import "../i18n";
 import { framelinkFrameDefAdd, framelinkLabelSet, framelinkPersistSave } from "../api/framelinkRules";
 import { useRulesStore } from "../apps/rules/stores/rulesStore";
 

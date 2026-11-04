@@ -5,6 +5,8 @@
 // freq / size + a manual chip override; everything else is auto-detected.
 
 import { useEffect } from "react";
+import i18n from "i18next";
+import { useTranslation } from "react-i18next";
 import {
   flasherEspCancel,
   flasherEspErase,
@@ -21,7 +23,7 @@ import { Field, Select } from "./formHelpers";
 import type { DriverOptionsPanelProps, FlasherDriver } from "./types";
 
 const CHIP_OPTIONS = [
-  { value: "auto", label: "Auto-detect" },
+  { value: "auto", label: null },
   { value: "esp32", label: "ESP32" },
   { value: "esp32s2", label: "ESP32-S2" },
   { value: "esp32s3", label: "ESP32-S3" },
@@ -41,7 +43,7 @@ const FLASH_BAUD_OPTIONS = [
 const FLASH_MODE_OPTIONS = ["dio", "qio", "qout", "dout"] as const;
 const FLASH_FREQ_OPTIONS = ["20MHz", "26MHz", "40MHz", "80MHz"] as const;
 const FLASH_SIZE_OPTIONS = [
-  { value: "auto", label: "Auto" },
+  { value: "auto", label: null },
   { value: "1MB", label: "1 MB" },
   { value: "2MB", label: "2 MB" },
   { value: "4MB", label: "4 MB" },
@@ -51,6 +53,7 @@ const FLASH_SIZE_OPTIONS = [
 ] as const;
 
 function EspOptionsPanel({ chip }: DriverOptionsPanelProps<EspChipInfo>) {
+  const { t } = useTranslation("serial");
   const options = useFlasherStore((s) => s.espOptions);
   const setOptions = useFlasherStore((s) => s.setEspOptions);
 
@@ -68,14 +71,14 @@ function EspOptionsPanel({ chip }: DriverOptionsPanelProps<EspChipInfo>) {
     <div
       className={`p-3 ${bgSurface} ${borderDivider} border-b grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3`}
     >
-      <Field label="Chip">
+      <Field label={t("flash.esp.chip")}>
         <Select
           value={options.chip ?? "auto"}
           onChange={(v) => setOptions({ chip: v === "auto" ? null : v })}
-          options={CHIP_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+          options={CHIP_OPTIONS.map((o) => ({ value: o.value, label: o.label ?? t("flash.esp.autoDetect") }))}
         />
       </Field>
-      <Field label="Flash baud">
+      <Field label={t("flash.esp.flashBaud")}>
         <Select
           value={String(options.flash_baud ?? 460_800)}
           onChange={(v) => setOptions({ flash_baud: Number(v) })}
@@ -85,27 +88,27 @@ function EspOptionsPanel({ chip }: DriverOptionsPanelProps<EspChipInfo>) {
           }))}
         />
       </Field>
-      <Field label="Flash mode">
+      <Field label={t("flash.esp.flashMode")}>
         <Select
           value={options.flash_mode ?? "dio"}
           onChange={(v) => setOptions({ flash_mode: v })}
           options={FLASH_MODE_OPTIONS.map((m) => ({ value: m, label: m }))}
         />
       </Field>
-      <Field label="Flash freq">
+      <Field label={t("flash.esp.flashFreq")}>
         <Select
           value={options.flash_freq ?? "40MHz"}
           onChange={(v) => setOptions({ flash_freq: v })}
           options={FLASH_FREQ_OPTIONS.map((f) => ({ value: f, label: f }))}
         />
       </Field>
-      <Field label="Flash size">
+      <Field label={t("flash.esp.flashSize")}>
         <Select
           value={options.flash_size ?? "auto"}
           onChange={(v) => setOptions({ flash_size: v === "auto" ? null : v })}
           options={FLASH_SIZE_OPTIONS.map((o) => ({
             value: o.value,
-            label: o.label,
+            label: o.label ?? t("flash.esp.autoSize"),
           }))}
         />
       </Field>
@@ -150,7 +153,7 @@ export const espDriver: FlasherDriver<EspChipInfo> = {
   describeChip: (chip) => {
     const parts: string[] = [chip.chip];
     if (chip.flash_size_bytes) {
-      parts.push(`${Math.round(chip.flash_size_bytes / 1024 / 1024)} MB flash`);
+      parts.push(i18n.t("serial:flash.flashSizeMb", { size: Math.round(chip.flash_size_bytes / 1024 / 1024) }));
     }
     return {
       label: parts.join(" · "),

@@ -6,7 +6,7 @@ All notable changes to WireTAP will be documented in this file.
 
 ### Changed
 
-- **More of the interface follows your language.** Discovery, the Decoder, the frames table, session menu, status badges, time display, device connection fields, frame context menus, the Catalogue (its editor views, tree, configuration, node, mux, checksum, enum, export and validation dialogs), Transmit, the Frame Calculator, Query, Devices, Settings, the Session Manager and its log used to stay in English whatever language you chose; they now translate. The English wording is unchanged, except that counts now read correctly in the singular and plural, and the source picker names device types in full.
+- **More of the interface follows your language.** Discovery, the Decoder, the frames table, session menu, status badges, time display, device connection fields, frame context menus, the Catalogue (its editor views, tree, configuration, node, mux, checksum, enum, export and validation dialogs), Transmit, the Frame Calculator, Query, Devices, Settings, the Session Manager and its log, Test Pattern, Serial's Flash tab, Rules and the Dashboard's panels used to stay in English whatever language you chose; they now translate. The English wording is unchanged, except that counts now read correctly in the singular and plural, the source picker names device types in full, and Test Pattern names a run's mode and role in full.
 
 ### Fixed
 

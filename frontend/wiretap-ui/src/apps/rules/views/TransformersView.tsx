@@ -11,6 +11,7 @@ import type { TransformerDescriptor } from "../../../api/framelinkRules";
 import { InlineEdit } from "../components/InlineEdit";
 import TransformerDialog from "../dialogs/TransformerDialog";
 import { formatHexId } from "../utils/formatHex";
+import { FRAME_DEF_ID_DEVICE } from "../utils/framelinkConstants";
 import { Button, IconButton } from "../../../components/Button";
 import { Badge } from "../../../components/Badge";
 import { Card } from "../../../components/Card";
@@ -115,8 +116,9 @@ export default function TransformersView() {
               </div>
               <div className={`mt-1 text-xs ${textSecondary}`}>
                 {xf.source_frame_def_name} ({xf.source_interface_name}) →{" "}
-                {xf.dest_frame_def_name}
-                {xf.dest_frame_def_name !== "Device Signals" ? ` (${xf.dest_interface_name})` : ""}
+                {xf.dest_frame_def_id === FRAME_DEF_ID_DEVICE
+                  ? t("transformerDialog.fields.deviceSignals")
+                  : `${xf.dest_frame_def_name} (${xf.dest_interface_name})`}
                 {` | ${t("common.mappingsCount", { count: xf.mappings.length })}`}
               </div>
               <div className="mt-1">

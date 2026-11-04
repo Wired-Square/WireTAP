@@ -1,5 +1,6 @@
 // Copyright 2026 Wired Square Pty Ltd
 
+import { useTranslation } from "react-i18next";
 import { textPrimary, textSecondary } from "../../../styles";
 
 interface MaskBitRowProps {
@@ -21,13 +22,14 @@ export default function MaskBitRow({
   showHeader = false,
   dimWhenMaskZero = false,
 }: MaskBitRowProps) {
+  const { t } = useTranslation("rules");
   const bits = Array.from({ length: bitWidth }, (_, i) => bitWidth - 1 - i);
 
   return (
     <div>
       {showHeader && (
         <div className="flex items-center gap-1 mb-1">
-          <div className={`w-16 text-2xs font-mono ${textSecondary}`}>bit</div>
+          <div className={`w-16 text-2xs font-mono ${textSecondary}`}>{t("maskBitRow.bit")}</div>
           {bits.map((bitIdx) => (
             <div
               key={bitIdx}

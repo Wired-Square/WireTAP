@@ -1,6 +1,7 @@
 // Copyright 2026 Wired Square Pty Ltd
 
 import { useState, useRef, useMemo, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import {
   textPrimary,
   textSecondary,
@@ -29,12 +30,6 @@ interface SignalComboboxProps {
 // ============================================================================
 // Constants
 // ============================================================================
-
-const TIER_LABELS: Record<SelectableSignal["tier"], string> = {
-  frame_def: "Frame Definition Signals",
-  device: "Device Signals",
-  user: "User Signals",
-};
 
 const TIER_ORDER: SelectableSignal["tier"][] = ["frame_def", "device", "user"];
 
@@ -110,9 +105,10 @@ export default function SignalCombobox({
   signals,
   value,
   onChange,
-  placeholder = "Select signal...",
+  placeholder,
   minBitLength,
 }: SignalComboboxProps) {
+  const { t } = useTranslation("rules");
   const [isOpen, setIsOpen] = useState(false);
   const [filter, setFilter] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -190,7 +186,7 @@ export default function SignalCombobox({
         ref={inputRef}
         type="text"
         size="sm"
-        placeholder={placeholder}
+        placeholder={placeholder ?? t("signalCombobox.placeholder")}
         value={displayText}
         onFocus={open}
         onClick={() => { if (!isOpen) open(); }}
@@ -216,7 +212,7 @@ export default function SignalCombobox({
       >
         {filteredGroups.length === 0 && (
           <div className={`px-2 py-2 text-xs ${textSecondary}`}>
-            {filter ? "No matching signals" : "No signals available"}
+            {t(filter ? "signalCombobox.noMatches" : "signalCombobox.noSignals")}
           </div>
         )}
 
@@ -225,7 +221,7 @@ export default function SignalCombobox({
           const showTierHeader = !renderedTiers.has(tier);
           if (showTierHeader) renderedTiers.add(tier);
 
-          const tierLabel = TIER_LABELS[tier];
+          const tierLabel = t(`signalCombobox.tiers.${tier}`);
 
           return (
             <div key={`${tier}:${group}`}>

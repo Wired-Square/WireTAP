@@ -266,10 +266,10 @@ export default function FrameDefEditor({
   // --- Cancel with dirty guard ---
   const handleCancel = useCallback(() => {
     if (state.dirty) {
-      if (!window.confirm("Discard unsaved changes?")) return;
+      if (!window.confirm(t("frameDefEditor.discardChanges"))) return;
     }
     onCancel();
-  }, [state.dirty, onCancel]);
+  }, [state.dirty, onCancel, t]);
 
   // --- Keyboard handler ---
   useEffect(() => {

@@ -5,6 +5,8 @@
 // the visible <canvas> so PNG export keeps working.
 
 import { useEffect, useRef, useState } from "react";
+import i18n from "i18next";
+import { useTranslation } from "react-i18next";
 import { type DashboardPanel } from "../../../../../stores/dashboardStore";
 import { useCanvasExportRef } from "../../../widgets/useExportRef";
 import { customWidgetKeys, makeSignalSampler } from "../../../widgets/useSignalValues";
@@ -18,6 +20,7 @@ interface Props {
 }
 
 export default function RawCanvasPanel({ panel, canvasRef }: Props) {
+  const { t } = useTranslation("dashboard");
   const canvasElRef = useRef<HTMLCanvasElement>(null);
   useCanvasExportRef(canvasElRef, canvasRef);
   const [error, setError] = useState<string | null>(null);
@@ -46,13 +49,13 @@ export default function RawCanvasPanel({ panel, canvasRef }: Props) {
         bmp.close();
       },
       onError: (m) => setError(m),
-      onTimeout: () => setError("Draw timed out — code was stopped"),
+      onTimeout: () => setError(i18n.t("dashboard:panel.drawTimedOut")),
     });
     return () => host.destroy();
   }, [code, fps, keys]);
 
   if (!code) {
-    return <WidgetEmpty>Add custom canvas code in Configure</WidgetEmpty>;
+    return <WidgetEmpty>{t("panel.emptyCanvasCode")}</WidgetEmpty>;
   }
 
   return (

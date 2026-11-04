@@ -3,6 +3,7 @@
 // Centralised uPlot plugins for the line chart panel.
 // All plugins share the same CSS-variable-based styling and formatting helpers.
 
+import i18n from "i18next";
 import type uPlot from "uplot";
 import type { SignalRef } from "../../../../../stores/dashboardStore";
 import { getSignalLabel, signalKey, useDashboardStore } from "../../../../../stores/dashboardStore";
@@ -80,7 +81,7 @@ function signalRowNode(
     const confCol = confidenceColours[sig.confidence] || confidenceColours.none;
     const confDot = createEl("span", "display: inline-block; width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0;");
     confDot.style.background = confCol;
-    confDot.title = `Confidence: ${sig.confidence}`;
+    confDot.title = i18n.t("dashboard:panelConfig.actions.confidence", { level: sig.confidence });
     row.appendChild(confDot);
   }
 

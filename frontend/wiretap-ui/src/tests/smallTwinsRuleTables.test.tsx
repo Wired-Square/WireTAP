@@ -9,6 +9,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn(async () => () => {}) }));
 
+import "../i18n";
 import { AutoSummary, txGaugeMax } from "../apps/test-pattern/TestPattern";
 import { INTERFACE_TYPE_NAMES } from "../generated/framelinkNames";
 import { VALUE_TYPES } from "../apps/rules/utils/bitGrid";

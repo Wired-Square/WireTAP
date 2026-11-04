@@ -7,6 +7,8 @@
 //             the DOM, Tauri, or the network.
 
 import { useEffect, useRef, useState } from "react";
+import i18n from "i18next";
+import { useTranslation } from "react-i18next";
 import DOMPurify from "dompurify";
 import { useDashboardStore, type DashboardPanel } from "../../../../../stores/dashboardStore";
 import { customWidgetKeys, makeSignalSampler, useReadoutOf } from "../../../widgets/useSignalValues";
@@ -26,6 +28,7 @@ function parseViewBox(vb: string): { w: number; h: number } {
 }
 
 export default function CustomSvgPanel({ panel, svgRef }: Props) {
+  const { t } = useTranslation("dashboard");
   const svgElRef = useRef<SVGSVGElement>(null);   // scene mode root
   const containerRef = useRef<HTMLDivElement>(null); // script mode host
 
@@ -64,16 +67,16 @@ export default function CustomSvgPanel({ panel, svgRef }: Props) {
         { USE_PROFILES: { svg: true, svgFilters: true } },
       )),
       onError: (msg) => setError(msg),
-      onTimeout: () => setError("Draw timed out — code was stopped"),
+      onTimeout: () => setError(i18n.t("dashboard:panel.drawTimedOut")),
     });
     return () => host.destroy();
   }, [mode, code, fps, keys, viewBox]);
 
   if (mode === "scene" && (!cfg?.scene || cfg.scene.length === 0)) {
-    return <WidgetEmpty>Configure an SVG scene (or switch to script mode)</WidgetEmpty>;
+    return <WidgetEmpty>{t("panel.emptySvgScene")}</WidgetEmpty>;
   }
   if (mode === "script" && !code) {
-    return <WidgetEmpty>Add custom SVG code in Configure</WidgetEmpty>;
+    return <WidgetEmpty>{t("panel.emptySvgCode")}</WidgetEmpty>;
   }
 
   const valueOf = (key: string) => latest.get(key) ?? NaN;

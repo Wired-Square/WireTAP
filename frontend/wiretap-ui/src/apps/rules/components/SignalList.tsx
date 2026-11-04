@@ -1,5 +1,6 @@
 // Copyright 2026 Wired Square Pty Ltd
 
+import { useTranslation } from "react-i18next";
 import { textPrimary, textSecondary } from "../../../styles";
 import { Badge } from "../../../components/Badge";
 import { Listbox, Option } from "../../../components/Listbox";
@@ -12,10 +13,11 @@ interface SignalListProps {
 }
 
 export default function SignalList({ signals, selectedIndex, onSelect }: SignalListProps) {
+  const { t } = useTranslation("rules");
   if (signals.length === 0) {
     return (
       <div className={`flex items-center justify-center h-full text-center px-4 text-sm ${textSecondary}`}>
-        No signals defined. Click bits in the grid to add signals.
+        {t("signalList.empty")}
       </div>
     );
   }
@@ -40,7 +42,7 @@ export default function SignalList({ signals, selectedIndex, onSelect }: SignalL
 
             {/* Signal name */}
             <span className={`flex-1 text-sm truncate ${signal.name ? textPrimary : textSecondary}`}>
-              {signal.name || "(unnamed)"}
+              {signal.name || t("signalList.unnamed")}
             </span>
 
             {/* Bit range */}

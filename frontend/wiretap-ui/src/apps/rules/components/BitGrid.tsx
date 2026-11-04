@@ -5,6 +5,7 @@
 // to anchor selection and complete ranges for placing signals.
 
 import { useState, useMemo, useRef, useEffect, useCallback, forwardRef } from "react";
+import { useTranslation } from "react-i18next";
 import { textPrimary, textSecondary } from "../../../styles";
 import type { PlacedSignal } from "../utils/bitGrid";
 import { Button } from "../../../components/Button";
@@ -35,6 +36,7 @@ export default function BitGrid({
   scrollToByte,
 }: BitGridProps) {
   const [hoveredBit, setHoveredBit] = useState<number | null>(null);
+  const { t } = useTranslation("rules");
   const [jumpInput, setJumpInput] = useState("");
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -83,7 +85,7 @@ export default function BitGrid({
       {/* Header row */}
       <div className="flex items-center gap-1 px-1 pb-1">
         <div className={`w-10 text-right text-2xs font-mono pr-1 ${textSecondary}`}>
-          Byte
+          {t("bitGrid.byte")}
         </div>
         {COLUMN_HEADERS.map((bit) => (
           <div
@@ -102,7 +104,7 @@ export default function BitGrid({
             value={jumpInput}
             onChange={(e) => setJumpInput(e.target.value)}
             onKeyDown={handleJumpKeyDown}
-            placeholder="Go to"
+            placeholder={t("bitGrid.goTo")}
             size="xs"
             mono
             className="w-16"
@@ -113,7 +115,7 @@ export default function BitGrid({
             size="sm"
             className="h-5"
           >
-            Go
+            {t("bitGrid.go")}
           </Button>
         </div>
       </div>

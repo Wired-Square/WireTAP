@@ -120,7 +120,7 @@ function DashboardInner() {
           }));
           loadLayout({
             id: 'import',
-            name: 'Imported',
+            name: t('import.defaultName'),
             catalogFilename: catalogFilenameFromPath(catalogPath),
             panels,
             layout,
@@ -133,7 +133,7 @@ function DashboardInner() {
       }
     }
     setRawViewMode(!rawViewMode);
-  }, [rawViewMode, rawViewContent, catalogPath, loadLayout]);
+  }, [rawViewMode, rawViewContent, catalogPath, loadLayout, t]);
 
   // ── Delivery batching ──
   // Rust holds each signal's history and the panels read it; what arrives here is

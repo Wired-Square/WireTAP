@@ -2,6 +2,7 @@
 //
 // Image export utilities for graph panels (PNG, SVG, interactive SVG).
 
+import i18n from "i18next";
 import { saveBinaryFile, saveCatalog } from "../../../api/catalog";
 import { getSignalLabel, type SignalRef } from "../../../stores/dashboardStore";
 import type { SeriesWindow } from "../../../api/dashboardHistory";
@@ -77,7 +78,7 @@ export async function exportSvgElementAsPng(
 
     await new Promise<void>((resolve, reject) => {
       img.onload = () => resolve();
-      img.onerror = () => reject(new Error("Failed to load SVG for PNG export"));
+      img.onerror = () => reject(new Error(i18n.t("dashboard:panel.svgLoadFailed")));
       img.src = url;
     });
 

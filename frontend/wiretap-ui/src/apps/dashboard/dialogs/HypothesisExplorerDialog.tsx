@@ -155,11 +155,11 @@ export default function HypothesisExplorerDialog({ sessionId, isOpen, onClose }:
       // Set a descriptive title
       const frameLabel = chunk.length === 1 || new Set(chunk.map((c) => c.frameId)).size === 1
         ? formatFrameId(chunk[0].frameId)
-        : "multi";
+        : t("hypothesis.panelTitleMultiFrame");
       const rangeLabel = chunk.length === 1
         ? chunk[0].label
         : `${chunk[0].label} … ${chunk[chunk.length - 1].label}`;
-      updatePanel(panelId, { title: `Hypothesis ${frameLabel}: ${rangeLabel}` });
+      updatePanel(panelId, { title: t("hypothesis.panelTitle", { frame: frameLabel, range: rangeLabel }) });
 
       for (const candidate of chunk) {
         addSignalToPanel(panelId, candidate.frameId, candidate.name);
@@ -167,7 +167,7 @@ export default function HypothesisExplorerDialog({ sessionId, isOpen, onClose }:
     }
 
     handleClose();
-  }, [candidates, selectedCandidates, registerHypotheses, addPanel, updatePanel, addSignalToPanel]);
+  }, [candidates, selectedCandidates, registerHypotheses, addPanel, updatePanel, addSignalToPanel, t]);
 
   const handleClose = useCallback(() => {
     setStep(1);

@@ -30,5 +30,93 @@
     "paste": "Paste",
     "selectAll": "Select all",
     "copyAll": "Copy all"
+  },
+  "flash": {
+    "modes": {
+      "flash": "Flash",
+      "backup": "Backup",
+      "erase": "Erase"
+    },
+    "unsupported": {
+      "flash": "{{manufacturer}} doesn't support flash",
+      "backup": "{{manufacturer}} doesn't support backup",
+      "erase": "{{manufacturer}} doesn't support erase"
+    },
+    "phases": {
+      "idle": "idle",
+      "connecting": "connecting",
+      "erasing": "erasing",
+      "writing": "writing",
+      "reading": "reading",
+      "verifying": "verifying",
+      "done": "done",
+      "error": "error",
+      "cancelled": "cancelled"
+    },
+    "operationFailed": "Operation failed",
+    "firmwareFilter": "Firmware",
+    "dumpFilter": "Flash dump",
+    "log": {
+      "invalidAddress": "Invalid address: {{value}}",
+      "flashFailed": "Flash failed: {{message}}",
+      "invalidOffset": "Invalid offset: {{value}}",
+      "invalidSize": "Invalid size: {{value}}",
+      "backupFailed": "Backup failed: {{message}}",
+      "eraseFailed": "Erase failed: {{message}}"
+    },
+    "detecting": "Detecting…",
+    "detectFailed": "Detect failed — {{error}}",
+    "notDetected": "Chip not detected — click Detect to try again",
+    "detect": "Detect",
+    "detectChip": "Detect chip",
+    "image": "Image",
+    "choose": "Choose {{extensions}}",
+    "address": "Flash address",
+    "addressFromImage": "(from image)",
+    "outputFile": "Output file",
+    "offset": "Offset",
+    "size": "Size",
+    "fullChip": "Full chip",
+    "readProtected": "Read protection is on — backup will fail until RDP is cleared.",
+    "readFlash": "Read flash",
+    "eraseWarning": "Erases the entire flash chip. The device will need fresh firmware after this completes.",
+    "confirmWipe": "Confirm wipe?",
+    "no": "No",
+    "yesErase": "Yes, erase",
+    "eraseEntire": "Erase entire flash",
+    "progressBytes_one": "{{done}}/{{formatted}} byte",
+    "progressBytes_other": "{{done}}/{{formatted}} bytes",
+    "hints": {
+      "flash": "Pick an image and click Flash to begin.",
+      "flashSerial": "Pick an image and click Flash to begin. The terminal will be disconnected for the duration of the flash.",
+      "backup": "Choose an output file and click Read flash. Use Full chip to dump everything.",
+      "erase": "Click Erase entire flash to wipe the chip. This is destructive."
+    },
+    "empty": {
+      "detecting": "Detecting chip…",
+      "pickDevice": "Pick a serial port or a DFU device from the top bar to begin.",
+      "noChip": "No supported chip detected on this port. Hold the chip in bootloader mode and click Detect.",
+      "unknownDfu": "Selected DFU device isn't a recognised chip family."
+    },
+    "noDfuDriver": "No driver for DFU device \"{{manufacturer}}\"",
+    "flashSizeMb": "{{size}} MB flash",
+    "flashSizeKb": "{{size}} KB flash",
+    "esp": {
+      "chip": "Chip",
+      "autoDetect": "Auto-detect",
+      "flashBaud": "Flash baud",
+      "flashMode": "Flash mode",
+      "flashFreq": "Flash freq",
+      "flashSize": "Flash size",
+      "autoSize": "Auto"
+    },
+    "stm32": {
+      "boot0Pin": "BOOT0 pin",
+      "resetPin": "RESET pin",
+      "pinNone": "None",
+      "invertBoot0": "Invert BOOT0",
+      "invertReset": "Invert RESET",
+      "activeLow": "Active low"
+    }
   }
 }
