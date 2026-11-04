@@ -764,7 +764,7 @@ function DiscoveryFramesView({
         variant="surface"
         size="sm"
         pressed={showRefColumn}
-        title={showRefColumn ? 'Hide # column' : 'Show # column'}
+        title={t(showRefColumn ? 'framesView.actions.hideColumn' : 'framesView.actions.showColumn', { column: '#' })}
       >
         <Hash className={iconSm} />
       </IconButton>
@@ -774,7 +774,7 @@ function DiscoveryFramesView({
         tone="cyan"
         size="sm"
         pressed={showBusColumn}
-        title={showBusColumn ? 'Hide Bus column' : 'Show Bus column'}
+        title={t(showBusColumn ? 'framesView.actions.hideColumn' : 'framesView.actions.showColumn', { column: t('frameTable.bus') })}
       >
         <Network className={iconSm} />
       </IconButton>
@@ -784,7 +784,7 @@ function DiscoveryFramesView({
         tone="warning"
         size="sm"
         pressed={showAsciiColumn}
-        title={showAsciiColumn ? 'Hide ASCII column' : 'Show ASCII column'}
+        title={t(showAsciiColumn ? 'framesView.actions.hideColumn' : 'framesView.actions.showColumn', { column: 'ASCII' })}
       >
         <FileText className={iconSm} />
       </IconButton>
@@ -804,7 +804,7 @@ function DiscoveryFramesView({
             variant="surface"
             size="sm"
             pressed={findOpen}
-            title={findOpen ? 'Close find (Escape)' : 'Find in frames (⌘F)'}
+            title={findOpen ? t('framesView.actions.closeFind') : t('framesView.actions.find')}
           >
             <Search className={iconSm} />
           </IconButton>

@@ -77,7 +77,11 @@
       "freezeDisplay": "⟦Freeze display⟧",
       "unfreezeDisplay": "⟦Unfreeze display⟧",
       "refreshLatest": "⟦Refresh to latest frames⟧",
-      "playbackSpeed": "⟦Playback speed⟧"
+      "playbackSpeed": "⟦Playback speed⟧",
+      "hideColumn": "⟦Hide {{column}} column⟧",
+      "showColumn": "⟦Show {{column}} column⟧",
+      "find": "⟦Find in frames (⌘F)⟧",
+      "closeFind": "⟦Close find (Escape)⟧"
     }
   },
   "modbusView": {
