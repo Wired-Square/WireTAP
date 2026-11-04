@@ -2,7 +2,7 @@
 
 The Settings panel lets you configure WireTAP's behaviour, set up IO profiles for your hardware and data sources, and manage your catalogs and directories.
 
-<img width="899" height="711" alt="Screenshot 2026-02-28 at 5 12 58 pm" src="https://github.com/user-attachments/assets/5824ab01-d184-4519-9194-f5ee2c4fb60c" />
+![Settings showing Data IO profiles](images/settings.png)
 
 ## Sections
 

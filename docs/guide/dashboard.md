@@ -2,6 +2,8 @@
 
 The Dashboard panel (formerly Graph) visualises CAN data as interactive charts, gauges, instruments and live value lists.
 
+![Dashboard with gauges, level bars, a line chart and a list](images/dashboard.png)
+
 ## Overview
 
 Dashboard loads a signal catalog and decodes incoming frames in real time, plotting signal values over time. It supports many panel types arranged in a draggable grid layout, with tools for zooming, measuring, and exporting data. Some panel types work on raw frame bytes and need no catalog, which helps when reverse-engineering. Panels and layouts persist across sessions.

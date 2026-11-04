@@ -2,6 +2,8 @@
 
 The Query panel searches recorded CAN data for specific events and lets you ingest the results into other apps for visualisation.
 
+![Query results for a byte-changes query](images/query.png)
+
 ## Overview
 
 Query runs analytical queries against historical frames to find events like byte value changes, payload transitions, transmission gaps and mirror frame mismatches. It reads from two kinds of source: a WireTAP backend profile (the long-term archive kept by [WireTAP Server](wiretap-server.md), reached over its HTTP API with an API key) or a local capture. Results can be ingested back into the session system, allowing the Decoder and Dashboard apps to visualise the surrounding frames.

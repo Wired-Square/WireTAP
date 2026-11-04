@@ -2,6 +2,8 @@
 
 The Sessions app (the Session Manager) provides real-time visualisation and control of all active IO sessions across WireTAP.
 
+![Sessions Visual tab showing a source, its session and three apps](images/sessions.png)
+
 ## Overview
 
 The Session Manager displays a node graph showing how data flows from sources through sessions to the apps using them. It provides controls for starting, stopping, and reconfiguring sessions, wiring buses and apps, and monitoring session events through a detailed log.

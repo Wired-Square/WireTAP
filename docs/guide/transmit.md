@@ -2,7 +2,7 @@
 
 The Transmit panel allows you to send CAN frames or serial bytes to your network, either as single transmissions or repeating messages, and shows the replays started from Discovery.
 
-<img width="941" height="689" alt="transmit-screenshot" src="https://github.com/user-attachments/assets/365b308c-62eb-43fe-ab56-4d49962a01e0" />
+![Transmit queue with repeating frames](images/transmit.png)
 
 ## Overview
 
