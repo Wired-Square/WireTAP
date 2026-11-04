@@ -477,7 +477,7 @@ export default function SourceList({
         ? capturesBody
         : devicesBody}
 
-      {readProfiles.length === 0 && !isCsvSelected && (
+      {readProfiles.length === 0 && captureCount === 0 && !isCsvSelected && (
         <div className="p-4 text-sm text-muted">
           {t("ioSourcePicker.sources.noSources")}
         </div>
