@@ -15,6 +15,7 @@ All notable changes to WireTAP will be documented in this file.
 - **The Decoder's timestamps no longer run into signal names.** With Display time as set to Timestamp, the time was wider than its column and overlapped the name beside it; the column now widens to fit.
 - **Hex input takes a 0x on every byte.** The Calculator, Transmit and the other hex fields read `0x12 0x34` as the bytes 12 34; they used to strip only the first 0x and read it as 12 03 4.
 - **The Decoder's update flash is readable in light mode.** A changing signal's name, value and bytes used to flash towards white, which faded them into the card on a light theme; they now flash towards the theme's text colour, so they darken in light mode and still brighten in dark mode.
+- **The macOS app icon sits at the size of its neighbours.** It used to fill its whole square, so it looked larger than other apps in the Dock and Finder; it now follows Apple's icon grid.
 
 ## [0.16.0] - 2026-11-03
 
