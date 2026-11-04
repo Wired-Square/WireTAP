@@ -140,7 +140,7 @@ export default function UnifiedConfigDialog({
   // Handle removing a protocol config (just update local state - actual removal on Save)
   const handleRemoveCanConfig = () => {
     if (hasCanFrames) {
-      if (!window.confirm("This catalog has CAN frames. Remove CAN configuration anyway?")) {
+      if (!window.confirm(t("configDialog.removeCanConfirm"))) {
         return;
       }
     }
@@ -150,7 +150,7 @@ export default function UnifiedConfigDialog({
 
   const handleRemoveSerialConfig = () => {
     if (hasSerialFrames) {
-      if (!window.confirm("This catalog has Serial frames. Remove Serial configuration anyway?")) {
+      if (!window.confirm(t("configDialog.removeSerialConfirm"))) {
         return;
       }
     }
@@ -160,7 +160,7 @@ export default function UnifiedConfigDialog({
 
   const handleRemoveModbusConfig = () => {
     if (hasModbusFrames) {
-      if (!window.confirm("This catalog has Modbus frames. Remove Modbus configuration anyway?")) {
+      if (!window.confirm(t("configDialog.removeModbusConfirm"))) {
         return;
       }
     }
@@ -177,8 +177,8 @@ export default function UnifiedConfigDialog({
       isOpen={open}
       onClose={onCancel}
       size="xl"
-      title="Catalog Configuration"
-      subtitle="Configure catalog metadata and protocol settings"
+      title={t("configDialog.title")}
+      subtitle={t("configDialog.subtitle")}
       icon={<Settings className="text-accent-primary" />}
     >
       <DialogBody className="space-y-6">
@@ -193,7 +193,7 @@ export default function UnifiedConfigDialog({
         {/* Protocol Configurations */}
         <div className="space-y-3">
           <h3 className="text-sm font-semibold text-primary uppercase tracking-wide">
-            Protocol Configurations
+            {t("configDialog.protocols")}
           </h3>
 
           <CanConfigSection
@@ -256,8 +256,7 @@ export default function UnifiedConfigDialog({
 
         {/* Info box */}
         <Alert tone="info" size="sm">
-          <strong>Note:</strong> Protocol configurations define default settings for all frames of that type.
-          Add a configuration for each protocol you plan to use in this catalog.
+          <strong>{t("configDialog.noteTitle")}</strong> {t("configDialog.noteText")}
         </Alert>
       </DialogBody>
       <DialogFooter>

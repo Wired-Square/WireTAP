@@ -172,18 +172,18 @@ export default function ChecksumView({
             if (hasNegativeStart || hasNegativeEnd) {
               return (
                 <div className={monoBody}>
-                  bytes {checksum.calcStartByte}
+                  {t("checksumView.rangeFrom", { start: checksum.calcStartByte })}
                   {hasNegativeStart && <span className="text-muted"> (→ {resolvedStart})</span>}
-                  {" "}to {checksum.calcEndByte}
+                  {" "}{t("checksumView.rangeTo", { end: checksum.calcEndByte })}
                   {hasNegativeEnd && <span className="text-muted"> (→ {resolvedEnd})</span>}
-                  {" "}= bytes {resolvedStart} to {resolvedEnd - 1}
+                  {" "}{t("checksumView.rangeResolved", { start: resolvedStart, last: resolvedEnd - 1 })}
                 </div>
               );
             }
 
             return (
               <div className={monoBody}>
-                bytes {checksum.calcStartByte} to {resolvedEnd - 1} (exclusive end: {checksum.calcEndByte})
+                {t("checksumView.range", { start: checksum.calcStartByte, last: resolvedEnd - 1, end: checksum.calcEndByte })}
               </div>
             );
           })()}

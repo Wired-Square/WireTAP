@@ -2,6 +2,7 @@
 // tinted icon well, the protocol name, its status, and Add / Remove.
 
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { ChevronDown, ChevronRight, AlertTriangle, Check } from "lucide-react";
 import { iconMd, iconXs, flexRowGap2 } from "../../../../styles/spacing";
 import { Button } from "../../../../components/Button";
@@ -38,6 +39,7 @@ export function ConfigSectionHeader({
   onAdd,
   onRemove,
 }: ConfigSectionHeaderProps) {
+  const { t } = useTranslation("catalog");
   const Chevron = isExpanded ? ChevronDown : ChevronRight;
   return (
     <div
@@ -54,24 +56,24 @@ export function ConfigSectionHeader({
         {isConfigured && (
           <span className="flex items-center gap-1 text-xs text-green">
             <Check className={iconXs} />
-            configured
+            {t("configSections.configured")}
           </span>
         )}
         {showWarning && (
           <span className="flex items-center gap-1 text-xs text-amber">
             <AlertTriangle className={iconXs} />
-            frames exist, no config
+            {t("configSections.framesWithoutConfig")}
           </span>
         )}
       </div>
       <div className={flexRowGap2} onClick={(e) => e.stopPropagation()}>
         {isConfigured ? (
           <Button onClick={onRemove} variant="ghost" tone="danger" size="sm">
-            Remove
+            {t("common:actions.remove")}
           </Button>
         ) : (
           <Button onClick={onAdd} variant="ghost" tone={tone} size="sm">
-            + Add
+            {t("configSections.add")}
           </Button>
         )}
       </div>

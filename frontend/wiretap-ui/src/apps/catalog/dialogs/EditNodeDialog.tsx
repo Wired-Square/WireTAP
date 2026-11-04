@@ -47,9 +47,9 @@ export default function EditNodeDialog({
   const nodeError = useMemo(() => validationErrors.find((e) => e.field === "node"), [validationErrors]);
 
   return (
-    <Dialog isOpen={open} onClose={onCancel} title="Edit Node">
+    <Dialog isOpen={open} onClose={onCancel} title={t("nodeDialog.editTitle")}>
       <DialogBody className="space-y-4">
-        <FormField label="Node Name" required variant="default">
+        <FormField label={t("nodeDialog.name")} required variant="default">
           <Input
             size="lg"
             value={nodeName}
@@ -57,7 +57,7 @@ export default function EditNodeDialog({
               setNodeName(e.target.value);
               if (nodeError) clearValidation();
             }}
-            placeholder="inverter, battery, etc."
+            placeholder={t("nodeDialog.namePlaceholder")}
             onKeyDown={(e) => {
               if (e.key === "Enter" && nodeName.trim()) {
                 onSave();
@@ -68,7 +68,7 @@ export default function EditNodeDialog({
             <p className="mt-2 text-sm text-danger">{nodeError.message}</p>
           )}
           <p className={`mt-2 ${caption}`}>
-            Changing the name will update all frames that reference this node.
+            {t("nodeDialog.editHint")}
           </p>
         </FormField>
 

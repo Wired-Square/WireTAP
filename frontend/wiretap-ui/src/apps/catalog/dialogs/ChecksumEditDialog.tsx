@@ -58,21 +58,19 @@ export default function ChecksumEditDialog({
   const expectedOutputBytes = selectedAlgorithm?.outputBytes ?? 1;
 
   return (
-    <Dialog isOpen={open} onClose={onCancel} size="xl" title={editingIndex !== null ? "Edit Checksum" : "Add Checksum"}>
+    <Dialog isOpen={open} onClose={onCancel} size="xl" title={t(editingIndex !== null ? "checksumDialog.editTitle" : "checksumDialog.addTitle")}>
       <DialogBody className="space-y-4">
-        {/* Name */}
-        <FormField label="Name" required variant="default">
+        <FormField label={t("checksumDialog.name")} required variant="default">
           <Input
             size="lg"
             value={fields.name}
             onChange={(e) => setFields({ ...fields, name: e.target.value })}
-            placeholder="e.g., frame_checksum"
+            placeholder={t("checksumDialog.namePlaceholder")}
           />
         </FormField>
 
-        {/* Algorithm */}
         <div>
-          <FormField label="Algorithm" required variant="default">
+          <FormField label={t("checksumDialog.algorithm")} required variant="default">
             <Select
               size="lg"
               value={fields.algorithm}
@@ -89,7 +87,7 @@ export default function ChecksumEditDialog({
             >
               {CHECKSUM_ALGORITHMS.map((algo) => (
                 <option key={algo.id} value={algo.id}>
-                  {algo.name} ({algo.outputBytes} byte{algo.outputBytes > 1 ? "s" : ""})
+                  {t("checksumDialog.algorithmOption", { name: algo.name, count: algo.outputBytes })}
                 </option>
               ))}
             </Select>
@@ -99,17 +97,12 @@ export default function ChecksumEditDialog({
           )}
         </div>
 
-        {/* Checksum Position */}
         <Card tone="purple" padding="lg">
-          <h3 className={`${h3} text-purple mb-3`}>
-            Checksum Location
-          </h3>
-          <p className="text-xs text-purple mb-3">
-            Use negative values for positions from end (-1 = last byte, -2 = second-to-last)
-          </p>
+          <h3 className={`${h3} text-purple mb-3`}>{t("checksumDialog.location")}</h3>
+          <p className="text-xs text-purple mb-3">{t("checksumDialog.locationHint")}</p>
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <FormField label="Start Byte" required variant="default">
+              <FormField label={t("checksumDialog.startByte")} required variant="default">
                 <Input
                   size="lg"
                   type="number"
@@ -121,12 +114,12 @@ export default function ChecksumEditDialog({
               </FormField>
               {fields.start_byte < 0 && (
                 <p className="mt-1 text-xs text-purple">
-                  → byte {checksumStart ?? "…"}
+                  {t("checksumDialog.resolvedByte", { index: checksumStart ?? "…" })}
                 </p>
               )}
             </div>
             <div>
-              <FormField label="Byte Length" required variant="default">
+              <FormField label={t("checksumDialog.byteLength")} required variant="default">
                 <Input
                   size="lg"
                   type="number"
@@ -138,11 +131,11 @@ export default function ChecksumEditDialog({
               </FormField>
               {fields.byte_length !== expectedOutputBytes && (
                 <p className="mt-1 text-xs text-amber">
-                  Algorithm output is {expectedOutputBytes} byte{expectedOutputBytes > 1 ? "s" : ""}
+                  {t("checksumDialog.algorithmOutput", { count: expectedOutputBytes })}
                 </p>
               )}
             </div>
-            <FormField label="Endianness" variant="default">
+            <FormField label={t("checksumDialog.endianness")} variant="default">
               <Select
                 size="lg"
                 value={fields.endianness || "big"}
@@ -158,18 +151,12 @@ export default function ChecksumEditDialog({
           </div>
         </Card>
 
-        {/* Calculation Range */}
         <Card tone="info" padding="lg">
-          <h3 className={`${h3} text-info mb-3`}>
-            Calculation Range
-          </h3>
-          <p className="text-xs text-info mb-3">
-            Which bytes are included in the checksum calculation (end byte is exclusive).
-            Use negative values for positions from end.
-          </p>
+          <h3 className={`${h3} text-info mb-3`}>{t("checksumDialog.range")}</h3>
+          <p className="text-xs text-info mb-3">{t("checksumDialog.rangeHint")}</p>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <FormField label="Start Byte" required variant="default">
+              <FormField label={t("checksumDialog.startByte")} required variant="default">
                 <Input
                   size="lg"
                   type="number"
@@ -183,12 +170,12 @@ export default function ChecksumEditDialog({
               </FormField>
               {fields.calc_start_byte < 0 && (
                 <p className="mt-1 text-xs text-blue">
-                  → byte {calcStart ?? "…"}
+                  {t("checksumDialog.resolvedByte", { index: calcStart ?? "…" })}
                 </p>
               )}
             </div>
             <div>
-              <FormField label="End Byte (exclusive)" required variant="default">
+              <FormField label={t("checksumDialog.endByte")} required variant="default">
                 <Input
                   size="lg"
                   type="number"
@@ -202,25 +189,24 @@ export default function ChecksumEditDialog({
               </FormField>
               {fields.calc_end_byte < 0 && (
                 <p className="mt-1 text-xs text-blue">
-                  → byte {calcEnd ?? "…"}
+                  {t("checksumDialog.resolvedByte", { index: calcEnd ?? "…" })}
                 </p>
               )}
             </div>
           </div>
           {calcStart !== null && calcEnd !== null && (calcRangeEmpty ? (
             <p className="mt-2 text-xs text-red">
-              End byte must be greater than start byte (resolved: {calcStart} to {calcEnd})
+              {t("checksumDialog.rangeEmpty", { start: calcStart, end: calcEnd })}
             </p>
           ) : (
             <p className={`mt-2 ${helpText}`}>
-              Calculating over bytes {calcStart} to {calcEnd - 1} ({calcEnd - calcStart} bytes total)
+              {t("checksumDialog.rangeSummary", { start: calcStart, last: calcEnd - 1, count: calcEnd - calcStart })}
             </p>
           ))}
         </Card>
 
-        {/* Byte Layout Visualization */}
         <div className="p-4 bg-surface rounded-lg">
-          <h3 className={`${h3} mb-3`}>Byte Layout Preview</h3>
+          <h3 className={`${h3} mb-3`}>{t("checksumDialog.layoutPreview")}</h3>
           <div className="flex flex-wrap gap-1 font-mono text-xs">
             {Array.from({ length: frameLength }).map((_, i) => {
               const isChecksumByte =
@@ -240,10 +226,10 @@ export default function ChecksumEditDialog({
                   className={`w-7 h-7 flex items-center justify-center rounded ${bgClass}`}
                   title={
                     isChecksumByte
-                      ? "Checksum location"
+                      ? t("checksumDialog.byteIsChecksum")
                       : isCalcByte
-                        ? "Included in calculation"
-                        : `Byte ${i}`
+                        ? t("checksumDialog.byteInRange")
+                        : t("checksumDialog.byte", { index: i })
                   }
                 >
                   {i}
@@ -254,16 +240,15 @@ export default function ChecksumEditDialog({
           <div className="flex items-center gap-4 mt-2 text-xs text-muted">
             <div className="flex items-center gap-1">
               <div className="w-3 h-3 rounded bg-purple"></div>
-              <span>Checksum</span>
+              <span>{t("checksumDialog.legendChecksum")}</span>
             </div>
             <div className="flex items-center gap-1">
               <div className="w-3 h-3 rounded bg-info"></div>
-              <span>Calculation range</span>
+              <span>{t("checksumDialog.legendRange")}</span>
             </div>
           </div>
         </div>
 
-        {/* Notes */}
         <FormField label={t("shared.notes")} variant="default">
           <Textarea
             size="lg"
@@ -286,7 +271,7 @@ export default function ChecksumEditDialog({
             calcRangeEmpty
           }
         >
-          {editingIndex !== null ? "Update Checksum" : "Add Checksum"}
+          {t(editingIndex !== null ? "checksumDialog.update" : "checksumDialog.addTitle")}
         </PrimaryButton>
       </DialogFooter>
     </Dialog>

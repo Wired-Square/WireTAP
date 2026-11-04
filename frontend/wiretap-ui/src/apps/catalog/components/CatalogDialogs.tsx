@@ -1,6 +1,7 @@
 // ui/src/apps/catalog/components/CatalogDialogs.tsx
 // Consolidated dialog rendering for CatalogEditor
 
+import { useTranslation } from "react-i18next";
 import { useCatalogEditorStore } from "../../../stores/catalogEditorStore";
 import SignalEditDialog from "../dialogs/SignalEditDialog";
 import MuxEditDialog from "../dialogs/MuxEditDialog";
@@ -72,6 +73,7 @@ export default function CatalogDialogs({
   catalogPath,
   handlers,
 }: Props) {
+  const { t } = useTranslation("catalog");
   // Store selectors for dialog state
   const dialogs = useCatalogEditorStore((s) => s.ui.dialogs);
   const dialogPayload = useCatalogEditorStore((s) => s.ui.dialogPayload);
@@ -229,8 +231,8 @@ export default function CatalogDialogs({
 
       <ConfirmDeleteDialog
         open={dialogs.deleteCanFrame}
-        title="Delete CAN Frame"
-        message="Are you sure you want to delete CAN frame"
+        title={t("deleteConfirm.canFrameTitle")}
+        message={t("deleteConfirm.canFrame")}
         highlightText={dialogPayload.idToDelete || undefined}
         onCancel={() => {
           closeDialog("deleteCanFrame");
@@ -241,8 +243,8 @@ export default function CatalogDialogs({
 
       <ConfirmDeleteDialog
         open={dialogs.deleteSignal}
-        title="Delete Signal"
-        message="Are you sure you want to delete signal"
+        title={t("deleteConfirm.signalTitle")}
+        message={t("deleteConfirm.signal")}
         highlightText={
           (dialogPayload.signalToDelete && dialogPayload.signalToDelete.name) || undefined
         }
@@ -255,8 +257,8 @@ export default function CatalogDialogs({
 
       <ConfirmDeleteDialog
         open={dialogs.deleteChecksum}
-        title="Delete Checksum"
-        message="Are you sure you want to delete checksum"
+        title={t("deleteConfirm.checksumTitle")}
+        message={t("deleteConfirm.checksum")}
         highlightText={
           (dialogPayload.checksumToDelete && dialogPayload.checksumToDelete.name) || undefined
         }
@@ -309,8 +311,8 @@ export default function CatalogDialogs({
 
       <ConfirmDeleteDialog
         open={dialogs.deleteNode}
-        title="Delete Node"
-        message="Are you sure you want to delete node"
+        title={t("deleteConfirm.nodeTitle")}
+        message={t("deleteConfirm.node")}
         highlightText={dialogPayload.nodeToDelete || undefined}
         onCancel={() => {
           closeDialog("deleteNode");
@@ -321,8 +323,8 @@ export default function CatalogDialogs({
 
       <ConfirmDeleteDialog
         open={dialogs.deleteGeneric}
-        title="Delete"
-        message="Are you sure you want to delete"
+        title={t("common:actions.delete")}
+        message={t("deleteConfirm.generic")}
         highlightText={
           dialogPayload.genericLabel ||
           (dialogPayload.genericPathToDelete?.slice(-1)[0] ?? undefined)

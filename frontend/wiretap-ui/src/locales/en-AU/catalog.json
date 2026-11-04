@@ -32,7 +32,20 @@
     },
     "noFrames": "No frames in this catalog",
     "openCatalogPrompt": "Open a catalog file to view its structure",
-    "emptyStructure": "No structure to display"
+    "emptyStructure": "No structure to display",
+    "unassigned": "Unassigned",
+    "checksumBytes": "(byte {{start}}:{{length}})",
+    "fallback": {
+      "signal": "Signal {{number}}",
+      "case": "Case {{value}}",
+      "mux": "Mux",
+      "checksum": "Checksum {{number}}"
+    },
+    "sections": {
+      "meta": "meta",
+      "frame": "frame",
+      "node": "node"
+    }
   },
   "editor": {
     "textViewEdit": "Edit",
@@ -146,7 +159,9 @@
     "deleteSignal": "Delete signal",
     "noSignalsLong": "No signals defined yet",
     "deleteNode": "Delete node",
-    "editNode": "Edit node"
+    "editNode": "Edit node",
+    "locationFrame": "frame",
+    "locationCase": "case {{value}}"
   },
   "canFrameView": {
     "id": "ID",
@@ -351,7 +366,11 @@
     "calcEnd": "Calc End",
     "byteOrder": "Byte Order",
     "endianBE": "Big Endian",
-    "endianLE": "Little Endian"
+    "endianLE": "Little Endian",
+    "rangeFrom": "bytes {{start}}",
+    "rangeTo": "to {{end}}",
+    "rangeResolved": "= bytes {{start}} to {{last}}",
+    "range": "bytes {{start}} to {{last}} (exclusive end: {{end}})"
   },
   "muxView": {
     "title": "Mux Selector",
@@ -530,7 +549,8 @@
     "intervalPlaceholder": "1000",
     "notesLabel": "Notes",
     "notesPlaceholder": "Add notes about this frame (one per line)",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "serialRs485": "Serial (RS-485)"
   },
   "frameEdit": {
     "name": "Name",
@@ -601,7 +621,10 @@
     "modbusRegisterBaseNotSpecified": "Not specified",
     "modbusRegisterBase0": "0-based (0-65535)",
     "modbusRegisterBase1": "1-based (1-65536)",
-    "modbusRegisterBaseHint": "Some manufacturers count registers from 0, others from 1"
+    "modbusRegisterBaseHint": "Some manufacturers count registers from 0, others from 1",
+    "modbusRegisterFromName": "{{register}} (from name)",
+    "modbusNameNotRegister": "⚠ Name isn't a register — enter a register number, or name the frame by its register (e.g. 2581 or 0x32F9).",
+    "modbusRegisterFromNameHint": "Optional — taken from the frame name. Set a value only to override it."
   },
   "newCatalog": {
     "title": "Create New Catalog",
@@ -913,5 +936,288 @@
     "addField": "Add Field",
     "hideBitPicker": "Hide bit picker",
     "showBitPicker": "Show bit picker"
+  },
+  "nodeDialog": {
+    "addTitle": "Add Node",
+    "editTitle": "Edit Node",
+    "name": "Node Name",
+    "namePlaceholder": "inverter, battery, etc.",
+    "addHint": "Enter a descriptive name for this node (e.g., \"inverter\", \"battery\", \"motor\")",
+    "editHint": "Changing the name will update all frames that reference this node.",
+    "deviceAddressHint": "Modbus slave address (1-247) this node is polled at."
+  },
+  "muxCaseDialog": {
+    "addTitle": "Add Mux Case",
+    "editTitle": "Edit Mux Case",
+    "caseValue": "Case Value",
+    "caseValuePlaceholder": "0, 1, 2, etc.",
+    "caseValueHint": "Enter the case value (e.g., \"0\", \"1\", \"2\" for numeric cases or any string)",
+    "submit": "Add Case"
+  },
+  "muxDialog": {
+    "addTitle": "Add Mux",
+    "addNestedTitle": "Add Nested Mux",
+    "editTitle": "Edit Mux",
+    "layoutPreview_one": "Bit Layout Preview ({{count}} byte)",
+    "layoutPreview_other": "Bit Layout Preview ({{count}} bytes)",
+    "name": "Name",
+    "namePlaceholder": "Named from the frame and bits when left blank",
+    "startBit": "Start Bit",
+    "bitLength": "Bit Length"
+  },
+  "validationDialog": {
+    "passed": "Validation Passed",
+    "warnings": "Validation Warnings",
+    "issuesFound_one": "{{count}} issue found",
+    "issuesFound_other": "{{count}} issues found",
+    "valid": "The catalog is valid and ready for use."
+  },
+  "checksumDialog": {
+    "addTitle": "Add Checksum",
+    "editTitle": "Edit Checksum",
+    "update": "Update Checksum",
+    "name": "Name",
+    "namePlaceholder": "e.g., frame_checksum",
+    "algorithm": "Algorithm",
+    "algorithmOption_one": "{{name}} ({{count}} byte)",
+    "algorithmOption_other": "{{name}} ({{count}} bytes)",
+    "location": "Checksum Location",
+    "locationHint": "Use negative values for positions from end (-1 = last byte, -2 = second-to-last)",
+    "startByte": "Start Byte",
+    "byteLength": "Byte Length",
+    "endByte": "End Byte (exclusive)",
+    "resolvedByte": "→ byte {{index}}",
+    "algorithmOutput_one": "Algorithm output is {{count}} byte",
+    "algorithmOutput_other": "Algorithm output is {{count}} bytes",
+    "endianness": "Endianness",
+    "range": "Calculation Range",
+    "rangeHint": "Which bytes are included in the checksum calculation (end byte is exclusive). Use negative values for positions from end.",
+    "rangeEmpty": "End byte must be greater than start byte (resolved: {{start}} to {{end}})",
+    "rangeSummary_one": "Calculating over bytes {{start}} to {{last}} ({{count}} byte total)",
+    "rangeSummary_other": "Calculating over bytes {{start}} to {{last}} ({{count}} bytes total)",
+    "layoutPreview": "Byte Layout Preview",
+    "byteIsChecksum": "Checksum location",
+    "byteInRange": "Included in calculation",
+    "byte": "Byte {{index}}",
+    "legendChecksum": "Checksum",
+    "legendRange": "Calculation range"
+  },
+  "enumDialog": {
+    "title": "Edit Enum Values",
+    "description": "Map raw signal values to human-readable labels.",
+    "rawValue": "Raw Value",
+    "label": "Label",
+    "addValue": "Add Value",
+    "rawEmpty": "Raw value cannot be empty",
+    "rawInvalid": "Invalid raw value: \"{{value}}\" (must be an integer or hex like 0x1F)",
+    "labelEmpty": "Label for value {{value}} cannot be empty",
+    "duplicate": "Duplicate raw value: {{value}} (same as {{existing}})",
+    "rawPlaceholder": "0 or 0x1F"
+  },
+  "exportDialog": {
+    "title": "Export Catalog",
+    "format": "Export Format",
+    "groups": {
+      "data": "Data Formats",
+      "report": "Documentation Reports"
+    },
+    "formats": {
+      "toml": {
+        "name": "TOML Catalog",
+        "option": "TOML Catalog (.toml)",
+        "description": "Native WireTAP format. Preserves all features including nested multiplexing, confidence levels, and decode sets."
+      },
+      "dbc": {
+        "name": "DBC (Vector CANdb++)",
+        "option": "DBC File (.dbc)",
+        "description": "Industry-standard format for CAN database files."
+      },
+      "html-screen": {
+        "name": "HTML Report (Screen)",
+        "option": "HTML Report - Screen (.html)",
+        "description": "Rich HTML with dark theme colors and styling. Best for viewing on screen."
+      },
+      "html-print": {
+        "name": "HTML Report (Print)",
+        "option": "HTML Report - Print (.html)",
+        "description": "Light theme HTML optimized for printing or PDF export via browser print."
+      },
+      "markdown": {
+        "name": "Markdown Report",
+        "option": "Markdown Report (.md)",
+        "description": "Structured markdown with tables and sections. Compatible with documentation tools."
+      },
+      "text": {
+        "name": "Text Report",
+        "option": "Text Report (.txt)",
+        "description": "Plain text report with visual formatting. Works anywhere."
+      }
+    },
+    "muxMode": "Multiplexing Mode",
+    "muxExtended": "Extended (SG_MUL_VAL_)",
+    "muxExtendedHint": "Uses SG_MUL_VAL_ section with mNM notation for nested multiplexors. Best for modern tools.",
+    "muxFlattened": "Flattened (Legacy)",
+    "muxFlattenedHint": "Flattens nested mux into composite values. Compatible with older tools.",
+    "saving": "Saving...",
+    "saveAs": "Save As..."
+  },
+  "configDialog": {
+    "title": "Catalog Configuration",
+    "subtitle": "Configure catalog metadata and protocol settings",
+    "protocols": "Protocol Configurations",
+    "noteTitle": "Note:",
+    "noteText": "Protocol configurations define default settings for all frames of that type. Add a configuration for each protocol you plan to use in this catalog.",
+    "removeCanConfirm": "This catalog has CAN frames. Remove CAN configuration anyway?",
+    "removeSerialConfirm": "This catalog has Serial frames. Remove Serial configuration anyway?",
+    "removeModbusConfirm": "This catalog has Modbus frames. Remove Modbus configuration anyway?"
+  },
+  "configSections": {
+    "configured": "configured",
+    "framesWithoutConfig": "frames exist, no config",
+    "add": "+ Add",
+    "metadata": "Catalog Metadata",
+    "name": "Name",
+    "namePlaceholder": "My Catalog",
+    "version": "Version",
+    "optional": "(optional)",
+    "headerFields": "Header Fields",
+    "removeField": "Remove field",
+    "fieldTypeExists": "{{label}} (exists)",
+    "fieldTypes": {
+      "id": "ID",
+      "source_address": "Source Address",
+      "destination_address": "Destination Address",
+      "custom": "Custom"
+    },
+    "noBitsSelected": "no bits selected",
+    "bitInfo_one": "{{count}} bit @ bit {{first}}",
+    "bitInfo_other": "{{count}} bits @ bit {{first}}",
+    "summaryInterval": "{{ms}}ms",
+    "can": {
+      "byteOrderHint": "Byte order used for multi-byte signals",
+      "interval": "Default Interval (ms)",
+      "intervalHint": "Default transmit interval for frames",
+      "extendedAuto": "Auto-detect from ID",
+      "extendedNo": "No (11-bit standard)",
+      "extendedYes": "Yes (29-bit extended)",
+      "extendedHint": "Default ID type for frames without explicit setting",
+      "fdAuto": "Classic CAN (default)",
+      "fdYes": "Yes (CAN FD)",
+      "fdHint": "Default to CAN FD frames (64-byte payload, BRS)",
+      "idMask": "Frame ID Mask",
+      "optionalHex": "(optional, hex)",
+      "idType": "ID type:",
+      "idTypeTooltip": "CAN ID type",
+      "idMaskHint": "Mask applied to frame ID before catalog matching. For J1939, use 0x1FFFFF00 to mask off the source address.",
+      "headerFieldsHint": "Extract named values from the CAN ID using bitmasks. The \"Source Address\" field enables per-source view.",
+      "maskTooltip": "Mask (hex)",
+      "shiftTooltip": "Right shift (bits)",
+      "addFieldHint": "Use the bit picker after adding to select which CAN ID bits this field covers.",
+      "noHeaderFields": "No header fields defined. Add a \"Source Address\" field to enable per-source view in the decoder.",
+      "summaryByteOrder": "Byte order: {{order}}",
+      "summaryInterval": "Interval: {{ms}}ms",
+      "summaryExtendedYes": "Extended: Yes",
+      "summaryExtendedNo": "Extended: No",
+      "summaryFdYes": "FD: Yes",
+      "summaryFdNo": "FD: No",
+      "summaryMask": "Mask: {{mask}}",
+      "summaryHeaderFields_one": "{{count}} header field",
+      "summaryHeaderFields_other": "{{count}} header fields"
+    },
+    "serial": {
+      "byteOrder": "Byte Order",
+      "bigEndian": "Big Endian (MSB first)",
+      "littleEndian": "Little Endian (LSB first)",
+      "byteOrderHint": "Default byte order for signal decoding",
+      "header": "Header",
+      "headerLength": "Header Length (bytes)",
+      "headerLengthHint": "Fixed header size for all frames. Required when defining header fields.",
+      "headerFieldsHint": "Define named masks over the header bytes. The \"ID\" field is used for frame matching.",
+      "startByteTooltip": "Start byte (negative counts from the end)",
+      "bytesTooltip": "Bytes",
+      "byteOrderTooltip": "Byte order",
+      "byteInfo_one": "{{count}} byte @ offset {{offset}}",
+      "byteInfo_other": "{{count}} bytes @ offset {{offset}}",
+      "addFieldHint": "Use the bit picker to select which header bytes this field covers.",
+      "noHeaderFields": "No header fields defined. Add an \"ID\" field to enable frame matching.",
+      "checksum": "Protocol Checksum",
+      "checksumHint": "Default checksum settings for all frames",
+      "checksumStartTooltip": "Byte position where checksum is stored (-1 = last byte)",
+      "lastByteHint": "-1 = last byte",
+      "byteCount_one": "{{count}} byte",
+      "byteCount_other": "{{count}} bytes",
+      "calcStart": "Calc Start Byte",
+      "calcStartTooltip": "First byte included in calculation",
+      "calcEnd": "Calc End Byte",
+      "calcEndTooltip": "Last byte (exclusive) included in calculation (-1 = up to checksum)",
+      "upToChecksumHint": "-1 = up to checksum",
+      "checksumBigEndian": "Big endian (MSB first)",
+      "noChecksum": "No protocol-level checksum configured. Click \"Add Checksum\" to define defaults.",
+      "summaryEncoding": "Encoding: {{encoding}}",
+      "summaryHeader": "Header: {{bytes}}B",
+      "summaryFields_one": "{{count}} field",
+      "summaryFields_other": "{{count}} fields",
+      "summaryIdField": "ID field",
+      "summaryChecksum": "Checksum: {{algorithm}}"
+    },
+    "modbus": {
+      "base0": "0-based (register 0 = address 0)",
+      "base1": "1-based (register 1 = address 0)",
+      "registerBaseHint": "Register addressing convention used by the device",
+      "pollInterval": "Default Poll Interval",
+      "pollIntervalHint": "Default polling interval for frames without an explicit interval",
+      "byteOrderHint": "Byte order within each register",
+      "wordOrder": "Default Word Order",
+      "wordBig": "Big-endian (high word first)",
+      "wordLittle": "Little-endian (low word first)",
+      "wordOrderHint": "Word order for multi-register values",
+      "summaryBase": "Base: {{base}}-based",
+      "summaryByte": "Byte: {{order}}",
+      "summaryWord": "Word: {{order}}"
+    }
+  },
+  "deleteConfirm": {
+    "canFrameTitle": "Delete CAN Frame",
+    "canFrame": "Are you sure you want to delete CAN frame",
+    "signalTitle": "Delete Signal",
+    "signal": "Are you sure you want to delete signal",
+    "checksumTitle": "Delete Checksum",
+    "checksum": "Are you sure you want to delete checksum",
+    "nodeTitle": "Delete Node",
+    "node": "Are you sure you want to delete node",
+    "generic": "Are you sure you want to delete"
+  },
+  "errors": {
+    "createCatalog": "Failed to create catalog",
+    "deleteId": "Failed to delete ID",
+    "frameIdRequired": "Frame identifier is required",
+    "deleteFrame": "Failed to delete frame",
+    "deleteNode": "Failed to delete node",
+    "editNode": "Failed to edit node",
+    "deleteItem": "Failed to delete item",
+    "addCase": "Failed to add case",
+    "editCase": "Failed to edit case",
+    "caseExists": "Case {{value}} already exists",
+    "deleteSignal": "Failed to delete signal",
+    "saveChecksum": "Failed to save checksum",
+    "deleteChecksum": "Failed to delete checksum",
+    "reloadDiscards": "You have unsaved changes. Reload will discard them. Continue?"
+  },
+  "selection": {
+    "table": "Table",
+    "signal": "Signal",
+    "metadata": "Metadata",
+    "canFrame": "CAN Frame",
+    "register": "Register",
+    "registerGroup": "Register Group",
+    "slave": "Slave",
+    "peer": "Peer",
+    "mux": "Mux",
+    "muxCase": "Mux Case",
+    "copiedFrom": "Copied from {{source}}",
+    "mirrorOf": "Mirror of {{source}}",
+    "copyOf": "Copy of {{source}}",
+    "editFrame": "Edit frame",
+    "deleteFrame": "Delete frame"
   }
 }

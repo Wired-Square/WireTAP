@@ -60,7 +60,7 @@ export default function DiffView({ lines }: DiffViewProps) {
   if (lines.length === 0) {
     return (
       <div className={`flex-1 flex items-center justify-center ${bgPrimary} ${textMuted} text-sm`}>
-        {t("editor.diffNoChanges", "No changes since last save")}
+        {t("editor.diffNoChanges")}
       </div>
     );
   }

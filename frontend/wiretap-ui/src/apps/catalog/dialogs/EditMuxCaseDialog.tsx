@@ -38,9 +38,9 @@ export default function EditMuxCaseDialog({
   const caseError = useMemo(() => validationErrors.find((e) => e.field === "case"), [validationErrors]);
 
   return (
-    <Dialog isOpen={open} onClose={onCancel} title="Edit Mux Case">
+    <Dialog isOpen={open} onClose={onCancel} title={t("muxCaseDialog.editTitle")}>
       <DialogBody className="space-y-4">
-        <FormField label="Case Value" required variant="default">
+        <FormField label={t("muxCaseDialog.caseValue")} required variant="default">
           <Input
             size="lg"
             value={caseValue}
@@ -48,7 +48,7 @@ export default function EditMuxCaseDialog({
               setCaseValue(e.target.value);
               if (caseError) clearValidation();
             }}
-            placeholder="0, 1, 2, etc."
+            placeholder={t("muxCaseDialog.caseValuePlaceholder")}
             onKeyDown={(e) => {
               if (e.key === "Enter" && caseValue.trim()) {
                 onSave();
@@ -59,7 +59,7 @@ export default function EditMuxCaseDialog({
             <p className="mt-2 text-sm text-danger">{caseError.message}</p>
           )}
           <p className={`mt-2 ${caption}`}>
-            Enter the case value (e.g., "0", "1", "2" for numeric cases or any string)
+            {t("muxCaseDialog.caseValueHint")}
           </p>
         </FormField>
 

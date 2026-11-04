@@ -1,6 +1,7 @@
 // ui/src/apps/catalog/hooks/handlers/useSignalHandlers.ts
 // Signal and checksum operations for catalog editor
 
+import i18n from "../../../../i18n";
 import { useCatalogEditorStore } from "../../../../stores/catalogEditorStore";
 import {
   upsertSignalToml,
@@ -137,7 +138,7 @@ export function useSignalHandlers({
       setToml(newContent);
     } catch (error) {
       console.error("Failed to delete signal:", error);
-      setValidation([{ field: "signal", message: "Failed to delete signal" }]);
+      setValidation([{ field: "signal", message: i18n.t("catalog:errors.deleteSignal") }]);
     }
   };
 
@@ -177,7 +178,7 @@ export function useSignalHandlers({
       clearValidation();
     } catch (error) {
       console.error("Failed to save checksum:", error);
-      setValidation([{ field: "checksum", message: "Failed to save checksum" }]);
+      setValidation([{ field: "checksum", message: i18n.t("catalog:errors.saveChecksum") }]);
     }
   };
 
@@ -214,7 +215,7 @@ export function useSignalHandlers({
       setSelectedPath(null);
     } catch (error) {
       console.error("Failed to delete checksum:", error);
-      setValidation([{ field: "checksum", message: "Failed to delete checksum" }]);
+      setValidation([{ field: "checksum", message: i18n.t("catalog:errors.deleteChecksum") }]);
     } finally {
       closeDialog("deleteChecksum");
       setDialogPayload({ checksumToDelete: null });

@@ -2,6 +2,7 @@
 
 import React from "react";
 import { useTranslation } from "react-i18next";
+import i18n from "../../../i18n";
 import { Plus, Trash2, Pencil } from "lucide-react";
 import { iconMd, flexRowGap2 } from "../../../styles/spacing";
 import { caption, labelSmallMuted, monoBody, textMedium, bgSurface, sectionHeaderText, emptyStateText } from "../../../styles";
@@ -49,7 +50,7 @@ function ownSignals(frame: Frame): FrameSignal[] {
     signals.forEach((s, index) => {
       if (s.inherited) return;
       out.push({
-        name: s.name || `Signal ${index + 1}`,
+        name: s.name || i18n.t("catalog:tree.fallback.signal", { number: index + 1 }),
         startBit: s.startBit ?? undefined,
         bitLength: s.bitLength ?? undefined,
         location,
@@ -60,12 +61,13 @@ function ownSignals(frame: Frame): FrameSignal[] {
     });
   const walk = (mux: Mux, muxPath: string[], prefix: string | null) => {
     for (const [k, c] of Object.entries(mux.cases)) {
-      const location = prefix ? `${prefix} • case ${k}` : `case ${k}`;
+      const muxCase = i18n.t("catalog:nodeView.locationCase", { value: k });
+      const location = prefix ? `${prefix} • ${muxCase}` : muxCase;
       push(c.signals, [...muxPath, k], location);
       if (c.mux) walk(c.mux, [...muxPath, k, "mux"], location);
     }
   };
-  push(frame.signals, framePath, "frame");
+  push(frame.signals, framePath, i18n.t("catalog:nodeView.locationFrame"));
   if (frame.mux && !frame.inheritedFields?.includes("mux")) walk(frame.mux, [...framePath, "mux"], null);
   return out;
 }

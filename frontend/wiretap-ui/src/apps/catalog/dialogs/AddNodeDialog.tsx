@@ -38,14 +38,14 @@ export default function AddNodeDialog({
 }: AddNodeDialogProps) {
   const { t } = useTranslation("catalog");
   return (
-    <Dialog isOpen={open} onClose={onCancel} title="Add Node">
+    <Dialog isOpen={open} onClose={onCancel} title={t("nodeDialog.addTitle")}>
       <DialogBody className="space-y-4">
-        <FormField label="Node Name" required variant="default">
+        <FormField label={t("nodeDialog.name")} required variant="default">
           <Input
             size="lg"
             value={nodeName}
             onChange={(e) => setNodeName(e.target.value)}
-            placeholder="inverter, battery, etc."
+            placeholder={t("nodeDialog.namePlaceholder")}
             onKeyDown={(e) => {
               if (e.key === "Enter" && nodeName.trim()) {
                 onAdd();
@@ -53,7 +53,7 @@ export default function AddNodeDialog({
             }}
           />
           <p className={`mt-2 ${caption}`}>
-            Enter a descriptive name for this node (e.g., "inverter", "battery", "motor")
+            {t("nodeDialog.addHint")}
           </p>
         </FormField>
 
@@ -76,7 +76,7 @@ export default function AddNodeDialog({
       <DialogFooter>
         <SecondaryButton onClick={onCancel}>{t("common:actions.cancel")}</SecondaryButton>
         <PrimaryButton onClick={onAdd} disabled={!nodeName.trim()}>
-          Add Node
+          {t("nodeDialog.addTitle")}
         </PrimaryButton>
       </DialogFooter>
     </Dialog>

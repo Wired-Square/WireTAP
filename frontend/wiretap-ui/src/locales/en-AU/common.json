@@ -230,6 +230,7 @@
     "signalFallback": "Signal",
     "muxShort": "Mux",
     "signalShort": "Signal",
+    "checksumShort": "Checksum",
     "tooltipSelecting": "Selecting bit {{bit}}",
     "tooltipOverlap": "OVERLAP: {{names}}",
     "tooltipCurrent": "Bit {{bit}} (current)",

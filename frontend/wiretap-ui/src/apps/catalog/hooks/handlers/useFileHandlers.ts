@@ -1,6 +1,7 @@
 // ui/src/apps/catalog/hooks/handlers/useFileHandlers.ts
 // File I/O operations for catalog editor
 
+import i18n from "../../../../i18n";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { useCatalogEditorStore } from "../../../../stores/catalogEditorStore";
 import { openCatalogWithMigration, saveCatalogAtPath, pickCatalogToOpen, pickCatalogSavePath } from "../../io";
@@ -112,7 +113,7 @@ export function useFileHandlers({ settings, saveFrameIdFormat }: UseFileHandlers
       }
     } catch (error) {
       console.error("Failed to create new catalog:", error);
-      setValidation([{ field: "meta", message: "Failed to create catalog" }]);
+      setValidation([{ field: "meta", message: i18n.t("catalog:errors.createCatalog") }]);
     }
   };
 
@@ -144,7 +145,7 @@ export function useFileHandlers({ settings, saveFrameIdFormat }: UseFileHandlers
     const hasUnsaved = hasUnsavedChanges();
     if (hasUnsaved) {
       const confirmed = window.confirm(
-        "You have unsaved changes. Reload will discard them. Continue?"
+        i18n.t("catalog:errors.reloadDiscards")
       );
       if (!confirmed) return;
     }
