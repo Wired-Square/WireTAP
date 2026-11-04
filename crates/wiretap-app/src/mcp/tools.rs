@@ -677,7 +677,8 @@ impl WireTapTools {
     ) -> Result<CallToolResult, McpError> {
         let cat = self.ctx.find_catalog(&p.name).map_err(err)?;
         let toml = crate::catalog::open_catalog(cat.path).await.map_err(err)?;
-        let markdown = crate::report::catalog::render(&toml, crate::report::ReportFormat::Markdown).map_err(err)?;
+        let markdown = crate::report::catalog::render(&toml, crate::report::ReportFormat::Markdown, &Default::default())
+            .map_err(err)?;
         Ok(ok_text(markdown))
     }
 
@@ -762,8 +763,8 @@ impl WireTapTools {
         .map_err(err)?;
         Ok(ok_text(format!(
             "{}\n{}",
-            crate::report::changes::report(&changes).render(Markdown),
-            crate::report::order::report(&orders).render(Markdown)
+            crate::report::changes::report(&changes, &Default::default()).render(Markdown),
+            crate::report::order::report(&orders, &Default::default()).render(Markdown)
         )))
     }
 

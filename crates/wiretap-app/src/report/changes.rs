@@ -4,10 +4,11 @@
 
 use std::collections::HashSet;
 
+use wiretap_analysis::roles::{Endianness, Trend};
 use wiretap_analysis::{changes_counts, ByteColumn, ByteRole, FrameKey, MultiBytePattern, MuxSelector, PatternKind};
 
 use super::notes::{case_lines, frame_lines, mux_value};
-use super::{count, frame_label, grouped, protocol_label, protocol_rank, Block, Cell, Doc};
+use super::{frame_label, protocol_rank, Block, Cell, Doc, ReportLocale};
 use crate::byte_roles::{ChangesFrame, PayloadChanges};
 
 fn protocol(frame: &ChangesFrame) -> &str {
@@ -18,7 +19,11 @@ fn key(frame: &ChangesFrame) -> FrameKey {
     FrameKey::new(frame.profile.frame_id, frame.profile.is_extended)
 }
 
-pub fn report(changes: &PayloadChanges) -> Doc {
+fn labels(l: &ReportLocale, keys: &[&str]) -> Vec<String> {
+    keys.iter().map(|k| l.label(k)).collect()
+}
+
+pub fn report(changes: &PayloadChanges, l: &ReportLocale) -> Doc {
     let mut frames: Vec<&ChangesFrame> = changes.frames.iter().collect();
     frames.sort_by_key(|f| (protocol_rank(protocol(f)), protocol(f), key(f)));
 
@@ -33,27 +38,27 @@ pub fn report(changes: &PayloadChanges) -> Doc {
     let mut protocols: Vec<&str> = frames.iter().map(|f| protocol(f)).collect();
     protocols.dedup();
     let mut fields = vec![
-        ("Frames read", grouped(changes.frame_count)),
-        ("Frames profiled", grouped(counts.frames)),
+        (l.label("reports:changes.field.framesRead"), l.grouped(changes.frame_count)),
+        (l.label("reports:changes.field.framesProfiled"), l.grouped(counts.frames)),
     ];
     if !protocols.is_empty() {
-        let labels: Vec<String> = protocols.iter().map(|p| protocol_label(p)).collect();
-        fields.push(("Protocols", labels.join(", ")));
+        let labels: Vec<String> = protocols.iter().map(|p| l.protocol_label(p)).collect();
+        fields.push((l.label("reports:changes.field.protocols"), labels.join(", ")));
     }
     for (label, n) in [
-        ("Not profiled", changes.skipped_frames),
-        ("Mirror groups", counts.mirror_groups),
-        ("Identical", counts.identical),
-        ("Varying length", counts.varying_length),
-        ("Multiplexed", counts.mux),
-        ("Burst", counts.burst),
+        ("reports:changes.field.notProfiled", changes.skipped_frames),
+        ("reports:changes.mirrorGroups", counts.mirror_groups),
+        ("reports:changes.field.identical", counts.identical),
+        ("reports:changes.field.varyingLength", counts.varying_length),
+        ("reports:changes.field.multiplexed", counts.mux),
+        ("reports:changes.field.burst", counts.burst),
     ] {
         if n > 0 {
-            fields.push((label, grouped(n)));
+            fields.push((l.label(label), l.grouped(n)));
         }
     }
 
-    let mut blocks = vec![Block::Section("Summary".into(), vec![Block::Fields(fields)])];
+    let mut blocks = vec![Block::Section(l.label("reports:summary"), vec![Block::Fields(fields)])];
     let mirror_rows: Vec<Vec<Cell>> = changes
         .mirrors
         .iter()
@@ -62,58 +67,72 @@ pub fn report(changes: &PayloadChanges) -> Doc {
             let ids: Vec<String> = g.keys.iter().map(|k| frame_label(protocol, *k)).collect();
             vec![
                 Cell::Code(ids.join(" ↔ ")),
-                Cell::Plain(format!("{}%", g.match_percentage)),
-                Cell::Plain(grouped(g.sample_count)),
+                Cell::Plain(l.percent(g.match_percentage)),
+                Cell::Plain(l.grouped(g.sample_count)),
                 Cell::Code(hex(&g.sample_payload)),
             ]
         })
         .collect();
     if !mirror_rows.is_empty() {
-        blocks.push(Block::Section(
-            "Mirror groups".into(),
-            vec![Block::Table(vec!["Frames", "Match", "Paired samples", "Sample"], mirror_rows)],
-        ));
+        let header = labels(
+            l,
+            &[
+                "reports:changes.column.frames",
+                "reports:changes.column.match",
+                "reports:changes.column.pairedSamples",
+                "reports:changes.column.sample",
+            ],
+        );
+        blocks.push(Block::Section(l.label("reports:changes.mirrorGroups"), vec![Block::Table(header, mirror_rows)]));
     }
-    blocks.push(Block::Section("Frames".into(), frames.into_iter().map(frame).collect()));
-    Doc { title: "Payload Changes Report".into(), blocks }
+    blocks.push(Block::Section(l.label("reports:changes.frames"), frames.into_iter().map(|f| frame(f, l)).collect()));
+    Doc::new(l, l.label("reports:changes.title"), blocks)
 }
 
 fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{b:02X}")).collect::<Vec<_>>().join(" ")
 }
 
-fn frame(f: &ChangesFrame) -> Block {
+fn frame(f: &ChangesFrame, l: &ReportLocale) -> Block {
     let p = &f.profile.profile;
     let length = if p.min_len == p.max_len {
-        count(p.max_len, "byte")
+        l.count("reports:count.byte", p.max_len)
     } else {
-        format!("{}–{} bytes", p.min_len, p.max_len)
+        l.t("reports:changes.lengthRange", &[("min", &p.min_len.to_string()), ("max", &p.max_len.to_string())])
     };
-    let mut fields = vec![("Samples", grouped(p.sample_count)), ("Length", length)];
-    let flags: Vec<&str> = [
-        (p.identical.is_some(), "identical"),
-        (p.mux.is_some(), "multiplexed"),
-        (f.burst, "burst"),
+    let mut fields = vec![
+        (l.label("reports:changes.field.samples"), l.grouped(p.sample_count)),
+        (l.label("reports:changes.field.length"), length),
+    ];
+    let flags: Vec<String> = [
+        (p.identical.is_some(), "reports:changes.flag.identical"),
+        (p.mux.is_some(), "reports:changes.flag.multiplexed"),
+        (f.burst, "reports:changes.flag.burst"),
     ]
     .into_iter()
-    .filter_map(|(on, flag)| on.then_some(flag))
+    .filter(|(on, _)| *on)
+    .map(|(_, flag)| l.label(flag))
     .collect();
     if !flags.is_empty() {
-        fields.push(("Flags", flags.join(", ")));
+        fields.push((l.label("reports:changes.field.flags"), flags.join(", ")));
     }
     let selector = p.mux.as_ref().map(|m| m.detection.selector);
     if let Some(selector) = selector {
-        fields.push(("Selector", selector_text(selector).into()));
+        fields.push((l.label("reports:changes.field.selector"), selector_text(selector).into()));
     }
 
     let mut blocks = vec![Block::Fields(fields)];
     if !p.columns.is_empty() {
-        blocks.push(Block::Table(vec!["Byte", "Role", "Details"], p.columns.iter().map(role_row).collect()));
+        let header = labels(
+            l,
+            &["reports:changes.column.byte", "reports:changes.column.role", "reports:changes.column.details"],
+        );
+        blocks.push(Block::Table(header, p.columns.iter().map(|c| role_row(c, l)).collect()));
     }
     if p.mux.is_none() && !p.patterns.is_empty() {
-        blocks.push(pattern_table(&p.patterns));
+        blocks.push(pattern_table(&p.patterns, l));
     }
-    let notes = frame_lines(&f.notes.frame, selector);
+    let notes = frame_lines(l, &f.notes.frame, selector);
     if !notes.is_empty() {
         blocks.push(Block::List(notes));
     }
@@ -121,18 +140,24 @@ fn frame(f: &ChangesFrame) -> Block {
         for case in &mux.cases {
             let mut inner = Vec::new();
             if !case.patterns.is_empty() {
-                inner.push(pattern_table(&case.patterns));
+                inner.push(pattern_table(&case.patterns, l));
             }
             let notes = f.notes.cases.iter().find(|n| n.value == case.value);
-            let lines = notes.map(|n| case_lines(&n.notes, selector)).unwrap_or_default();
+            let lines = notes.map(|n| case_lines(l, &n.notes, selector)).unwrap_or_default();
             if !lines.is_empty() {
                 inner.push(Block::List(lines));
             }
-            let title = format!("Case {} ({})", mux_value(case.value, selector), count(case.sample_count, "sample"));
+            let title = l.t(
+                "reports:changes.case",
+                &[
+                    ("value", &mux_value(case.value, selector)),
+                    ("samples", &l.count("reports:count.sample", case.sample_count)),
+                ],
+            );
             blocks.push(Block::Section(title, inner));
         }
     }
-    let title = format!("{} {}", protocol_label(protocol(f)), frame_label(protocol(f), key(f)));
+    let title = format!("{} {}", l.protocol_label(protocol(f)), frame_label(protocol(f), key(f)));
     Block::Section(title, blocks)
 }
 
@@ -143,51 +168,73 @@ pub fn selector_text(selector: MuxSelector) -> &'static str {
     }
 }
 
-fn role_row(c: &ByteColumn) -> Vec<Cell> {
+fn role_row(c: &ByteColumn, l: &ReportLocale) -> Vec<Cell> {
     let (role, details) = match &c.role {
-        ByteRole::Static { value } => ("static", format!("0x{value:02X}")),
-        ByteRole::Counter { step, looping: Some(l), .. } => {
-            ("counter", format!("looping {}–{} (mod {}), step {step}", l.min, l.max, l.modulo))
+        ByteRole::Static { value } => ("reports:changes.role.static", format!("0x{value:02X}")),
+        ByteRole::Counter { step, looping: Some(lp), .. } => {
+            let [min, max, modulo, step] = [lp.min.to_string(), lp.max.to_string(), lp.modulo.to_string(), step.to_string()];
+            let details = l.t(
+                "reports:changes.loopingCounter",
+                &[("min", &min), ("max", &max), ("modulo", &modulo), ("step", &step)],
+            );
+            ("reports:changes.role.counter", details)
         }
         ByteRole::Counter { step, rollover, .. } => {
-            ("counter", format!("step {step}{}", if *rollover { ", rollover" } else { "" }))
+            let key = if *rollover { "reports:changes.stepRollover" } else { "reports:changes.step" };
+            ("reports:changes.role.counter", l.t(key, &[("step", &step.to_string())]))
         }
-        ByteRole::Sensor { trend, .. } => ("sensor", format!("trend {}", format!("{trend:?}").to_lowercase())),
-        ByteRole::Value => ("value", count(c.stats.distinct_values, "distinct value")),
-        ByteRole::Unknown => ("unknown", String::new()),
+        ByteRole::Sensor { trend, .. } => {
+            let trend = l.label(match trend {
+                Trend::Increasing => "reports:changes.trends.increasing",
+                Trend::Decreasing => "reports:changes.trends.decreasing",
+                Trend::Mixed => "reports:changes.trends.mixed",
+            });
+            ("reports:changes.role.sensor", l.t("reports:changes.trend", &[("trend", &trend)]))
+        }
+        ByteRole::Value => ("reports:changes.role.value", l.count("reports:count.distinctValue", c.stats.distinct_values)),
+        ByteRole::Unknown => ("reports:changes.role.unknown", String::new()),
     };
-    vec![Cell::Plain(c.stats.position.to_string()), Cell::from(role), Cell::Plain(details)]
+    vec![Cell::Plain(c.stats.position.to_string()), Cell::Plain(l.label(role)), Cell::Plain(details)]
 }
 
-fn pattern_table(patterns: &[MultiBytePattern]) -> Block {
+fn pattern_table(patterns: &[MultiBytePattern], l: &ReportLocale) -> Block {
     let rows = patterns
         .iter()
         .map(|p| {
             let kind = match p.kind {
-                PatternKind::Counter16 => "16-bit counter",
-                PatternKind::Sensor16 => "16-bit sensor",
-                PatternKind::Sensor32 => "32-bit sensor",
-                PatternKind::Text => "text",
+                PatternKind::Counter16 => "reports:changes.patternKind.counter16",
+                PatternKind::Sensor16 => "reports:changes.patternKind.sensor16",
+                PatternKind::Sensor32 => "reports:changes.patternKind.sensor32",
+                PatternKind::Text => "reports:changes.patternKind.text",
             };
             let mut details = Vec::new();
             if let Some(e) = p.endianness {
-                details.push(format!("{} endian", format!("{e:?}").to_lowercase()));
+                let order = l.label(match e {
+                    Endianness::Little => "reports:changes.order.little",
+                    Endianness::Big => "reports:changes.order.big",
+                    Endianness::Mixed => "reports:changes.order.mixed",
+                });
+                details.push(l.t("reports:changes.endian", &[("order", &order)]));
             }
             if p.rollover {
-                details.push("rollover".into());
+                details.push(l.label("reports:changes.rollover"));
             }
             if let Some((min, max)) = p.range {
-                details.push(format!("range {min}–{max}"));
+                details.push(l.t("reports:changes.range", &[("min", &min.to_string()), ("max", &max.to_string())]));
             }
             if let Some(text) = &p.sample_text {
                 details.push(format!("\"{text}\""));
             }
             vec![
                 Cell::Code(format!("byte[{}:{}]", p.start, p.start + p.len - 1)),
-                Cell::from(kind),
+                Cell::Plain(l.label(kind)),
                 Cell::Plain(details.join(", ")),
             ]
         })
         .collect();
-    Block::Table(vec!["Bytes", "Pattern", "Details"], rows)
+    let header = labels(
+        l,
+        &["reports:changes.column.bytes", "reports:changes.column.pattern", "reports:changes.column.details"],
+    );
+    Block::Table(header, rows)
 }
