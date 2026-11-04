@@ -9090,7 +9090,7 @@ dependencies = [
 
 [[package]]
 name = "wiretap"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "async-trait",
  "can-dbc",
@@ -9157,7 +9157,7 @@ dependencies = [
 
 [[package]]
 name = "wiretap-analysis"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "rayon",
  "serde",
@@ -9174,7 +9174,7 @@ dependencies = [
 
 [[package]]
 name = "wiretap-can-cli"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "clap",
  "hex",
@@ -9192,7 +9192,7 @@ dependencies = [
 
 [[package]]
 name = "wiretap-capture-store"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "serde",
  "serde_json",
