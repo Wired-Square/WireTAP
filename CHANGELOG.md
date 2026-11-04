@@ -14,6 +14,7 @@ All notable changes to WireTAP will be documented in this file.
 - **Empty Dashboard panels say how to add a signal.** They used to say "Click +", but panels no longer have a + button; they now point to ⋮ → Configure → Add Signals. An icon-state panel with no states says they come from an enum signal added with "Add catalog signals as instruments".
 - **The Decoder's timestamps no longer run into signal names.** With Display time as set to Timestamp, the time was wider than its column and overlapped the name beside it; the column now widens to fit.
 - **Hex input takes a 0x on every byte.** The Calculator, Transmit and the other hex fields read `0x12 0x34` as the bytes 12 34; they used to strip only the first 0x and read it as 12 03 4.
+- **The Decoder's update flash is readable in light mode.** A changing signal's name, value and bytes used to flash towards white, which faded them into the card on a light theme; they now flash towards the theme's text colour, so they darken in light mode and still brighten in dark mode.
 
 ## [0.16.0] - 2026-11-03
 

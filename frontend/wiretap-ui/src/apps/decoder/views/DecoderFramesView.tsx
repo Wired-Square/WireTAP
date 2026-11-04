@@ -241,24 +241,8 @@ function formatSignalTimestamp(
   }
 }
 
-/**
- * Brighten a colour by interpolating towards white.
- * Amount is 0-1, where 1 is fully white.
- */
-function brightenColour(colour: string, amount: number): string {
-  // Handle hex colours
-  if (colour.startsWith('#')) {
-    const hex = colour.slice(1);
-    const r = parseInt(hex.slice(0, 2), 16);
-    const g = parseInt(hex.slice(2, 4), 16);
-    const b = parseInt(hex.slice(4, 6), 16);
-    const newR = Math.round(r + (255 - r) * amount);
-    const newG = Math.round(g + (255 - g) * amount);
-    const newB = Math.round(b + (255 - b) * amount);
-    return `rgb(${newR}, ${newG}, ${newB})`;
-  }
-  // For non-hex colours, return white for flash
-  return `rgb(255, 255, 255)`;
+function emphasisedColour(colour: string): string {
+  return `color-mix(in srgb, ${colour}, var(--text-primary) 70%)`;
 }
 
 /**
@@ -526,15 +510,9 @@ function FrameCard({
     return false;
   };
 
-  // Get text colour with optional flash brightening (only if signal's bytes are bright)
   const getTextColour = (baseColour: string | undefined, signal: Signal | undefined) => {
     if (signal && signalHasBrightBytes(signal)) {
-      // When flashing, brighten the colour significantly
-      if (baseColour) {
-        return brightenColour(baseColour, 0.7);
-      }
-      // For default colours, use bright white
-      return 'rgb(255, 255, 255)';
+      return baseColour ? emphasisedColour(baseColour) : 'var(--text-primary)';
     }
     return baseColour;
   };
@@ -560,7 +538,7 @@ function FrameCard({
     return rawBytes.map((_, byteIdx) => {
       const baseColour = byteColourMap.get(byteIdx) ?? signalColours?.none;
       const colour = (brightByteIndices.has(byteIdx) && baseColour)
-        ? brightenColour(baseColour, 0.7)
+        ? emphasisedColour(baseColour)
         : baseColour;
       return colour ? { color: colour } : undefined;
     });
