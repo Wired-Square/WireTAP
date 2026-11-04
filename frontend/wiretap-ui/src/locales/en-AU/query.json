@@ -46,7 +46,6 @@
     "ingestAll": "Ingest All",
     "ingestAllTooltip": "Ingest all results",
     "ingestAroundEvent": "Ingest frames around this event",
-    "ingestAroundFirst": "Ingest frames around first occurrence",
     "ingestAroundLast": "Ingest frames around last occurrence",
     "ingestAroundGap": "Ingest frames around this gap",
     "ingestAroundMatch": "Ingest frames around this match",
