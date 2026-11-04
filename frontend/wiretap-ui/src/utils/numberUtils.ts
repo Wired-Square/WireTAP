@@ -2,8 +2,8 @@
 
 // Common numeric conversion helpers used across tools (e.g., frame calculator).
 
-// Re-export hexToBytes from the canonical location for backwards compatibility
-export { hexToBytes } from './byteUtils';
+// Re-export the hex helpers from the canonical location for backwards compatibility
+export { cleanHex, hexToBytes } from './byteUtils';
 
 /**
  * Parse a string as an integer, supporting both decimal and hex (0x prefix) formats.
@@ -31,13 +31,6 @@ export function isValidIntValue(value: string): boolean {
 
   // Decimal: must be digits only, optionally with leading minus
   return /^-?\d+$/.test(trimmed);
-}
-
-/**
- * Clean a hex string by removing 0x prefix and non-hex characters.
- */
-export function cleanHex(input: string): string {
-  return input.replace(/^0x/i, "").replace(/[^0-9a-fA-F]/g, "").toLowerCase();
 }
 
 /**
