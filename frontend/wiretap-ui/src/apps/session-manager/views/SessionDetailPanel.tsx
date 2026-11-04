@@ -17,6 +17,7 @@ import { Button, IconButton } from "../../../components/Button";
 import { Badge } from "../../../components/Badge";
 import { protocolLabel, protocolTone } from "../../../utils/profileTraits";
 import { appTitle } from "../../registry";
+import { ioStateLabel } from "../stores/sessionLogStore";
 import { Checkbox, Input, Select } from "../../../components/forms";
 
 interface SessionDetailPanelProps {
@@ -175,7 +176,7 @@ function SessionDetails({
           isPaused ? "text-info" :
           "text-danger"
         }`}>
-          {getStateType(session.state)}
+          {ioStateLabel(session.state)}
         </p>
       </div>
 

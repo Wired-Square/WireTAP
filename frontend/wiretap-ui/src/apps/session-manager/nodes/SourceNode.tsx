@@ -2,6 +2,7 @@
 
 import { memo } from "react";
 import { useTranslation } from "react-i18next";
+import { getIOKindLabel } from "../../../utils/ioKindLabel";
 import { Port } from "./Port";
 import { Wifi, Database, Radio, Pin } from "lucide-react";
 import { iconSm, iconXs } from "../../../styles/spacing";
@@ -72,14 +73,14 @@ function SourceNode({ data, selected }: SourceNodeProps) {
 
       {/* Device type + buffer info */}
       <div className="text-xs text-muted flex items-center gap-1">
-        <span>{sourceType}</span>
+        <span>{kind === "capture" ? t("common:session.types.capture") : getIOKindLabel(sourceType)}</span>
         {isActive && (
           <Radio className="w-3 h-3 text-purple animate-pulse" />
         )}
       </div>
       {captureCount != null && (
         <div className="text-2xs text-muted mt-0.5">
-          {captureCount.toLocaleString()} {captureKind ?? "frames"}
+          {captureCount.toLocaleString()} {t(`common:units.${captureKind ?? "frames"}`)}
         </div>
       )}
 

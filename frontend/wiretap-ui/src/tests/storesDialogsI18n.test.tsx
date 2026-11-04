@@ -9,6 +9,7 @@ import type { DashboardPanel } from "../stores/dashboardStore";
 vi.mock("@sentry/react", () => ({ captureMessage: vi.fn() }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn(() => Promise.resolve()), Channel: class {} }));
 vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn(async () => () => {}), emit: vi.fn(async () => {}) }));
+vi.mock("../apps/session-manager/nodes/Port", () => ({ Port: () => null }));
 
 const { default: i18n } = await import("../i18n");
 const { FALLBACK_LANGUAGE, PSEUDO_LANGUAGE } = await import("../locales");
@@ -21,6 +22,8 @@ const { default: ConfirmDeleteDialog } = await import("../dialogs/ConfirmDeleteD
 const { CHECKSUM_ALGORITHMS } = await import("../utils/analysis/checksums");
 const { candidateReasonNote } = await import("../utils/analysis/serialFrameAnalysis");
 const { fileFilter } = await import("../api/dialogs");
+const { ioStateLabel, describeEvent } = await import("../apps/session-manager/stores/sessionLogStore");
+const { default: SourceNode } = await import("../apps/session-manager/nodes/SourceNode");
 
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 
@@ -104,5 +107,21 @@ describe("store, dialog and shared labels", () => {
     dashboard().addSignalToPanel("Rotary", 0x100, "steer");
     dashboard().addSignalToPanel("Pump", 0x100, "steer");
     expect(dashboard().panels.map((p) => p.title)).toEqual(["steer", "Pump"]);
+  });
+
+  it("names session states and source kinds in the Session Manager, keeping the ids", () => {
+    expect(ioStateLabel({ type: "Starting" })).toBe("⟦starting⟧");
+    expect(describeEvent({ kind: "state", state: { type: "Error", message: "port lost" } }, null)).toBe("⟦State: ⟦error: port lost⟧⟧");
+    expect(describeEvent({ kind: "stats", state: { type: "Running" }, subscriber_count: 1, frame_count: 2 }, null)).toBe("⟦State: ⟦running⟧, Listeners: 1, Frames: 2⟧");
+    const text = render(
+      <>
+        <SourceNode selected={false} data={{ profileId: "c", profileName: "Bench", sourceType: "sqlite", isRealtime: false, isActive: false, captureCount: 3, captureKind: "bytes" }} />
+        <SourceNode selected={false} data={{ profileId: "v", profileName: "Sim", sourceType: "virtual", isRealtime: true, isActive: false }} />
+      </>,
+    );
+    expect(text).toContain("⟦Capture⟧");
+    expect(text).toContain("3 ⟦bytes⟧");
+    expect(text).toContain("⟦Virtual");
+    expect(text).not.toMatch(/sqlite|virtual/);
   });
 });
