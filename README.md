@@ -14,12 +14,12 @@ Formerly known as CANdor.
 
 ## Documentation
 
-See the [Wiki](../../wiki) for detailed documentation:
+The [user guide](docs/guide/README.md) covers each app and the hardware:
 
-- [Installation](../../wiki/Installation) - Download and setup instructions
-- [Getting Started](../../wiki/Home) - Overview and quick start guide
-- [Supported Hardware](../../wiki/Supported-Hardware) - Compatible CAN interfaces
-- [CANable Setup](../../wiki/CANable-Setup) - Firmware flashing guide
+- [Installation](docs/guide/installation.md) - Download and setup instructions
+- [Getting Started](docs/guide/README.md) - Overview and quick start guide
+- [Supported Hardware](docs/guide/supported-hardware.md) - Compatible CAN interfaces
+- [CANable Setup](docs/guide/canable-setup.md) - Firmware flashing guide
 
 ## Supported Hardware
 
@@ -46,7 +46,7 @@ CANable and CANable Pro devices support two firmware options that determine whic
 4. **CAN FD support** — The CANable Pro with candleLight firmware supports CAN FD natively via gs_usb. slcan has no standard CAN FD extension.
 5. **Cross-platform without drivers** — WireTAP's nusb integration means gs_usb works on macOS, Windows, and Linux without installing platform-specific drivers. On Linux, gs_usb devices also appear as native SocketCAN interfaces.
 
-To use gs_usb, flash your CANable with [Elmue's CANable 2.5 firmware](https://github.com/Elmue/CANable-2.5-firmware-Slcan-and-Candlelight), which is maintained and supports both slcan and candleLight (gs_usb) modes; upstream candleLight is no longer actively developed. Elmue's [firmware updater](https://netcult.ch/elmue/CANable%20Firmware%20Update/) flashes it, and the [CANable Setup](../../wiki/CANable-Setup) wiki page has more on flashing.
+To use gs_usb, flash your CANable with [Elmue's CANable 2.5 firmware](https://github.com/Elmue/CANable-2.5-firmware-Slcan-and-Candlelight), which is maintained and supports both slcan and candleLight (gs_usb) modes; upstream candleLight is no longer actively developed. Elmue's [firmware updater](https://netcult.ch/elmue/CANable%20Firmware%20Update/) flashes it, and the [CANable Setup](docs/guide/canable-setup.md) page has more on flashing.
 
 ## Data Sources
 
