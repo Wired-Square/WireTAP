@@ -17,7 +17,7 @@
     "test:watch": "npm run test:watch -w frontend/wiretap-ui",
     "tauri": "tauri",
     "tauri:dev": "bash scripts/tauri-dev.sh",
-    "tauri:build": "node scripts/bump-version.js && if [ \"$APPLE_NOTARISE\" = \"true\" ]; then export APPLE_PASSWORD=\"$APPLE_NOTARY_PASSWORD\"; fi && bash scripts/tauri.sh build && bash scripts/macos-bundle-sign.sh",
+    "tauri:build": "node scripts/bump-version.js && bash scripts/tauri.sh build && bash scripts/macos-bundle-sign.sh",
     "tauri:build:debug": "bash scripts/tauri.sh build --debug && bash scripts/macos-bundle-sign.sh",
     "ios:init": "bash scripts/tauri.sh ios init",
     "ios:dev": "bash scripts/ios-dev.sh",
@@ -30,10 +30,10 @@
     "release:minor": "node scripts/release.js minor",
     "release:major": "node scripts/release.js major",
     "release:rebuild": "node scripts/release.js rebuild",
-    "notarise:build": "APPLE_PASSWORD=\"$APPLE_NOTARY_PASSWORD\" bash scripts/tauri.sh build",
-    "notarise:history": "xcrun notarytool history --apple-id \"$APPLE_ID\" --team-id \"$APPLE_TEAM_ID\" --password \"$APPLE_NOTARY_PASSWORD\"",
-    "notarise:log": "xcrun notarytool log --apple-id \"$APPLE_ID\" --team-id \"$APPLE_TEAM_ID\" --password \"$APPLE_NOTARY_PASSWORD\"",
-    "notarise:info": "xcrun notarytool info --apple-id \"$APPLE_ID\" --team-id \"$APPLE_TEAM_ID\" --password \"$APPLE_NOTARY_PASSWORD\""
+    "notarise:build": "bash scripts/macos-notarise.sh build",
+    "notarise:history": "bash scripts/macos-notarise.sh history",
+    "notarise:log": "bash scripts/macos-notarise.sh log",
+    "notarise:info": "bash scripts/macos-notarise.sh info"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2"
