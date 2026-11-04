@@ -89,11 +89,15 @@ pub async fn dispatch_catalog_command(
             let errors = wslib_wiretap_catalogue::validate::validate_checksum_fields(&input);
             Ok(serde_json::json!({ "valid": errors.is_empty(), "errors": errors }))
         }
-        // The catalogue report. Params: { content, format }.
+        // The catalogue report. Params: { content, format, locale? }.
         "catalog.report" => {
             let format = serde_json::from_value(params.get("format").cloned().unwrap_or_default())
                 .map_err(|e| format!("invalid report format: {e}"))?;
-            Ok(serde_json::Value::String(crate::report::catalog::render(&content()?, format)?))
+            let locale: Option<crate::report::ReportLocale> =
+                serde_json::from_value(params.get("locale").cloned().unwrap_or_default())
+                    .map_err(|e| format!("invalid report locale: {e}"))?;
+            let report = crate::report::catalog::render(&content()?, format, &locale.unwrap_or_default())?;
+            Ok(serde_json::Value::String(report))
         }
         // DBC text → catalogue TOML.
         "catalog.import_dbc" => {

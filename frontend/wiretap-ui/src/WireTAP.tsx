@@ -16,6 +16,7 @@ import "./WireTAP.css";
 import MainLayout from "./components/MainLayout";
 import { useUpdateStore } from "./stores/updateStore";
 import { useTheme } from "./hooks/useTheme";
+import { useNativeMenuLabels } from "./hooks/useNativeMenuLabels";
 import { useAppErrorDialog, useSessionStore } from "./stores/sessionStore";
 import { useSettingsStore } from "./apps/settings/stores/settingsStore";
 import { useAdHocProfileStore } from "./stores/adHocProfileStore";
@@ -96,6 +97,7 @@ export default function WireTAP() {
 
   // Apply global theme (dark/light mode + CSS variables)
   useTheme();
+  useNativeMenuLabels();
 
   // Sync the active i18n language with the user's setting. Runs whenever the
   // language preference changes (and on initial settings load).

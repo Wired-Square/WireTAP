@@ -284,6 +284,11 @@ version is out.
   are generated (`npm run gen:types`), never written by hand.
 - **No CSS framework.** `styles/utilities.css` is generated from the class
   names in `src/`. Colours come only from the theme variables.
+- **Translations.** UI text lives in `src/locales/en-AU/`. A dev build offers
+  a pseudo language in Settings → General → Language that wraps every
+  translated string in ⟦…⟧, so any text still in plain English is not
+  translated. Run `npm run gen:pseudo` after editing en-AU; the tests fail
+  until you do.
 - **Few comments.** Prefer names and structure that explain themselves.
   Comment only a non-obvious *why*.
 - Code-coupled design notes are in `docs/`. Read `docs/session-flow.md` and

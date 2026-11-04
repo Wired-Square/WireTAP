@@ -76,6 +76,8 @@ fn render() -> BTreeMap<PathBuf, String> {
         ]),
     };
     r.visit::<crate::io::GvretDeviceInfo>();
+    r.visit::<crate::menu::NativeMenuLabels>();
+    r.visit::<crate::report::ReportLocale>();
     r.visit::<crate::io::ActiveSessionInfo>();
     r.visit::<crate::io::bus_status::BusStatusMsg>();
     r.visit::<crate::io::AppInstanceInfo>();

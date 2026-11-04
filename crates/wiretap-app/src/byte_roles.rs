@@ -20,7 +20,7 @@ use crate::drafting;
 use wiretap_analysis::draft::Draft;
 use crate::checksum_discovery::DEFAULT_SAMPLE_LIMIT;
 use crate::capture_db;
-use crate::report::{held, ReportFormat};
+use crate::report::{held, ReportFormat, ReportLocale};
 
 /// One protocol's mirror groups.
 #[derive(Debug, Clone, Serialize)]
@@ -183,8 +183,10 @@ pub fn payload_changes_report_cmd(
     selection: Vec<ProtocolFrames>,
     newest: Option<usize>,
     format: ReportFormat,
+    locale: Option<ReportLocale>,
 ) -> Result<String, String> {
-    held::render_changes(&held::window_key(&capture_id, &selection, newest, None), format)
+    let key = held::window_key(&capture_id, &selection, newest, None);
+    held::render_changes(&key, format, &locale.unwrap_or_default())
 }
 
 /// The Frame Order report on what `frame_order_cmd` last returned for this window.
@@ -195,8 +197,10 @@ pub fn frame_order_report_cmd(
     newest: Option<usize>,
     start: Option<OrderStart>,
     format: ReportFormat,
+    locale: Option<ReportLocale>,
 ) -> Result<String, String> {
-    held::render_orders(&held::window_key(&capture_id, &selection, newest, start.as_ref()), format)
+    let key = held::window_key(&capture_id, &selection, newest, start.as_ref());
+    held::render_orders(&key, format, &locale.unwrap_or_default())
 }
 
 /// Id and source-address candidates over one serial link's framed payloads.

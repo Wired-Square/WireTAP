@@ -2,6 +2,7 @@
 // Tauri API wrappers for native menu state management
 
 import { invoke } from "@tauri-apps/api/core";
+import type { NativeMenuLabels } from "../generated/NativeMenuLabels";
 
 export interface MenuState {
   hasSession: boolean;
@@ -34,4 +35,9 @@ export async function updateMenuState(state: MenuState): Promise<void> {
 /** Update the Events > Jump to Event submenu with the focused session's events. */
 export async function updateEventsMenu(events: EventMenuInfo[]): Promise<void> {
   return invoke("update_events_menu", { events });
+}
+
+/** Relabel the native menu bar in the frontend's language. */
+export async function setNativeMenuLabels(labels: NativeMenuLabels): Promise<void> {
+  return invoke("set_native_menu_labels", { labels });
 }

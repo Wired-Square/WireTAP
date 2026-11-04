@@ -218,7 +218,8 @@
       "sample": " \"{{text}}\"",
       "varyingValues": "{{bytes}} byte(s) with varying values detected",
       "little": "little",
-      "big": "big"
+      "big": "big",
+      "mixed": "mixed"
     },
     "caseNote": {
       "statics": "Static: {{bytes}}",

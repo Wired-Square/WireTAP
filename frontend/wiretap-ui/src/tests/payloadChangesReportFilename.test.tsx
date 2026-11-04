@@ -9,7 +9,10 @@ vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn(async () => "report"), Ch
 vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn(async () => () => {}), emit: vi.fn(async () => {}) }));
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (key: string) => key, i18n: { language: "en-AU" } }),
+  initReactI18next: { type: "3rdParty", init: () => {} },
 }));
+
+await import("../i18n");
 
 const { default: ExportAnalysisDialog } = await import("../dialogs/ExportAnalysisDialog");
 

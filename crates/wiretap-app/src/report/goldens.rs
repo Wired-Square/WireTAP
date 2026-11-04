@@ -3,7 +3,7 @@
 // Each report in each format, pinned under the frontend's catalogue fixtures.
 // `WRITE_REPORT_GOLDENS=1` rewrites them.
 
-use super::ReportFormat;
+use super::{ReportFormat, ReportLocale};
 use wiretap_analysis::source::{message_order, FrameSelection, MemorySource};
 use crate::byte_roles::payload_changes;
 
@@ -33,7 +33,7 @@ fn catalogue_reports_match_their_goldens() {
     ] {
         let text = std::fs::read_to_string(format!("{FIXTURES}/{fixture}")).unwrap();
         for (format, ext) in FORMATS {
-            let rendered = super::catalog::render(&text, format).unwrap();
+            let rendered = super::catalog::render(&text, format, &ReportLocale::default()).unwrap();
             assert_golden(&format!("catalogReport.{stem}.{ext}"), &rendered);
         }
     }
@@ -69,7 +69,27 @@ async fn analysis_reports_match_their_goldens() {
     let changes = payload_changes(&source, vec![], None, usize::MAX).await.unwrap();
     let orders = message_order(&source, &FrameSelection::default(), None, None).await.unwrap();
     for (format, ext) in FORMATS {
-        assert_golden(&format!("payloadChanges.{ext}"), &super::changes::report(&changes).render(format));
-        assert_golden(&format!("frameOrder.{ext}"), &super::order::report(&orders).render(format));
+        let l = ReportLocale::default();
+        assert_golden(&format!("payloadChanges.{ext}"), &super::changes::report(&changes, &l).render(format));
+        assert_golden(&format!("frameOrder.{ext}"), &super::order::report(&orders, &l).render(format));
     }
+}
+
+#[tokio::test]
+async fn a_supplied_locale_words_the_headings_and_notes() {
+    let changes = payload_changes(&capture(), vec![], None, usize::MAX).await.unwrap();
+    let l: ReportLocale = serde_json::from_value(serde_json::json!({
+        "messages": {
+            "reports:summary": "Zusammenfassung",
+            "discovery:changes.note.up": "aufsteigend",
+            "discovery:changes.note.counter": "Zähler an byte[{{position}}]: {{direction}}",
+        },
+        "groupSeparator": ".",
+        "decimalSeparator": ",",
+    }))
+    .unwrap();
+    let text = super::changes::report(&changes, &l).render(ReportFormat::Markdown);
+    assert!(text.contains("## Zusammenfassung\n"), "{text}");
+    assert!(text.contains("- Zähler an byte[0]: aufsteigend\n"), "{text}");
+    assert!(text.contains("# Payload Changes Report\n"), "{text}");
 }

@@ -1,6 +1,7 @@
 // ui/src/apps/catalog/dialogs/ExportCatalogDialog.tsx
 
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Download, FileText, Database, FileCode, BookOpen } from "lucide-react";
 import { iconMd, iconLg } from "../../../styles/spacing";
 import { caption, sectionHeaderText } from "../../../styles/typography";
@@ -107,6 +108,7 @@ export default function ExportCatalogDialog({
   const [isExporting, setIsExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { settings } = useSettings();
+  const { t } = useTranslation();
 
   const handleExport = async () => {
     setError(null);
@@ -141,7 +143,7 @@ export default function ExportCatalogDialog({
           : catalogContent;
         await saveCatalog(path, output);
       } else {
-        const content = await renderReport(format as Exclude<CatalogExportFormat, "toml" | "dbc">, `Catalogue Report — ${baseName}`, (f) =>
+        const content = await renderReport(format as Exclude<CatalogExportFormat, "toml" | "dbc">, t("reports:catalogue.title", { name: baseName }), (f) =>
           catalogReport(catalogContent, f),
         );
         await saveCatalog(path, content);

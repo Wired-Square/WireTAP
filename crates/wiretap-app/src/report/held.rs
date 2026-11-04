@@ -9,7 +9,7 @@ use std::sync::Mutex;
 
 use once_cell::sync::Lazy;
 
-use super::ReportFormat;
+use super::{ReportFormat, ReportLocale};
 use wiretap_analysis::source::{OrderStart, ProtocolFrames, ProtocolOrder};
 use crate::byte_roles::PayloadChanges;
 
@@ -44,16 +44,16 @@ pub fn hold_orders(key: WindowKey, orders: Vec<ProtocolOrder>) {
 
 const NOT_HELD: &str = "is no longer held for this capture; run it again, then export";
 
-pub fn render_changes(key: &WindowKey, format: ReportFormat) -> Result<String, String> {
+pub fn render_changes(key: &WindowKey, format: ReportFormat, l: &ReportLocale) -> Result<String, String> {
     let held = HELD.lock().unwrap();
     let changes = held.changes.get(key).ok_or_else(|| format!("Payload Changes {NOT_HELD}"))?;
-    Ok(super::changes::report(changes).render(format))
+    Ok(super::changes::report(changes, l).render(format))
 }
 
-pub fn render_orders(key: &WindowKey, format: ReportFormat) -> Result<String, String> {
+pub fn render_orders(key: &WindowKey, format: ReportFormat, l: &ReportLocale) -> Result<String, String> {
     let held = HELD.lock().unwrap();
     let orders = held.orders.get(key).ok_or_else(|| format!("Frame Order {NOT_HELD}"))?;
-    Ok(super::order::report(orders).render(format))
+    Ok(super::order::report(orders, l).render(format))
 }
 
 pub fn forget_capture(capture_id: &str) {
@@ -73,6 +73,7 @@ mod tests {
     #[test]
     fn a_report_renders_the_held_result_for_its_window_until_the_capture_is_forgotten() {
         let key = window_key("held-a", &[], Some(10), None);
+        let render_changes = |key: &WindowKey, format| render_changes(key, format, &ReportLocale::default());
         assert!(render_changes(&key, ReportFormat::Text).unwrap_err().contains("run it again"));
 
         hold_changes(key.clone(), changes(7));

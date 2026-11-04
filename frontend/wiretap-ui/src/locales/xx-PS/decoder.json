@@ -1,0 +1,52 @@
+{
+  "catalogPicker": {
+    "title": "⟦Select Decoder Catalog⟧"
+  },
+  "framesView": {
+    "sendToCalculator": "⟦Send to Frame Calculator⟧",
+    "showTimeRange": "⟦Show time range⟧",
+    "hideTimeRange": "⟦Hide time range⟧",
+    "start": "⟦Start⟧",
+    "end": "⟦End⟧",
+    "playbackSpeed": "⟦Playback speed⟧",
+    "addEvent": "⟦Add event at current position⟧"
+  },
+  "topBar": {
+    "showRawBytes": "⟦Show raw bytes⟧",
+    "hideRawBytes": "⟦Hide raw bytes⟧",
+    "clearDecoded": "⟦Clear decoded values⟧",
+    "showAsciiColumn": "⟦Show ASCII column⟧",
+    "hideAsciiColumn": "⟦Hide ASCII column⟧"
+  },
+  "filterDialog": {
+    "title": "⟦Frame Filters⟧",
+    "frameIdsLabel": "⟦Frame IDs (hex)⟧",
+    "frameIdsPlaceholder": "⟦e.g., 0x100-0x109, 0x151⟧",
+    "frameIdsHelp": "⟦Frames with matching IDs will be moved to the Filtered tab. Supports comma-separated values and ranges (e.g., 0x100-0x109, 0x151).⟧",
+    "minLengthLabel": "⟦Minimum frame length (bytes)⟧",
+    "minLengthHelp": "⟦Frames shorter than this will be filtered out and shown in the Filtered tab. Set to 0 to disable length filtering.⟧",
+    "apply": "⟦Apply⟧",
+    "clearAll": "⟦Clear All⟧"
+  },
+  "modbus": {
+    "pause": "⟦Pause⟧",
+    "poll": "⟦Poll⟧",
+    "pausePolling": "⟦Pause polling⟧",
+    "resumePolling": "⟦Resume polling⟧",
+    "startPolling": "⟦Start polling⟧",
+    "pollRegisterCount": "⟦{{polls}} polls · {{registers}} regs⟧"
+  },
+  "tunnelView": {
+    "tab": "⟦Modbus⟧",
+    "request": "⟦Request⟧",
+    "response": "⟦Response⟧",
+    "unit": "⟦unit {{device}}⟧",
+    "frameSpan_other": "⟦{{count}} frames⟧",
+    "directionGuessed": "⟦guessed⟧",
+    "directionGuessedHint": "⟦A vendor function code, so request and response were told apart by their alternation on the line. The label may be the wrong way round.⟧",
+    "coils": "⟦Coils⟧",
+    "crcInvalid": "⟦CRC failed⟧",
+    "crcInvalidHint": "⟦The trailing CRC-16 does not match. This message was framed from the Modbus length rules alone, so its boundaries may be wrong.⟧",
+    "empty": "⟦No Modbus messages yet.⟧"
+  }
+}

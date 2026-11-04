@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import "../i18n";
 import { renderReport } from "../utils/reportExport";
 
 describe("renderReport", () => {
