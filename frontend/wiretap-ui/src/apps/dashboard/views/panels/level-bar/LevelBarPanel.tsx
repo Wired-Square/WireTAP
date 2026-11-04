@@ -1,6 +1,7 @@
 // ui/src/apps/dashboard/views/panels/level-bar/LevelBarPanel.tsx
 
 import { useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { type DashboardPanel } from "../../../../../stores/dashboardStore";
 import { useSettings } from "../../../../../hooks/useSettings";
 import { fraction, thresholdColour } from "../../../widgets/svgArc";
@@ -15,6 +16,7 @@ interface Props {
 }
 
 export default function LevelBarPanel({ panel, svgRef: svgRefProp }: Props) {
+  const { t } = useTranslation("dashboard");
   const { settings } = useSettings();
   const svgElRef = useRef<SVGSVGElement>(null);
   useSvgExportRef(svgElRef, svgRefProp);
@@ -25,7 +27,7 @@ export default function LevelBarPanel({ panel, svgRef: svgRefProp }: Props) {
   const vertical = cfg?.orientation === "vertical";
 
   if (panel.signals.length === 0) {
-    return <WidgetEmpty>Click + to add a signal</WidgetEmpty>;
+    return <WidgetEmpty>{t("panel.emptyAddSignal")}</WidgetEmpty>;
   }
 
   const idx = Math.min(cfg?.primarySignalIndex ?? 0, panel.signals.length - 1);

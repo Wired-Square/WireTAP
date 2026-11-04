@@ -1,6 +1,7 @@
 // ui/src/apps/dashboard/views/panels/list/ListPanel.tsx
 
 import { getSignalLabel, getConfidenceColour, type DashboardPanel } from "../../../../../stores/dashboardStore";
+import { useTranslation } from "react-i18next";
 import { useSignalReadouts } from "../../../widgets/useSignalValues";
 import { useSettings } from "../../../../../hooks/useSettings";
 import { emptyStateContainer, emptyStateText } from "../../../../../styles/typography";
@@ -11,6 +12,7 @@ interface Props {
 }
 
 export default function ListPanel({ panel }: Props) {
+  const { t } = useTranslation("dashboard");
   const { settings } = useSettings();
 
   const readouts = useSignalReadouts(panel.signals);
@@ -18,7 +20,7 @@ export default function ListPanel({ panel }: Props) {
   if (panel.signals.length === 0) {
     return (
       <div className={emptyStateContainer}>
-        <p className={emptyStateText}>Click + to add signals</p>
+        <p className={emptyStateText}>{t("panel.emptyAddSignals")}</p>
       </div>
     );
   }

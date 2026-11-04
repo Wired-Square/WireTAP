@@ -15,6 +15,14 @@ describe("frame calculator utils", () => {
       expect(cleanHex("0xABCDEF")).toBe("abcdef"); // 0x prefix removed
       expect(cleanHex("AB:CD:EF")).toBe("abcdef");
     });
+
+    it("strips a 0x prefix from every byte, not only the first", () => {
+      expect(hexToBytes(cleanHex("0x12 0x34"))).toEqual([0x12, 0x34]);
+      expect(hexToBytes(cleanHex("0x12,0x34"))).toEqual([0x12, 0x34]);
+      expect(hexToBytes(cleanHex("0X12, 0X34"))).toEqual([0x12, 0x34]);
+      expect(hexToBytes(cleanHex("12 34"))).toEqual([0x12, 0x34]);
+      expect(hexToBytes(cleanHex("0x1234"))).toEqual([0x12, 0x34]);
+    });
   });
 
   describe("hex to bytes conversion", () => {
@@ -24,6 +32,10 @@ describe("frame calculator utils", () => {
 
     it("handles single byte", () => {
       expect(hexToBytes("ff")).toEqual([0xff]);
+    });
+
+    it("strips a 0x prefix from every byte", () => {
+      expect(hexToBytes("0x12 0x34")).toEqual([0x12, 0x34]);
     });
 
     it("handles empty hex", () => {

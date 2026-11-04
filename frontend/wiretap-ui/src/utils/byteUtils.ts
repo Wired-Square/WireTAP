@@ -57,14 +57,19 @@ export function hexRunChars(frames: readonly { bytes: number[] }[]): number {
   return widest > 0 ? widest * 3 - 1 : 0;
 }
 
+/** Lower-case hex digits only, with a 0x prefix stripped from every token ("0x12 0x34" → "1234"). */
+export function cleanHex(input: string): string {
+  return input.replace(/(^|[^0-9a-f])0x/gi, '$1').replace(/[^0-9a-f]/gi, '').toLowerCase();
+}
+
 /**
  * Convert a hex string to byte array.
- * Handles "0x" prefix and ignores non-hex characters.
+ * Handles "0x" prefixes and ignores non-hex characters.
  * @example hexToBytes("0AFF") => [10, 255]
- * @example hexToBytes("0x0AFF") => [10, 255]
+ * @example hexToBytes("0x0A 0xFF") => [10, 255]
  */
 export function hexToBytes(hex: string): number[] {
-  const clean = hex.replace(/^0x/i, '').replace(/[^0-9a-fA-F]/g, '');
+  const clean = cleanHex(hex);
   const bytes: number[] = [];
   for (let i = 0; i < clean.length; i += 2) {
     bytes.push(parseInt(clean.slice(i, i + 2), 16));

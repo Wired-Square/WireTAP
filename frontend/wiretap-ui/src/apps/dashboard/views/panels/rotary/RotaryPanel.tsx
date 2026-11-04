@@ -1,6 +1,7 @@
 // ui/src/apps/dashboard/views/panels/rotary/RotaryPanel.tsx
 
 import { useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { type DashboardPanel } from "../../../../../stores/dashboardStore";
 import { useSettings } from "../../../../../hooks/useSettings";
 import { fraction } from "../../../widgets/svgArc";
@@ -29,6 +30,7 @@ function SteeringWheel({ colour }: { colour: string }) {
 }
 
 export default function RotaryPanel({ panel, svgRef: svgRefProp }: Props) {
+  const { t } = useTranslation("dashboard");
   const { settings } = useSettings();
   const svgElRef = useRef<SVGSVGElement>(null);
   useSvgExportRef(svgElRef, svgRefProp);
@@ -38,7 +40,7 @@ export default function RotaryPanel({ panel, svgRef: svgRefProp }: Props) {
   const cfg = panel.widgetConfig?.rotary;
 
   if (panel.signals.length === 0) {
-    return <WidgetEmpty>Click + to add a signal</WidgetEmpty>;
+    return <WidgetEmpty>{t("panel.emptyAddSignal")}</WidgetEmpty>;
   }
 
   const idx = Math.min(cfg?.primarySignalIndex ?? 0, panel.signals.length - 1);

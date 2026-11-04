@@ -769,7 +769,7 @@ function FrameCard({
               >
                 <div className="flex items-center gap-3">
                   {timestampStr && (
-                    <span className={`${caption} font-mono w-20 shrink-0`}>
+                    <span className={`${caption} font-mono min-w-20 shrink-0`}>
                       {timestampStr}
                     </span>
                   )}

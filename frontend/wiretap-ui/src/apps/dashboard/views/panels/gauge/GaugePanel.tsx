@@ -1,6 +1,7 @@
 // ui/src/apps/dashboard/views/panels/gauge/GaugePanel.tsx
 
 import { useRef, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { useDashboardStore, getConfidenceColour, signalKey, type DashboardPanel } from "../../../../../stores/dashboardStore";
 import { useSettings } from "../../../../../hooks/useSettings";
 import { polarToCartesian, describeArc } from "../../../widgets/svgArc";
@@ -22,6 +23,7 @@ const LABEL_OFFSET = 14;
 const ARC_GAP = 3;              // gap between concentric arcs
 
 export default function GaugePanel({ panel, svgRef: svgRefProp }: Props) {
+  const { t } = useTranslation("dashboard");
   const signalCount = panel.signals.length;
   const { settings } = useSettings();
   const svgElRef = useRef<SVGSVGElement>(null);
@@ -71,7 +73,7 @@ export default function GaugePanel({ panel, svgRef: svgRefProp }: Props) {
   const displayValue = readouts[primaryIdx];
 
   if (signalCount === 0) {
-    return <WidgetEmpty>Click + to add a signal</WidgetEmpty>;
+    return <WidgetEmpty>{t("panel.emptyAddSignal")}</WidgetEmpty>;
   }
 
   return (

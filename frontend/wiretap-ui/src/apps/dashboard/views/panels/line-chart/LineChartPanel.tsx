@@ -1,6 +1,7 @@
 // ui/src/apps/dashboard/views/panels/line-chart/LineChartPanel.tsx
 
 import type uPlot from "uplot";
+import { useTranslation } from "react-i18next";
 import "uplot/dist/uPlot.min.css";
 import { getSignalLabel, type DashboardPanel } from "../../../../../stores/dashboardStore";
 import { useSettings } from "../../../../../hooks/useSettings";
@@ -108,6 +109,7 @@ function signalConfigKey(panel: DashboardPanel): string {
 }
 
 export default function LineChartPanel({ panel, canvasRef }: Props) {
+  const { t } = useTranslation("dashboard");
   const { settings } = useSettings();
   const confidenceColours = settings ? {
     none: settings.signal_colour_none || '#94a3b8',
@@ -127,7 +129,7 @@ export default function LineChartPanel({ panel, canvasRef }: Props) {
   if (panel.signals.length === 0) {
     return (
       <div className="flex items-center justify-center h-full">
-        <p className={emptyStateText}>Click + to add signals</p>
+        <p className={emptyStateText}>{t("panel.emptyAddSignals")}</p>
       </div>
     );
   }
