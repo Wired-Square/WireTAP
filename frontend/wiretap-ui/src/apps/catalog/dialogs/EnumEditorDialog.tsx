@@ -1,6 +1,7 @@
 // ui/src/apps/catalog/dialogs/EnumEditorDialog.tsx
 
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { Plus, Trash2 } from "lucide-react";
 import { iconMd } from "../../../styles/spacing";
 import Dialog, { DialogBody, DialogFooter } from "../../../components/Dialog";
@@ -44,6 +45,7 @@ export default function EnumEditorDialog({
   onSave,
   onCancel,
 }: EnumEditorDialogProps) {
+  const { t } = useTranslation("catalog");
   const [values, setValues] = useState<EnumValue[]>([]);
   const [error, setError] = useState<string | null>(null);
 
@@ -182,7 +184,7 @@ export default function EnumEditorDialog({
         )}
       </DialogBody>
       <DialogFooter>
-        <SecondaryButton onClick={onCancel}>Cancel</SecondaryButton>
+        <SecondaryButton onClick={onCancel}>{t("common:actions.cancel")}</SecondaryButton>
         <PrimaryButton onClick={handleSave}>Save</PrimaryButton>
       </DialogFooter>
     </Dialog>

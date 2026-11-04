@@ -9,6 +9,7 @@
 // profile by id — an ad-hoc device must be registered before it can be probed.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import i18n from "i18next";
 import { PROBE_DEBOUNCE_MS } from "../../constants";
 import { probeSlcanDevice } from "../../api/serial";
 import { probeGsUsbDevice } from "../../api/gs_usb";
@@ -279,8 +280,7 @@ export function useConnectionProbe({
       } else if (configuredCount !== result.bus_count) {
         // Keep the user's config, but say the device disagrees with it.
         setGvretError(
-          `Device reports ${result.bus_count} interface(s), but ${configuredCount} configured. ` +
-            `Delete interfaces field in settings to re-probe.`,
+          i18n.t("common:connectionProbe.interfaceMismatch", { reported: result.bus_count, configured: configuredCount }),
         );
       }
       onUpdateConnectionField("_probed_bus_count", result.bus_count);

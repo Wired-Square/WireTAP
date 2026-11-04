@@ -29,7 +29,7 @@ import { iconMd, iconSm } from "../../styles/spacing";
 import { Button } from "../../components/Button";
 import { Select, Checkbox, SecondaryButton, PrimaryButton } from "../../components/forms";
 import { Alert } from "../../components/Alert";
-import { PROTOCOL_LABELS, type Protocol } from "../../utils/profileTraits";
+import { protocolLabel, type Protocol } from "../../utils/profileTraits";
 
 const IMPORT_PROTOCOLS: Protocol[] = ["can", "modbus", "modbus_rtu", "serial"];
 
@@ -375,7 +375,7 @@ export default function CsvColumnMapperDialog({
               className="w-auto"
             >
               {IMPORT_PROTOCOLS.map((p) => (
-                <option key={p} value={p}>{PROTOCOL_LABELS[p]}</option>
+                <option key={p} value={p}>{protocolLabel(p)}</option>
               ))}
             </Select>
           </div>

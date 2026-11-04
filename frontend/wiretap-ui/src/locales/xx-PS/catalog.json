@@ -900,5 +900,18 @@
     "openInEditor": "⟦Open in editor⟧",
     "apply": "⟦Replace local copy⟧",
     "cancel": "⟦Close⟧"
+  },
+  "shared": {
+    "notes": "⟦Notes⟧",
+    "notesPlaceholderNode": "⟦Optional notes about this node...⟧",
+    "notesPlaceholderCase": "⟦Optional notes about this case...⟧",
+    "notesPlaceholderMux": "⟦Optional notes about this mux...⟧",
+    "notesPlaceholderChecksum": "⟦Optional notes about this checksum...⟧",
+    "bigEndian": "⟦Big Endian⟧",
+    "littleEndian": "⟦Little Endian⟧",
+    "fieldName": "⟦Field name⟧",
+    "addField": "⟦Add Field⟧",
+    "hideBitPicker": "⟦Hide bit picker⟧",
+    "showBitPicker": "⟦Show bit picker⟧"
   }
 }

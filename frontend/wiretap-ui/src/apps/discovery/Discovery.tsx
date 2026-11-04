@@ -16,7 +16,7 @@ import { selectionSetKeys, type SelectionSet } from "../../utils/selectionSets";
 import { capturedFrameCount, useDiscoveryFrameStore } from "../../stores/discoveryFrameStore";
 import { useDiscoveryUIStore } from "../../stores/discoveryUIStore";
 import { framedSource, useDiscoverySerialStore } from "../../stores/discoverySerialStore";
-import { isOwnScanSession, runningModbusScan, useDiscoveryToolboxStore } from "../../stores/discoveryToolboxStore";
+import { isOwnScanSession, runningModbusScan, TOOL_TAB_CONFIG, useDiscoveryToolboxStore } from "../../stores/discoveryToolboxStore";
 import { useShallow } from "@wired-square/store/react";
 import { useDiscoveryHandlers } from "./hooks/useDiscoveryHandlers";
 import { useModbusScanSync } from "./hooks/useModbusScanSync";
@@ -1167,7 +1167,7 @@ function DiscoveryInner() {
       <AnalysisProgressDialog
         isOpen={toolboxIsRunning}
         frameCount={liveFrameCount}
-        toolName={toolboxActiveView === 'changes' ? 'Payload Changes' : toolboxActiveView === 'message-order' ? 'Frame Order' : 'Analysis'}
+        toolName={toolboxActiveView === 'changes' || toolboxActiveView === 'message-order' ? t(TOOL_TAB_CONFIG[toolboxActiveView].labelKey) : t('tabs.analysis')}
       />
 
       <SpeedPickerDialog

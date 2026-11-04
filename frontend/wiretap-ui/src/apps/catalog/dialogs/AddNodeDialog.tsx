@@ -1,6 +1,7 @@
 // ui/src/apps/catalog/dialogs/AddNodeDialog.tsx
 
 import Dialog, { DialogBody, DialogFooter } from "../../../components/Dialog";
+import { useTranslation } from "react-i18next";
 import { Input, Textarea, FormField, SecondaryButton, PrimaryButton } from "../../../components/forms";
 import { caption } from "../../../styles";
 import NodeDeviceAddressField from "./NodeDeviceAddressField";
@@ -35,6 +36,7 @@ export default function AddNodeDialog({
   onCancel,
   onAdd,
 }: AddNodeDialogProps) {
+  const { t } = useTranslation("catalog");
   return (
     <Dialog isOpen={open} onClose={onCancel} title="Add Node">
       <DialogBody className="space-y-4">
@@ -61,18 +63,18 @@ export default function AddNodeDialog({
           onChange={setDeviceAddress}
         />
 
-        <FormField label="Notes" variant="default">
+        <FormField label={t("shared.notes")} variant="default">
           <Textarea
             size="lg"
             value={nodeNotes}
             onChange={(e) => setNodeNotes(e.target.value)}
-            placeholder="Optional notes about this node..."
+            placeholder={t("shared.notesPlaceholderNode")}
             rows={2}
           />
         </FormField>
       </DialogBody>
       <DialogFooter>
-        <SecondaryButton onClick={onCancel}>Cancel</SecondaryButton>
+        <SecondaryButton onClick={onCancel}>{t("common:actions.cancel")}</SecondaryButton>
         <PrimaryButton onClick={onAdd} disabled={!nodeName.trim()}>
           Add Node
         </PrimaryButton>

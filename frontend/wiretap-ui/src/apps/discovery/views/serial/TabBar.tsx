@@ -99,10 +99,10 @@ export default function TabBar({
 
     // Dynamic tool output tabs
     if (hasSerialFramingResults) {
-      result.push({ id: TOOL_TAB_CONFIG['serial-framing'].tabId, label: TOOL_TAB_CONFIG['serial-framing'].label, closeable: true });
+      result.push({ id: TOOL_TAB_CONFIG['serial-framing'].tabId, label: t(TOOL_TAB_CONFIG['serial-framing'].labelKey), closeable: true });
     }
     if (hasSerialPayloadResults) {
-      result.push({ id: TOOL_TAB_CONFIG['serial-payload'].tabId, label: TOOL_TAB_CONFIG['serial-payload'].label, closeable: true });
+      result.push({ id: TOOL_TAB_CONFIG['serial-payload'].tabId, label: t(TOOL_TAB_CONFIG['serial-payload'].labelKey), closeable: true });
     }
 
     return result;

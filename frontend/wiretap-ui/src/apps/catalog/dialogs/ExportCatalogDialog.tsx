@@ -264,7 +264,7 @@ export default function ExportCatalogDialog({
           onClick={onCancel}
           disabled={isExporting}
         >
-          Cancel
+          {t("actions.cancel")}
         </SecondaryButton>
         <Button
           onClick={handleExport}

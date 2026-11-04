@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { getStateType } from "../api/io";
+import "../i18n";
 import { sessionStatus } from "../utils/sessionStatus";
 
 describe("sessionStatus", () => {

@@ -18,14 +18,16 @@
     "reset": "⟦Reset⟧",
     "confirm": "⟦Confirm⟧",
     "discard": "⟦Discard⟧",
-    "ingest": "⟦Ingest⟧"
+    "ingest": "⟦Ingest⟧",
+    "copyToClipboard": "⟦Copy to clipboard⟧"
   },
   "states": {
     "loading": "⟦Loading…⟧",
     "saving": "⟦Saving…⟧",
     "noData": "⟦No data⟧",
     "notConnected": "⟦Not connected⟧",
-    "empty": "⟦Empty⟧"
+    "empty": "⟦Empty⟧",
+    "copied": "⟦Copied!⟧"
   },
   "errors": {
     "generic": "⟦Something went wrong⟧",
@@ -120,17 +122,42 @@
     "listen_only": "⟦Listen-only mode — cannot transmit⟧"
   },
   "session": {
-    "state": "⟦State:⟧",
-    "type": "⟦Type:⟧",
-    "capture": "⟦Capture:⟧",
-    "frames": "⟦Frames:⟧",
+    "state": "⟦State⟧",
+    "type": "⟦Type⟧",
+    "capture": "⟦Capture⟧",
+    "frames": "⟦Frames⟧",
     "renameCapture": "⟦Rename capture⟧",
     "captureName": "⟦Capture name⟧",
     "resumeIo": "⟦Resume IO stream⟧",
     "pinCapture": "⟦Pin capture (survives restart)⟧",
     "unpinCapture": "⟦Unpin capture (will be cleared on restart)⟧",
     "interfaceSettings": "⟦Interface settings — {{name}}⟧",
-    "showEvents": "⟦Show events⟧"
+    "showEvents": "⟦Show events⟧",
+    "unique": "⟦Unique⟧",
+    "interface_one": "⟦Interface⟧",
+    "interface_other": "⟦Interfaces⟧",
+    "types": {
+      "capture": "⟦Capture⟧",
+      "realtime": "⟦Realtime⟧",
+      "unknown": "⟦Unknown⟧"
+    },
+    "multiBus": "⟦Multi-Bus ({{profiles}})⟧",
+    "noSource": "⟦No source⟧",
+    "menu": "⟦Session menu⟧",
+    "selectSource": "⟦Select source⟧",
+    "changeSource": "⟦Change source⟧",
+    "changeSourcePause": "⟦Pause or disconnect to change source⟧",
+    "changeSourceStop": "⟦Stop or leave the session to change source⟧",
+    "speed": "⟦Speed⟧",
+    "speedUnavailable": "⟦Speed control (available for captures)⟧",
+    "deleteCapture": "⟦Delete capture⟧",
+    "clearCapture": "⟦Clear capture and start fresh⟧",
+    "disconnect": "⟦Disconnect⟧",
+    "leave": "⟦Leave session⟧",
+    "stop": "⟦Stop session⟧",
+    "stopTooltip": "⟦Stop the session for all connected apps and review the capture⟧",
+    "destroy": "⟦Destroy session⟧",
+    "destroyTooltip": "⟦Destroy this session and reset all connected apps to No source⟧"
   },
   "busStatus": {
     "noAck": "⟦No ACK⟧",
@@ -145,7 +172,10 @@
     "sendsLostNoAck_other": "⟦At least {{count}} sends lost on bus {{bus}} (no ACK)⟧"
   },
   "timezone": {
-    "changeTooltip": "⟦Click to change timezone⟧"
+    "changeTooltip": "⟦Click to change timezone⟧",
+    "local": "⟦Local⟧",
+    "cycleOverride": "⟦Click to cycle timezone. Currently: {{zone}} (override)⟧",
+    "cycleDefault": "⟦Click to cycle timezone. Currently: {{zone}} (default)⟧"
   },
   "catalogButton": {
     "selectCatalog": "⟦Select catalog⟧",
@@ -284,5 +314,53 @@
     "input": "⟦Input (FC 4)⟧",
     "coil": "⟦Coil (FC 1)⟧",
     "discrete": "⟦Discrete (FC 2)⟧"
-  }
+  },
+  "protocols": {
+    "modbus": "⟦Modbus⟧",
+    "modbus_rtu": "⟦Modbus RTU⟧",
+    "serial": "⟦Serial⟧"
+  },
+  "status": {
+    "running": "⟦Running⟧",
+    "paused": "⟦Paused⟧",
+    "stopped": "⟦Stopped⟧",
+    "starting": "⟦Starting⟧",
+    "error": "⟦Error⟧",
+    "live": "⟦Live⟧"
+  },
+  "dataSource": {
+    "recorded": "⟦Recorded data source⟧",
+    "live": "⟦Live data source⟧"
+  },
+  "frameNumber": "⟦Frame {{index}}⟧",
+  "canFlags": {
+    "remoteRequest_one": "⟦Remote request for {{count}} byte⟧",
+    "remoteRequest_other": "⟦Remote request for {{count}} bytes⟧",
+    "brs": "⟦Bit rate switch⟧",
+    "esi": "⟦Error state indicator: the sender is error passive⟧"
+  },
+  "headerFieldFilter": {
+    "hide": "⟦Hide {{field}} {{value}}⟧",
+    "show": "⟦Show {{field}} {{value}}⟧",
+    "clear": "⟦Clear {{field}} filter⟧"
+  },
+  "securePassword": {
+    "label": "⟦Password⟧",
+    "optional": "⟦(optional)⟧",
+    "secure": "⟦Secure⟧",
+    "migrate": "⟦Migrate⟧",
+    "plainTextWarning": "⟦Password stored in plain text. Migrate to secure storage.⟧",
+    "hide": "⟦Hide password⟧",
+    "show": "⟦Show password⟧",
+    "storedHint": "⟦Password stored in system keychain. Leave empty to keep current password.⟧"
+  },
+  "linuxCanSetup": {
+    "title": "⟦Linux setup required⟧",
+    "instruction": "⟦Run this command in your terminal to configure the CAN interface:⟧",
+    "note": "⟦Note: You may need to adjust udev rules for non-root access, or run WireTAP with elevated privileges.⟧"
+  },
+  "connectionProbe": {
+    "interfaceMismatch": "⟦Device reports {{reported}} interface(s), but {{configured}} configured. Delete interfaces field in settings to re-probe.⟧"
+  },
+  "busNumber": "⟦Bus {{bus}}⟧"
 }

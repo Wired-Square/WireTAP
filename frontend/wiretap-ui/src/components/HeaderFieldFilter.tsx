@@ -2,6 +2,7 @@
 // Reusable filter component for header fields (Direction, Source, custom fields)
 
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { X } from "lucide-react";
 import { iconSm } from "../styles/spacing";
 import { labelSmall } from "../styles/typography";
@@ -46,6 +47,7 @@ export default function HeaderFieldFilter({
   showCounts = true,
   compact = false,
 }: HeaderFieldFilterProps) {
+  const { t } = useTranslation("common");
   const hasSelection = selectedValues.size > 0;
   const sortedOptions = useMemo(
     () => [...options].sort((a, b) => a.value - b.value),
@@ -80,7 +82,7 @@ export default function HeaderFieldFilter({
               size="sm"
               pressed={isActive}
               className="font-mono"
-              title={`${isSelected ? "Hide" : "Show"} ${fieldName} ${option.display}`}
+              title={t(isSelected ? "headerFieldFilter.hide" : "headerFieldFilter.show", { field: fieldName, value: option.display })}
             >
               {option.display}
               {showCounts && (
@@ -94,7 +96,7 @@ export default function HeaderFieldFilter({
           <IconButton
             onClick={onClear}
             size="xs"
-            title={`Clear ${fieldName} filter`}
+            title={t("headerFieldFilter.clear", { field: fieldName })}
           >
             <X className={iconSm} />
           </IconButton>

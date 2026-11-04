@@ -358,9 +358,9 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
                           size="sm"
                           className="w-16"
                         >
-                          {GVRET_BUSES.map((b) => (
-                            <option key={b.value} value={b.value}>
-                              {b.label}
+                          {GVRET_BUSES.map((bus) => (
+                            <option key={bus} value={bus}>
+                              {t("common:busNumber", { bus })}
                             </option>
                           ))}
                         </Select>

@@ -21,12 +21,24 @@
     "modbusScan": "Register Scan",
     "modbusUnitScan": "Unit ID Scan",
     "frameOrder": "Frame Order",
-    "payloadChanges": "Payload Changes"
+    "payloadChanges": "Payload Changes",
+    "checksums": "Checksums",
+    "serialFraming": "Serial Framing",
+    "serialPayload": "Serial Payload",
+    "functionCodes": "Function Codes",
+    "analysis": "Analysis"
   },
   "contextMenu": {
     "copyId": "Copy ID",
     "copyData": "Copy Data",
-    "inspect": "Inspect"
+    "inspect": "Inspect",
+    "filter": "Filter",
+    "solo": "Solo",
+    "unfilter": "Unfilter",
+    "sendToTransmit": "Send to Transmit",
+    "addToTransmitQueue": "Add to Transmit queue",
+    "dashboard": "Dashboard",
+    "addEvent": "Add event here"
   },
   "states": {
     "noProfile": "No source connected",
@@ -544,5 +556,23 @@
       "id": "frame ID",
       "source_address": "source address"
     }
+  },
+  "frameTable": {
+    "time": "Time",
+    "id": "ID",
+    "unitFunction": "Unit/Fn",
+    "bus": "Bus",
+    "source": "Source",
+    "length": "Len",
+    "data": "Data",
+    "rowIncomplete": "Frame {{index}} - Incomplete (no delimiter found)",
+    "addEvent": "Add event at this frame's time",
+    "empty": "No frames to display"
+  },
+  "columns": {
+    "ref": "# Column",
+    "bus": "Bus Column",
+    "ascii": "ASCII Column",
+    "source": "Source Column"
   }
 }

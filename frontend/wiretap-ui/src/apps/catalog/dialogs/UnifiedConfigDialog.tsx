@@ -2,6 +2,7 @@
 // Unified catalog configuration dialog with collapsible protocol sections
 
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { Settings } from "lucide-react";
 import Dialog, { DialogBody, DialogFooter } from "../../../components/Dialog";
 import { useCatalogEditorStore } from "../../../stores/catalogEditorStore";
@@ -25,6 +26,7 @@ export default function UnifiedConfigDialog({
   onCancel,
   onSave,
 }: UnifiedConfigDialogProps) {
+  const { t } = useTranslation("catalog");
   // Store selectors for form values
   const metaFields = useCatalogEditorStore((s) => s.forms.meta);
   const setMetaFields = useCatalogEditorStore((s) => s.setMetaForm);
@@ -259,12 +261,12 @@ export default function UnifiedConfigDialog({
         </Alert>
       </DialogBody>
       <DialogFooter>
-        <SecondaryButton onClick={onCancel}>Cancel</SecondaryButton>
+        <SecondaryButton onClick={onCancel}>{t("common:actions.cancel")}</SecondaryButton>
         <PrimaryButton
           onClick={() => onSave({ can: canEnabled, serial: serialEnabled, modbus: modbusEnabled })}
           disabled={!isValid}
         >
-          Save Changes
+          {t("editor.saveChanges")}
         </PrimaryButton>
       </DialogFooter>
     </Dialog>

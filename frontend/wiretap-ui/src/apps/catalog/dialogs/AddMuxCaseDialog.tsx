@@ -1,6 +1,7 @@
 // ui/src/apps/catalog/dialogs/AddMuxCaseDialog.tsx
 
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import Dialog, { DialogBody, DialogFooter } from "../../../components/Dialog";
 import { Input, Textarea, FormField, SecondaryButton, SuccessButton } from "../../../components/forms";
 import { caption } from "../../../styles";
@@ -33,6 +34,7 @@ export default function AddMuxCaseDialog({
   onCancel,
   onAdd,
 }: AddMuxCaseDialogProps) {
+  const { t } = useTranslation("catalog");
   const caseError = useMemo(() => validationErrors.find((e) => e.field === "case"), [validationErrors]);
 
   return (
@@ -61,18 +63,18 @@ export default function AddMuxCaseDialog({
           </p>
         </FormField>
 
-        <FormField label="Notes" variant="default">
+        <FormField label={t("shared.notes")} variant="default">
           <Textarea
             size="lg"
             value={caseNotes}
             onChange={(e) => setCaseNotes(e.target.value)}
-            placeholder="Optional notes about this case..."
+            placeholder={t("shared.notesPlaceholderCase")}
             rows={2}
           />
         </FormField>
       </DialogBody>
       <DialogFooter>
-        <SecondaryButton onClick={onCancel}>Cancel</SecondaryButton>
+        <SecondaryButton onClick={onCancel}>{t("common:actions.cancel")}</SecondaryButton>
         <SuccessButton onClick={onAdd} disabled={!caseValue.trim()}>
           Add Case
         </SuccessButton>

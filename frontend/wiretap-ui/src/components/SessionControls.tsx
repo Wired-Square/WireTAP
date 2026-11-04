@@ -7,6 +7,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import { Star, FileText, Play, Pause, Gauge, Flag, LogOut, Pencil, Pin, PinOff, Trash2, ArrowRightLeft, Power, Square, Settings2 } from "lucide-react";
 import { iconSm, roundedDefault } from "../styles/spacing";
 import { sourceKindColours } from "../styles/colourTokens";
@@ -143,6 +144,7 @@ export function SessionButton({
   title,
   isCaptureMode: isCaptureModeProp,
 }: SessionButtonProps) {
+  const { t } = useTranslation("common");
   const openedOnCapture = useSessionStore((s) => isCaptureSession(s, ioProfile));
   const sessionCaptureName = useSessionStore((s) => (ioProfile ? s.sessions[ioProfile]?.capture?.name : null));
   const isCaptureProfile = isCaptureModeProp ?? openedOnCapture;
@@ -157,13 +159,13 @@ export function SessionButton({
   // Track whether sessionId is already shown in displayName (to avoid duplication)
   let sessionIdInDisplayName = false;
   if (isCaptureProfile) {
-    displayName = captureMetadata?.name || sessionCaptureName || captureMetadata?.id || "Capture";
+    displayName = captureMetadata?.name || sessionCaptureName || captureMetadata?.id || t("session.types.capture");
     sessionIdInDisplayName = true;
   } else if (showAsMultiBus) {
     // Multi-bus: show sessionId with profile count (e.g., "f_abc123 (2)")
     displayName = sessionId
       ? `${sessionId} (${multiBusProfiles.length})`
-      : `Multi-Bus (${multiBusProfiles.length})`;
+      : t("session.multiBus", { profiles: multiBusProfiles.length });
     sessionIdInDisplayName = !!sessionId;
   } else if (selectedProfile) {
     displayName = selectedProfile.name;
@@ -176,7 +178,7 @@ export function SessionButton({
     displayName = sessionId;
     sessionIdInDisplayName = true;
   } else {
-    displayName = "No source";
+    displayName = t("session.noSource");
   }
 
   const isDefaultReader = !isCaptureProfile && !showAsMultiBus && selectedProfile?.id === defaultReadProfileId;
@@ -224,6 +226,7 @@ function getSessionDetails({
   ioState,
   outputBusToSource,
   isCaptureMode,
+  t,
 }: {
   ioProfile: string | null;
   ioProfiles: IOProfile[];
@@ -232,6 +235,7 @@ function getSessionDetails({
   ioState?: string | null;
   outputBusToSource?: Map<number, BusSourceInfo>;
   isCaptureMode: boolean;
+  t: TFunction;
 }): SessionDetails {
   const showAsMultiBus = !isCaptureMode && multiBusProfiles.length > 0;
 
@@ -242,10 +246,10 @@ function getSessionDetails({
   }
 
   let typeLabel: string;
-  if (isCaptureMode) typeLabel = "Capture";
-  else if (showAsMultiBus) typeLabel = "Realtime";
+  if (isCaptureMode) typeLabel = t("session.types.capture");
+  else if (showAsMultiBus) typeLabel = t("session.types.realtime");
   else if (selectedProfile?.kind) typeLabel = getIOKindLabel(selectedProfile.kind);
-  else typeLabel = "Unknown";
+  else typeLabel = t("session.types.unknown");
 
   let interfaceEntries: SessionDetails["interfaceEntries"] = [];
   if (outputBusToSource && outputBusToSource.size > 0) {
@@ -430,6 +434,7 @@ export function IOSessionControls({
     ioState,
     outputBusToSource,
     isCaptureMode,
+    t,
   });
 
   const showPlay = (isPaused || isStopped) && !!onPlay;
@@ -446,6 +451,7 @@ export function IOSessionControls({
   const changeSourceDisabled = isStreaming && !isCaptureMode;
 
   const speedLabel = speed === 1 ? "1x" : `${speed}x`;
+  const clearLabel = isCaptureMode ? t("session.deleteCapture") : t("session.clearCapture");
   const detailRow = "flex items-center justify-between gap-3 mb-1";
   const detailKey = "text-muted";
   const detailVal = "font-medium text-primary";
@@ -463,7 +469,7 @@ export function IOSessionControls({
         ioState={ioState}
         onClick={hasSource ? menu.toggle : onOpenIoSessionPicker}
         buttonRef={menu.trigger.ref}
-        title={hasSource ? "Session menu" : "Select source"}
+        title={hasSource ? t("session.menu") : t("session.selectSource")}
         isCaptureMode={isCaptureMode}
       />
       <BusStatusBadges sessionId={sessionId} />
@@ -492,17 +498,17 @@ export function IOSessionControls({
           <div className="px-3 py-2 text-xs cursor-default">
             {statusLabel && (
               <div className={detailRow}>
-                <span className={detailKey}>State</span>
+                <span className={detailKey}>{t("session.state")}</span>
                 <span className={`font-medium ${statusLabel.colour}`}>{statusLabel.label}</span>
               </div>
             )}
             <div className={detailRow}>
-              <span className={detailKey}>Type</span>
+              <span className={detailKey}>{t("session.type")}</span>
               <span className={detailVal}>{typeLabel}</span>
             </div>
             {captureMetadata?.id && (
               <div className={detailRow}>
-                <span className={detailKey}>Capture</span>
+                <span className={detailKey}>{t("session.capture")}</span>
                 <span className={`${detailVal} truncate max-w-40`}>
                   {captureMetadata.name || captureMetadata.id}
                 </span>
@@ -510,20 +516,20 @@ export function IOSessionControls({
             )}
             {totalFrameCount != null && (
               <div className={detailRow}>
-                <span className={detailKey}>Frames</span>
+                <span className={detailKey}>{t("session.frames")}</span>
                 <span className={detailVal}>{totalFrameCount.toLocaleString()}</span>
               </div>
             )}
             {frameCount != null && (
               <div className={detailRow}>
-                <span className={detailKey}>{totalFrameCount != null ? "Unique" : "Frames"}</span>
+                <span className={detailKey}>{totalFrameCount != null ? t("session.unique") : t("session.frames")}</span>
                 <span className={detailVal}>{frameCount.toLocaleString()}</span>
               </div>
             )}
             {interfaceEntries.length > 0 && (
               <div className="flex items-start justify-between gap-3 mt-1 pt-1 border-t border-default">
                 <span className={`${detailKey} shrink-0 pt-1`}>
-                  {interfaceEntries.length > 1 ? "Interfaces" : "Interface"}
+                  {t("session.interface", { count: interfaceEntries.length })}
                 </span>
                 <div className="flex flex-col items-stretch gap-0.5 min-w-0">
                   {/* Each interface opens its own settings, so a multi-bus
@@ -561,11 +567,11 @@ export function IOSessionControls({
             icon={<ArrowRightLeft />}
             title={
               changeSourceDisabled
-                ? canPause ? "Pause or disconnect to change source" : "Stop or leave the session to change source"
+                ? canPause ? t("session.changeSourcePause") : t("session.changeSourceStop")
                 : undefined
             }
           >
-            Change source
+            {t("session.changeSource")}
           </MenuItem>
 
           {/* Playback / capture actions */}
@@ -584,9 +590,9 @@ export function IOSessionControls({
               onClick={onOpenSpeedPicker}
               disabled={!supportsSpeed}
               icon={<Gauge />}
-              title={supportsSpeed ? undefined : "Speed control (available for captures)"}
+              title={supportsSpeed ? undefined : t("session.speedUnavailable")}
             >
-              <span className="flex-1">Speed</span>
+              <span className="flex-1">{t("session.speed")}</span>
               <span className="text-muted">{speedLabel}</span>
             </MenuItem>
           )}
@@ -617,9 +623,9 @@ export function IOSessionControls({
               disabled={!hasData}
               tone="danger"
               icon={<Trash2 />}
-              title={isCaptureMode ? "Delete capture" : "Clear capture and start fresh"}
+              title={clearLabel}
             >
-              {isCaptureMode ? "Delete capture" : "Clear capture and start fresh"}
+              {clearLabel}
             </MenuItem>
           )}
 
@@ -627,7 +633,7 @@ export function IOSessionControls({
           {(showLeave || showStop || showDestroy) && <MenuSeparator />}
           {showLeave && (
             <MenuItem onClick={onLeave} tone="warning" icon={<LogOut />}>
-              {isCaptureMode ? "Disconnect" : "Leave session"}
+              {isCaptureMode ? t("session.disconnect") : t("session.leave")}
             </MenuItem>
           )}
           {showStop && (
@@ -635,9 +641,9 @@ export function IOSessionControls({
               onClick={onStop}
               tone="warning"
               icon={<Square />}
-              title="Stop the session for all connected apps and review the capture"
+              title={t("session.stopTooltip")}
             >
-              Stop session
+              {t("session.stop")}
             </MenuItem>
           )}
           {showDestroy && (
@@ -645,9 +651,9 @@ export function IOSessionControls({
               onClick={onDestroy}
               tone="danger"
               icon={<Power />}
-              title="Destroy this session and reset all connected apps to No source"
+              title={t("session.destroyTooltip")}
             >
-              Destroy session
+              {t("session.destroy")}
             </MenuItem>
           )}
       </Menu>

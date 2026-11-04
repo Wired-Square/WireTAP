@@ -1,6 +1,7 @@
 // ui/src/components/TimelineScrubber.tsx
 
 import { useRef, useState, useCallback, useEffect, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { formatHumanUs, formatDeltaUs } from "../utils/timeFormat";
 import { caption } from "../styles/typography";
 
@@ -73,6 +74,7 @@ export default function TimelineScrubber({
   useLocalTimezone = false,
   markers,
 }: Props) {
+  const { t } = useTranslation("common");
   const trackRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [hoverPosition, setHoverPosition] = useState<number | null>(null); // frame index or timestamp
@@ -316,7 +318,7 @@ export default function TimelineScrubber({
             }}
           >
             {isFrameMode
-              ? `Frame ${(hoverPosition + 1).toLocaleString()}`
+              ? t("frameNumber", { index: (hoverPosition + 1).toLocaleString() })
               : formatTooltipTime(hoverPosition)}
           </div>
         )}

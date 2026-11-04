@@ -1,7 +1,7 @@
 // ui/src/apps/decoder/views/DecoderFramesView.tsx
 
 import { useRef, useEffect, useState, useMemo, useCallback } from "react";
-import { Calculator, Flag, Clock, Check, X, Layers, Copy, ClipboardCopy, Filter, Target, Send, Gauge, Pencil } from "lucide-react";
+import { Calculator, Flag, Clock, Check, X, Layers, Copy, ClipboardCopy, Gauge, Pencil } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { iconSm, iconXs, flexRowGap2 } from "../../../styles/spacing";
 import { PlaybackControls } from "../../../components/PlaybackControls";
@@ -22,8 +22,9 @@ import type { DecodedFrame, DecodedSignal, DecoderViewMode, UnmatchedFrame, Filt
 import DecoderTunnelView from "./DecoderTunnelView";
 import { useDecoderStore, MAX_TUNNEL_TRANSACTIONS } from "../../../stores/decoderStore";
 import { useSettingsStore } from "../../../apps/settings/stores/settingsStore";
-import { useTransmitStore } from "../../../stores/transmitStore";
+import { useTransmitStore, type CanEditorState } from "../../../stores/transmitStore";
 import { canEditorFromDecoded, canEditorFromUnmatched } from "../canEditorFromDecoder";
+import { addEventMenuItem, copyMenuItems, inspectMenuItem, menuSeparator, selectionMenuItems, sendToTransmitMenuItem } from "../../discovery/components/frameContextMenuItems";
 import { useDashboardStore } from "../../../stores/dashboardStore";
 import { useSessionStore } from "../../../stores/sessionStore";
 import { useCatalogEditorStore } from "../../../stores/catalogEditorStore";
@@ -243,6 +244,34 @@ function formatSignalTimestamp(
 
 function emphasisedColour(colour: string): string {
   return `color-mix(in srgb, ${colour}, var(--text-primary) 70%)`;
+}
+
+function sendToTransmit(editor: Partial<CanEditorState>) {
+  const sourceSessionId = useDecoderStore.getState().ioProfile;
+  useTransmitStore.getState().updateCanEditor(editor);
+  if (sourceSessionId) useSessionStore.getState().requestSessionJoin("transmit", sourceSessionId);
+  useTransmitStore.getState().setActiveTab("frame");
+  openPanel("transmit");
+}
+
+/** Adds a Dashboard panel, with the Decoder's catalogue loaded first so it decodes as soon as it joins. */
+function openDashboardWith(addPanel: (dashboard: ReturnType<typeof useDashboardStore.getState>) => void) {
+  const sourceSessionId = useDecoderStore.getState().ioProfile;
+  const dashboard = useDashboardStore.getState();
+  const decoderCatalogPath = useDecoderStore.getState().catalogPath;
+  if (decoderCatalogPath && decoderCatalogPath !== dashboard.catalogPath) {
+    dashboard.loadCatalog(decoderCatalogPath);
+  }
+  addPanel(dashboard);
+  if (sourceSessionId) useSessionStore.getState().requestSessionJoin("dashboard", sourceSessionId);
+  openPanel("dashboard");
+}
+
+function openFlowPanel(frameId: number, title: string) {
+  openDashboardWith((dashboard) => {
+    const panelId = dashboard.addPanel('flow');
+    dashboard.updatePanel(panelId, { targetFrameId: frameId, title });
+  });
 }
 
 /**
@@ -1123,110 +1152,54 @@ export default function DecoderFramesView({
     const { frame, decodedFrame } = frameContextMenu;
     const formattedId = formatFrameId(frame.frameId, displayFrameIdFormat, frame.isExtended);
     const rawBytes = decodedFrame?.rawBytes ?? [];
-    const hexData = rawBytes.map(b => b.toString(16).toUpperCase().padStart(2, '0')).join(' ');
 
     return [
-      {
-        label: 'Copy ID',
-        icon: <Copy />,
-        onClick: () => { navigator.clipboard.writeText(formattedId); },
-      },
-      {
-        label: 'Copy Data',
-        icon: <ClipboardCopy />,
-        onClick: () => { navigator.clipboard.writeText(hexData); },
-      },
-      { separator: true, label: '', onClick: () => {} },
-      {
-        label: 'Filter',
-        icon: <Filter />,
-        onClick: () => { useDecoderStore.getState().toggleFrameSelection(frameKey(proto, frame.frameId)); },
-      },
-      {
-        label: 'Solo',
-        icon: <Target />,
-        onClick: () => {
+      ...copyMenuItems(t, { id: formattedId, data: rawBytes.map(byteToHex).join(' ') }),
+      menuSeparator,
+      ...selectionMenuItems(t, {
+        onFilter: () => { useDecoderStore.getState().toggleFrameSelection(frameKey(proto, frame.frameId)); },
+        onSolo: () => {
           const store = useDecoderStore.getState();
           store.deselectAllFrames();
           store.toggleFrameSelection(frameKey(proto, frame.frameId));
         },
-      },
-      { separator: true, label: '', onClick: () => {} },
+      }),
+      menuSeparator,
+      inspectMenuItem(t, bytesToHex(rawBytes)),
+      sendToTransmitMenuItem(t, () => sendToTransmit(canEditorFromDecoded(frame, decodedFrame))),
       {
-        label: 'Inspect',
-        icon: <Calculator />,
-        onClick: () => { sendHexDataToCalculator(bytesToHex(rawBytes)); },
-      },
-      {
-        label: 'Send to Transmit',
-        icon: <Send />,
-        onClick: () => {
-          const sourceSessionId = useDecoderStore.getState().ioProfile;
-          useTransmitStore.getState().updateCanEditor(canEditorFromDecoded(frame, decodedFrame));
-          if (sourceSessionId) useSessionStore.getState().requestSessionJoin("transmit", sourceSessionId);
-          useTransmitStore.getState().setActiveTab("frame");
-          openPanel("transmit");
-        },
+        label: t('contextMenu.dashboardFrame'),
+        icon: <Gauge />,
+        onClick: () => openFlowPanel(frame.frameId, formattedId),
       },
       {
-        label: 'Dashboard Frame',
+        label: t('contextMenu.dashboardAllSignals'),
         icon: <Gauge />,
         onClick: () => {
-          const sourceSessionId = useDecoderStore.getState().ioProfile;
-          const gStore = useDashboardStore.getState();
-          // Pre-load decoder catalog so Dashboard can decode frames immediately after joining
-          const decoderCatalogPath = useDecoderStore.getState().catalogPath;
-          if (decoderCatalogPath && decoderCatalogPath !== gStore.catalogPath) {
-            gStore.loadCatalog(decoderCatalogPath);
-          }
-          const panelId = gStore.addPanel('flow');
-          gStore.updatePanel(panelId, { targetFrameId: frame.frameId, title: formatFrameId(frame.frameId, displayFrameIdFormat, frame.isExtended) });
-          if (sourceSessionId) useSessionStore.getState().requestSessionJoin("dashboard", sourceSessionId);
-          openPanel("dashboard");
-        },
-      },
-      {
-        label: 'Dashboard All Signals',
-        icon: <Gauge />,
-        onClick: () => {
-          const sourceSessionId = useDecoderStore.getState().ioProfile;
-          const allSignals = allFrameSignals(frame);
-          const numericSignals = allSignals.filter(s => {
+          const numericSignals = allFrameSignals(frame).filter(s => {
             const fmt = s.format;
             return !fmt || !['enum', 'ascii', 'utf8', 'hex'].includes(fmt);
           });
           if (numericSignals.length === 0) return;
-
-          const gStore = useDashboardStore.getState();
-          // Pre-load decoder catalog so Dashboard can decode frames immediately after joining
-          const decoderCatalogPath = useDecoderStore.getState().catalogPath;
-          if (decoderCatalogPath && decoderCatalogPath !== gStore.catalogPath) {
-            gStore.loadCatalog(decoderCatalogPath);
-          }
-          const panelId = gStore.addPanel('line-chart');
-          gStore.updatePanel(panelId, { title: formatFrameId(frame.frameId, displayFrameIdFormat, frame.isExtended) });
-          for (const signal of numericSignals) {
-            if (signal.name) {
-              gStore.addSignalToPanel(panelId, frame.frameId, signal.name, signal.unit ?? undefined);
+          openDashboardWith((gStore) => {
+            const panelId = gStore.addPanel('line-chart');
+            gStore.updatePanel(panelId, { title: formattedId });
+            for (const signal of numericSignals) {
+              if (signal.name) {
+                gStore.addSignalToPanel(panelId, frame.frameId, signal.name, signal.unit ?? undefined);
+              }
             }
-          }
-          if (sourceSessionId) useSessionStore.getState().requestSessionJoin("dashboard", sourceSessionId);
-          openPanel("dashboard");
+          });
         },
       },
       {
-        label: 'Edit in Catalog',
+        label: t('contextMenu.editInCatalog'),
         icon: <Pencil />,
         onClick: () => { navigateToCatalogFrame(frame); },
       },
-      ...(onAddEvent
-        ? [
-            { separator: true, label: '', onClick: () => {} },
-            { label: 'Add event here', icon: <Flag />, onClick: onAddEvent },
-          ]
-        : []),
+      ...(onAddEvent ? [menuSeparator, addEventMenuItem(t, onAddEvent)] : []),
     ];
-  }, [frameContextMenu, displayFrameIdFormat, onAddEvent]);
+  }, [frameContextMenu, displayFrameIdFormat, onAddEvent, t]);
 
   const signalContextMenuItems: ContextMenuItem[] = useMemo(() => {
     if (!signalContextMenu) return [];
@@ -1234,105 +1207,48 @@ export default function DecoderFramesView({
 
     return [
       {
-        label: 'Dashboard Frame',
+        label: t('contextMenu.dashboardFrame'),
         icon: <Gauge />,
-        onClick: () => {
-          const sourceSessionId = useDecoderStore.getState().ioProfile;
-          const gStore = useDashboardStore.getState();
-          // Pre-load decoder catalog so Dashboard can decode frames immediately after joining
-          const decoderCatalogPath = useDecoderStore.getState().catalogPath;
-          if (decoderCatalogPath && decoderCatalogPath !== gStore.catalogPath) {
-            gStore.loadCatalog(decoderCatalogPath);
-          }
-          const panelId = gStore.addPanel('flow');
-          gStore.updatePanel(panelId, { targetFrameId: frame.frameId, title: formatFrameId(frame.frameId, displayFrameIdFormat, frame.isExtended) });
-          if (sourceSessionId) useSessionStore.getState().requestSessionJoin("dashboard", sourceSessionId);
-          openPanel("dashboard");
-        },
+        onClick: () => openFlowPanel(frame.frameId, formatFrameId(frame.frameId, displayFrameIdFormat, frame.isExtended)),
       },
       {
-        label: 'Dashboard Signal',
+        label: t('contextMenu.dashboardSignal'),
         icon: <Gauge />,
-        onClick: () => {
-          const sourceSessionId = useDecoderStore.getState().ioProfile;
-          const gStore = useDashboardStore.getState();
-          // Pre-load decoder catalog so Dashboard can decode frames immediately after joining
-          const decoderCatalogPath = useDecoderStore.getState().catalogPath;
-          if (decoderCatalogPath && decoderCatalogPath !== gStore.catalogPath) {
-            gStore.loadCatalog(decoderCatalogPath);
-          }
+        onClick: () => openDashboardWith((gStore) => {
           const panelId = gStore.addPanel('line-chart');
           gStore.addSignalToPanel(panelId, frame.frameId, signal.name, signal.unit);
-          if (sourceSessionId) useSessionStore.getState().requestSessionJoin("dashboard", sourceSessionId);
-          openPanel("dashboard");
-        },
+        }),
       },
       {
-        label: 'Copy Signal Name',
+        label: t('contextMenu.copySignalName'),
         icon: <Copy />,
         onClick: () => { navigator.clipboard.writeText(signal.name); },
       },
       {
-        label: 'Copy Value',
+        label: t('contextMenu.copyValue'),
         icon: <ClipboardCopy />,
         onClick: () => { navigator.clipboard.writeText(formatSignalValue(signal)); },
       },
     ];
-  }, [signalContextMenu, displayFrameIdFormat]);
+  }, [signalContextMenu, displayFrameIdFormat, t]);
 
   const unmatchedContextMenuItems: ContextMenuItem[] = useMemo(() => {
     if (!unmatchedContextMenu) return [];
     const { frame } = unmatchedContextMenu;
     const formattedId = formatProtocolFrameId(frame.protocol, frame.frameId, displayFrameIdFormat, frame.isExtended);
-    const hexData = frame.bytes.map(b => b.toString(16).toUpperCase().padStart(2, '0')).join(' ');
 
     return [
+      ...copyMenuItems(t, { id: formattedId, data: frame.bytes.map(byteToHex).join(' ') }),
+      menuSeparator,
+      inspectMenuItem(t, bytesToHex(frame.bytes)),
+      sendToTransmitMenuItem(t, () => sendToTransmit(canEditorFromUnmatched(frame))),
       {
-        label: 'Copy ID',
-        icon: <Copy />,
-        onClick: () => { navigator.clipboard.writeText(formattedId); },
-      },
-      {
-        label: 'Copy Data',
-        icon: <ClipboardCopy />,
-        onClick: () => { navigator.clipboard.writeText(hexData); },
-      },
-      { separator: true, label: '', onClick: () => {} },
-      {
-        label: 'Inspect',
-        icon: <Calculator />,
-        onClick: () => { sendHexDataToCalculator(hexData.replace(/\s+/g, '')); },
-      },
-      {
-        label: 'Send to Transmit',
-        icon: <Send />,
-        onClick: () => {
-          const sourceSessionId = useDecoderStore.getState().ioProfile;
-          useTransmitStore.getState().updateCanEditor(canEditorFromUnmatched(frame));
-          if (sourceSessionId) useSessionStore.getState().requestSessionJoin("transmit", sourceSessionId);
-          useTransmitStore.getState().setActiveTab("frame");
-          openPanel("transmit");
-        },
-      },
-      {
-        label: 'Dashboard Frame',
+        label: t('contextMenu.dashboardFrame'),
         icon: <Gauge />,
-        onClick: () => {
-          const sourceSessionId = useDecoderStore.getState().ioProfile;
-          const gStore = useDashboardStore.getState();
-          // Pre-load decoder catalog so Dashboard can decode frames immediately after joining
-          const decoderCatalogPath = useDecoderStore.getState().catalogPath;
-          if (decoderCatalogPath && decoderCatalogPath !== gStore.catalogPath) {
-            gStore.loadCatalog(decoderCatalogPath);
-          }
-          const panelId = gStore.addPanel('flow');
-          gStore.updatePanel(panelId, { targetFrameId: frame.frameId, title: formattedId });
-          if (sourceSessionId) useSessionStore.getState().requestSessionJoin("dashboard", sourceSessionId);
-          openPanel("dashboard");
-        },
+        onClick: () => openFlowPanel(frame.frameId, formattedId),
       },
     ];
-  }, [unmatchedContextMenu, displayFrameIdFormat]);
+  }, [unmatchedContextMenu, displayFrameIdFormat, t]);
 
   // Tab bar controls (right side buttons)
   const tabBarControls = (

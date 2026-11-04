@@ -4,6 +4,7 @@
 // Optimised for streaming: SVG sprites, event delegation, stable keys.
 
 import { ReactNode, forwardRef, useRef, useEffect, useCallback, type MouseEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAutoRowCount } from '../../../hooks/useAutoRowCount';
 import { useFrameIdFormat } from '../../../hooks/useFrameIdFormat';
 import { bytesToAscii, hexRunChars } from '../../../utils/byteUtils';
@@ -169,7 +170,7 @@ const FrameDataTable = forwardRef<HTMLDivElement, FrameDataTableProps>(({
   formatTime,
   showSourceAddress = false,
   onAddEvent,
-  emptyMessage = 'No frames to display',
+  emptyMessage,
   sourceByteCount = 2,
   renderBytes,
   showRef = true,
@@ -189,6 +190,7 @@ const FrameDataTable = forwardRef<HTMLDivElement, FrameDataTableProps>(({
   autoFit = false,
   onFitChange,
 }, ref) => {
+  const { t } = useTranslation('discovery');
   const { formatFor: formatId } = useFrameIdFormat();
   const internalRef = useRef<HTMLDivElement>(null);
   const containerRef = (ref as React.RefObject<HTMLDivElement>) || internalRef;
@@ -329,16 +331,16 @@ const FrameDataTable = forwardRef<HTMLDivElement, FrameDataTableProps>(({
             {renderRowStatus && <th className="px-1" />}
             {onAddEvent && <th className="px-1" />}
             {showRef && <th className="text-right">#</th>}
-            <th>Time</th>
+            <th>{t('frameTable.time')}</th>
             {showId && (
               <th className="text-right">
-                {frames[0]?.protocol === 'modbus_rtu' ? 'Unit/Fn' : 'ID'}
+                {frames[0]?.protocol === 'modbus_rtu' ? t('frameTable.unitFunction') : t('frameTable.id')}
               </th>
             )}
-            {showBus && <th className={`text-center ${textDataCyan}`}>Bus</th>}
-            {showSourceAddress && <th className={`text-right ${textDataPurple}`}>Source</th>}
-            <th>Len</th>
-            <th>Data</th>
+            {showBus && <th className={`text-center ${textDataCyan}`}>{t('frameTable.bus')}</th>}
+            {showSourceAddress && <th className={`text-right ${textDataPurple}`}>{t('frameTable.source')}</th>}
+            <th>{t('frameTable.length')}</th>
+            <th>{t('frameTable.data')}</th>
           </tr>
         </thead>
         <tbody onClick={handleBodyClick} onContextMenu={handleBodyContextMenu}>
@@ -354,12 +356,12 @@ const FrameDataTable = forwardRef<HTMLDivElement, FrameDataTableProps>(({
                 data-idx={idx}
                 aria-current={isCurrentFrame || undefined}
                 className={`${frame.incomplete ? 'opacity-60' : ''} ${onRowClick ? 'cursor-pointer' : ''}`}
-                title={`Frame ${displayIndex}${frame.incomplete ? ' - Incomplete (no delimiter found)' : ''}`}
+                title={t(frame.incomplete ? 'frameTable.rowIncomplete' : 'common:frameNumber', { index: displayIndex })}
               >
                 {renderRowStatus && <td className="px-1">{renderRowStatus(frame, idx)}</td>}
                 {onAddEvent && (
                   <td className="px-1">
-                    <IconButton data-action="add-event" size="xs" title="Add event at this frame's time">
+                    <IconButton data-action="add-event" size="xs" title={t('frameTable.addEvent')}>
                       <UseIcon id="fdt-event" className={`w-3 h-3 ${textDataAmber}`} />
                     </IconButton>
                   </td>
@@ -421,7 +423,7 @@ const FrameDataTable = forwardRef<HTMLDivElement, FrameDataTableProps>(({
       </Table>
       {frames.length === 0 ? (
         <div className={emptyStateContainer}>
-          <p className={emptyStateText}>{emptyMessage}</p>
+          <p className={emptyStateText}>{emptyMessage ?? t('frameTable.empty')}</p>
         </div>
       ) : (
         <div style={{ height: RESERVED_PX }} />

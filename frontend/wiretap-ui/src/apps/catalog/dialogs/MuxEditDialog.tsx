@@ -1,6 +1,7 @@
 // ui/src/apps/catalog/dialogs/MuxEditDialog.tsx
 
 import Dialog, { DialogBody, DialogFooter } from "../../../components/Dialog";
+import { useTranslation } from "react-i18next";
 import BitPreview from "../../../components/BitPreview";
 import { Input, Textarea, FormField, SecondaryButton, PrimaryButton } from "../../../components/forms";
 import { textMedium } from "../../../styles";
@@ -33,6 +34,7 @@ export default function MuxEditDialog({
   onCancel,
   onSave,
 }: MuxEditDialogProps) {
+  const { t } = useTranslation("catalog");
   const title = isAddingNestedMux ? "Add Nested Mux" : isEditingExistingMux ? "Edit Mux" : "Add Mux";
   const layout = useFrameLayout(open ? currentMuxPath : null);
 
@@ -91,18 +93,18 @@ export default function MuxEditDialog({
         {bitPreview}
 
         {/* Notes */}
-        <FormField label="Notes" variant="default">
+        <FormField label={t("shared.notes")} variant="default">
           <Textarea
             size="lg"
             value={typeof fields.notes === "string" ? fields.notes : fields.notes?.join("\n") ?? ""}
             onChange={(e) => setFields({ ...fields, notes: e.target.value || undefined })}
-            placeholder="Optional notes about this mux..."
+            placeholder={t("shared.notesPlaceholderMux")}
             rows={2}
           />
         </FormField>
       </DialogBody>
       <DialogFooter>
-        <SecondaryButton onClick={onCancel}>Cancel</SecondaryButton>
+        <SecondaryButton onClick={onCancel}>{t("common:actions.cancel")}</SecondaryButton>
         <PrimaryButton onClick={onSave} disabled={(fields.bit_length ?? 0) < 1}>
           OK
         </PrimaryButton>

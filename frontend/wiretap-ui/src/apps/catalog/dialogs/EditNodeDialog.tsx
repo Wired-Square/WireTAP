@@ -1,6 +1,7 @@
 // ui/src/apps/catalog/dialogs/EditNodeDialog.tsx
 
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import Dialog, { DialogBody, DialogFooter } from "../../../components/Dialog";
 import { Input, Textarea, FormField, SecondaryButton, PrimaryButton } from "../../../components/forms";
 import { caption } from "../../../styles";
@@ -42,6 +43,7 @@ export default function EditNodeDialog({
   onCancel,
   onSave,
 }: EditNodeDialogProps) {
+  const { t } = useTranslation("catalog");
   const nodeError = useMemo(() => validationErrors.find((e) => e.field === "node"), [validationErrors]);
 
   return (
@@ -76,20 +78,20 @@ export default function EditNodeDialog({
           onChange={setDeviceAddress}
         />
 
-        <FormField label="Notes" variant="default">
+        <FormField label={t("shared.notes")} variant="default">
           <Textarea
             size="lg"
             value={nodeNotes}
             onChange={(e) => setNodeNotes(e.target.value)}
-            placeholder="Optional notes about this node..."
+            placeholder={t("shared.notesPlaceholderNode")}
             rows={2}
           />
         </FormField>
       </DialogBody>
       <DialogFooter>
-        <SecondaryButton onClick={onCancel}>Cancel</SecondaryButton>
+        <SecondaryButton onClick={onCancel}>{t("common:actions.cancel")}</SecondaryButton>
         <PrimaryButton onClick={onSave} disabled={!nodeName.trim()}>
-          Save Changes
+          {t("editor.saveChanges")}
         </PrimaryButton>
       </DialogFooter>
     </Dialog>

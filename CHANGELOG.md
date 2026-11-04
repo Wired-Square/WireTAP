@@ -4,6 +4,10 @@ All notable changes to WireTAP will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- **More of the interface follows your language.** The frames table, session menu, status badges, time display, device connection fields, frame context menus and the catalogue editor's common buttons used to stay in English whatever language you chose; they now translate. The English wording is unchanged.
+
 ### Fixed
 
 - **Query's source picker no longer says no sources are configured beside a capture.** The line telling you to add a source in Settings now shows only when the picker has nothing to list.

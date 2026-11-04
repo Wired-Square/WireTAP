@@ -9,17 +9,8 @@ import { Loader2, AlertCircle, Bus, Lock } from "lucide-react";
 import { iconMd, iconXs } from "../../styles/spacing";
 import { caption, sectionHeaderText } from "../../styles/typography";
 import type { GvretDeviceInfo, BusMapping, Protocol } from "../../api/io";
-import { PROTOCOL_LABELS } from "../../utils/profileTraits";
+import { protocolLabel } from "../../utils/profileTraits";
 import { Checkbox, Select } from "../../components/forms";
-
-// Generic bus names - actual meaning varies by device
-const BUS_NAMES: Record<number, string> = {
-  0: "Bus 0",
-  1: "Bus 1",
-  2: "Bus 2",
-  3: "Bus 3",
-  4: "Bus 4",
-};
 
 /** Output bus numbers a mapping may be remapped onto. */
 const OUTPUT_BUS_COUNT = 8;
@@ -109,7 +100,7 @@ export default function DeviceBusConfig({
     return busSelect(
       mapping.protocol ?? options[0],
       (value) => updateBus(mapping.device_bus, { protocol: value as Protocol }),
-      options.map((p) => ({ value: p, label: PROTOCOL_LABELS[p] })),
+      options.map((p) => ({ value: p, label: protocolLabel(p) })),
     );
   };
 
@@ -196,7 +187,7 @@ export default function DeviceBusConfig({
                     size="sm"
                   />
                   <span className={configLocked ? "text-muted" : "text-secondary"}>
-                    {BUS_NAMES[mapping.device_bus] || t("ioSourcePicker.busConfig.busLabel", { bus: mapping.device_bus })}
+                    {t("common:busNumber", { bus: mapping.device_bus })}
                   </span>
                 </label>
 
@@ -268,7 +259,7 @@ export default function DeviceBusConfig({
                   disabled={configLocked}
                 />
                 <span className={configLocked ? "text-sm font-medium text-muted" : sectionHeaderText}>
-                  {BUS_NAMES[mapping.device_bus] || `Bus ${mapping.device_bus}`}
+                  {t("common:busNumber", { bus: mapping.device_bus })}
                 </span>
               </label>
 
