@@ -454,43 +454,46 @@ function StatusBar({
   status,
   detail,
   elapsedSec,
-  passLabel = "PASS",
+  passLabel,
 }: {
   status: TestStatus;
   detail: string;
   elapsedSec: number;
   passLabel?: string;
 }) {
+  const { t } = useTranslation("testPattern");
   const { passed, hasVerdict } = verdict(status);
   const colour = passed ? textDataGreen : status === "failed" ? textDanger : textPrimary;
   return (
     <div className="flex items-center gap-3">
-      <span className={`text-sm font-semibold uppercase ${colour}`}>{status}</span>
+      <span className={`text-sm font-semibold uppercase ${colour}`}>{t(`statuses.${status}`)}</span>
       <span className={`text-xs ${textSecondary}`}>
         {detail} — {elapsedSec.toFixed(1)}s
       </span>
       {hasVerdict && (
         <span className={`text-xs font-semibold ${passed ? textDataGreen : textDanger}`}>
-          {passed ? passLabel : "FAIL"}
+          {passed ? passLabel ?? t("results.pass") : t("results.fail")}
         </span>
       )}
     </div>
   );
 }
 
+function useRunDetail(state: IOTestState) {
+  const { t } = useTranslation("testPattern");
+  return t("results.runDetail", { mode: t(`modes.${state.mode}`), role: t(`roles.${state.role}`) });
+}
+
 /** What the Hello handshake found, before any traffic went out. */
 function PeerSummary({ peer }: { peer: PeerInfo | null }) {
+  const { t } = useTranslation("testPattern");
   if (!peer) {
-    return (
-      <div className={`text-xs ${textDataOrange}`}>
-        No peer answered Hello — start a responder on the other endpoint.
-      </div>
-    );
+    return <div className={`text-xs ${textDataOrange}`}>{t("peer.none")}</div>;
   }
+  const yesNo = (flag: boolean) => t(flag ? "peer.yes" : "peer.no");
   return (
     <div className={`text-xs ${textSecondary}`}>
-      Peer answered on bus {peer.bus} — CAN FD {peer.fd ? "yes" : "no"}, extended IDs{" "}
-      {peer.extended ? "yes" : "no"}.
+      {t("peer.answered", { bus: peer.bus, fd: yesNo(peer.fd), extended: yesNo(peer.extended) })}
     </div>
   );
 }
@@ -501,15 +504,16 @@ function PeerSummary({ peer }: { peer: PeerInfo | null }) {
  * where a payload length and a data length code are the same number.
  */
 function SweepTable({ rows }: { rows: SweepRow[] }) {
+  const { t } = useTranslation("testPattern");
   return (
     <Card padding="none" className="overflow-x-auto">
       <Table mono>
         <thead>
           <tr>
-            <th>Code</th>
-            <th className="text-right">Expected</th>
-            <th className="text-right">Received</th>
-            <th>Result</th>
+            <th>{t("sweep.columns.code")}</th>
+            <th className="text-right">{t("sweep.columns.expected")}</th>
+            <th className="text-right">{t("sweep.columns.received")}</th>
+            <th>{t("auto.phaseColumns.result")}</th>
           </tr>
         </thead>
         <tbody>
@@ -521,7 +525,7 @@ function SweepTable({ rows }: { rows: SweepRow[] }) {
                 {r.received_len === null ? "—" : `${r.received_len} B`}
               </td>
               <td className={`font-semibold ${r.passed ? textDataGreen : textDanger}`}>
-                {r.passed ? "PASS" : r.received_len === null ? "NO ECHO" : "MISMATCH"}
+                {t(r.passed ? "results.pass" : r.received_len === null ? "sweep.noEcho" : "sweep.mismatch")}
               </td>
             </tr>
           ))}
@@ -532,39 +536,36 @@ function SweepTable({ rows }: { rows: SweepRow[] }) {
 }
 
 function SweepResults({ state }: { state: IOTestState }) {
+  const { t } = useTranslation("testPattern");
+  const run = useRunDetail(state);
   const rows = state.sweep ?? [];
   const failures = rows.filter((r) => !r.passed);
   return (
     <div className="flex flex-col gap-3 flex-1">
       <StatusBar
         status={state.status}
-        detail={`sweep / ${state.role} — ${rows.length} length codes`}
+        detail={t("sweep.detail", { run, count: rows.length })}
         elapsedSec={state.elapsed_sec}
       />
       <PeerSummary peer={state.peer} />
       {rows.length > 0 && <SweepTable rows={rows} />}
       {verdict(state.status).settled && (
         <div className={`text-sm ${textSecondary} border-t border-default pt-2 mt-1`}>
-          {failures.length === 0 && rows.length > 0 ? (
-            <p>
-              Every length code round-tripped at exactly the length it names
-              {rows.length > 9
-                ? ", including the CAN FD codes 9–15 (12–64 bytes) that a silent downgrade to classic CAN cannot carry."
-                : " (0–8 bytes, classic CAN)."}
-            </p>
-          ) : (
-            <p>
-              {failures.length} of {rows.length} length codes failed:{" "}
-              {failures
-                .map((f) =>
-                  f.received_len === null
-                    ? `code ${f.code} (${f.expected_len} B) never echoed`
-                    : `code ${f.code} expected ${f.expected_len} B, got ${f.received_len} B`,
-                )
-                .join("; ")}
-              .
-            </p>
-          )}
+          <p>
+            {failures.length === 0 && rows.length > 0
+              ? t(rows.length > 9 ? "sweep.allPassedFd" : "sweep.allPassedClassic")
+              : t("sweep.failed", {
+                  failed: failures.length,
+                  count: rows.length,
+                  list: failures
+                    .map((f) =>
+                      f.received_len === null
+                        ? t("sweep.neverEchoed", { code: f.code, length: f.expected_len })
+                        : t("sweep.wrongLength", { code: f.code, expected: f.expected_len, received: f.received_len }),
+                    )
+                    .join("; "),
+                })}
+          </p>
         </div>
       )}
     </div>
@@ -572,11 +573,14 @@ function SweepResults({ state }: { state: IOTestState }) {
 }
 
 function TestResults({ state }: { state: IOTestState }) {
+  const { t } = useTranslation("testPattern");
+  const run = useRunDetail(state);
   const isThroughput = state.mode === "throughput";
   // Detect loopback echo — if we received frames during throughput, the
   // interface echoes transmitted frames and we can show bus delivery metrics.
   const hasLoopback = isThroughput && state.rx_count > 0;
   const passed = state.status === "completed";
+  const frames = t("results.gauges.unitFrames");
 
   const fpsMax = Math.max(100, nearestRound(state.frames_per_sec * 1.2));
   const txMax = txGaugeMax(state);
@@ -589,7 +593,7 @@ function TestResults({ state }: { state: IOTestState }) {
     <div className="flex flex-col gap-3 flex-1">
       <StatusBar
         status={state.status}
-        detail={`${state.mode} / ${state.role}`}
+        detail={run}
         elapsedSec={state.elapsed_sec}
       />
       {state.role === "initiator" && state.mode !== "loopback" && (
@@ -604,7 +608,7 @@ function TestResults({ state }: { state: IOTestState }) {
               <Gauge
                 value={state.elapsed_sec > 0 ? state.rx_count / state.elapsed_sec : 0}
                 max={fpsMax}
-                label="Bus Rate"
+                label={t("results.gauges.busRate")}
                 unit="fps"
                 colour="#22c55e"
               />
@@ -612,7 +616,7 @@ function TestResults({ state }: { state: IOTestState }) {
             <Gauge
               value={state.frames_per_sec}
               max={Math.max(fpsMax, nearestRound(state.frames_per_sec * 1.2))}
-              label={hasLoopback ? "Queue Rate" : "Throughput"}
+              label={t(hasLoopback ? "results.gauges.queueRate" : "results.gauges.throughput")}
               unit="fps"
               colour={hasLoopback ? "#3b82f6" : "#22c55e"}
             />
@@ -620,16 +624,16 @@ function TestResults({ state }: { state: IOTestState }) {
               <Gauge
                 value={state.rx_count}
                 max={txMax}
-                label="Delivered"
-                unit="frames"
+                label={t("results.gauges.delivered")}
+                unit={frames}
                 colour="#06b6d4"
               />
             )}
             <Gauge
               value={state.tx_count}
               max={txMax}
-              label={hasLoopback ? "Queued" : "Transmitted"}
-              unit="frames"
+              label={t(hasLoopback ? "results.gauges.queued" : "results.gauges.transmitted")}
+              unit={frames}
               colour={hasLoopback ? "#8b5cf6" : "#3b82f6"}
             />
           </>
@@ -638,15 +642,15 @@ function TestResults({ state }: { state: IOTestState }) {
             <Gauge
               value={state.frames_per_sec}
               max={fpsMax}
-              label="Throughput"
+              label={t("results.gauges.throughput")}
               unit="fps"
               colour="#22c55e"
             />
             <Gauge
               value={state.tx_count}
               max={txMax}
-              label="Transmitted"
-              unit="frames"
+              label={t("results.gauges.transmitted")}
+              unit={frames}
               colour="#3b82f6"
             />
           </>
@@ -656,8 +660,8 @@ function TestResults({ state }: { state: IOTestState }) {
             <Gauge
               value={state.drops}
               max={dropMax}
-              label="Drops"
-              unit="frames"
+              label={t("results.gauges.drops")}
+              unit={frames}
               colour={state.drops > 0 ? "#ef4444" : "#22c55e"}
               warn={state.drops > 0}
             />
@@ -665,7 +669,7 @@ function TestResults({ state }: { state: IOTestState }) {
               <Gauge
                 value={state.latency_us.mean_us}
                 max={latMax}
-                label="Latency (mean)"
+                label={t("results.gauges.latencyMean")}
                 unit="μs"
                 colour="#a855f7"
               />
@@ -673,8 +677,8 @@ function TestResults({ state }: { state: IOTestState }) {
               <Gauge
                 value={state.rx_count}
                 max={txMax}
-                label="Received"
-                unit="frames"
+                label={t("results.gauges.received")}
+                unit={frames}
                 colour="#06b6d4"
               />
             )}
@@ -684,20 +688,20 @@ function TestResults({ state }: { state: IOTestState }) {
 
       {/* Detail counters */}
       <div className={`grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-1 ${monoBody}`}>
-        <Stat label="TX" value={state.tx_count} />
-        <Stat label="Rate" value={`${state.frames_per_sec.toFixed(0)} fps`} />
+        <Stat label={t("results.stats.tx")} value={state.tx_count} />
+        <Stat label={t("results.stats.rate")} value={`${state.frames_per_sec.toFixed(0)} fps`} />
         {hasLoopback && (
           <>
-            <Stat label="Delivered" value={state.rx_count} />
-            <Stat label="Bus Rate" value={`${(state.elapsed_sec > 0 ? state.rx_count / state.elapsed_sec : 0).toFixed(0)} fps`} />
+            <Stat label={t("results.stats.delivered")} value={state.rx_count} />
+            <Stat label={t("results.stats.busRate")} value={`${(state.elapsed_sec > 0 ? state.rx_count / state.elapsed_sec : 0).toFixed(0)} fps`} />
           </>
         )}
         {!isThroughput && (
           <>
-            <Stat label="RX" value={state.rx_count} />
-            <Stat label="Drops" value={state.drops} warn={state.drops > 0} />
-            <Stat label="Duplicates" value={state.duplicates} warn={state.duplicates > 0} />
-            <Stat label="Out-of-order" value={state.out_of_order} warn={state.out_of_order > 0} />
+            <Stat label={t("results.stats.rx")} value={state.rx_count} />
+            <Stat label={t("results.stats.drops")} value={state.drops} warn={state.drops > 0} />
+            <Stat label={t("results.stats.duplicates")} value={state.duplicates} warn={state.duplicates > 0} />
+            <Stat label={t("results.stats.outOfOrder")} value={state.out_of_order} warn={state.out_of_order > 0} />
           </>
         )}
       </div>
@@ -705,14 +709,14 @@ function TestResults({ state }: { state: IOTestState }) {
       {/* Latency breakdown */}
       {!isThroughput && state.latency_us && (
         <div>
-          <div className={`text-xs mb-1 ${textSecondary}`}>Latency (μs)</div>
+          <div className={`text-xs mb-1 ${textSecondary}`}>{t("results.latencyTitle")}</div>
           <div className={`grid grid-cols-3 sm:grid-cols-6 gap-x-4 gap-y-1 ${monoBody}`}>
-            <Stat label="min" value={state.latency_us.min_us} />
-            <Stat label="max" value={state.latency_us.max_us} />
-            <Stat label="mean" value={state.latency_us.mean_us} />
-            <Stat label="p50" value={state.latency_us.p50_us} />
-            <Stat label="p95" value={state.latency_us.p95_us} />
-            <Stat label="p99" value={state.latency_us.p99_us} />
+            <Stat label={t("results.latencyMin")} value={state.latency_us.min_us} />
+            <Stat label={t("results.latencyMax")} value={state.latency_us.max_us} />
+            <Stat label={t("results.latencyMean")} value={state.latency_us.mean_us} />
+            <Stat label={t("results.latencyP50")} value={state.latency_us.p50_us} />
+            <Stat label={t("results.latencyP95")} value={state.latency_us.p95_us} />
+            <Stat label={t("results.latencyP99")} value={state.latency_us.p99_us} />
           </div>
         </div>
       )}
@@ -724,11 +728,11 @@ function TestResults({ state }: { state: IOTestState }) {
               losing frames fast enough accumulates more than anyone can read.
               Drops is the authoritative count. */}
           <div className={`text-xs mb-1 ${textSecondary}`}>
-            Sequence gaps (first {Math.min(state.sequence_gaps.length, 20)} of {state.drops} drops)
+            {t("results.sequenceGapsTitle", { shown: Math.min(state.sequence_gaps.length, 20), count: state.drops })}
           </div>
           <div className={`text-xs ${monoBody} max-h-24 overflow-y-auto`}>
             {state.sequence_gaps.slice(0, 20).map(([expected, got], i) => (
-              <div key={i}>expected {expected}, got {got}</div>
+              <div key={i}>{t("results.expectedGotFmt", { expected, got })}</div>
             ))}
           </div>
         </div>
@@ -737,13 +741,13 @@ function TestResults({ state }: { state: IOTestState }) {
       {/* Remote endpoint stats */}
       {state.remote && (
         <div>
-          <div className={`text-xs mb-1 ${textSecondary}`}>Remote Endpoint</div>
+          <div className={`text-xs mb-1 ${textSecondary}`}>{t("results.remoteEndpointTitle")}</div>
           <div className={`grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-1 ${monoBody}`}>
-            <Stat label="RX" value={state.remote.rx_count} />
-            <Stat label="TX" value={state.remote.tx_count} />
-            <Stat label="Rate" value={`${state.remote.fps} fps`} />
+            <Stat label={t("results.stats.rx")} value={state.remote.rx_count} />
+            <Stat label={t("results.stats.tx")} value={state.remote.tx_count} />
+            <Stat label={t("results.stats.rate")} value={`${state.remote.fps} fps`} />
             {state.remote.drops > 0 && (
-              <Stat label="Drops" value={state.remote.drops} warn />
+              <Stat label={t("results.stats.drops")} value={state.remote.drops} warn />
             )}
           </div>
         </div>
@@ -753,7 +757,7 @@ function TestResults({ state }: { state: IOTestState }) {
       {state.errors.length > 0 && (
         <div>
           <div className={`text-xs mb-1 ${textDanger}`}>
-            Errors ({state.errors.length})
+            {t("results.errorsTitle", { count: state.errors.length })}
           </div>
           <div className={`text-xs ${monoBody} max-h-24 overflow-y-auto`}>
             {state.errors.slice(0, 10).map((err, i) => (
@@ -778,6 +782,7 @@ function TestResults({ state }: { state: IOTestState }) {
 // ============================================================================
 
 function AutoResults({ state }: { state: IOTestState }) {
+  const { t } = useTranslation("testPattern");
   const results = state.auto_results ?? [];
   const settled = verdict(state.status).settled;
 
@@ -785,9 +790,9 @@ function AutoResults({ state }: { state: IOTestState }) {
     <div className="flex flex-col gap-3 flex-1">
       <StatusBar
         status={state.status}
-        detail={state.auto_phase ?? "full suite"}
+        detail={state.auto_phase ?? t("auto.fullSuite")}
         elapsedSec={state.elapsed_sec}
-        passLabel="ALL PASS"
+        passLabel={t("results.allPass")}
       />
       <PeerSummary peer={state.peer} />
 
@@ -797,14 +802,14 @@ function AutoResults({ state }: { state: IOTestState }) {
           <Table mono>
             <thead>
               <tr>
-                <th>Phase</th>
-                <th>Result</th>
-                <th className="text-right">TX</th>
-                <th className="text-right">RX</th>
-                <th className="text-right">Drops</th>
-                <th className="text-right">Rate</th>
-                <th className="text-right">Latency</th>
-                <th className="text-right">Time</th>
+                <th>{t("auto.phaseColumns.phase")}</th>
+                <th>{t("auto.phaseColumns.result")}</th>
+                <th className="text-right">{t("auto.phaseColumns.tx")}</th>
+                <th className="text-right">{t("auto.phaseColumns.rx")}</th>
+                <th className="text-right">{t("auto.phaseColumns.drops")}</th>
+                <th className="text-right">{t("auto.phaseColumns.rate")}</th>
+                <th className="text-right">{t("auto.phaseColumns.latency")}</th>
+                <th className="text-right">{t("auto.phaseColumns.time")}</th>
               </tr>
             </thead>
             <tbody>
@@ -812,7 +817,7 @@ function AutoResults({ state }: { state: IOTestState }) {
                 <tr key={i}>
                   <td>{r.phase}</td>
                   <td className={`font-semibold ${r.passed ? textDataGreen : textDanger}`}>
-                    {r.passed ? "PASS" : "FAIL"}
+                    {t(r.passed ? "results.pass" : "results.fail")}
                   </td>
                   <td className="text-right">{r.tx_count.toLocaleString()}</td>
                   <td className="text-right">{r.rx_count.toLocaleString()}</td>
@@ -834,7 +839,7 @@ function AutoResults({ state }: { state: IOTestState }) {
       {/* Per-length-code detail, so a sweep failure names the byte count */}
       {!!state.sweep?.length && (
         <div>
-          <div className={`text-xs mb-1 ${textSecondary}`}>Sweep — payload length by code</div>
+          <div className={`text-xs mb-1 ${textSecondary}`}>{t("auto.sweepTitle")}</div>
           <SweepTable rows={state.sweep} />
         </div>
       )}
@@ -846,12 +851,12 @@ function AutoResults({ state }: { state: IOTestState }) {
         return (
           <div>
             <div className={`text-xs mb-1 ${textSecondary}`}>
-              Remote Endpoint (from {remotePhase.phase})
+              {t("auto.remoteFromPhase", { phase: remotePhase.phase })}
             </div>
             <div className={`grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-1 ${monoBody}`}>
-              <Stat label="RX" value={remotePhase.remote.rx_count} />
-              <Stat label="TX" value={remotePhase.remote.tx_count} />
-              <Stat label="Rate" value={`${remotePhase.remote.fps} fps`} />
+              <Stat label={t("results.stats.rx")} value={remotePhase.remote.rx_count} />
+              <Stat label={t("results.stats.tx")} value={remotePhase.remote.tx_count} />
+              <Stat label={t("results.stats.rate")} value={`${remotePhase.remote.fps} fps`} />
             </div>
           </div>
         );
@@ -867,9 +872,12 @@ function AutoResults({ state }: { state: IOTestState }) {
   );
 }
 
+const counted = (n: number) => ({ count: n, formatted: n.toLocaleString() });
+
 export function AutoSummary({ results, status, elapsed }: { results: AutoPhaseResult[]; status: TestStatus; elapsed: number }) {
+  const { t } = useTranslation("testPattern");
   const stopped = status === "stopped";
-  const outcome = status === "completed" ? "ALL PASS" : stopped ? "STOPPED" : "FAILURES DETECTED";
+  const outcome = t(status === "completed" ? "results.allPass" : stopped ? "results.stopped" : "results.failuresDetected");
   const echoResult = results.find((r) => r.phase === "Echo");
   const latResult = results.find((r) => r.phase === "Latency");
   const tpResult = results.find((r) => r.phase === "Throughput");
@@ -877,12 +885,12 @@ export function AutoSummary({ results, status, elapsed }: { results: AutoPhaseRe
 
   const parts: string[] = [];
 
-  parts.push(`Full test suite ${stopped ? "stopped after" : "completed in"} ${elapsed.toFixed(0)}s — ${outcome}.`);
+  parts.push(t(stopped ? "summary.suiteStopped" : "summary.suiteCompleted", { seconds: elapsed.toFixed(0), outcome }));
 
   if (echoResult) {
     parts.push(echoResult.passed
-      ? `Echo: ${echoResult.frames_per_sec.toFixed(0)} fps, zero drops.`
-      : `Echo: FAILED (${echoResult.drops} drops, ${echoResult.errors.length} errors).`);
+      ? t("summary.echoPassed", { fps: echoResult.frames_per_sec.toFixed(0) })
+      : t("summary.echoFailed", { drops: echoResult.drops, errors: echoResult.errors.length }));
   }
 
   const sweepResult = results.find((r) => r.phase === "Sweep");
@@ -890,98 +898,87 @@ export function AutoSummary({ results, status, elapsed }: { results: AutoPhaseRe
     const rows = sweepResult.sweep ?? [];
     const bad = rows.filter((r) => !r.passed);
     parts.push(sweepResult.passed
-      ? `Sweep: all ${rows.length} length codes carried their full payload.`
-      : `Sweep: FAILED at ${bad.map((r) => `${r.expected_len} B`).join(", ")}.`);
+      ? t("summary.sweepPassed", { count: rows.length })
+      : t("summary.sweepFailed", { lengths: bad.map((r) => `${r.expected_len} B`).join(", ") }));
   }
 
   if (latResult?.latency_us) {
-    parts.push(`Latency: ${latResult.latency_us.mean_us.toLocaleString()} μs mean, ${latResult.latency_us.p95_us.toLocaleString()} μs p95.`);
+    parts.push(t("summary.latency", { mean: latResult.latency_us.mean_us.toLocaleString(), p95: latResult.latency_us.p95_us.toLocaleString() }));
   }
 
   if (tpResult) {
     const remote = tpResult.remote;
-    if (remote && remote.rx_count > 0) {
-      parts.push(`Throughput: ${tpResult.frames_per_sec.toFixed(0)} fps queue rate, ${remote.fps} fps bus rate.`);
-    } else {
-      parts.push(`Throughput: ${tpResult.frames_per_sec.toFixed(0)} fps.`);
-    }
+    const fps = tpResult.frames_per_sec.toFixed(0);
+    parts.push(remote && remote.rx_count > 0
+      ? t("summary.throughputWithBus", { fps, busFps: remote.fps })
+      : t("summary.throughput", { fps }));
   }
 
   if (relResult) {
+    const seconds = relResult.elapsed_sec.toFixed(0);
     parts.push(relResult.passed
-      ? `Reliability: ${relResult.tx_count.toLocaleString()} frames over ${relResult.elapsed_sec.toFixed(0)}s, zero drops.`
-      : `Reliability: FAILED — ${relResult.drops} drops in ${relResult.elapsed_sec.toFixed(0)}s.`);
+      ? t("summary.reliabilityPassed", { ...counted(relResult.tx_count), seconds })
+      : t("summary.reliabilityFailed", { count: relResult.drops, seconds }));
   }
 
   return <p>{parts.join(" ")}</p>;
 }
 
 function TestSummary({ state, passed }: { state: IOTestState; passed: boolean }) {
+  const { t } = useTranslation("testPattern");
   const mode = state.mode;
-  const dur = state.elapsed_sec.toFixed(1);
+  const seconds = state.elapsed_sec.toFixed(1);
   const fps = state.frames_per_sec.toFixed(0);
+  const sentences = (...parts: (string | false | null | undefined)[]) => <p>{parts.filter(Boolean).join(" ")}</p>;
 
   if (state.status === "failed" && state.errors.length > 0 && state.tx_count === 0) {
-    return <p>Test failed — could not transmit any frames. Check that the session supports transmit and is connected.</p>;
+    return <p>{t("summary.noTransmit")}</p>;
   }
 
   if (mode === "throughput") {
     const remote = state.remote;
     if (remote && remote.rx_count > 0) {
-      const busRate = (remote.rx_count / state.elapsed_sec).toFixed(0);
-      return (
-        <p>
-          Transmitted {state.tx_count.toLocaleString()} frames in {dur}s at {fps} fps (queue rate).
-          The remote endpoint received {remote.rx_count.toLocaleString()} frames at {busRate} fps (bus rate).
-          {remote.rx_count < state.tx_count
-            ? ` ${(state.tx_count - remote.rx_count).toLocaleString()} frames were lost due to buffer overflow between the software queue and the bus.`
-            : ""}
-        </p>
+      return sentences(
+        t("summary.transmittedQueueRate", { ...counted(state.tx_count), seconds, fps }),
+        t("summary.remoteBusRate", { ...counted(remote.rx_count), fps: (remote.rx_count / state.elapsed_sec).toFixed(0) }),
+        remote.rx_count < state.tx_count && t("summary.framesLost", counted(state.tx_count - remote.rx_count)),
       );
     }
-    return <p>Transmitted {state.tx_count.toLocaleString()} frames in {dur}s at {fps} fps.</p>;
+    return sentences(t("summary.transmitted", { ...counted(state.tx_count), seconds, fps }));
   }
 
   if (mode === "latency") {
     const lat = state.latency_us;
     if (passed && lat) {
-      return (
-        <p>
-          Sent {state.tx_count.toLocaleString()} latency probes in {dur}s.
-          All {state.rx_count.toLocaleString()} replies received with zero drops.
-          Round-trip: {lat.mean_us.toLocaleString()} μs mean, {lat.p95_us.toLocaleString()} μs p95.
-          {state.remote ? ` Remote received ${state.remote.rx_count.toLocaleString()} probes at ${state.remote.fps} fps.` : ""}
-        </p>
+      return sentences(
+        t("summary.probesSent", { ...counted(state.tx_count), seconds }),
+        t("summary.allReplies", counted(state.rx_count)),
+        t("summary.roundTripP95", { mean: lat.mean_us.toLocaleString(), p95: lat.p95_us.toLocaleString() }),
+        state.remote && t("summary.remoteProbes", { ...counted(state.remote.rx_count), fps: state.remote.fps }),
       );
     }
-    return (
-      <p>
-        Sent {state.tx_count.toLocaleString()} latency probes in {dur}s.
-        {state.drops > 0 ? ` ${state.drops.toLocaleString()} probes were lost (${(state.drops / state.tx_count * 100).toFixed(1)}% loss).` : ""}
-        {lat ? ` Round-trip: ${lat.mean_us.toLocaleString()} μs mean, ${lat.p99_us.toLocaleString()} μs p99.` : ""}
-      </p>
+    return sentences(
+      t("summary.probesSent", { ...counted(state.tx_count), seconds }),
+      state.drops > 0 && t("summary.probesLost", { ...counted(state.drops), percent: (state.drops / state.tx_count * 100).toFixed(1) }),
+      lat && t("summary.roundTripP99", { mean: lat.mean_us.toLocaleString(), p99: lat.p99_us.toLocaleString() }),
     );
   }
 
   // Echo / reliability
   if (passed) {
-    return (
-      <p>
-        Sent {state.tx_count.toLocaleString()} pings in {dur}s at {fps} fps.
-        All {state.rx_count.toLocaleString()} responses received with zero drops.
-        {state.remote ? ` Remote endpoint received ${state.remote.rx_count.toLocaleString()} frames at ${state.remote.fps} fps.` : ""}
-      </p>
+    return sentences(
+      t("summary.pingsSent", { ...counted(state.tx_count), seconds, fps }),
+      t("summary.allResponses", counted(state.rx_count)),
+      state.remote && t("summary.remoteFrames", { ...counted(state.remote.rx_count), fps: state.remote.fps }),
     );
   }
 
-  return (
-    <p>
-      Sent {state.tx_count.toLocaleString()} frames in {dur}s.
-      Received {state.rx_count.toLocaleString()} responses.
-      {state.drops > 0 ? ` ${state.drops.toLocaleString()} dropped.` : ""}
-      {state.duplicates > 0 ? ` ${state.duplicates} duplicates.` : ""}
-      {state.errors.length > 0 ? ` ${state.errors.length} errors.` : ""}
-    </p>
+  return sentences(
+    t("summary.framesSent", { ...counted(state.tx_count), seconds }),
+    t("summary.responses", counted(state.rx_count)),
+    state.drops > 0 && t("summary.dropped", counted(state.drops)),
+    state.duplicates > 0 && t("summary.duplicates", { count: state.duplicates }),
+    state.errors.length > 0 && t("summary.errors", { count: state.errors.length }),
   );
 }
 

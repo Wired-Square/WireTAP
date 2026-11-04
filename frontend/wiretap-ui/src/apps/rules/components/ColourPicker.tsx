@@ -4,6 +4,7 @@
 // and hex input. Writes to the device only on committed changes.
 
 import { useState, useCallback, useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { textSecondary } from "../../../styles";
 import { brgbComponents, cssToBrgb } from "../utils/brgbColour";
 import { Input } from "../../../components/forms";
@@ -15,6 +16,7 @@ interface ColourPickerProps {
 }
 
 export default function ColourPicker({ value, onChange }: ColourPickerProps) {
+  const { t } = useTranslation("rules");
   const { brightness, r, g, b } = brgbComponents(value);
   const [hexInput, setHexInput] = useState("");
   const [localBrightness, setLocalBrightness] = useState(brightness);
@@ -91,13 +93,13 @@ export default function ColourPicker({ value, onChange }: ColourPickerProps) {
           value={rgbHex}
           onChange={handleColourInput}
           className="h-9 w-9 rounded-lg"
-          title="Pick colour"
+          title={t("colourPicker.pick")}
         />
         {/* Dimmed preview swatch */}
         <div
           className="w-9 h-9 rounded-lg border border-default shrink-0"
           style={{ backgroundColor: dimmedColour }}
-          title={`Dimmed preview (brightness ${localBrightness})`}
+          title={t("colourPicker.dimmedPreview", { brightness: localBrightness })}
         />
         {/* Hex input */}
         <Input
@@ -113,7 +115,7 @@ export default function ColourPicker({ value, onChange }: ColourPickerProps) {
 
       {/* Brightness slider */}
       <div className="flex items-center gap-2">
-        <span className={`text-2xs w-12 ${textSecondary}`}>Brightness</span>
+        <span className={`text-2xs w-12 ${textSecondary}`}>{t("colourPicker.brightness")}</span>
         <input
           type="range"
           min={0}

@@ -1,5 +1,6 @@
 // ui/src/apps/dashboard/views/panels/StatsOverlay.tsx
 
+import { useTranslation } from "react-i18next";
 import type { SignalRef } from "../../../../stores/dashboardStore";
 import type { WindowStats } from "../../../../api/dashboardHistory";
 import { textMuted } from "../../../../styles";
@@ -8,6 +9,7 @@ import { useSignalPrecisions } from "../../widgets/useSignalValues";
 
 /** min / avg / max of each signal over the samples the chart holds. */
 export default function StatsOverlay({ signals, stats }: { signals: SignalRef[]; stats: (WindowStats | null)[] }) {
+  const { t } = useTranslation("dashboard");
   const precisions = useSignalPrecisions(signals);
   return (
     <div
@@ -40,7 +42,7 @@ export default function StatsOverlay({ signals, stats }: { signals: SignalRef[];
         );
       })}
       <div className={textMuted} style={{ fontSize: 9, textAlign: "center", marginTop: 1 }}>
-        min / avg / max
+        {t("panel.statsLegend")}
       </div>
     </div>
   );

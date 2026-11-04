@@ -408,6 +408,117 @@
     "headerCanFmt": "⟦{{id}}{{ext}} | DLC {{dlc}}⟧",
     "headerSerialFmt": "⟦Framing {{mode}}⟧",
     "interfaceTypeFmt": "⟦Type {{type}}⟧",
-    "save": "⟦Save⟧"
+    "save": "⟦Save⟧",
+    "discardChanges": "⟦Discard unsaved changes?⟧"
+  },
+  "store": {
+    "notConnected": "⟦Not connected to device⟧",
+    "failed": "⟦{{action}} failed: {{error}}⟧",
+    "loadFailed": {
+      "frameDefs": "⟦Failed to load frame defs: {{error}}⟧",
+      "bridges": "⟦Failed to load bridges: {{error}}⟧",
+      "transformers": "⟦Failed to load transformers: {{error}}⟧",
+      "generators": "⟦Failed to load generators: {{error}}⟧",
+      "indicators": "⟦Failed to load indicators: {{error}}⟧",
+      "selectableSignals": "⟦Failed to load selectable signals: {{error}}⟧"
+    },
+    "connecting": "⟦Connecting to {{label}}...⟧",
+    "connected": "⟦Connected to {{label}}⟧",
+    "connectionFailed": "⟦Connection failed: {{error}}⟧",
+    "adding": {
+      "frameDef": "⟦Adding frame def {{id}}⟧",
+      "bridge": "⟦Adding bridge {{id}}⟧",
+      "transformer": "⟦Adding transformer {{id}}⟧",
+      "generator": "⟦Adding generator {{id}}⟧",
+      "userSignal": "⟦Adding user signal {{id}}⟧"
+    },
+    "removing": {
+      "frameDef": "⟦Removing frame def {{id}}⟧",
+      "bridge": "⟦Removing bridge {{id}}⟧",
+      "transformer": "⟦Removing transformer {{id}}⟧",
+      "generator": "⟦Removing generator {{id}}⟧",
+      "userSignal": "⟦Removing user signal {{id}}⟧"
+    },
+    "added": {
+      "frameDef": "⟦Frame def {{id}} added⟧",
+      "bridge": "⟦Bridge {{id}} added⟧",
+      "transformer": "⟦Transformer {{id}} added⟧",
+      "generator": "⟦Generator {{id}} added⟧",
+      "userSignal": "⟦User signal {{id}} added⟧",
+      "userSignalNamed": "⟦User signal {{id}} ({{name}}) added⟧"
+    },
+    "removed": {
+      "frameDef": "⟦Frame def {{id}} removed⟧",
+      "bridge": "⟦Bridge {{id}} removed⟧",
+      "transformer": "⟦Transformer {{id}} removed⟧",
+      "generator": "⟦Generator {{id}} removed⟧",
+      "userSignal": "⟦User signal {{id}} removed⟧"
+    },
+    "enabling": {
+      "bridge": "⟦Enabling bridge {{id}}⟧",
+      "transformer": "⟦Enabling transformer {{id}}⟧",
+      "generator": "⟦Enabling generator {{id}}⟧"
+    },
+    "disabling": {
+      "bridge": "⟦Disabling bridge {{id}}⟧",
+      "transformer": "⟦Disabling transformer {{id}}⟧",
+      "generator": "⟦Disabling generator {{id}}⟧"
+    },
+    "enabled": {
+      "bridge": "⟦Bridge {{id}} enabled⟧",
+      "transformer": "⟦Transformer {{id}} enabled⟧",
+      "generator": "⟦Generator {{id}} enabled⟧"
+    },
+    "disabled": {
+      "bridge": "⟦Bridge {{id}} disabled⟧",
+      "transformer": "⟦Transformer {{id}} disabled⟧",
+      "generator": "⟦Generator {{id}} disabled⟧"
+    },
+    "persist": {
+      "saving": "⟦Saving configuration to NVS...⟧",
+      "saveAction": "⟦Persist⟧",
+      "saved": "⟦Configuration saved to NVS⟧",
+      "loading": "⟦Loading persisted configuration...⟧",
+      "loadAction": "⟦Load⟧",
+      "loaded": "⟦Persisted configuration loaded⟧",
+      "clearing": "⟦Clearing persisted rules...⟧",
+      "clearAction": "⟦Clear⟧",
+      "cleared": "⟦Persisted rules cleared⟧"
+    },
+    "settingLabel": {
+      "frame_def": "⟦Setting the label of frame def {{id}}⟧",
+      "generator": "⟦Setting the label of generator {{id}}⟧",
+      "transformer": "⟦Setting the label of transformer {{id}}⟧"
+    }
+  },
+  "signalList": {
+    "empty": "⟦No signals defined. Click bits in the grid to add signals.⟧",
+    "unnamed": "⟦(unnamed)⟧"
+  },
+  "maskBitRow": {
+    "bit": "⟦bit⟧"
+  },
+  "colourPicker": {
+    "pick": "⟦Pick colour⟧",
+    "dimmedPreview": "⟦Dimmed preview (brightness {{brightness}})⟧",
+    "brightness": "⟦Brightness⟧"
+  },
+  "bitGrid": {
+    "byte": "⟦Byte⟧",
+    "goTo": "⟦Go to⟧",
+    "go": "⟦Go⟧"
+  },
+  "signalCombobox": {
+    "placeholder": "⟦Select signal...⟧",
+    "noMatches": "⟦No matching signals⟧",
+    "noSignals": "⟦No signals available⟧",
+    "tiers": {
+      "frame_def": "⟦Frame Definition Signals⟧",
+      "device": "⟦Device Signals⟧",
+      "user": "⟦User Signals⟧"
+    }
+  },
+  "bridgeFilterHelp": {
+    "maskLabel": "⟦Mask {{mask}}⟧"
   }
 }

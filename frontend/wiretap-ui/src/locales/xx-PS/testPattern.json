@@ -22,7 +22,8 @@
     "durationSeconds": "⟦Duration in seconds⟧",
     "busNumber": "⟦Bus number⟧",
     "fdMode": "⟦CAN FD mode⟧",
-    "extendedIds": "⟦Extended (29-bit) IDs⟧"
+    "extendedIds": "⟦Extended (29-bit) IDs⟧",
+    "extendedShort": "⟦Ext⟧"
   },
   "states": {
     "noSession": "⟦No Session Connected⟧",
@@ -50,7 +51,8 @@
       "transmitted": "⟦Transmitted⟧",
       "drops": "⟦Drops⟧",
       "latencyMean": "⟦Latency (mean)⟧",
-      "received": "⟦Received⟧"
+      "received": "⟦Received⟧",
+      "unitFrames": "⟦frames⟧"
     },
     "stats": {
       "tx": "⟦TX⟧",
@@ -69,11 +71,13 @@
     "latencyP50": "⟦p50⟧",
     "latencyP95": "⟦p95⟧",
     "latencyP99": "⟦p99⟧",
-    "sequenceGapsTitle": "⟦Sequence gaps⟧",
     "remoteEndpointTitle": "⟦Remote Endpoint⟧",
-    "errorsTitle": "⟦Errors⟧",
     "expectedGotFmt": "⟦expected {{expected}}, got {{got}}⟧",
-    "andMoreFmt": "⟦... and {{count}} more⟧"
+    "stopped": "⟦STOPPED⟧",
+    "runDetail": "⟦{{mode}} / {{role}}⟧",
+    "sequenceGapsTitle_one": "⟦Sequence gaps (first {{shown}} of {{count}} drop)⟧",
+    "sequenceGapsTitle_other": "⟦Sequence gaps (first {{shown}} of {{count}} drops)⟧",
+    "errorsTitle": "⟦Errors ({{count}})⟧"
   },
   "auto": {
     "phaseColumns": {
@@ -86,6 +90,88 @@
       "latency": "⟦Latency⟧",
       "time": "⟦Time⟧"
     },
-    "remoteFromPhase": "⟦Remote Endpoint (from {{phase}})⟧"
+    "remoteFromPhase": "⟦Remote Endpoint (from {{phase}})⟧",
+    "fullSuite": "⟦full suite⟧",
+    "sweepTitle": "⟦Sweep — payload length by code⟧"
+  },
+  "statuses": {
+    "running": "⟦running⟧",
+    "listening": "⟦listening⟧",
+    "completed": "⟦completed⟧",
+    "stopped": "⟦stopped⟧",
+    "failed": "⟦failed⟧"
+  },
+  "peer": {
+    "none": "⟦No peer answered Hello — start a responder on the other endpoint.⟧",
+    "answered": "⟦Peer answered on bus {{bus}} — CAN FD {{fd}}, extended IDs {{extended}}.⟧",
+    "yes": "⟦yes⟧",
+    "no": "⟦no⟧"
+  },
+  "sweep": {
+    "columns": {
+      "code": "⟦Code⟧",
+      "expected": "⟦Expected⟧",
+      "received": "⟦Received⟧"
+    },
+    "noEcho": "⟦NO ECHO⟧",
+    "mismatch": "⟦MISMATCH⟧",
+    "detail_one": "⟦{{run}} — {{count}} length code⟧",
+    "detail_other": "⟦{{run}} — {{count}} length codes⟧",
+    "allPassedFd": "⟦Every length code round-tripped at exactly the length it names, including the CAN FD codes 9–15 (12–64 bytes) that a silent downgrade to classic CAN cannot carry.⟧",
+    "allPassedClassic": "⟦Every length code round-tripped at exactly the length it names (0–8 bytes, classic CAN).⟧",
+    "failed_one": "⟦{{failed}} of {{count}} length code failed: {{list}}.⟧",
+    "failed_other": "⟦{{failed}} of {{count}} length codes failed: {{list}}.⟧",
+    "neverEchoed": "⟦code {{code}} ({{length}} B) never echoed⟧",
+    "wrongLength": "⟦code {{code}} expected {{expected}} B, got {{received}} B⟧"
+  },
+  "summary": {
+    "suiteCompleted": "⟦Full test suite completed in {{seconds}}s — {{outcome}}.⟧",
+    "suiteStopped": "⟦Full test suite stopped after {{seconds}}s — {{outcome}}.⟧",
+    "echoPassed": "⟦Echo: {{fps}} fps, zero drops.⟧",
+    "echoFailed": "⟦Echo: FAILED ({{drops}} drops, {{errors}} errors).⟧",
+    "sweepPassed_one": "⟦Sweep: all {{count}} length code carried its full payload.⟧",
+    "sweepPassed_other": "⟦Sweep: all {{count}} length codes carried their full payload.⟧",
+    "sweepFailed": "⟦Sweep: FAILED at {{lengths}}.⟧",
+    "latency": "⟦Latency: {{mean}} μs mean, {{p95}} μs p95.⟧",
+    "throughputWithBus": "⟦Throughput: {{fps}} fps queue rate, {{busFps}} fps bus rate.⟧",
+    "throughput": "⟦Throughput: {{fps}} fps.⟧",
+    "reliabilityPassed_one": "⟦Reliability: {{formatted}} frame over {{seconds}}s, zero drops.⟧",
+    "reliabilityPassed_other": "⟦Reliability: {{formatted}} frames over {{seconds}}s, zero drops.⟧",
+    "reliabilityFailed_one": "⟦Reliability: FAILED — {{count}} drop in {{seconds}}s.⟧",
+    "reliabilityFailed_other": "⟦Reliability: FAILED — {{count}} drops in {{seconds}}s.⟧",
+    "noTransmit": "⟦Test failed — could not transmit any frames. Check that the session supports transmit and is connected.⟧",
+    "transmittedQueueRate_one": "⟦Transmitted {{formatted}} frame in {{seconds}}s at {{fps}} fps (queue rate).⟧",
+    "transmittedQueueRate_other": "⟦Transmitted {{formatted}} frames in {{seconds}}s at {{fps}} fps (queue rate).⟧",
+    "remoteBusRate_one": "⟦The remote endpoint received {{formatted}} frame at {{fps}} fps (bus rate).⟧",
+    "remoteBusRate_other": "⟦The remote endpoint received {{formatted}} frames at {{fps}} fps (bus rate).⟧",
+    "framesLost_one": "⟦{{formatted}} frame was lost due to buffer overflow between the software queue and the bus.⟧",
+    "framesLost_other": "⟦{{formatted}} frames were lost due to buffer overflow between the software queue and the bus.⟧",
+    "transmitted_one": "⟦Transmitted {{formatted}} frame in {{seconds}}s at {{fps}} fps.⟧",
+    "transmitted_other": "⟦Transmitted {{formatted}} frames in {{seconds}}s at {{fps}} fps.⟧",
+    "probesSent_one": "⟦Sent {{formatted}} latency probe in {{seconds}}s.⟧",
+    "probesSent_other": "⟦Sent {{formatted}} latency probes in {{seconds}}s.⟧",
+    "allReplies_one": "⟦All {{formatted}} reply received with zero drops.⟧",
+    "allReplies_other": "⟦All {{formatted}} replies received with zero drops.⟧",
+    "roundTripP95": "⟦Round-trip: {{mean}} μs mean, {{p95}} μs p95.⟧",
+    "roundTripP99": "⟦Round-trip: {{mean}} μs mean, {{p99}} μs p99.⟧",
+    "remoteProbes_one": "⟦Remote received {{formatted}} probe at {{fps}} fps.⟧",
+    "remoteProbes_other": "⟦Remote received {{formatted}} probes at {{fps}} fps.⟧",
+    "probesLost_one": "⟦{{formatted}} probe was lost ({{percent}}% loss).⟧",
+    "probesLost_other": "⟦{{formatted}} probes were lost ({{percent}}% loss).⟧",
+    "pingsSent_one": "⟦Sent {{formatted}} ping in {{seconds}}s at {{fps}} fps.⟧",
+    "pingsSent_other": "⟦Sent {{formatted}} pings in {{seconds}}s at {{fps}} fps.⟧",
+    "allResponses_one": "⟦All {{formatted}} response received with zero drops.⟧",
+    "allResponses_other": "⟦All {{formatted}} responses received with zero drops.⟧",
+    "remoteFrames_one": "⟦Remote endpoint received {{formatted}} frame at {{fps}} fps.⟧",
+    "remoteFrames_other": "⟦Remote endpoint received {{formatted}} frames at {{fps}} fps.⟧",
+    "framesSent_one": "⟦Sent {{formatted}} frame in {{seconds}}s.⟧",
+    "framesSent_other": "⟦Sent {{formatted}} frames in {{seconds}}s.⟧",
+    "responses_one": "⟦Received {{formatted}} response.⟧",
+    "responses_other": "⟦Received {{formatted}} responses.⟧",
+    "dropped": "⟦{{formatted}} dropped.⟧",
+    "duplicates_one": "⟦{{count}} duplicate.⟧",
+    "duplicates_other": "⟦{{count}} duplicates.⟧",
+    "errors_one": "⟦{{count}} error.⟧",
+    "errors_other": "⟦{{count}} errors.⟧"
   }
 }

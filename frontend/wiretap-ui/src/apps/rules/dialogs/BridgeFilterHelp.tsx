@@ -128,7 +128,7 @@ export default function BridgeFilterHelp({ kind, ide, onApplyMask }: BridgeFilte
             showHeader
           />
           <MaskBitRow
-            label={`Mask ${formatHexId(maskValue, hexBytes)}`}
+            label={t("bridgeFilterHelp.maskLabel", { mask: formatHexId(maskValue, hexBytes) })}
             value={maskValue}
             bitWidth={bitWidth}
           />

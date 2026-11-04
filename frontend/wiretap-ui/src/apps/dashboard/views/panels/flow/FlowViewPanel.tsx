@@ -1,6 +1,7 @@
 // ui/src/apps/dashboard/views/panels/flow/FlowViewPanel.tsx
 
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import type uPlot from "uplot";
 import "uplot/dist/uPlot.min.css";
 import { flowSignals, type DashboardPanel, type SignalRef } from "../../../../../stores/dashboardStore";
@@ -18,6 +19,7 @@ function buildOptions(
   signals: SignalRef[],
   width: number,
   height: number,
+  byteValueLabel: string,
   onUserInteraction?: () => void,
 ): uPlot.Options {
   const textColour = getCssVar("--text-primary") || "#e2e8f0";
@@ -69,7 +71,7 @@ function buildOptions(
         grid: { stroke: gridColour, width: 1 },
         ticks: { stroke: gridColour, width: 1 },
         size: isCompactW ? 40 : 60,
-        label: "Byte Value",
+        label: byteValueLabel,
       },
     ],
     legend: {
@@ -79,19 +81,21 @@ function buildOptions(
 }
 
 export default function FlowViewPanel({ panel, canvasRef }: Props) {
+  const { t } = useTranslation("dashboard");
+  const byteValueLabel = t("panel.byteValueAxis");
   const signals = useMemo(() => flowSignals(panel), [panel.targetFrameId, panel.byteCount]);
   const { containerRef, stats } = useUPlotPanel({
     panel,
     signals,
     canvasRef,
-    buildOptions: (width, height, onUserInteraction) => buildOptions(signals, width, height, onUserInteraction),
-    optionsKey: signals.map((s) => `${s.frameId}:${s.signalName}`).join("|"),
+    buildOptions: (width, height, onUserInteraction) => buildOptions(signals, width, height, byteValueLabel, onUserInteraction),
+    optionsKey: `${byteValueLabel}|${signals.map((s) => `${s.frameId}:${s.signalName}`).join("|")}`,
   });
 
   if (panel.targetFrameId == null) {
     return (
       <div className="flex items-center justify-center h-full">
-        <p className={emptyStateText}>Select a frame ID in Configure Panel</p>
+        <p className={emptyStateText}>{t("panel.selectFrameId")}</p>
       </div>
     );
   }

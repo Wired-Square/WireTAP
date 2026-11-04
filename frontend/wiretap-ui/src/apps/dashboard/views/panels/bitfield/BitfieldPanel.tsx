@@ -1,6 +1,7 @@
 // ui/src/apps/dashboard/views/panels/bitfield/BitfieldPanel.tsx
 
 import { useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { useDashboardStore, signalKey, type DashboardPanel } from "../../../../../stores/dashboardStore";
 import { useSvgExportRef } from "../../../widgets/useExportRef";
 import WidgetEmpty from "../../../widgets/WidgetEmpty";
@@ -18,6 +19,7 @@ const LABEL_W = 26;
 const LABEL_H = 14;
 
 export default function BitfieldPanel({ panel, svgRef: svgRefProp }: Props) {
+  const { t } = useTranslation("dashboard");
   const svgElRef = useRef<SVGSVGElement>(null);
   useSvgExportRef(svgElRef, svgRefProp);
 
@@ -28,7 +30,7 @@ export default function BitfieldPanel({ panel, svgRef: svgRefProp }: Props) {
   const byteCount = Math.max(1, Math.min(8, panel.byteCount ?? 8));
 
   if (frameId == null) {
-    return <WidgetEmpty>Configure a target frame ID</WidgetEmpty>;
+    return <WidgetEmpty>{t("panel.configureTargetFrame")}</WidgetEmpty>;
   }
 
   const onColour = cfg?.onColour ?? "#22c55e";

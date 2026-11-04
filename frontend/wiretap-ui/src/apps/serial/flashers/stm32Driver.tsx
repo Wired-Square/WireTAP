@@ -5,6 +5,8 @@
 // BOOT0/NRST on RTS/DTR. Hardware that doesn't wire those lines can set
 // both pins to "none" and put the chip in bootloader mode by hand.
 
+import i18n from "i18next";
+import { useTranslation } from "react-i18next";
 import {
   flasherStm32Cancel,
   flasherStm32Erase,
@@ -25,43 +27,38 @@ import { Field, Select } from "./formHelpers";
 import type { DriverOptionsPanelProps, FlasherDriver } from "./types";
 import { Checkbox } from "../../../components/forms";
 
-const PIN_OPTIONS: { value: Stm32PinSelection; label: string }[] = [
-  { value: "dtr", label: "DTR" },
-  { value: "rts", label: "RTS" },
-  { value: "none", label: "None" },
-];
+const PIN_OPTIONS: readonly Stm32PinSelection[] = ["dtr", "rts", "none"];
 
 const BAUD_OPTIONS = [9600, 19200, 38400, 57600, 115200];
 
 function Stm32OptionsPanel(_props: DriverOptionsPanelProps<Stm32ChipInfo>) {
   const options = useFlasherStore((s) => s.stm32Options);
   const setOptions = useFlasherStore((s) => s.setStm32Options);
+  const { t } = useTranslation("serial");
+  const pinOptions = PIN_OPTIONS.map((value) => ({
+    value,
+    label: value === "none" ? t("flash.stm32.pinNone") : value.toUpperCase(),
+  }));
 
   return (
     <div
       className={`p-3 ${bgSurface} ${borderDivider} border-b grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3`}
     >
-      <Field label="BOOT0 pin">
+      <Field label={t("flash.stm32.boot0Pin")}>
         <Select
           value={options.boot0_pin ?? "dtr"}
           onChange={(v) => setOptions({ boot0_pin: v as Stm32PinSelection })}
-          options={PIN_OPTIONS.map((o) => ({
-            value: o.value,
-            label: o.label,
-          }))}
+          options={pinOptions}
         />
       </Field>
-      <Field label="RESET pin">
+      <Field label={t("flash.stm32.resetPin")}>
         <Select
           value={options.reset_pin ?? "rts"}
           onChange={(v) => setOptions({ reset_pin: v as Stm32PinSelection })}
-          options={PIN_OPTIONS.map((o) => ({
-            value: o.value,
-            label: o.label,
-          }))}
+          options={pinOptions}
         />
       </Field>
-      <Field label="Invert BOOT0">
+      <Field label={t("flash.stm32.invertBoot0")}>
         <label
           className={`flex items-center gap-1 text-xs ${textSecondary} px-1 py-1 cursor-pointer`}
         >
@@ -69,10 +66,10 @@ function Stm32OptionsPanel(_props: DriverOptionsPanelProps<Stm32ChipInfo>) {
             checked={options.boot0_invert ?? false}
             onChange={(e) => setOptions({ boot0_invert: e.target.checked })}
           />
-          Active low
+          {t("flash.stm32.activeLow")}
         </label>
       </Field>
-      <Field label="Invert RESET">
+      <Field label={t("flash.stm32.invertReset")}>
         <label
           className={`flex items-center gap-1 text-xs ${textSecondary} px-1 py-1 cursor-pointer`}
         >
@@ -80,10 +77,10 @@ function Stm32OptionsPanel(_props: DriverOptionsPanelProps<Stm32ChipInfo>) {
             checked={options.reset_invert ?? true}
             onChange={(e) => setOptions({ reset_invert: e.target.checked })}
           />
-          Active low
+          {t("flash.stm32.activeLow")}
         </label>
       </Field>
-      <Field label="Baud">
+      <Field label={t("common:serialPortPicker.fields.baud")}>
         <Select
           value={String(options.baud ?? 115_200)}
           onChange={(v) => setOptions({ baud: Number(v) })}
@@ -142,7 +139,7 @@ export const stm32Driver: FlasherDriver<Stm32ChipInfo> = {
       `PID 0x${chip.pid.toString(16).toUpperCase().padStart(4, "0")}`,
     );
     parts.push(`BL v${chip.bootloader_version}`);
-    if (chip.flash_size_kb) parts.push(`${chip.flash_size_kb} KB flash`);
+    if (chip.flash_size_kb) parts.push(i18n.t("serial:flash.flashSizeKb", { size: chip.flash_size_kb }));
     const subline = chip.rdp_level ? `RDP ${chip.rdp_level}` : undefined;
     return { label: parts.join(" · "), subline };
   },

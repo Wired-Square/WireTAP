@@ -99,21 +99,21 @@ export default function HistogramPanel({ panel, canvasRef }: Props) {
           stroke: textColour,
           grid: { stroke: gridColour, width: 1 },
           ticks: { stroke: gridColour, width: 1 },
-          label: "Value",
+          label: t("panel.histogramValueAxis"),
         },
         {
           stroke: textColour,
           grid: { stroke: gridColour, width: 1 },
           ticks: { stroke: gridColour, width: 1 },
           size: 50,
-          label: "Count",
+          label: t("panel.histogramCountAxis"),
         },
       ],
       legend: {
         show: panel.signals.length > 1,
       },
     };
-  }, [panel.signals, sigKey]);
+  }, [panel.signals, sigKey, t]);
 
   // Re-create chart when signal config changes
   useEffect(() => {

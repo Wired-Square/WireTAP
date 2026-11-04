@@ -1,6 +1,7 @@
 // ui/src/apps/dashboard/views/panels/heatmap/HeatmapPanel.tsx
 
 import { useRef, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { useDashboardStore, type DashboardPanel } from "../../../../../stores/dashboardStore";
 import { emptyStateContainer, emptyStateText } from "../../../../../styles/typography";
 
@@ -28,6 +29,7 @@ const LABEL_H = 16;
 const SVG_W = LABEL_W + GRID_COLS * (CELL_SIZE + GAP);
 
 export default function HeatmapPanel({ panel, svgRef: svgRefProp }: Props) {
+  const { t } = useTranslation("dashboard");
   const svgElRef = useRef<SVGSVGElement>(null);
   const dataVersion = useDashboardStore((s) => s.dataVersion);
   const bitChangeCounts = useDashboardStore((s) => s.bitChangeCounts);
@@ -43,7 +45,7 @@ export default function HeatmapPanel({ panel, svgRef: svgRefProp }: Props) {
   if (panel.targetFrameId == null) {
     return (
       <div className={emptyStateContainer}>
-        <p className={emptyStateText}>Select a frame ID in Configure Panel</p>
+        <p className={emptyStateText}>{t("panel.selectFrameId")}</p>
       </div>
     );
   }
@@ -120,8 +122,8 @@ export default function HeatmapPanel({ panel, svgRef: svgRefProp }: Props) {
                   opacity={count === 0 ? 0.4 : 0.6 + 0.4 * Math.min(1, count / Math.max(1, maxCount))}
                 >
                   <title>
-                    Byte {byteIdx}, Bit {bitPos} | {count.toLocaleString()} changes ({rate}%)
-                    {totalFrames > 0 ? ` | ${totalFrames.toLocaleString()} frames` : ""}
+                    {t("panel.heatmapCell", { byte: byteIdx, bit: bitPos, count, formatted: count.toLocaleString(), rate })}
+                    {totalFrames > 0 ? ` | ${t("panel.heatmapFrames", { count: totalFrames, formatted: totalFrames.toLocaleString() })}` : ""}
                   </title>
                 </rect>
               );

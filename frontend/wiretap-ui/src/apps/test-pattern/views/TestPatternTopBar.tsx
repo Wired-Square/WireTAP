@@ -239,7 +239,7 @@ export default function TestPatternTopBar({
                 title={t("topBar.fdMode")}
               />
               <ToggleBadge
-                label="Ext"
+                label={t("topBar.extendedShort")}
                 on={useExtended}
                 colour="warning"
                 onToggle={() => onExtendedChange(!useExtended)}
