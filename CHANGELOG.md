@@ -11,6 +11,8 @@ All notable changes to WireTAP will be documented in this file.
 - **Query's Frame menu labels a frame by its name.** A frame with a `name` used to be labelled by its transmitter; the transmitter now shows only for a frame without a name.
 - **The Calculator shows what you type.** Its input used to show everything in capitals, so `0x12345678` read `0X12345678` and text in String mode looked upper-cased.
 - **Dashboard readouts show a value as the Decoder does.** The List, level bar, gauge, rotary, custom SVG text and hover tooltip used to pad a signal without `precision` to three decimals and show an enum signal as a number; they now show the decoded text, so 90 reads 90 and a gear reads Drive. Statistics and chart values still use the Dashboard's own rounding.
+- **Empty Dashboard panels say how to add a signal.** They used to say "Click +", but panels no longer have a + button; they now point to ⋮ → Configure → Add Signals. An icon-state panel with no states says they come from an enum signal added with "Add catalog signals as instruments".
+- **Hex input takes a 0x on every byte.** The Calculator, Transmit and the other hex fields read `0x12 0x34` as the bytes 12 34; they used to strip only the first 0x and read it as 12 03 4.
 
 ## [0.16.0] - 2026-11-03
 
