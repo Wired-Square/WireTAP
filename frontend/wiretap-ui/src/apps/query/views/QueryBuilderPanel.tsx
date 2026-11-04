@@ -89,6 +89,13 @@ export default function QueryBuilderPanel({
     (id: number, isExtended?: boolean | null) => formatFrameId(id, displayIdFormat, isExtended ?? undefined),
     [displayIdFormat]
   );
+  const frameLabel = useCallback(
+    (id: number, frame: Frame) => {
+      const tag = frame.name ?? frame.transmitter;
+      return `${fmtId(id, frame.isExtended)}${tag ? ` — ${tag}` : ""}`;
+    },
+    [fmtId]
+  );
 
   const catalogFrameMap = useMemo(() => (catalog ? framesById(catalog) : new Map<number, Frame>()), [catalog]);
   const catalogFrames = useMemo(
@@ -395,8 +402,7 @@ export default function QueryBuilderPanel({
         >
           {catalogFrames.map(({ id, frame }) => (
             <option key={id} value={id}>
-              {fmtId(id, frame.isExtended)}
-              {frame.transmitter ? ` — ${frame.transmitter}` : ""}
+              {frameLabel(id, frame)}
             </option>
           ))}
         </Select>
@@ -585,14 +591,10 @@ export default function QueryBuilderPanel({
                   <option value={0}>{t("builder.selectMirror")}</option>
                   {mirrorFrames.map(({ id, frame }) => {
                     const source = mirrorSource(frame);
-                    const sourceInfo = source
-                      ? ` → ${fmtId(source.frameId, source.isExtended)}${source.transmitter ? ` — ${source.transmitter}` : ""}`
-                      : "";
                     return (
                       <option key={id} value={id}>
-                        {fmtId(id, frame.isExtended)}
-                        {frame.transmitter ? ` — ${frame.transmitter}` : ""}
-                        {sourceInfo}
+                        {frameLabel(id, frame)}
+                        {source ? ` → ${frameLabel(source.frameId, source)}` : ""}
                       </option>
                     );
                   })}
