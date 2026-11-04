@@ -10,6 +10,12 @@ export function useSignalValues(signals: SignalRef[]): number[] {
   return signals.map((s) => latest.get(signalKey(s.frameId, s.signalName)) ?? NaN);
 }
 
+/** Each enum signal's latest label, aligned to `signals` order. */
+export function useSignalLabels(signals: SignalRef[]): (string | undefined)[] {
+  const labels = useDashboardStore((s) => s.latestLabels);
+  return signals.map((s) => labels.get(signalKey(s.frameId, s.signalName)));
+}
+
 /** Each signal's catalogue `precision`, aligned to `signals` order. */
 export function useSignalPrecisions(signals: SignalRef[]): (number | undefined)[] {
   const precisions = useDashboardStore((s) => s.signalPrecisions);

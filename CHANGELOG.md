@@ -2,6 +2,12 @@
 
 All notable changes to WireTAP will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+
+- **A Dashboard List shows an enum signal by its label.** A signal with enum labels used to show its raw value with decimals, such as "3.000"; it now shows the label the Decoder shows.
+
 ## [0.16.0] - 2026-11-03
 
 ### Added

@@ -28,4 +28,13 @@ describe("the list panel", () => {
     const values = [...host.querySelectorAll(".tabular-nums")].map((v) => v.textContent);
     expect(values).toEqual(["0.000", "—"]);
   });
+
+  it("shows an enum signal by its label", async () => {
+    useDashboardStore.getState().setLatest(new Map([["256:Gear", 3]]), new Map([["256:Gear", "Drive"]]));
+    const panel = { id: "l", type: "list", title: "", signals: [signal("Gear")], minValue: 0, maxValue: 0 } as DashboardPanel;
+    const host = document.createElement("div");
+    root = createRoot(host);
+    await act(async () => root.render(<ListPanel panel={panel} />));
+    expect(host.querySelector(".tabular-nums")?.textContent).toBe("Drive");
+  });
 });

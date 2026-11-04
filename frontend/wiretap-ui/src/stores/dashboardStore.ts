@@ -199,6 +199,8 @@ interface DashboardState {
   // ── Signal data (the history is Rust's) ──
   /** The last value each signal key arrived with, for the instruments. */
   latest: Map<string, number>;
+  /** The label Rust decoded for each enum signal's latest value. */
+  latestLabels: Map<string, string>;
   /** Bumped per delivery: charts re-read the history when it changes. */
   dataVersion: number;
 
@@ -260,7 +262,7 @@ interface DashboardState {
   restoreLastSession: () => Promise<void>;
 
   // Data ingestion
-  setLatest: (values: Map<string, number>) => void;
+  setLatest: (values: Map<string, number>, labels?: Map<string, string>) => void;
   clearData: () => void;
 
   // Raw byte tracking (flow view / heatmap)
@@ -289,6 +291,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   savedLayouts: [],
 
   latest: new Map(),
+  latestLabels: new Map(),
   dataVersion: 0,
   zoomResetVersion: 0,
   discoveredFrameIds: new Set(),
@@ -669,6 +672,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       panels: structuredClone(savedLayout.panels),
       layout: structuredClone(savedLayout.layout),
       latest: new Map(),
+      latestLabels: new Map(),
       dataVersion: 0,
       discoveredFrameIds: new Set(),
       bitChangeCounts: new Map(),
@@ -718,16 +722,19 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
 
   // ── Data ingestion ──
 
-  setLatest: (values) => {
+  setLatest: (values, labels = new Map()) => {
     if (values.size === 0) return;
     const latest = new Map(get().latest);
     for (const [key, value] of values) latest.set(key, value);
-    set((state) => ({ latest, dataVersion: state.dataVersion + 1 }));
+    const latestLabels = new Map(get().latestLabels);
+    for (const [key, label] of labels) latestLabels.set(key, label);
+    set((state) => ({ latest, latestLabels, dataVersion: state.dataVersion + 1 }));
   },
 
   clearData: () => {
     set({
       latest: new Map(),
+      latestLabels: new Map(),
       dataVersion: 0,
       discoveredFrameIds: new Set(),
       bitChangeCounts: new Map(),
