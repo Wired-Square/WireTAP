@@ -3,9 +3,8 @@
 import { useRef } from "react";
 import { type DashboardPanel } from "../../../../../stores/dashboardStore";
 import { useSettings } from "../../../../../hooks/useSettings";
-import { formatValue } from "../../../utils/dashboardFormat";
 import { fraction, thresholdColour } from "../../../widgets/svgArc";
-import { useSignalPrecisions, useSignalValues } from "../../../widgets/useSignalValues";
+import { useSignalReadouts, useSignalValues } from "../../../widgets/useSignalValues";
 import { useSvgExportRef } from "../../../widgets/useExportRef";
 import WidgetEmpty from "../../../widgets/WidgetEmpty";
 import PanelTooltip from "../PanelTooltip";
@@ -21,7 +20,7 @@ export default function LevelBarPanel({ panel, svgRef: svgRefProp }: Props) {
   useSvgExportRef(svgElRef, svgRefProp);
 
   const values = useSignalValues(panel.signals);
-  const precisions = useSignalPrecisions(panel.signals);
+  const readouts = useSignalReadouts(panel.signals);
   const cfg = panel.widgetConfig?.levelBar;
   const vertical = cfg?.orientation === "vertical";
 
@@ -42,7 +41,6 @@ export default function LevelBarPanel({ panel, svgRef: svgRefProp }: Props) {
   return (
     <PanelTooltip
       signals={[sig]}
-      values={[value]}
       settings={settings}
       showColourDot
       className="flex flex-col items-center justify-center h-full p-2 gap-1"
@@ -60,7 +58,7 @@ export default function LevelBarPanel({ panel, svgRef: svgRefProp }: Props) {
           </>
         )}
         <text x={50} y={vertical ? 99 : 30} textAnchor="middle" fill="var(--text-primary)" fontSize="14" fontWeight="600" fontFamily="ui-monospace, monospace">
-          {formatValue(value, precisions[idx])}
+          {readouts[idx]}
           {sig.unit ? ` ${sig.unit}` : ""}
         </text>
       </svg>

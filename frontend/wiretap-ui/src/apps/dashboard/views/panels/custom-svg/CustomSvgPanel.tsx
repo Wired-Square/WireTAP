@@ -9,7 +9,7 @@
 import { useEffect, useRef, useState } from "react";
 import DOMPurify from "dompurify";
 import { useDashboardStore, type DashboardPanel } from "../../../../../stores/dashboardStore";
-import { customWidgetKeys, makeSignalSampler } from "../../../widgets/useSignalValues";
+import { customWidgetKeys, makeSignalSampler, useReadoutOf } from "../../../widgets/useSignalValues";
 import WidgetEmpty from "../../../widgets/WidgetEmpty";
 import WidgetError from "../../../widgets/WidgetError";
 import { renderScene } from "../../../widgets/renderScene";
@@ -46,7 +46,7 @@ export default function CustomSvgPanel({ panel, svgRef }: Props) {
 
   // Scene mode reads reactively from the store.
   const latest = useDashboardStore((s) => s.latest);
-  const signalPrecisions = useDashboardStore((s) => s.signalPrecisions);
+  const readoutOf = useReadoutOf();
 
   const [markup, setMarkup] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -82,7 +82,7 @@ export default function CustomSvgPanel({ panel, svgRef }: Props) {
     <div className="relative h-full w-full">
       {mode === "scene" ? (
         <svg ref={svgElRef} viewBox={viewBox} className="h-full w-full" preserveAspectRatio="xMidYMid meet">
-          {renderScene(cfg!.scene!, valueOf, signalPrecisions)}
+          {renderScene(cfg!.scene!, valueOf, readoutOf)}
         </svg>
       ) : (
         <div ref={containerRef} className="custom-svg-host h-full w-full" dangerouslySetInnerHTML={{ __html: markup }} />

@@ -140,13 +140,16 @@ function DashboardInner() {
   // only each signal's newest value, for the instruments, and the cue to re-read.
   const autoImportRef = useRef(false);
   const pendingLatestRef = useRef(new Map<string, number>());
+  const pendingDisplaysRef = useRef(new Map<string, string>());
   const flushScheduledRef = useRef(false);
 
   const flushPendingValues = useCallback(() => {
     flushScheduledRef.current = false;
     const values = pendingLatestRef.current;
+    const displays = pendingDisplaysRef.current;
     pendingLatestRef.current = new Map();
-    useDashboardStore.getState().setLatest(values);
+    pendingDisplaysRef.current = new Map();
+    useDashboardStore.getState().setLatest(values, displays);
   }, []);
 
   const scheduleFlush = useCallback(() => {
@@ -172,7 +175,9 @@ function DashboardInner() {
       if ("kind" in msg) continue;
       store.recordFrameId(msg.maskedFrameId);
       for (const s of msg.signals) {
-        if (s.scaled !== null) pendingLatestRef.current.set(signalKey(msg.maskedFrameId, s.name), s.scaled);
+        const key = signalKey(msg.maskedFrameId, s.name);
+        if (s.scaled !== null) pendingLatestRef.current.set(key, s.scaled);
+        pendingDisplaysRef.current.set(key, s.display);
       }
     }
     scheduleFlush();

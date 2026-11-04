@@ -7,13 +7,13 @@
 import { createElement, type ReactNode } from "react";
 import { describeArc, fraction, polarToCartesian, thresholdColour } from "./svgArc";
 import type { SceneNode } from "./configTypes";
-import { formatValue } from "../utils/dashboardFormat";
 
 type ValueOf = (signalKey: string) => number;
+type ReadoutOf = (signalKey: string) => string;
 
 const ease = { transition: "all 0.15s ease-out" } as const;
 
-function renderNode(n: SceneNode, key: number, valueOf: ValueOf, precisions: Map<string, number>): ReactNode {
+function renderNode(n: SceneNode, key: number, valueOf: ValueOf, readoutOf: ReadoutOf): ReactNode {
   switch (n.kind) {
     case "arc": {
       const v = valueOf(n.bind.signalKey);
@@ -58,7 +58,7 @@ function renderNode(n: SceneNode, key: number, valueOf: ValueOf, precisions: Map
     }
     case "text": {
       const v = n.bind ? valueOf(n.bind.signalKey) : NaN;
-      const shown = n.bind && Number.isFinite(v) ? formatValue(v, precisions.get(n.bind.signalKey)) : "";
+      const shown = n.bind && Number.isFinite(v) ? readoutOf(n.bind.signalKey) : "";
       const label = n.template
         ? n.template.replace(/\{v(?:alue)?\}/g, shown)
         : `${shown}${n.unit ? ` ${n.unit}` : ""}`;
@@ -67,6 +67,6 @@ function renderNode(n: SceneNode, key: number, valueOf: ValueOf, precisions: Map
   }
 }
 
-export function renderScene(nodes: SceneNode[], valueOf: ValueOf, precisions: Map<string, number>): ReactNode[] {
-  return nodes.map((n, i) => renderNode(n, i, valueOf, precisions));
+export function renderScene(nodes: SceneNode[], valueOf: ValueOf, readoutOf: ReadoutOf): ReactNode[] {
+  return nodes.map((n, i) => renderNode(n, i, valueOf, readoutOf));
 }

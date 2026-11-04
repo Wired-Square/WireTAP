@@ -54,7 +54,6 @@ export default function IconStatePanel({ panel, svgRef: svgRefProp }: Props) {
   return (
     <PanelTooltip
       signals={[sig]}
-      values={[value]}
       settings={settings}
       showColourDot
       className="flex flex-col items-center justify-center h-full p-3 gap-1"
