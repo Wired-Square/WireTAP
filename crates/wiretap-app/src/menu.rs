@@ -1,5 +1,6 @@
 // Copyright 2026 Wired Square Pty Ltd
 
+use std::collections::HashMap;
 use std::sync::Mutex;
 
 #[cfg(not(target_os = "ios"))]
@@ -62,12 +63,161 @@ pub struct EventInfo {
     label: String,
 }
 
+/// The menu bar's words in the user's language, supplied by the frontend.
+#[derive(serde::Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase")]
+pub struct NativeMenuLabels {
+    apps_menu: String,
+    edit_menu: String,
+    session_menu: String,
+    events_menu: String,
+    jump_to_event_menu: String,
+    view_menu: String,
+    help_menu: String,
+    about: String,
+    settings: String,
+    new_window: String,
+    find: String,
+    no_source: String,
+    /// The source line, with `{{name}}` where the profile name goes.
+    source: String,
+    session_picker: String,
+    session_import_file: String,
+    session_play: String,
+    session_pause: String,
+    session_stop: String,
+    session_detach: String,
+    session_stop_all: String,
+    session_clear: String,
+    event_add: String,
+    event_show: String,
+    help_issues: String,
+    help_wiki: String,
+    help_source: String,
+    /// Apps menu labels by panel id; an app left out keeps its label.
+    apps: HashMap<String, String>,
+}
+
+#[cfg(not(target_os = "ios"))]
+const NAME_SLOT: &str = "{{name}}";
+
+#[cfg(not(target_os = "ios"))]
+impl NativeMenuLabels {
+    /// What the menu says before the frontend has loaded.
+    fn english() -> Self {
+        let s = str::to_owned;
+        Self {
+            apps_menu: s("Apps"),
+            edit_menu: s("Edit"),
+            session_menu: s("Session"),
+            events_menu: s("Events"),
+            jump_to_event_menu: s("Jump to Event"),
+            view_menu: s("View"),
+            help_menu: s("Help"),
+            about: s("About WireTAP"),
+            settings: s("Settings\u{2026}"),
+            new_window: s("New Window"),
+            find: s("Find\u{2026}"),
+            no_source: s("No source selected"),
+            source: s("Source: {{name}}"),
+            session_picker: s("Select Source\u{2026}"),
+            session_import_file: s("Import from File\u{2026}"),
+            session_play: s("Play"),
+            session_pause: s("Pause"),
+            session_stop: s("Stop"),
+            session_detach: s("Detach Session"),
+            session_stop_all: s("Stop Session"),
+            session_clear: s("Clear Frames"),
+            event_add: s("Add Event\u{2026}"),
+            event_show: s("Show Events"),
+            help_issues: s("Report an Issue\u{2026}"),
+            help_wiki: s("Documentation\u{2026}"),
+            help_source: s("Source Code\u{2026}"),
+            apps: HashMap::new(),
+        }
+    }
+
+    fn item(&self, id: ItemId) -> &str {
+        match id {
+            ItemId::About => &self.about,
+            ItemId::Settings => &self.settings,
+            ItemId::NewWindow => &self.new_window,
+            ItemId::Find => &self.find,
+            ItemId::SessionSource => &self.no_source,
+            ItemId::SessionPicker => &self.session_picker,
+            ItemId::SessionImportFile => &self.session_import_file,
+            ItemId::SessionPlay => &self.session_play,
+            ItemId::SessionPause => &self.session_pause,
+            ItemId::SessionStop => &self.session_stop,
+            ItemId::SessionDetach => &self.session_detach,
+            ItemId::SessionStopAll => &self.session_stop_all,
+            ItemId::SessionClear => &self.session_clear,
+            ItemId::EventAdd => &self.event_add,
+            ItemId::EventShow => &self.event_show,
+            ItemId::HelpIssues => &self.help_issues,
+            ItemId::HelpWiki => &self.help_wiki,
+            ItemId::HelpSource => &self.help_source,
+        }
+    }
+
+    fn title(&self, id: SubmenuId) -> &str {
+        match id {
+            SubmenuId::Apps => &self.apps_menu,
+            SubmenuId::Edit => &self.edit_menu,
+            SubmenuId::Session => &self.session_menu,
+            SubmenuId::Events => &self.events_menu,
+            SubmenuId::JumpToEvent => &self.jump_to_event_menu,
+            SubmenuId::View => &self.view_menu,
+            SubmenuId::Help => &self.help_menu,
+        }
+    }
+
+    fn source_line(&self, profile_name: Option<&str>) -> String {
+        match profile_name {
+            Some(name) => self.source.replace(NAME_SLOT, name),
+            None => self.no_source.clone(),
+        }
+    }
+
+    /// The text for the menu entry `id`, or `None` for one these labels don't cover.
+    fn text_for(&self, id: &str, profile_name: Option<&str>) -> Option<String> {
+        if let Some(item) = ItemId::parse(id) {
+            return Some(match item {
+                ItemId::SessionSource => self.source_line(profile_name),
+                _ => self.item(item).to_owned(),
+            });
+        }
+        if let Some(submenu) = SubmenuId::parse(id) {
+            return Some(self.title(submenu).to_owned());
+        }
+        id.strip_prefix(APP_PREFIX).and_then(|app| self.apps.get(app)).cloned()
+    }
+}
+
+#[cfg(not(target_os = "ios"))]
+pub(crate) struct MenuLabelState(Mutex<MenuLabels>);
+
+#[cfg(not(target_os = "ios"))]
+struct MenuLabels {
+    labels: NativeMenuLabels,
+    profile_name: Option<String>,
+}
+
+#[cfg(target_os = "ios")]
+#[allow(dead_code)]
+pub(crate) struct MenuLabelState(Mutex<()>);
+
 #[cfg(not(target_os = "ios"))]
 pub(crate) fn manage_state(builder: tauri::Builder<Wry>) -> tauri::Builder<Wry> {
     builder
         .manage(SessionMenuState(Mutex::new(None)))
         .manage(EventsMenuState(Mutex::new(None)))
         .manage(EventMenuItemState(Mutex::new(None)))
+        .manage(MenuLabelState(Mutex::new(MenuLabels {
+            labels: NativeMenuLabels::english(),
+            profile_name: None,
+        })))
 }
 
 #[cfg(target_os = "ios")]
@@ -76,31 +226,32 @@ pub(crate) fn manage_state(builder: tauri::Builder<tauri::Wry>) -> tauri::Builde
         .manage(SessionMenuState(Mutex::new(())))
         .manage(EventsMenuState(Mutex::new(())))
         .manage(EventMenuItemState(Mutex::new(())))
+        .manage(MenuLabelState(Mutex::new(())))
 }
 
 #[cfg(not(target_os = "ios"))]
 macro_rules! menu_ids {
-    ($($variant:ident = $id:literal),* $(,)?) => {
+    ($name:ident { $($variant:ident = $id:literal),* $(,)? }) => {
         #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-        enum ItemId { $($variant),* }
+        enum $name { $($variant),* }
 
-        impl ItemId {
+        impl $name {
             #[cfg(test)]
-            const ALL: &'static [ItemId] = &[$(ItemId::$variant),*];
+            const ALL: &'static [$name] = &[$($name::$variant),*];
 
             fn as_str(self) -> &'static str {
-                match self { $(ItemId::$variant => $id),* }
+                match self { $($name::$variant => $id),* }
             }
 
             fn parse(id: &str) -> Option<Self> {
-                match id { $($id => Some(ItemId::$variant),)* _ => None }
+                match id { $($id => Some($name::$variant),)* _ => None }
             }
         }
     };
 }
 
 #[cfg(not(target_os = "ios"))]
-menu_ids! {
+menu_ids! { ItemId {
     About = "about",
     Settings = "settings",
     NewWindow = "new-window",
@@ -119,7 +270,18 @@ menu_ids! {
     HelpIssues = "help-issues",
     HelpWiki = "help-wiki",
     HelpSource = "help-source",
-}
+}}
+
+#[cfg(not(target_os = "ios"))]
+menu_ids! { SubmenuId {
+    Apps = "submenu-apps",
+    Edit = "submenu-edit",
+    Session = "submenu-session",
+    Events = "submenu-events",
+    JumpToEvent = "submenu-jump-to-event",
+    View = "submenu-view",
+    Help = "submenu-help",
+}}
 
 /// Apps menu items are `app-<panel id>`, one per entry in apps.json.
 #[cfg(not(target_os = "ios"))]
@@ -141,8 +303,8 @@ enum MenuAction<'a> {
 
 #[cfg(not(target_os = "ios"))]
 impl ItemId {
-    fn item(self, label: &str) -> MenuItemBuilder {
-        MenuItemBuilder::with_id(self.as_str(), label)
+    fn item(self, labels: &NativeMenuLabels) -> MenuItemBuilder {
+        MenuItemBuilder::with_id(self.as_str(), labels.item(self))
     }
 
     /// Undo, redo, cut, copy, paste and select-all are predefined items the OS
@@ -213,6 +375,7 @@ pub fn update_menu_state(
     state: State<SessionMenuState>,
     event_item_state: State<EventMenuItemState>,
     events_menu_state: State<EventsMenuState>,
+    label_state: State<MenuLabelState>,
     has_session: bool,
     profile_name: Option<String>,
     is_streaming: bool,
@@ -221,13 +384,14 @@ pub fn update_menu_state(
     joiner_count: u32,
     has_events: bool,
 ) {
+    let source_line = {
+        let mut current = label_state.0.lock().unwrap();
+        current.profile_name = profile_name.filter(|_| has_session);
+        current.labels.source_line(current.profile_name.as_deref())
+    };
     if let Some(items) = state.0.lock().unwrap().as_ref() {
+        let _ = items.source.set_text(&source_line);
         if has_session {
-            let text = profile_name
-                .as_ref()
-                .map(|n| format!("Source: {}", n))
-                .unwrap_or_else(|| "No source selected".to_string());
-            let _ = items.source.set_text(&text);
             let _ = items.play.set_enabled(!is_streaming || is_paused);
             let _ = items.pause.set_enabled(is_streaming && !is_paused && can_pause);
             let _ = items.stop.set_enabled(is_streaming && !is_paused && can_pause);
@@ -236,7 +400,6 @@ pub fn update_menu_state(
             let _ = items.picker.set_enabled(true);
             let _ = items.clear.set_enabled(true);
         } else {
-            let _ = items.source.set_text("No source selected");
             let _ = items.picker.set_enabled(false);
             let _ = items.play.set_enabled(false);
             let _ = items.pause.set_enabled(false);
@@ -300,6 +463,7 @@ pub fn update_menu_state(
     _state: State<SessionMenuState>,
     _event_item_state: State<EventMenuItemState>,
     _events_menu_state: State<EventsMenuState>,
+    _label_state: State<MenuLabelState>,
     _has_session: bool,
     _profile_name: Option<String>,
     _is_streaming: bool,
@@ -308,6 +472,49 @@ pub fn update_menu_state(
     _joiner_count: u32,
     _has_events: bool,
 ) {
+    // No-op on iOS
+}
+
+/// Relabel the menu bar in the frontend's language.
+#[cfg(not(target_os = "ios"))]
+#[tauri::command]
+pub fn set_native_menu_labels(
+    app: AppHandle,
+    state: State<MenuLabelState>,
+    labels: NativeMenuLabels,
+) {
+    let mut current = state.0.lock().unwrap();
+    current.labels = labels;
+    if let Some(menu) = app.menu() {
+        relabel(menu.items().unwrap_or_default(), &|id| {
+            current.labels.text_for(id, current.profile_name.as_deref())
+        });
+    }
+}
+
+#[cfg(not(target_os = "ios"))]
+fn relabel(items: Vec<MenuItemKind<Wry>>, text_for: &impl Fn(&str) -> Option<String>) {
+    for kind in items {
+        match kind {
+            MenuItemKind::MenuItem(item) => {
+                if let Some(text) = text_for(item.id().as_ref()) {
+                    let _ = item.set_text(text);
+                }
+            }
+            MenuItemKind::Submenu(submenu) => {
+                if let Some(text) = text_for(submenu.id().as_ref()) {
+                    let _ = submenu.set_text(text);
+                }
+                relabel(submenu.items().unwrap_or_default(), text_for);
+            }
+            _ => {}
+        }
+    }
+}
+
+#[cfg(target_os = "ios")]
+#[tauri::command]
+pub fn set_native_menu_labels(_state: State<MenuLabelState>, _labels: NativeMenuLabels) {
     // No-op on iOS
 }
 
@@ -364,6 +571,7 @@ impl AppRegistryEntry {
 #[cfg(not(target_os = "ios"))]
 fn build_apps_menu(
     app: &mut tauri::App,
+    labels: &NativeMenuLabels,
 ) -> Result<tauri::menu::Submenu<Wry>, Box<dyn std::error::Error>> {
     let registry: AppRegistry = serde_json::from_str(APPS_JSON)?;
 
@@ -381,7 +589,7 @@ fn build_apps_menu(
             .push(builder.build(app)?);
     }
 
-    let mut builder = SubmenuBuilder::new(app, "Apps");
+    let mut builder = submenu(app, labels, SubmenuId::Apps);
     let mut group_emitted = false;
     for group in &registry.group_order {
         let Some(group_items) = items_by_group.get(group) else {
@@ -401,12 +609,22 @@ fn build_apps_menu(
     Ok(builder.build()?)
 }
 
+#[cfg(not(target_os = "ios"))]
+fn submenu<'m>(
+    app: &'m tauri::App,
+    labels: &NativeMenuLabels,
+    id: SubmenuId,
+) -> SubmenuBuilder<'m, Wry, tauri::App> {
+    SubmenuBuilder::with_id(app, id.as_str(), labels.title(id))
+}
+
 /// Setup menus for desktop platforms (not available on iOS)
 #[cfg(not(target_os = "ios"))]
 pub(crate) fn setup_desktop_menus(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
+    let labels = NativeMenuLabels::english();
     // Create About menu item (App submenu on macOS)
-    let about_item = ItemId::About.item("About WireTAP").build(app)?;
-    let settings_item = ItemId::Settings.item("Settings\u{2026}")
+    let about_item = ItemId::About.item(&labels).build(app)?;
+    let settings_item = ItemId::Settings.item(&labels)
         .accelerator("cmdOrCtrl+,")
         .build(app)?;
 
@@ -423,19 +641,19 @@ pub(crate) fn setup_desktop_menus(app: &mut tauri::App) -> Result<(), Box<dyn st
     // ordering, grouping, accelerators, and labels; the TS registry consumes
     // it too. To add or rename an app, edit apps.json (and add visual config
     // in src/apps/registry.ts on the TS side); this menu picks it up.
-    let apps_menu = build_apps_menu(app)?;
+    let apps_menu = build_apps_menu(app, &labels)?;
 
     // Create View menu items
-    let new_window_item = ItemId::NewWindow.item("New Window")
+    let new_window_item = ItemId::NewWindow.item(&labels)
         .accelerator("cmdOrCtrl+N")
         .build(app)?;
 
     // Edit menu - use predefined items for native clipboard/undo support
-    let find_item = ItemId::Find.item("Find…")
+    let find_item = ItemId::Find.item(&labels)
         .accelerator("cmdOrCtrl+F")
         .build(app)?;
 
-    let edit_menu = SubmenuBuilder::new(app, "Edit")
+    let edit_menu = submenu(app, &labels, SubmenuId::Edit)
         .undo()
         .redo()
         .separator()
@@ -449,39 +667,39 @@ pub(crate) fn setup_desktop_menus(app: &mut tauri::App) -> Result<(), Box<dyn st
         .build()?;
 
     // Create Session menu for stream control
-    let session_source_item = ItemId::SessionSource.item("No source selected")
+    let session_source_item = ItemId::SessionSource.item(&labels)
         .enabled(false)
         .build(app)?;
-    let session_picker_item = ItemId::SessionPicker.item("Select Source…")
+    let session_picker_item = ItemId::SessionPicker.item(&labels)
         .accelerator("cmdOrCtrl+I")
         .build(app)?;
-    let session_import_item = ItemId::SessionImportFile.item("Import from File…")
+    let session_import_item = ItemId::SessionImportFile.item(&labels)
         .accelerator("cmdOrCtrl+Shift+I")
         .build(app)?;
 
     // Playback controls (frame delivery)
-    let session_play_item = ItemId::SessionPlay.item("Play")
+    let session_play_item = ItemId::SessionPlay.item(&labels)
         .accelerator("cmdOrCtrl+Return")
         .build(app)?;
-    let session_pause_item = ItemId::SessionPause.item("Pause")
+    let session_pause_item = ItemId::SessionPause.item(&labels)
         .accelerator("cmdOrCtrl+.")
         .build(app)?;
-    let session_stop_item = ItemId::SessionStop.item("Stop")
+    let session_stop_item = ItemId::SessionStop.item(&labels)
         .accelerator("cmdOrCtrl+Shift+.")
         .build(app)?;
 
     // Session connection controls
-    let session_detach_item = ItemId::SessionDetach.item("Detach Session")
+    let session_detach_item = ItemId::SessionDetach.item(&labels)
         .enabled(false)
         .build(app)?;
-    let session_stop_all_item = ItemId::SessionStopAll.item("Stop Session")
+    let session_stop_all_item = ItemId::SessionStopAll.item(&labels)
         .build(app)?;
 
-    let session_clear_item = ItemId::SessionClear.item("Clear Frames")
+    let session_clear_item = ItemId::SessionClear.item(&labels)
         .accelerator("cmdOrCtrl+K")
         .build(app)?;
 
-    let session_menu = SubmenuBuilder::new(app, "Session")
+    let session_menu = submenu(app, &labels, SubmenuId::Session)
         .item(&session_source_item)
         .item(&session_picker_item)
         .item(&session_import_item)
@@ -497,15 +715,15 @@ pub(crate) fn setup_desktop_menus(app: &mut tauri::App) -> Result<(), Box<dyn st
         .build()?;
 
     // Create Events menu
-    let event_add_item = ItemId::EventAdd.item("Add Event…")
+    let event_add_item = ItemId::EventAdd.item(&labels)
         .accelerator("cmdOrCtrl+D")
         .build(app)?;
-    let event_show_item = ItemId::EventShow.item("Show Events").build(app)?;
+    let event_show_item = ItemId::EventShow.item(&labels).build(app)?;
 
     // Create "Jump to Event" submenu (dynamically populated by frontend)
-    let jump_to_event_submenu = SubmenuBuilder::new(app, "Jump to Event").build()?;
+    let jump_to_event_submenu = submenu(app, &labels, SubmenuId::JumpToEvent).build()?;
 
-    let events_menu = SubmenuBuilder::new(app, "Events")
+    let events_menu = submenu(app, &labels, SubmenuId::Events)
         .item(&event_add_item)
         .item(&jump_to_event_submenu)
         .separator()
@@ -513,18 +731,18 @@ pub(crate) fn setup_desktop_menus(app: &mut tauri::App) -> Result<(), Box<dyn st
         .build()?;
 
     // Create View submenu
-    let view_menu = SubmenuBuilder::new(app, "View")
+    let view_menu = submenu(app, &labels, SubmenuId::View)
         .item(&new_window_item)
         .separator()
         .fullscreen()
         .build()?;
 
     // Create Help menu
-    let help_issues_item = ItemId::HelpIssues.item("Report an Issue…").build(app)?;
-    let help_wiki_item = ItemId::HelpWiki.item("Documentation…").build(app)?;
-    let help_source_item = ItemId::HelpSource.item("Source Code…").build(app)?;
+    let help_issues_item = ItemId::HelpIssues.item(&labels).build(app)?;
+    let help_wiki_item = ItemId::HelpWiki.item(&labels).build(app)?;
+    let help_source_item = ItemId::HelpSource.item(&labels).build(app)?;
 
-    let help_menu = SubmenuBuilder::new(app, "Help")
+    let help_menu = submenu(app, &labels, SubmenuId::Help)
         .item(&help_wiki_item)
         .item(&help_issues_item)
         .separator()
@@ -597,6 +815,50 @@ mod tests {
             assert_eq!(ItemId::parse(&id), None, "{id} collides with a fixed item");
             assert_eq!(route(&id), Some(MenuAction::OpenPanel(&a.id)));
         }
+    }
+
+    #[test]
+    fn no_submenu_id_collides_with_an_item_or_a_prefix() {
+        for &id in SubmenuId::ALL {
+            let id = id.as_str();
+            assert_eq!(ItemId::parse(id), None, "{id}");
+            assert_eq!(route(id), None, "{id}");
+        }
+    }
+
+    #[test]
+    fn every_fixed_item_and_submenu_takes_its_text_from_the_labels() {
+        let labels = NativeMenuLabels::english();
+        for &id in ItemId::ALL {
+            assert!(!labels.text_for(id.as_str(), None).unwrap().is_empty(), "{id:?}");
+        }
+        for &id in SubmenuId::ALL {
+            let text = labels.text_for(id.as_str(), None);
+            assert_eq!(text.as_deref(), Some(labels.title(id)), "{id:?}");
+        }
+    }
+
+    #[test]
+    fn the_source_line_fills_the_name_slot_or_says_no_source() {
+        let labels = NativeMenuLabels {
+            source: "Quelle « {{name}} »".into(),
+            ..NativeMenuLabels::english()
+        };
+        assert_eq!(labels.source_line(Some("GVRET")), "Quelle « GVRET »");
+        assert_eq!(labels.source_line(None), "No source selected");
+        assert_eq!(labels.text_for("session-source", Some("GVRET")).unwrap(), "Quelle « GVRET »");
+    }
+
+    #[test]
+    fn an_app_takes_its_label_only_when_one_is_given() {
+        let labels = NativeMenuLabels {
+            apps: HashMap::from([("decoder".to_owned(), "Décodeur".to_owned())]),
+            ..NativeMenuLabels::english()
+        };
+        assert_eq!(labels.text_for("app-decoder", None).as_deref(), Some("Décodeur"));
+        assert_eq!(labels.text_for("app-discovery", None), None);
+        assert_eq!(labels.text_for("event-jump-ev_1", None), None);
+        assert_eq!(labels.text_for("undo", None), None);
     }
 
     #[test]

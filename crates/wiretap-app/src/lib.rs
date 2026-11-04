@@ -97,6 +97,7 @@ pub fn run() {
             windows::open_settings_panel,
             menu::update_menu_state,
             menu::update_events_menu,
+            menu::set_native_menu_labels,
             catalog::open_catalog,
             catalog::save_catalog,
             catalog::save_binary_file,
