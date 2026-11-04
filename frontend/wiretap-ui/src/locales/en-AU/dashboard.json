@@ -75,7 +75,10 @@
     "emptySvgCode": "Add custom SVG code in Configure",
     "emptyCanvasCode": "Add custom canvas code in Configure",
     "statsLegend": "min / avg / max",
-    "svgLoadFailed": "Failed to load SVG for PNG export"
+    "svgLoadFailed": "Failed to load SVG for PNG export",
+    "copyTitle": "{{title}} (copy)",
+    "bitfieldCell": "{{frameId}} byte {{row}} bit {{bit}} = {{on}}",
+    "bitfieldCellLabelled": "{{frameId}} byte {{row}} bit {{bit}} = {{on}} ({{label}})"
   },
   "import": {
     "placeholder": "Paste a graph layout JSON here…",
@@ -239,5 +242,20 @@
     "titleInstruments": "Add Instruments",
     "addInstruments": "Add as Instruments",
     "addInstrumentsHint": "Create a pre-configured widget panel for each selected signal (using its catalog display hint, or inferred from its range/enum)"
+  },
+  "defaultTitles": {
+    "lineChart": "Line Chart",
+    "gauge": "Gauge",
+    "list": "List",
+    "flow": "Flow View",
+    "heatmap": "Bit Heatmap",
+    "histogram": "Histogram",
+    "iconState": "Indicator",
+    "rotary": "Rotary",
+    "levelBar": "Level",
+    "bitfield": "Bitfield",
+    "rawCanvas": "Custom Canvas",
+    "customSvg": "Custom SVG",
+    "panel": "Panel"
   }
 }

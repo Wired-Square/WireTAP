@@ -2,25 +2,22 @@
 // Custom Dockview tab component with the app's icon in its hue.
 
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { type IDockviewPanelHeaderProps } from "dockview-react";
 import { X } from "lucide-react";
 import { iconMd, iconXs } from "../styles/spacing";
-import { isPanelId } from "../apps/registry";
+import { appTitle, isPanelId } from "../apps/registry";
 import { AppIcon } from "./AppIcon";
 
 export default function AppTab(props: IDockviewPanelHeaderProps) {
   const { api } = props;
   const panelId = api.id;
-  const [title, setTitle] = useState(api.title);
+  const { t } = useTranslation();
   const [isActive, setIsActive] = useState(api.isActive);
 
-  // Listen for title and active state changes
   useEffect(() => {
-    const disposables = [
-      api.onDidTitleChange(() => setTitle(api.title)),
-      api.onDidActiveChange(() => setIsActive(api.isActive)),
-    ];
-    return () => disposables.forEach((d) => d.dispose());
+    const disposable = api.onDidActiveChange(() => setIsActive(api.isActive));
+    return () => disposable.dispose();
   }, [api]);
 
   return (
@@ -30,7 +27,7 @@ export default function AppTab(props: IDockviewPanelHeaderProps) {
     >
       <div className="dv-default-tab-content">
         {isPanelId(panelId) && <AppIcon app={panelId} className={iconMd} />}
-        <span className="truncate">{title}</span>
+        <span className="truncate">{appTitle(t, panelId)}</span>
       </div>
       <div className="dv-default-tab-action">
         <button

@@ -4,6 +4,7 @@
 // the Transmit queue, which is Rust's process state (`transmit_queue.rs`) pushed
 // to every window over WS.
 
+import i18n from "i18next";
 import { create } from "@wired-square/store/react";
 import {
   type CanTransmitFrame,
@@ -272,7 +273,7 @@ const mintId = (prefix: string) => `${prefix}-${Date.now()}-${Math.random().toSt
 
 const TERMINAL_LOG_KIND = { finished: "completed", stopped: "stoppedByUser", failed: "deviceError" } as const;
 
-const NO_SESSION = "No IO session connected. Use 'Data Source' to connect.";
+const noSession = () => i18n.t("transmit:store.noSession");
 
 function syncQueuedMarks(queue: QueueRow[], sessionIds: Iterable<string>) {
   const { setHasQueuedMessages } = useSessionStore.getState();
@@ -402,18 +403,18 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
     const session = getActiveSession();
 
     if (!session) {
-      set({ error: "No IO session connected. Use 'Data Source' to connect." });
+      set({ error: noSession() });
       return null;
     }
 
     if (!session.capabilities?.traits.tx_frames) {
-      set({ error: "IO session does not support transmit" });
+      set({ error: i18n.t("transmit:store.noTransmit") });
       return null;
     }
 
     const frame = get().buildCanFrame();
     if (!frame) {
-      set({ error: "Invalid CAN frame" });
+      set({ error: i18n.t("transmit:store.invalidFrame") });
       return null;
     }
 
@@ -445,7 +446,7 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
 
   addCanToQueue: async () => {
     const session = getActiveSession();
-    if (!session) return set({ error: NO_SESSION });
+    if (!session) return set({ error: noSession() });
     const frame = get().buildCanFrame();
     if (!frame) return;
     await reporting(addToTransmitQueue([newRow(session, { kind: "can", frame }, get().queueRepeatIntervalMs)]));
@@ -461,7 +462,7 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
 
   addSerialToQueue: async () => {
     const session = getActiveSession();
-    if (!session) return set({ error: NO_SESSION });
+    if (!session) return set({ error: noSession() });
     const { serialEditor, queueRepeatIntervalMs } = get();
     const bytes = hexToBytes(serialEditor.hexInput);
     if (bytes.length === 0) return;

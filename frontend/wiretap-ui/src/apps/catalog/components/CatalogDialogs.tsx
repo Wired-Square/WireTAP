@@ -232,8 +232,8 @@ export default function CatalogDialogs({
       <ConfirmDeleteDialog
         open={dialogs.deleteCanFrame}
         title={t("deleteConfirm.canFrameTitle")}
-        message={t("deleteConfirm.canFrame")}
-        highlightText={dialogPayload.idToDelete || undefined}
+        messageKey="catalog:deleteConfirm.canFrame"
+        name={dialogPayload.idToDelete || undefined}
         onCancel={() => {
           closeDialog("deleteCanFrame");
           setDialogPayload({ idToDelete: null });
@@ -244,8 +244,8 @@ export default function CatalogDialogs({
       <ConfirmDeleteDialog
         open={dialogs.deleteSignal}
         title={t("deleteConfirm.signalTitle")}
-        message={t("deleteConfirm.signal")}
-        highlightText={
+        messageKey="catalog:deleteConfirm.signal"
+        name={
           (dialogPayload.signalToDelete && dialogPayload.signalToDelete.name) || undefined
         }
         onCancel={() => {
@@ -258,8 +258,8 @@ export default function CatalogDialogs({
       <ConfirmDeleteDialog
         open={dialogs.deleteChecksum}
         title={t("deleteConfirm.checksumTitle")}
-        message={t("deleteConfirm.checksum")}
-        highlightText={
+        messageKey="catalog:deleteConfirm.checksum"
+        name={
           (dialogPayload.checksumToDelete && dialogPayload.checksumToDelete.name) || undefined
         }
         onCancel={() => {
@@ -312,8 +312,8 @@ export default function CatalogDialogs({
       <ConfirmDeleteDialog
         open={dialogs.deleteNode}
         title={t("deleteConfirm.nodeTitle")}
-        message={t("deleteConfirm.node")}
-        highlightText={dialogPayload.nodeToDelete || undefined}
+        messageKey="catalog:deleteConfirm.node"
+        name={dialogPayload.nodeToDelete || undefined}
         onCancel={() => {
           closeDialog("deleteNode");
           setDialogPayload({ nodeToDelete: null });
@@ -324,8 +324,8 @@ export default function CatalogDialogs({
       <ConfirmDeleteDialog
         open={dialogs.deleteGeneric}
         title={t("common:actions.delete")}
-        message={t("deleteConfirm.generic")}
-        highlightText={
+        messageKey="catalog:deleteConfirm.generic"
+        name={
           dialogPayload.genericLabel ||
           (dialogPayload.genericPathToDelete?.slice(-1)[0] ?? undefined)
         }

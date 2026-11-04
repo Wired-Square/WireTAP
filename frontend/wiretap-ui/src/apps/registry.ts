@@ -11,6 +11,7 @@
 // they don't appear in apps.json since the Rust menu doesn't reference them.
 
 import type { ComponentType } from "react";
+import type { TFunction } from "i18next";
 import {
   Search,
   Activity,
@@ -212,6 +213,11 @@ export const apps: AppEntry[] = [...menuApps, ...hiddenApps];
 export const appById: Record<PanelId, AppEntry> = Object.fromEntries(
   apps.map((a) => [a.id, a]),
 ) as Record<PanelId, AppEntry>;
+
+/** An app's tab title in the current language; an unknown id is shown as itself. */
+export function appTitle(t: TFunction, id: string): string {
+  return isPanelId(id) ? t(`menus:panels.${appById[id].i18nKey}`) : id;
+}
 
 function kebabToCamel(s: string): string {
   return s.replace(/-([a-z])/g, (_m, c: string) => c.toUpperCase());

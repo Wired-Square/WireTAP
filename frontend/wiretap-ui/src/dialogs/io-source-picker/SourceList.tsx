@@ -549,7 +549,7 @@ function SourceButton({
           </span>
           {busNumber !== undefined && (
             <Badge size="sm">
-              {t("ioSourcePicker.sources.busLabel", { bus: busNumber })}
+              {t("common:busNumber", { bus: busNumber })}
             </Badge>
           )}
           {profile.ephemeral && (

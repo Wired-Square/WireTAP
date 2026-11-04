@@ -14,6 +14,7 @@ vi.mock("@tauri-apps/api/core", () => ({ invoke: (...args: unknown[]) => invoke(
 vi.mock("../api/capture", () => ({}));
 vi.mock("../utils/windowCommunication", () => ({ openPanel: vi.fn() }));
 
+import "../i18n";
 import { useSessionStore, type Session } from "../stores/sessionStore";
 import { useTransmitStore, type CanEditorState } from "../stores/transmitStore";
 import { hexToBytes } from "../utils/byteUtils";

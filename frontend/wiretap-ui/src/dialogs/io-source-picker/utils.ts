@@ -2,6 +2,9 @@
 //
 // Utility functions for the IoSourcePickerDialog
 
+import i18n from "i18next";
+import type { PlaybackSpeed } from "../../components/TimeController";
+
 /** Convert a datetime-local value to ISO-8601 string with explicit timezone offset */
 export function localToIsoWithOffset(datetimeLocal: string): string {
   if (!datetimeLocal) return "";
@@ -17,27 +20,16 @@ export function localToIsoWithOffset(datetimeLocal: string): string {
   return `${timeWithSeconds}${sign}${hours}:${minutes}`;
 }
 
-/** Get the local timezone abbreviation (e.g., "AEDT", "PST") */
-export function getLocalTimezoneAbbr(): string {
-  const formatter = new Intl.DateTimeFormat("en", { timeZoneName: "short" });
-  const parts = formatter.formatToParts(new Date());
-  const tzPart = parts.find((p) => p.type === "timeZoneName");
-  return tzPart?.value || "Local";
-}
-
-/** Format a Unix timestamp (seconds) as a time string (e.g., "10:30 AM") */
-export function formatBufferTimestamp(unixSeconds: number): string {
-  const date = new Date(unixSeconds * 1000);
-  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-}
-
-import type { PlaybackSpeed } from "../../components/TimeController";
-
 // Watch speed options - no "unlimited" since watching implies paced playback
 export const SPEED_OPTIONS: { value: PlaybackSpeed; label: string }[] = [
   { value: 0.25, label: "0.25x" },
   { value: 0.5, label: "0.5x" },
-  { value: 1, label: "1x (realtime)" },
+  {
+    value: 1,
+    get label() {
+      return i18n.t("common:playback.speedRealtime");
+    },
+  },
   { value: 2, label: "2x" },
   { value: 10, label: "10x" },
   { value: 30, label: "30x" },

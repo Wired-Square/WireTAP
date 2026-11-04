@@ -182,5 +182,10 @@
     },
     "replaying": "Replaying",
     "replayingLoop": "Replaying (loop)"
+  },
+  "store": {
+    "noSession": "No IO session connected. Use 'Data Source' to connect.",
+    "noTransmit": "IO session does not support transmit",
+    "invalidFrame": "Invalid CAN frame"
   }
 }

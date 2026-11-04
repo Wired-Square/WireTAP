@@ -226,7 +226,7 @@ function FrameCard({ frame, signals, t }: FrameCardProps) {
           )}
           {frame.bus !== null && (
             <span className={captionMuted}>
-              {t("decoderInfo.frames.busLabel", { bus: frame.bus })}
+              {t("common:busNumber", { bus: frame.bus })}
             </span>
           )}
         </div>

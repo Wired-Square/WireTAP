@@ -19,7 +19,9 @@
     "confirm": "Confirm",
     "discard": "Discard",
     "ingest": "Ingest",
-    "copyToClipboard": "Copy to clipboard"
+    "copyToClipboard": "Copy to clipboard",
+    "retry": "Retry",
+    "saveAs": "Save As..."
   },
   "states": {
     "loading": "Loading…",
@@ -27,7 +29,8 @@
     "noData": "No data",
     "notConnected": "Not connected",
     "empty": "Empty",
-    "copied": "Copied!"
+    "copied": "Copied!",
+    "loadingLayout": "Loading layout..."
   },
   "errors": {
     "generic": "Something went wrong",
@@ -35,7 +38,21 @@
     "saveFailed": "Failed to save",
     "validationFailed": "Validation failed",
     "exportTitle": "Export Error",
-    "reportNotExported": "The report was not exported"
+    "reportNotExported": "The report was not exported",
+    "streamTitle": "Stream Error",
+    "sessionStartFailed": "An error occurred while starting the session.",
+    "saveTitle": "Save Error",
+    "catalogueNotSaved": "The catalogue was not saved",
+    "decoderDirNotSet": "Decoder directory is not set in settings.",
+    "connectTitle": "Connect Error",
+    "loadTitle": "Load Error",
+    "startSessionFailed": "Failed to start session",
+    "startLoadFailed": "Failed to start load",
+    "noSession": "No session",
+    "sessionRecoveredTitle": "Session Recovered",
+    "sessionRecovered": "The system reclaimed memory from this window and the page was automatically reloaded. Your session has been reconnected.",
+    "panelTitle": "Panel Error",
+    "notDateTime": "\"{{value}}\" is not a date and time"
   },
   "units": {
     "seconds": "seconds",
@@ -174,7 +191,9 @@
     "stop": "Stop session",
     "stopTooltip": "Stop the session for all connected apps and review the capture",
     "destroy": "Destroy session",
-    "destroyTooltip": "Destroy this session and reset all connected apps to No source"
+    "destroyTooltip": "Destroy this session and reset all connected apps to No source",
+    "multiBusSources_one": "Multi-Bus ({{count}} source)",
+    "multiBusSources_other": "Multi-Bus ({{count}} sources)"
   },
   "busStatus": {
     "noAck": "No ACK",
@@ -364,7 +383,6 @@
   },
   "securePassword": {
     "label": "Password",
-    "optional": "(optional)",
     "secure": "Secure",
     "migrate": "Migrate",
     "plainTextWarning": "Password stored in plain text. Migrate to secure storage.",
@@ -384,5 +402,83 @@
   "sidebar": {
     "expand": "Expand sidebar",
     "collapse": "Collapse sidebar"
-  }
+  },
+  "forms": {
+    "optional": "(optional)"
+  },
+  "frameBadge": "Frame",
+  "filterOptions": {
+    "minLength": "Minimum frame length:",
+    "minLengthShort": "Min frame length",
+    "noFilterAll": "No filter - all frames accepted",
+    "discardHint": "Frames shorter than this will be discarded",
+    "noFilter": "No filter",
+    "discardBelow_one": "Discard frames < {{count}} byte",
+    "discardBelow_other": "Discard frames < {{count}} bytes"
+  },
+  "byteBits": {
+    "bit": "Bit {{bit}}: {{value}}",
+    "unused": "(unused)",
+    "clickToToggle": "(click to toggle)"
+  },
+  "checksumAlgorithms": {
+    "xor": {
+      "name": "XOR",
+      "description": "XOR of all bytes (8-bit)"
+    },
+    "sum8": {
+      "name": "Sum (8-bit)",
+      "description": "Simple sum of bytes modulo 256"
+    },
+    "crc8": {
+      "name": "CRC-8",
+      "description": "CRC-8 polynomial 0x07 (ITU/SMBUS)"
+    },
+    "crc8_sae_j1850": {
+      "name": "CRC-8 SAE-J1850",
+      "description": "CRC-8 polynomial 0x1D (automotive OBD-II)"
+    },
+    "crc8_autosar": {
+      "name": "CRC-8 AUTOSAR",
+      "description": "CRC-8 polynomial 0x2F (AUTOSAR E2E)"
+    },
+    "crc8_maxim": {
+      "name": "CRC-8 Maxim",
+      "description": "CRC-8 polynomial 0x31 (1-Wire devices)"
+    },
+    "crc8_cdma2000": {
+      "name": "CRC-8 CDMA2000",
+      "description": "CRC-8 polynomial 0x9B (telecom)"
+    },
+    "crc8_dvb_s2": {
+      "name": "CRC-8 DVB-S2",
+      "description": "CRC-8 polynomial 0xD5 (satellite)"
+    },
+    "crc8_nissan": {
+      "name": "CRC-8 Nissan",
+      "description": "CRC-8 polynomial 0x85 (Nissan CAN)"
+    },
+    "crc16_modbus": {
+      "name": "CRC-16 Modbus",
+      "description": "CRC-16 polynomial 0xA001 (Modbus)"
+    },
+    "crc16_ccitt": {
+      "name": "CRC-16 CCITT",
+      "description": "CRC-16 polynomial 0x1021 (CCITT)"
+    }
+  },
+  "fileFilters": {
+    "tomlCatalog": "TOML Catalog Files",
+    "dbc": "DBC Files",
+    "html": "HTML Files",
+    "markdown": "Markdown Files",
+    "text": "Text Files",
+    "json": "JSON Files",
+    "data": "Data Files (CSV, CAN Dump)",
+    "png": "PNG Images",
+    "svg": "SVG Images",
+    "catalog": "Catalog Files",
+    "toml": "TOML Files"
+  },
+  "mainWindow": "main"
 }

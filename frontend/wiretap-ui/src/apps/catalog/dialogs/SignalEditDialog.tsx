@@ -219,13 +219,13 @@ export default function SignalEditDialog({
                         : t("signalEdit.inheritOptionBE")
                       : t("signalEdit.byteOrderNotSet")}
                   </option>
-                  <option value="little">{t("signalEdit.endianLE")}</option>
-                  <option value="big">{t("signalEdit.endianBE")}</option>
+                  <option value="little">{t("shared.littleEndian")}</option>
+                  <option value="big">{t("shared.bigEndian")}</option>
                 </Select>
               </FormField>
             </div>
 
-            <FormField label={t("signalEdit.notes")} variant="default">
+            <FormField label={t("shared.notes")} variant="default">
               <Textarea
                 size="lg"
                 value={typeof fields.notes === "string" ? fields.notes : fields.notes?.join("\n") ?? ""}

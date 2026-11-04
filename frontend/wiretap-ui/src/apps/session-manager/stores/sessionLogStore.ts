@@ -79,8 +79,11 @@ const EVENTS = "sessionManager:log.events";
 
 const modeLabel = (mode: SessionMode) => i18n.t(`${EVENTS}.modes.${mode}`);
 
+/** A session's state as text; its id stays the logic and colour key. */
+export const ioStateLabel = (state: IOState) => i18n.t(`sessionManager:ioStates.${getStateType(state)}`);
+
 function stateLabel(state: IOState): string {
-  return state.type === "Error" ? `error: ${state.message}` : getStateType(state);
+  return state.type === "Error" ? i18n.t("sessionManager:ioStates.errorWithMessage", { message: state.message }) : ioStateLabel(state);
 }
 
 const listeners = (count: number) => i18n.t(`${EVENTS}.listeners`, { count });
@@ -144,7 +147,7 @@ export function describeEvent(event: SessionLogEvent, who: string | null): strin
       return i18n.t(`${EVENTS}.mcpDisconnected`, { client: event.client.slice(0, 8) });
     case "stats":
       return i18n.t(`${EVENTS}.stats`, {
-        state: getStateType(event.state),
+        state: ioStateLabel(event.state),
         listeners: event.subscriber_count,
         frames: event.frame_count,
       });

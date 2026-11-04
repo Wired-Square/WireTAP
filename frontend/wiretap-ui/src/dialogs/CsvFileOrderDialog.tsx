@@ -5,6 +5,8 @@
 // Auto-detects headers per file and validates column count consistency.
 
 import { useState, useCallback, useMemo, useEffect } from "react";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import {
   ChevronUp,
   ChevronDown,
@@ -54,7 +56,7 @@ interface FileEntry {
 }
 
 /** Build per-file anomaly warnings by comparing against the first file */
-function getAnomalies(entries: FileEntry[]): (string | null)[] {
+function getAnomalies(t: TFunction, entries: FileEntry[]): (string | null)[] {
   if (entries.length === 0) return [];
   const ref = entries[0];
   return entries.map((entry, i) => {
@@ -67,9 +69,7 @@ function getAnomalies(entries: FileEntry[]): (string | null)[] {
       entry.columnCount !== null &&
       entry.columnCount !== ref.columnCount
     ) {
-      warnings.push(
-        `Expected ${ref.columnCount} columns, found ${entry.columnCount}`
-      );
+      warnings.push(t("csvFileOrder.anomalies.columnCount", { expected: ref.columnCount, found: entry.columnCount }));
     }
 
     // Header differs from first file
@@ -82,7 +82,7 @@ function getAnomalies(entries: FileEntry[]): (string | null)[] {
         ref.headerStrings.length === entry.headerStrings.length &&
         ref.headerStrings.every((h, idx) => h === entry.headerStrings![idx]);
       if (!same) {
-        warnings.push("Header differs from first file");
+        warnings.push(t("csvFileOrder.anomalies.headerDiffers"));
       }
     }
 
@@ -96,6 +96,7 @@ export default function CsvFileOrderDialog({
   onConfirm,
   onCancel,
 }: CsvFileOrderDialogProps) {
+  const { t } = useTranslation("dialogs");
   // Sort naturally on first render
   const sortedPaths = useMemo(
     () =>
@@ -263,15 +264,15 @@ export default function CsvFileOrderDialog({
     const idx = contextMenu.index;
     return [
       {
-        label: "Remove from list",
+        label: t("csvFileOrder.removeFromList"),
         icon: <Trash2 className="text-muted" />,
         onClick: () => removeEntry(idx),
       },
     ];
-  }, [contextMenu, removeEntry]);
+  }, [contextMenu, removeEntry, t]);
 
   const detecting = entries.some((e) => e.detecting);
-  const anomalies = useMemo(() => getAnomalies(entries), [entries]);
+  const anomalies = useMemo(() => getAnomalies(t, entries), [t, entries]);
 
   return (
     <>
@@ -279,8 +280,8 @@ export default function CsvFileOrderDialog({
       isOpen={isOpen}
       onClose={onCancel}
       size="2xl"
-      title="Confirm File Order"
-      subtitle={`${entries.length} files selected. Files will be imported sequentially into a single buffer.`}
+      title={t("csvFileOrder.title")}
+      subtitle={t("csvFileOrder.summary", { count: entries.length })}
     >
       <DialogBody className="space-y-4">
         {/* File list */}
@@ -303,12 +304,12 @@ export default function CsvFileOrderDialog({
             <span
               className={`${textMuted} text-2xs uppercase tracking-wider flex-1 min-w-0`}
             >
-              File
+              {t("csvFileOrder.columns.file")}
             </span>
             <span
               className={`${textMuted} text-2xs uppercase tracking-wider w-14 text-center`}
             >
-              Header
+              {t("csvFileOrder.columns.header")}
             </span>
             <span className="w-4 shrink-0" />
             <span className="w-14 shrink-0" />
@@ -358,7 +359,7 @@ export default function CsvFileOrderDialog({
                       setDropInsertIndex(null);
                     }}
                     className="cursor-grab active:cursor-grabbing shrink-0"
-                    title="Drag to reorder"
+                    title={t("csvFileOrder.dragTooltip")}
                   >
                     <GripVertical
                       className={`${iconSm} text-muted`}
@@ -392,8 +393,8 @@ export default function CsvFileOrderDialog({
                       onChange={() => toggleHeader(i)}
                       title={
                         entry.hasHeader
-                          ? "First row is a header"
-                          : "No header row"
+                          ? t("csvFileOrder.headerTooltip")
+                          : t("csvFileOrder.noHeaderTooltip")
                       }
                     />
                   )}
@@ -416,7 +417,7 @@ export default function CsvFileOrderDialog({
                     onClick={() => moveUp(i)}
                     disabled={i === 0}
                     size="xs"
-                    title="Move up"
+                    title={t("csvFileOrder.moveUp")}
                   >
                     <ChevronUp className={iconSm} />
                   </IconButton>
@@ -424,7 +425,7 @@ export default function CsvFileOrderDialog({
                     onClick={() => moveDown(i)}
                     disabled={i === entries.length - 1}
                     size="xs"
-                    title="Move down"
+                    title={t("csvFileOrder.moveDown")}
                   >
                     <ChevronDown className={iconSm} />
                   </IconButton>
@@ -443,12 +444,12 @@ export default function CsvFileOrderDialog({
         {detecting && (
           <div className={`flex items-center gap-2 text-xs ${textMuted}`}>
             <Loader2 className={`${iconMd} animate-spin`} />
-            <span>Detecting headers...</span>
+            <span>{t("csvFileOrder.detectingHeaders")}</span>
           </div>
         )}
       </DialogBody>
       <DialogFooter>
-        <SecondaryButton onClick={onCancel}>Cancel</SecondaryButton>
+        <SecondaryButton onClick={onCancel}>{t("common:actions.cancel")}</SecondaryButton>
         <PrimaryButton
           onClick={() =>
             onConfirm(
@@ -458,7 +459,7 @@ export default function CsvFileOrderDialog({
           }
           disabled={detecting || entries.length === 0}
         >
-          Next: Map Columns
+          {t("csvFileOrder.next")}
         </PrimaryButton>
       </DialogFooter>
     </Dialog>

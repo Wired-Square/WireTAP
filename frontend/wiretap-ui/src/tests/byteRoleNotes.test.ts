@@ -72,6 +72,6 @@ describe("serial candidate notes", () => {
     [{ code: "noZeroAddress" } as const, 1, "No zero address (typical for device IDs)"],
     [{ code: "noZeroAddress" } as const, 2, "No zero address"],
   ])("%o at %i byte(s)", (reason, len, note) => {
-    expect(candidateReasonNote(reason, len)).toBe(note);
+    expect(candidateReasonNote(t, reason, len)).toBe(note);
   });
 });

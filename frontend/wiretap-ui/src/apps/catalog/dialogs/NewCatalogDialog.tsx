@@ -166,8 +166,8 @@ export default function NewCatalogDialog({
                   value={canDefaultEndianness}
                   onChange={(e) => setCanDefaultEndianness(e.target.value as "little" | "big")}
                 >
-                  <option value="little">{t("newCatalog.endianLE")}</option>
-                  <option value="big">{t("newCatalog.endianBE")}</option>
+                  <option value="little">{t("shared.littleEndian")}</option>
+                  <option value="big">{t("shared.bigEndian")}</option>
                 </Select>
               </FormField>
 

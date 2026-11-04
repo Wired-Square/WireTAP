@@ -212,7 +212,7 @@ export const useDiscoveryUIStore = create<DiscoveryUIState>((set, get) => ({
     const { saveMetadata, serialConfig } = get();
 
     if (!decoderDir) {
-      useSessionStore.getState().showAppError('Save Error', 'Decoder directory is not set in settings.');
+      useSessionStore.getState().showAppError(i18n.t('common:errors.saveTitle'), i18n.t('common:errors.decoderDirNotSet'));
       return;
     }
 
@@ -221,7 +221,7 @@ export const useDiscoveryUIStore = create<DiscoveryUIState>((set, get) => ({
     const baseDir = decoderDir.replace(/[\\/]+$/, '');
     const path = `${baseDir}/${filename}`;
     const saveBuilt = async (build: () => Promise<{ text: string; findings: ExportFinding[] }>) => {
-      const saved = await withAppError('Save Error', 'The catalogue was not saved', async () => {
+      const saved = await withAppError(i18n.t('common:errors.saveTitle'), i18n.t('common:errors.catalogueNotSaved'), async () => {
         const { text, findings } = await build();
         await saveCatalog(path, text);
         set({ exportFindings: findings });

@@ -4,7 +4,8 @@ import { memo } from "react";
 import { useTranslation } from "react-i18next";
 import { Port } from "./Port";
 import { Radio, Pause, Square, AlertCircle, Users, Database } from "lucide-react";
-import { getStateType, type ActiveSessionInfo } from "../../../api/io";
+import type { ActiveSessionInfo } from "../../../api/io";
+import { ioStateLabel } from "../stores/sessionLogStore";
 import { iconSm, iconXs } from "../../../styles/spacing";
 import { textDataCyan, textDataDisabled, textMuted } from "../../../styles/colourTokens";
 
@@ -88,7 +89,7 @@ function SessionNode({ data, selected }: SessionNodeProps) {
     ? t("node.session.states.paused")
     : isError
     ? t("node.session.states.error")
-    : getStateType(session.state);
+    : ioStateLabel(session.state);
 
   const totalOutputPorts = outputCount + 1; // connected + one empty slot
 

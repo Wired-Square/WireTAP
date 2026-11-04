@@ -9,6 +9,7 @@
 // - "card": Full card style for standalone dialogs
 
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { caption, captionMuted } from "../styles/typography";
 import { textDataMuted, textSecondary } from "../styles";
 import { Input } from "./forms";
@@ -36,6 +37,7 @@ export default function FilterOptionsPanel({
   variant = "panel",
   disabled = false,
 }: Props) {
+  const { t } = useTranslation();
   const [minLength, setMinLength] = useState(config.minFrameLength);
 
   // Sync local state when config changes externally
@@ -54,7 +56,7 @@ export default function FilterOptionsPanel({
     return (
       <div className="space-y-3">
         <label className="block text-sm">
-          <span className={textSecondary}>Minimum frame length:</span>
+          <span className={textSecondary}>{t("filterOptions.minLength")}</span>
           <Input
             type="number"
             value={minLength}
@@ -65,7 +67,7 @@ export default function FilterOptionsPanel({
             min={0}
           />
           <span className={`text-xs mt-1 block ${textDataMuted}`}>
-            {minLength === 0 ? "No filter - all frames accepted" : "Frames shorter than this will be discarded"}
+            {minLength === 0 ? t("filterOptions.noFilterAll") : t("filterOptions.discardHint")}
           </span>
         </label>
       </div>
@@ -77,7 +79,7 @@ export default function FilterOptionsPanel({
     <div className="space-y-2">
       <div>
         <label className={`block ${caption} mb-1`}>
-          Min frame length
+          {t("filterOptions.minLengthShort")}
         </label>
         <Input
           type="number"
@@ -87,7 +89,7 @@ export default function FilterOptionsPanel({
           disabled={disabled}
         />
         <div className={`${captionMuted} mt-0.5`}>
-          {minLength === 0 ? "No filter" : `Discard frames < ${minLength} bytes`}
+          {minLength === 0 ? t("filterOptions.noFilter") : t("filterOptions.discardBelow", { count: minLength })}
         </div>
       </div>
     </div>

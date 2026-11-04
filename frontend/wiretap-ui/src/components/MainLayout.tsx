@@ -2,7 +2,7 @@
 
 import React, { useRef, useState, useCallback, useEffect, lazy, Suspense } from "react";
 import { useTranslation } from "react-i18next";
-import type { TFunction } from "i18next";
+import i18n from "i18next";
 import {
   DockviewReact,
   DockviewReadyEvent,
@@ -47,7 +47,7 @@ import { registerOpenApp, unregisterOpenApp } from "../api/io";
 import { trackFeatureUsage } from "../api/telemetry";
 import { formatWindowName } from "../utils/windowName";
 import { useFocusStore } from "../stores/focusStore";
-import { apps, menuApps, menuGroupOrder, sessionAwarePanelIds, type AppEntry, type PanelId } from "../apps/registry";
+import { apps, appTitle, menuApps, menuGroupOrder, sessionAwarePanelIds, type AppEntry, type PanelId } from "../apps/registry";
 import { Button } from "./Button";
 const logo = "/logo.svg";
 
@@ -60,11 +60,12 @@ const SAVE_DEBOUNCE_MS = 500;
 
 // Panel loading fallback
 function PanelLoading() {
+  const { t } = useTranslation();
   return (
     <div className={`flex items-center justify-center h-full ${bgPrimary}`}>
       <div className="flex flex-col items-center gap-3">
         <div className="w-6 h-6 border-2 border-accent-primary border-t-transparent rounded-full animate-spin" />
-        <span className={`text-sm ${textSecondary}`}>Loading...</span>
+        <span className={`text-sm ${textSecondary}`}>{t("states.loading")}</span>
       </div>
     </div>
   );
@@ -87,7 +88,7 @@ class PanelErrorBoundary extends React.Component<
       return (
         <div className={`flex items-center justify-center h-full ${bgPrimary}`}>
           <div className="flex flex-col items-center gap-3 p-6 max-w-md text-center">
-            <span className={`text-sm font-medium ${textPrimary}`}>Panel Error</span>
+            <span className={`text-sm font-medium ${textPrimary}`}>{i18n.t("common:errors.panelTitle")}</span>
             <span className={`text-xs ${textSecondary} break-all`}>{this.state.error.message}</span>
             <Button
               onClick={() => this.setState({ error: null })}
@@ -96,7 +97,7 @@ class PanelErrorBoundary extends React.Component<
               size="sm"
               className="mt-2"
             >
-              Retry
+              {i18n.t("common:actions.retry")}
             </Button>
           </div>
         </div>
@@ -174,7 +175,7 @@ function Watermark(_props: IWatermarkPanelProps) {
 
         {/* Byline - closer to title */}
         <p className={`text-lg ${textSecondary} font-ubuntu -mt-4`}>
-          by Wired Square
+          {t("watermark.byline")}
         </p>
 
         {/* App launcher — grouped by registry group, dividers between groups.
@@ -217,16 +218,6 @@ function Watermark(_props: IWatermarkPanelProps) {
   );
 }
 
-// Panel ID → menus.json key — derived from the registry.
-const panelI18nKeys = Object.fromEntries(
-  apps.map((a) => [a.id, a.i18nKey]),
-) as Record<PanelId, string>;
-
-function getPanelTitle(t: TFunction, panelId: PanelId): string {
-  const key = panelI18nKeys[panelId];
-  return key ? t(`panels.${key}`) : panelId;
-}
-
 export default function MainLayout() {
   const { t } = useTranslation("menus");
   const apiRef = useRef<DockviewApi | null>(null);
@@ -246,7 +237,7 @@ export default function MainLayout() {
   // Surface which window this is in the OS title bar (multi-window setups).
   useEffect(() => {
     void getCurrentWebviewWindow().setTitle(`WireTAP — ${formatWindowName(windowLabel)}`);
-  }, [windowLabel]);
+  }, [windowLabel, t]);
 
   // Mirror repeat-transmit lifecycle (e.g. agent-started repeats) from the WS
   // push channel into the transmit queue, opening the Transmit panel on start.
@@ -462,7 +453,7 @@ export default function MainLayout() {
         event.api.addPanel({
           id: "discovery",
           component: "discovery",
-          title: getPanelTitle(t, "discovery"),
+          title: appTitle(t, "discovery"),
         });
         restoringLayout = false;
       }
@@ -493,7 +484,7 @@ export default function MainLayout() {
       apiRef.current.addPanel({
         id: panelId,
         component: panelId,
-        title: getPanelTitle(t, panelId as PanelId),
+        title: appTitle(t, panelId),
       });
     }
   }, []);
@@ -605,7 +596,7 @@ export default function MainLayout() {
       <div className={`h-screen flex items-center justify-center ${bgPrimary}`}>
         <div className="flex flex-col items-center gap-3">
           <div className="w-8 h-8 border-2 border-accent-primary border-t-transparent rounded-full animate-spin" />
-          <span className={`text-sm ${textSecondary}`}>Loading layout...</span>
+          <span className={`text-sm ${textSecondary}`}>{t("common:states.loadingLayout")}</span>
         </div>
       </div>
     );

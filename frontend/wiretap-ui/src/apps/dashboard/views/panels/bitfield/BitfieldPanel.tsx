@@ -73,7 +73,7 @@ export default function BitfieldPanel({ panel, svgRef: svgRefProp }: Props) {
                   <rect key={`c${col}`} x={x} y={y} width={CELL} height={CELL} rx={3}
                     fill={on ? onColour : offColour}
                     style={{ transition: "fill 0.1s ease-out" }}>
-                    <title>{`${formatFrameId(frameId)} byte ${row} bit ${bit} = ${on}${label ? ` (${label})` : ""}`}</title>
+                    <title>{t(label ? "panel.bitfieldCellLabelled" : "panel.bitfieldCell", { frameId: formatFrameId(frameId), row, bit, on: String(on), label })}</title>
                   </rect>
                 );
               })}

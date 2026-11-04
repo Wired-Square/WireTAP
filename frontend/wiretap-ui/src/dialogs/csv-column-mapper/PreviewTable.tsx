@@ -189,7 +189,7 @@ export default function PreviewTable({
                       title={header}
                     >
                       {showImportedTs && colIdx === tsColIndex
-                        ? "Offset"
+                        ? t("csvColumnMapperPreview.offset")
                         : header}
                     </td>
                   );

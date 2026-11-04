@@ -40,7 +40,7 @@ function LoadingFallback() {
     <div className="flex items-center justify-center h-screen bg-primary">
       <div className="flex flex-col items-center gap-3">
         <div className="w-8 h-8 border-2 border-accent-primary border-t-transparent rounded-full animate-spin" />
-        <span className="text-sm text-muted">Loading...</span>
+        <span className="text-sm text-muted">{i18n.t("common:states.loading")}</span>
       </div>
     </div>
   );
@@ -154,8 +154,8 @@ export default function WireTAP() {
       if (recovered) {
         tlog.info("[recovery] WebView recovered from system memory event");
         useSessionStore.getState().showAppError(
-          "Session Recovered",
-          "The system reclaimed memory from this window and the page was automatically reloaded. Your session has been reconnected.",
+          i18n.t("common:errors.sessionRecoveredTitle"),
+          i18n.t("common:errors.sessionRecovered"),
         );
       }
     });

@@ -6,7 +6,9 @@
 
 import type { LucideIcon } from "lucide-react";
 import { LineChart, Gauge, List, Waves, Grid3X3, BarChart2, Lightbulb, LifeBuoy, SlidersHorizontal, Binary, PenTool, Shapes } from "lucide-react";
+import i18n from "i18next";
 import type { DashboardPanel, PanelType } from "../../../stores/dashboardStore";
+import { FALLBACK_LANGUAGE } from "../../../locales";
 
 /** How a widget sources its data — drives default binding + auto-widget selection. */
 export type DataShape = "scalar" | "enum" | "bitfield" | "timeseries" | "raw";
@@ -25,8 +27,10 @@ export interface WidgetMeta {
   surface: Surface;
   dataShape: DataShape;
   category: WidgetCategory;
+  /** Key under "dashboard:defaultTitles"; the title a panel shows until it is given one. */
+  defaultTitle: string;
   /** Merged into a new panel on creation. */
-  defaultConfig: Partial<DashboardPanel>;
+  defaultConfig?: Partial<DashboardPanel>;
   defaultSize: { w: number; h: number };
   supportsCsv?: boolean;
 }
@@ -39,7 +43,7 @@ export const WIDGET_META: Partial<Record<PanelType, WidgetMeta>> = {
     surface: "canvas",
     dataShape: "timeseries",
     category: "signal",
-    defaultConfig: { title: "Line Chart" },
+    defaultTitle: "lineChart",
     defaultSize: { w: 6, h: 3 },
     supportsCsv: true,
   },
@@ -50,7 +54,7 @@ export const WIDGET_META: Partial<Record<PanelType, WidgetMeta>> = {
     surface: "svg",
     dataShape: "scalar",
     category: "signal",
-    defaultConfig: { title: "Gauge" },
+    defaultTitle: "gauge",
     defaultSize: { w: 3, h: 3 },
   },
   list: {
@@ -60,7 +64,7 @@ export const WIDGET_META: Partial<Record<PanelType, WidgetMeta>> = {
     surface: "dom",
     dataShape: "scalar",
     category: "signal",
-    defaultConfig: { title: "List" },
+    defaultTitle: "list",
     defaultSize: { w: 3, h: 3 },
   },
   flow: {
@@ -70,7 +74,7 @@ export const WIDGET_META: Partial<Record<PanelType, WidgetMeta>> = {
     surface: "canvas",
     dataShape: "timeseries",
     category: "raw",
-    defaultConfig: { title: "Flow View" },
+    defaultTitle: "flow",
     defaultSize: { w: 6, h: 3 },
     supportsCsv: true,
   },
@@ -81,7 +85,7 @@ export const WIDGET_META: Partial<Record<PanelType, WidgetMeta>> = {
     surface: "svg",
     dataShape: "bitfield",
     category: "raw",
-    defaultConfig: { title: "Bit Heatmap" },
+    defaultTitle: "heatmap",
     defaultSize: { w: 3, h: 3 },
   },
   histogram: {
@@ -91,7 +95,7 @@ export const WIDGET_META: Partial<Record<PanelType, WidgetMeta>> = {
     surface: "canvas",
     dataShape: "scalar",
     category: "raw",
-    defaultConfig: { title: "Histogram" },
+    defaultTitle: "histogram",
     defaultSize: { w: 4, h: 3 },
   },
   "icon-state": {
@@ -101,7 +105,7 @@ export const WIDGET_META: Partial<Record<PanelType, WidgetMeta>> = {
     surface: "svg",
     dataShape: "enum",
     category: "signal",
-    defaultConfig: { title: "Indicator" },
+    defaultTitle: "iconState",
     defaultSize: { w: 2, h: 2 },
   },
   rotary: {
@@ -111,7 +115,8 @@ export const WIDGET_META: Partial<Record<PanelType, WidgetMeta>> = {
     surface: "svg",
     dataShape: "scalar",
     category: "signal",
-    defaultConfig: { title: "Rotary", minValue: -540, maxValue: 540 },
+    defaultTitle: "rotary",
+    defaultConfig: { minValue: -540, maxValue: 540 },
     defaultSize: { w: 3, h: 3 },
   },
   "level-bar": {
@@ -121,7 +126,7 @@ export const WIDGET_META: Partial<Record<PanelType, WidgetMeta>> = {
     surface: "svg",
     dataShape: "scalar",
     category: "signal",
-    defaultConfig: { title: "Level" },
+    defaultTitle: "levelBar",
     defaultSize: { w: 3, h: 2 },
   },
   bitfield: {
@@ -131,7 +136,7 @@ export const WIDGET_META: Partial<Record<PanelType, WidgetMeta>> = {
     surface: "svg",
     dataShape: "bitfield",
     category: "raw",
-    defaultConfig: { title: "Bitfield" },
+    defaultTitle: "bitfield",
     defaultSize: { w: 3, h: 3 },
   },
   "raw-canvas": {
@@ -141,7 +146,7 @@ export const WIDGET_META: Partial<Record<PanelType, WidgetMeta>> = {
     surface: "canvas",
     dataShape: "raw",
     category: "custom",
-    defaultConfig: { title: "Custom Canvas" },
+    defaultTitle: "rawCanvas",
     defaultSize: { w: 4, h: 4 },
   },
   "custom-svg": {
@@ -151,11 +156,22 @@ export const WIDGET_META: Partial<Record<PanelType, WidgetMeta>> = {
     surface: "svg",
     dataShape: "raw",
     category: "custom",
-    defaultConfig: { title: "Custom SVG" },
+    defaultTitle: "customSvg",
     defaultSize: { w: 4, h: 4 },
   },
 };
 
 export function getWidgetMeta(type: PanelType): WidgetMeta | undefined {
   return WIDGET_META[type];
+}
+
+const defaultTitleKey = (type: PanelType) => `dashboard:defaultTitles.${WIDGET_META[type]?.defaultTitle ?? "panel"}`;
+
+/** An empty title is the default; so is the English default an older dashboard saved. */
+export function hasDefaultTitle(panel: Pick<DashboardPanel, "type" | "title">): boolean {
+  return !panel.title || panel.title === i18n.t(defaultTitleKey(panel.type), { lng: FALLBACK_LANGUAGE });
+}
+
+export function panelTitle(panel: Pick<DashboardPanel, "type" | "title">): string {
+  return hasDefaultTitle(panel) ? i18n.t(defaultTitleKey(panel.type)) : panel.title;
 }

@@ -21,22 +21,6 @@ export const FORMAT_EXTENSIONS: Record<ExportFormat, string> = {
   json: ".json",
 };
 
-export const FORMAT_DESCRIPTIONS: Record<ExportFormat, string> = {
-  text: "Plain text report with visual formatting",
-  markdown: "Structured markdown with tables and sections",
-  "html-screen": "Rich HTML with dark theme colors and styling",
-  "html-print": "Light theme HTML optimized for printing or PDF export",
-  json: "Raw JSON data for programmatic processing",
-};
-
-export const FORMAT_OPTIONS: { value: ExportFormat; label: string }[] = [
-  { value: "text", label: "Text" },
-  { value: "markdown", label: "Markdown" },
-  { value: "html-screen", label: "HTML (Screen Optimised)" },
-  { value: "html-print", label: "HTML (Print Optimised)" },
-  { value: "json", label: "JSON" },
-];
-
 /**
  * Get date prefix in reverse ISO format (YYYYMMDD-)
  */

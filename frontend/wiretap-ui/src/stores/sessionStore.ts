@@ -4,6 +4,7 @@
 // Session lifecycle and subscriber management is handled by Rust backend.
 // This store manages frontend state and event listeners.
 
+import i18n from "i18next";
 import * as Sentry from "@sentry/react";
 import { create } from "@wired-square/store/react";
 import { listen, emit } from "@tauri-apps/api/event";
@@ -595,7 +596,7 @@ function setupSessionEventSubscribers(sessionId: string, eventListeners: Session
               // show it directly rather than a generic sentence. A stable
               // fingerprint keeps these grouped as one Sentry issue despite the
               // device name / OS code varying.
-              showAppError("Stream Error", error, undefined, "stream-error", sessionId);
+              showAppError(i18n.t("common:errors.streamTitle"), error, undefined, "stream-error", sessionId);
             }
           }
           updateSession(sessionId, {
@@ -1474,7 +1475,7 @@ async function openNow(
   listeners.registeredSubscribers.add(subscriberId);
   const startProblem = opened.start_error ?? opened.startup_error;
   if (startProblem) {
-    useSessionStore.getState().showAppError("Stream Error", "An error occurred while starting the session.", startProblem);
+    useSessionStore.getState().showAppError(i18n.t("common:errors.streamTitle"), i18n.t("common:errors.sessionStartFailed"), startProblem);
   }
 
   const captureId = opened.capture_id;

@@ -1,5 +1,6 @@
 // ui/src/utils/timeFormat.ts
 
+import i18n from "i18next";
 import React from "react";
 import type { TimeDisplayFormat } from "../types/common";
 
@@ -137,7 +138,7 @@ const DATETIME_LOCAL = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.
 export function datetimeLocalToMicros(value: string, mode: "local" | "utc"): number | null {
   if (!value) return null;
   const match = DATETIME_LOCAL.exec(value);
-  if (!match) throw new Error(`"${value}" is not a date and time`);
+  if (!match) throw new Error(i18n.t("common:errors.notDateTime", { value }));
   const typed = match.slice(1, 7).map((part) => Number(part ?? 0));
   const [y, mo, d, h, mi, s] = typed;
   const at = mode === "utc" ? new Date(Date.UTC(y, mo - 1, d, h, mi, s)) : new Date(y, mo - 1, d, h, mi, s);

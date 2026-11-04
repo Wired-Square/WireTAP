@@ -6,6 +6,7 @@
 // For framing detection (SLIP, Modbus RTU, delimiter-based), see api/framingDetection.ts;
 // that analysis runs in Rust, against the framer that would actually read the line.
 
+import i18n, { type TFunction } from 'i18next';
 import { detectChecksum, type ChecksumCandidate } from '../../api/checksums';
 import { serialStructure, type CandidateReason, type FieldCandidate } from '../../api/byteRoles';
 
@@ -55,21 +56,23 @@ export type SerialFrameAnalysisResult = {
 // Analysis
 // ============================================================================
 
-/** The English note for one of a candidate's reasons, as the TypeScript scorer wrote it. */
-export function candidateReasonNote(reason: CandidateReason, len: number): string {
-  const wide = len === 2;
+/** The note for one of a candidate's reasons; a two-byte candidate has its own wording. */
+export function candidateReasonNote(t: TFunction, reason: CandidateReason, len: number): string {
+  const wide = len === 2 ? "Wide" : "";
+  const say = (key: string, options?: Record<string, unknown>) => t(`discovery:serialAnalysis.reasons.${key}`, options);
   switch (reason.code) {
-    case 'protocolMarkers': return 'Contains common protocol markers (0xFB-0xFE)';
-    case 'commandIds': return 'Contains small sequential values (likely command IDs)';
-    case 'typeSubtype': return `First byte has only ${reason.firstByteValues} values (type + subtype pattern)`;
-    case 'deviceCount': return wide
-      ? `${reason.count} unique 16-bit addresses (strong pattern)`
-      : `${reason.count} unique addresses (typical device count)`;
-    case 'addressCount': return wide ? `${reason.count} unique 16-bit addresses` : `${reason.count} unique addresses`;
-    case 'twelveBitRange': return '12-bit address range';
-    case 'evenDistribution': return wide ? 'Even distribution' : 'Even distribution across addresses';
-    case 'smallAddresses': return 'Small address values (0x00-0x20)';
-    case 'noZeroAddress': return wide ? 'No zero address' : 'No zero address (typical for device IDs)';
+    case 'protocolMarkers':
+    case 'commandIds':
+    case 'twelveBitRange':
+    case 'smallAddresses':
+      return say(reason.code);
+    case 'typeSubtype': return say('typeSubtype', { count: reason.firstByteValues });
+    case 'deviceCount':
+    case 'addressCount':
+      return say(`${reason.code}${wide}`, { count: reason.count });
+    case 'evenDistribution':
+    case 'noZeroAddress':
+      return say(`${reason.code}${wide}`);
   }
 }
 
@@ -80,12 +83,16 @@ function toCandidate(c: FieldCandidate): CandidateIdGroup {
     uniqueValues: c.values,
     sampleCount: c.sampleCount,
     confidence: c.confidence,
-    notes: c.reasons.map((r) => candidateReasonNote(r, c.len)),
+    notes: c.reasons.map((r) => candidateReasonNote(i18n.t.bind(i18n), r, c.len)),
   };
 }
 
 const byteSpan = (c: CandidateIdGroup) =>
-  `byte${c.length > 1 ? 's' : ''} [${c.startByte}${c.length > 1 ? ':' + (c.startByte + c.length - 1) : ''}]`;
+  c.length > 1
+    ? i18n.t('discovery:serialAnalysis.byteRangeMulti', { start: c.startByte, end: c.startByte + c.length - 1 })
+    : i18n.t('discovery:serialAnalysis.byteRangeSingle', { start: c.startByte });
+
+const note = (key: string, options?: Record<string, unknown>) => i18n.t(`discovery:serialAnalysis.notes.${key}`, options);
 
 /**
  * Find candidate id bytes, source addresses and checksums in a link's framed
@@ -103,7 +110,7 @@ export async function analyzeSerialFrameStructure(
       candidateIdGroups: [],
       candidateSourceAddresses: [],
       candidateChecksums: [],
-      notes: ['No frames to analyze'],
+      notes: [note('noFrames')],
     };
   }
 
@@ -114,18 +121,18 @@ export async function analyzeSerialFrameStructure(
   const { minLen: minLength, maxLen: maxLength } = structure;
   const hasVaryingLength = minLength !== maxLength;
 
-  const notes = [hasVaryingLength ? `Varying length: ${minLength}–${maxLength} bytes` : `Fixed length: ${minLength} bytes`];
+  const notes = [hasVaryingLength ? note('varyingLength', { min: minLength, max: maxLength }) : note('fixedLength', { count: minLength })];
   const [bestId] = candidateIdGroups;
   if (bestId) {
-    notes.push(`Best ID candidate: ${byteSpan(bestId)} with ${bestId.uniqueValues.length} distinct values`);
+    notes.push(note('bestId', { span: byteSpan(bestId), count: bestId.uniqueValues.length }));
   }
   const [bestSrc] = candidateSourceAddresses;
   if (bestSrc) {
-    notes.push(`Best source address candidate: ${byteSpan(bestSrc)} with ${bestSrc.uniqueValues.length} distinct values`);
+    notes.push(note('bestSource', { span: byteSpan(bestSrc), count: bestSrc.uniqueValues.length }));
   }
   const [bestChecksum] = candidateChecksums;
   if (bestChecksum) {
-    notes.push(`Best checksum candidate: ${bestChecksum.algorithm} at byte ${bestChecksum.position} (${bestChecksum.matchRate.toFixed(0)}% match rate)`);
+    notes.push(note('bestChecksum', { algorithm: bestChecksum.algorithm, position: bestChecksum.position, percent: bestChecksum.matchRate.toFixed(0) }));
   }
 
   return {
@@ -138,15 +145,4 @@ export async function analyzeSerialFrameStructure(
     candidateChecksums,
     notes,
   };
-}
-
-/**
- * Format an ID group candidate for display
- */
-export function formatIdCandidate(candidate: CandidateIdGroup): string {
-  const byteRange = candidate.length === 1
-    ? `byte[${candidate.startByte}]`
-    : `bytes[${candidate.startByte}:${candidate.startByte + candidate.length - 1}]`;
-
-  return `${byteRange}: ${candidate.uniqueValues.length} distinct values (${candidate.confidence.toFixed(0)}% confidence)`;
 }

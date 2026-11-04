@@ -16,6 +16,8 @@ import { useCatalogList } from "../../../hooks/useCatalogList";
 import { Button, IconButton } from "../../../components/Button";
 import { Badge } from "../../../components/Badge";
 import { protocolLabel, protocolTone } from "../../../utils/profileTraits";
+import { appTitle } from "../../registry";
+import { ioStateLabel } from "../stores/sessionLogStore";
 import { Checkbox, Input, Select } from "../../../components/forms";
 
 interface SessionDetailPanelProps {
@@ -174,7 +176,7 @@ function SessionDetails({
           isPaused ? "text-info" :
           "text-danger"
         }`}>
-          {getStateType(session.state)}
+          {ioStateLabel(session.state)}
         </p>
       </div>
 
@@ -397,10 +399,9 @@ function SessionDetails({
                   variant="tonal"
                   tone="cyan"
                   size="sm"
-                  className="capitalize"
                 >
                   <Plug className={iconSm} />
-                  {appName}
+                  {appTitle(t, appName)}
                 </Button>
               ))}
             </div>
@@ -908,8 +909,8 @@ function EdgeDetails({
             {subscriberId}
           </p>
           {listener && (
-            <p className="text-xs text-muted capitalize">
-              {listener.app_name || subscriberId}
+            <p className="text-xs text-muted">
+              {appTitle(t, listener.app_name || subscriberId)}
             </p>
           )}
         </div>

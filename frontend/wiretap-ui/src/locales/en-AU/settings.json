@@ -761,7 +761,7 @@
     "deleteCatalogTitle": "Delete Catalog",
     "deleteSelectionSetTitle": "Delete Selection Set",
     "deleteDashboardLayoutTitle": "Delete Dashboard Layout",
-    "areYouSure": "Are you sure you want to delete"
+    "areYouSure": "Are you sure you want to delete <name>{{name}}</name>"
   },
   "ioDeviceStatus": {
     "firmware": "Firmware",

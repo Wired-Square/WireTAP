@@ -6,6 +6,7 @@ import { Trash2, Settings2, Copy, Maximize2, ChevronsRight, BarChart2, Download,
 import { iconSm } from "../../../../styles/spacing";
 import { useDashboardStore, type DashboardPanel } from "../../../../stores/dashboardStore";
 import { getWidget } from "../../widgets/registry";
+import { panelTitle } from "../../widgets/widgetMeta";
 import { IconButton } from "../../../../components/Button";
 import { Card } from "../../../../components/Card";
 import { Menu, MenuHeading, MenuItem, MenuSeparator, usePopover } from "../../../../components/Menu";
@@ -84,7 +85,7 @@ export default function PanelWrapper({ panel, onOpenPanelConfig, onExport, onExp
       >
         <div className="flex items-center px-2 py-0.5">
           <div className="flex-1 min-w-0 text-xs font-medium text-primary truncate">
-            {panel.title}
+            {panelTitle(panel)}
           </div>
 
           {/* Overflow menu button — always visible */}

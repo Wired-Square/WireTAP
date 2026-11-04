@@ -604,7 +604,7 @@ function MultiBusSection({ multiBus, format }: MultiBusSectionProps) {
                     <div className="flex flex-wrap gap-1">
                       {counts.map(([bus]) => (
                         <Badge key={bus} tone="danger" size="sm" mono>
-                          {t("messageOrder.busLabel", { bus })}
+                          {t("common:busNumber", { bus })}
                         </Badge>
                       ))}
                     </div>

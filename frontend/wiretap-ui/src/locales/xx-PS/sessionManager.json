@@ -208,5 +208,13 @@
       "mcp_disconnected": "⟦MCP Disconnect⟧",
       "cleared": "⟦Cleared⟧"
     }
+  },
+  "ioStates": {
+    "stopped": "⟦stopped⟧",
+    "starting": "⟦starting⟧",
+    "running": "⟦running⟧",
+    "paused": "⟦paused⟧",
+    "error": "⟦error⟧",
+    "errorWithMessage": "⟦error: {{message}}⟧"
   }
 }

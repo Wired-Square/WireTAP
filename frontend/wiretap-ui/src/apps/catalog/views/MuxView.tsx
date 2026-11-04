@@ -92,7 +92,7 @@ export default function MuxView({
 
       {mux.notes && (
         <div className={`p-3 ${bgSurface} rounded-lg`}>
-          <div className={labelSmallMuted}>{t("muxView.notes")}</div>
+          <div className={labelSmallMuted}>{t("shared.notes")}</div>
           <div className="text-sm text-secondary whitespace-pre-wrap">
             {mux.notes.join("\n")}
           </div>
@@ -151,8 +151,8 @@ export default function MuxView({
       <ConfirmDeleteDialog
         open={confirmOpen}
         title={t("muxView.deleteMuxTitle")}
-        message={t("muxView.deleteMuxMessage")}
-        highlightText={mux.name || undefined}
+        messageKey="catalog:muxView.deleteMuxMessage"
+        name={mux.name || undefined}
         confirmText={t("muxView.deleteLabel")}
         onCancel={() => setConfirmOpen(false)}
         onConfirm={() => {

@@ -1,6 +1,7 @@
 // ui/src/stores/decoderStore.ts
 
 import { create } from '@wired-square/store/react';
+import i18n from 'i18next';
 import { tlog } from '../api/settings';
 import { LRUMap } from '../utils/LRUMap';
 import { useSettingsStore } from '../apps/settings/stores/settingsStore';
@@ -846,7 +847,7 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
       .map(([, f]) => ({ id: f.frameId, len: f.length, isExtended: !!f.isExtended, protocol: null }))
       .sort((a, b) => a.id - b.id);
 
-    const saved = await withAppError('Save Error', 'The catalogue was not saved', async () => {
+    const saved = await withAppError(i18n.t('common:errors.saveTitle'), i18n.t('common:errors.catalogueNotSaved'), async () => {
       const text = await exportFramesCatalog(
         selectedFramesList,
         {

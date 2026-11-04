@@ -487,8 +487,8 @@ export default function Settings() {
       <ConfirmDeleteDialog
         open={dialogs.deleteIOProfile}
         title={t("confirmDelete.deleteIoProfileTitle")}
-        message={t("confirmDelete.areYouSure")}
-        highlightText={dialogPayload.ioProfileToDelete?.name}
+        messageKey="settings:confirmDelete.areYouSure"
+        name={dialogPayload.ioProfileToDelete?.name}
         onCancel={handlers.handleCancelDeleteIOProfile}
         onConfirm={handlers.handleConfirmDeleteIOProfile}
       />
@@ -497,8 +497,8 @@ export default function Settings() {
       <ConfirmDeleteDialog
         open={dialogs.deleteCatalog}
         title={t("confirmDelete.deleteCatalogTitle")}
-        message={t("confirmDelete.areYouSure")}
-        highlightText={
+        messageKey="settings:confirmDelete.areYouSure"
+        name={
           dialogPayload.catalogToDelete?.name ||
           dialogPayload.catalogToDelete?.filename
         }
@@ -543,8 +543,8 @@ export default function Settings() {
       <ConfirmDeleteDialog
         open={dialogs.deleteSelectionSet}
         title={t("confirmDelete.deleteSelectionSetTitle")}
-        message={t("confirmDelete.areYouSure")}
-        highlightText={dialogPayload.selectionSetToDelete?.name}
+        messageKey="settings:confirmDelete.areYouSure"
+        name={dialogPayload.selectionSetToDelete?.name}
         onCancel={handlers.handleCancelDeleteSelectionSet}
         onConfirm={handlers.handleConfirmDeleteSelectionSet}
       />
@@ -562,8 +562,8 @@ export default function Settings() {
       <ConfirmDeleteDialog
         open={dialogs.deleteDashboardLayout}
         title={t("confirmDelete.deleteDashboardLayoutTitle")}
-        message={t("confirmDelete.areYouSure")}
-        highlightText={dialogPayload.dashboardLayoutToDelete?.name}
+        messageKey="settings:confirmDelete.areYouSure"
+        name={dialogPayload.dashboardLayoutToDelete?.name}
         onCancel={handlers.handleCancelDeleteDashboardLayout}
         onConfirm={handlers.handleConfirmDeleteDashboardLayout}
       />

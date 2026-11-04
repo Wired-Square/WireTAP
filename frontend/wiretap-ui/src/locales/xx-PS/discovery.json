@@ -144,7 +144,6 @@
     "multiBusHint": "⟦(same ID seen on multiple buses)⟧",
     "tableBuses": "⟦Buses⟧",
     "tableCountPerBus": "⟦Count per Bus⟧",
-    "busLabel": "⟦Bus {{bus}}⟧",
     "intervalGroups": "⟦Repetition Period Groups⟧",
     "intervalHint": "⟦(frames grouped by how often they repeat)⟧",
     "frameCount_one": "⟦({{count}} frame)⟧",
@@ -439,7 +438,38 @@
     "sampleValues": "⟦Sample values:⟧",
     "sampleAddresses": "⟦Sample addresses:⟧",
     "moreItems": "⟦+{{count}} more⟧",
-    "close": "⟦Close⟧"
+    "close": "⟦Close⟧",
+    "reasons": {
+      "protocolMarkers": "⟦Contains common protocol markers (0xFB-0xFE)⟧",
+      "commandIds": "⟦Contains small sequential values (likely command IDs)⟧",
+      "typeSubtype_one": "⟦First byte has only {{count}} value (type + subtype pattern)⟧",
+      "typeSubtype_other": "⟦First byte has only {{count}} values (type + subtype pattern)⟧",
+      "deviceCountWide_one": "⟦{{count}} unique 16-bit address (strong pattern)⟧",
+      "deviceCountWide_other": "⟦{{count}} unique 16-bit addresses (strong pattern)⟧",
+      "deviceCount_one": "⟦{{count}} unique address (typical device count)⟧",
+      "deviceCount_other": "⟦{{count}} unique addresses (typical device count)⟧",
+      "addressCountWide_one": "⟦{{count}} unique 16-bit address⟧",
+      "addressCountWide_other": "⟦{{count}} unique 16-bit addresses⟧",
+      "addressCount_one": "⟦{{count}} unique address⟧",
+      "addressCount_other": "⟦{{count}} unique addresses⟧",
+      "twelveBitRange": "⟦12-bit address range⟧",
+      "evenDistributionWide": "⟦Even distribution⟧",
+      "evenDistribution": "⟦Even distribution across addresses⟧",
+      "smallAddresses": "⟦Small address values (0x00-0x20)⟧",
+      "noZeroAddressWide": "⟦No zero address⟧",
+      "noZeroAddress": "⟦No zero address (typical for device IDs)⟧"
+    },
+    "notes": {
+      "noFrames": "⟦No frames to analyze⟧",
+      "varyingLength": "⟦Varying length: {{min}}–{{max}} bytes⟧",
+      "fixedLength_one": "⟦Fixed length: {{count}} byte⟧",
+      "fixedLength_other": "⟦Fixed length: {{count}} bytes⟧",
+      "bestId_one": "⟦Best ID candidate: {{span}} with {{count}} distinct value⟧",
+      "bestId_other": "⟦Best ID candidate: {{span}} with {{count}} distinct values⟧",
+      "bestSource_one": "⟦Best source address candidate: {{span}} with {{count}} distinct value⟧",
+      "bestSource_other": "⟦Best source address candidate: {{span}} with {{count}} distinct values⟧",
+      "bestChecksum": "⟦Best checksum candidate: {{algorithm}} at byte {{position}} ({{percent}}% match rate)⟧"
+    }
   },
   "serial": {
     "rawBytesTitle": "⟦Raw Bytes Display⟧",
