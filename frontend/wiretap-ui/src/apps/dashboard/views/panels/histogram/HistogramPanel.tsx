@@ -1,6 +1,7 @@
 // ui/src/apps/dashboard/views/panels/histogram/HistogramPanel.tsx
 
 import { useRef, useEffect, useCallback, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import uPlot from "uplot";
 import "uplot/dist/uPlot.min.css";
 import { getSignalLabel, type DashboardPanel } from "../../../../../stores/dashboardStore";
@@ -34,6 +35,7 @@ function histogramData(perSignal: HistogramBin[][]): uPlot.AlignedData {
 }
 
 export default function HistogramPanel({ panel, canvasRef }: Props) {
+  const { t } = useTranslation("dashboard");
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<uPlot | null>(null);
   const bins = panel.histogramBins ?? 20;
@@ -152,7 +154,7 @@ export default function HistogramPanel({ panel, canvasRef }: Props) {
   if (panel.signals.length === 0) {
     return (
       <div className="flex items-center justify-center h-full">
-        <p className={emptyStateText}>Click + to add signals</p>
+        <p className={emptyStateText}>{t("panel.emptyAddSignals")}</p>
       </div>
     );
   }

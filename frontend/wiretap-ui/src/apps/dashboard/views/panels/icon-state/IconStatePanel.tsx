@@ -1,6 +1,7 @@
 // ui/src/apps/dashboard/views/panels/icon-state/IconStatePanel.tsx
 
 import { useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { type DashboardPanel } from "../../../../../stores/dashboardStore";
 import { useSettings } from "../../../../../hooks/useSettings";
 import { useSignalValues } from "../../../widgets/useSignalValues";
@@ -28,6 +29,7 @@ function pickState(value: number, cfg: IconStateConfig) {
 }
 
 export default function IconStatePanel({ panel, svgRef: svgRefProp }: Props) {
+  const { t } = useTranslation("dashboard");
   const { settings } = useSettings();
   const svgElRef = useRef<SVGSVGElement>(null);
   useSvgExportRef(svgElRef, svgRefProp);
@@ -36,7 +38,7 @@ export default function IconStatePanel({ panel, svgRef: svgRefProp }: Props) {
   const cfg = panel.widgetConfig?.iconState;
 
   if (panel.signals.length === 0 || !cfg) {
-    return <WidgetEmpty>{cfg ? "Click + to add a signal" : "Configure icon states"}</WidgetEmpty>;
+    return <WidgetEmpty>{cfg ? t("panel.emptyAddSignal") : t("panel.emptyIconStates")}</WidgetEmpty>;
   }
 
   const idx = Math.min(cfg.primarySignalIndex ?? 0, panel.signals.length - 1);

@@ -57,7 +57,10 @@
     "exportCsv": "Export CSV",
     "configure": "Configure",
     "clone": "Clone",
-    "remove": "Remove"
+    "remove": "Remove",
+    "emptyAddSignal": "Open ⋮ → Configure → Add Signals to add a signal",
+    "emptyAddSignals": "Open ⋮ → Configure → Add Signals to add signals",
+    "emptyIconStates": "No icon states: add an enum signal with “Add catalog signals as instruments”"
   },
   "import": {
     "placeholder": "Paste a graph layout JSON here…"
