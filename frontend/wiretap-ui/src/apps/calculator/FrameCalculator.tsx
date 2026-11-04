@@ -494,7 +494,7 @@ export default function FrameCalculator() {
           value={rawInput}
           onChange={(e) => setRawInput(e.target.value)}
           size="lg"
-          className="flex-1 min-w-32 font-ubuntu-mono text-base tracking-wider uppercase"
+          className="flex-1 min-w-32 font-ubuntu-mono text-base tracking-wider"
           placeholder={
             inputMode === "hex"
               ? "01020304"
