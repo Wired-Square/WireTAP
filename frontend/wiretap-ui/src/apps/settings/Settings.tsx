@@ -244,7 +244,7 @@ export default function Settings() {
     { id: "devices", label: t("sidebar.devices"), icon: Cpu },
     { id: "general", label: t("sidebar.general"), icon: Cog },
     { id: "dashboard-layouts", label: t("sidebar.dashboardLayouts"), icon: LayoutGrid },
-    { id: "mcp", label: "MCP Server", icon: Bot },
+    { id: "mcp", label: t("sidebar.mcp"), icon: Bot },
     { id: "privacy", label: t("sidebar.privacy"), icon: Shield },
     { id: "selection-sets", label: t("sidebar.selectionSets"), icon: Star },
     // Hide Storage on iOS - custom directory paths aren't supported

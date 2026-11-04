@@ -7,7 +7,8 @@
 // effect only when "Apply & restart server" is pressed (one restart, rather
 // than bouncing the server — and disconnecting any client — on every tick).
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Trans, useTranslation } from "react-i18next";
 import { invoke } from "@tauri-apps/api/core";
 import { Copy, RefreshCw, Check } from "lucide-react";
 import { useSettingsStore } from "../stores/settingsStore";
@@ -36,6 +37,7 @@ interface McpStatus {
 const STOPPED_STATUS: McpStatus = { running: false, port: null, restartPending: false };
 
 export default function McpServerView() {
+  const { t } = useTranslation("settings");
   const serverEnabled = useSettingsStore((s) => s.mcp.serverEnabled);
   const allowControl = useSettingsStore((s) => s.mcp.allowControl);
   const allowSessionControl = useSettingsStore((s) => s.mcp.allowSessionControl);
@@ -127,108 +129,30 @@ export default function McpServerView() {
   // server; the button is always clickable, this only drives its emphasis.
   const pendingRestart = status.restartPending;
 
-  let applyMessage: string;
-  if (pendingRestart && status.running) {
-    applyMessage = "Unapplied changes — press Apply & restart server for them to take effect.";
-  } else if (pendingRestart) {
-    applyMessage = "Server is enabled but not running — press Apply to start it.";
-  } else if (status.running) {
-    applyMessage = "The running server matches these settings.";
-  } else {
-    applyMessage = "The MCP server is off — enable it above to start.";
-  }
+  const applyStatus = pendingRestart
+    ? status.running ? "unappliedRunning" : "notRunning"
+    : status.running ? "matches" : "off";
 
   // Permission gates — each adds a group of write/control tools. Staged (applied
   // on "Apply & restart server"), so each toggles via `staged(setter)`.
-  const permissionGates: {
-    label: string;
-    checked: boolean;
-    setter: (v: boolean) => void;
-    help: ReactNode;
-  }[] = [
-    {
-      label: "Allow control tools",
-      checked: allowControl,
-      setter: setAllowControl,
-      help: (
-        <>
-          Lets the client <strong>drive the app</strong> — transmit frames on the bus, write
-          Modbus registers and replay captures. Leave off for read-only introspection.
-        </>
-      ),
-    },
-    {
-      label: "Allow session open/stop",
-      checked: allowSessionControl,
-      setter: setAllowSessionControl,
-      help: (
-        <>
-          Lets the client <strong>open and stop sessions</strong> — e.g. start a Modbus session
-          polling from a profile's catalogue. Separate from the control gate above.
-        </>
-      ),
-    },
-    {
-      label: "Allow catalogue create (new files)",
-      checked: allowCatalogWrite,
-      setter: setAllowCatalogWrite,
-      help: (
-        <>
-          Lets the client <strong>create new decoder catalogues</strong> in the decoder
-          directory. Validated before writing; existing files are never overwritten.
-        </>
-      ),
-    },
-    {
-      label: "Allow catalogue modify (overwrite existing)",
-      checked: allowCatalogModify,
-      setter: setAllowCatalogModify,
-      help: (
-        <>
-          Lets the client <strong>overwrite existing decoder catalogues</strong>. Validated
-          before writing. Separate from the create gate above.
-        </>
-      ),
-    },
-    {
-      label: "Allow dashboard write",
-      checked: allowDashboardWrite,
-      setter: setAllowDashboardWrite,
-      help: (
-        <>
-          Lets the client <strong>create or overwrite dashboard files</strong> in the
-          dashboards directory. The JSON shape is validated; any embedded custom-widget code
-          is stored opaque and only ever runs later inside the sandboxed worker.
-        </>
-      ),
-    },
-    {
-      label: "Allow UI control (open panels, click and type)",
-      checked: allowUiControl,
-      setter: setAllowUiControl,
-      help: (
-        <>
-          Lets the client <strong>open or focus a panel</strong> in the running window — e.g.
-          show a dashboard it just authored. Requires the WireTAP window to be open.
-        </>
-      ),
-    },
+  const permissionGates: { key: string; checked: boolean; setter: (v: boolean) => void }[] = [
+    { key: "control", checked: allowControl, setter: setAllowControl },
+    { key: "sessionControl", checked: allowSessionControl, setter: setAllowSessionControl },
+    { key: "catalogueCreate", checked: allowCatalogWrite, setter: setAllowCatalogWrite },
+    { key: "catalogueModify", checked: allowCatalogModify, setter: setAllowCatalogModify },
+    { key: "dashboardWrite", checked: allowDashboardWrite, setter: setAllowDashboardWrite },
+    { key: "uiControl", checked: allowUiControl, setter: setAllowUiControl },
   ];
 
   const ApplyButton = pendingRestart ? PrimaryButton : SecondaryButton;
 
   return (
     <div className="space-y-6">
-      <h2 className={h2}>MCP Server</h2>
-      <p className={helpText}>
-        Exposes live WireTAP runtime state — sessions, captures, frame data, payload
-        analysis and decoded signals — to an external MCP client such as Claude Code,
-        over a localhost-only HTTP transport. Everything is off by default; the server
-        binds to 127.0.0.1 and stays read-only unless you grant control below.
-      </p>
+      <h2 className={h2}>{t("mcp.title")}</h2>
+      <p className={helpText}>{t("mcp.intro")}</p>
 
       <SettingToggleRow
-        label="Enable MCP server"
+        label={t("mcp.enable.label")}
         checked={serverEnabled}
         disabled={busy}
         onChange={(v) => {
@@ -237,9 +161,9 @@ export default function McpServerView() {
         }}
         help={
           <>
-            Starts the server listening on the port below.{" "}
+            {t("mcp.enable.help")}{" "}
             <span className={status.running ? textSuccess : textSecondary}>
-              {status.running ? `Running on 127.0.0.1:${status.port}` : "Stopped"}
+              {status.running ? t("mcp.enable.running", { port: status.port }) : t("mcp.enable.stopped")}
             </span>
           </>
         }
@@ -247,28 +171,32 @@ export default function McpServerView() {
 
       {/* Permissions — staged; applied on "Apply & restart server" */}
       <div className="space-y-1 pt-1">
-        <h3 className={`text-sm font-semibold ${textPrimary}`}>Permissions</h3>
+        <h3 className={`text-sm font-semibold ${textPrimary}`}>{t("mcp.permissions.title")}</h3>
         <p className={helpText}>
-          Grant only what the client needs. Read-only tools are always available; each
-          gate below adds a group of write/control tools. Permission, port and token
-          changes take effect when you press <strong>Apply &amp; restart server</strong>.
+          <Trans t={t} i18nKey="mcp.permissions.help" components={{ strong: <strong /> }} />
         </p>
       </div>
 
       {permissionGates.map((gate) => (
         <SettingToggleRow
-          key={gate.label}
-          label={gate.label}
+          key={gate.key}
+          label={t(`mcp.permissions.${gate.key}.label`)}
           checked={gate.checked}
           disabled={busy}
           warn
           onChange={staged(gate.setter)}
-          help={gate.help}
+          help={
+            <Trans
+              t={t}
+              i18nKey={`mcp.permissions.${gate.key}.help`}
+              components={{ strong: <strong /> }}
+            />
+          }
         />
       ))}
 
       {/* Port */}
-      <SettingRow label="Port" htmlFor="mcp-port" className="max-w-xs">
+      <SettingRow label={t("mcp.port.label")} htmlFor="mcp-port" className="max-w-xs">
         <Input
           id="mcp-port"
           type="number"
@@ -286,14 +214,14 @@ export default function McpServerView() {
       {/* Token */}
       <div className="space-y-2 max-w-xl">
         <label className={labelDefault} htmlFor="mcp-token">
-          Bearer token
+          {t("mcp.token.label")}
         </label>
         <div className="flex items-center gap-2">
           <Input
             id="mcp-token"
             type="text"
             value={serverToken}
-            placeholder="(no auth — leave blank for local-only)"
+            placeholder={t("mcp.token.placeholder")}
             onChange={(e) => {
               setServerToken(e.target.value);
               stageChange();
@@ -301,55 +229,46 @@ export default function McpServerView() {
             mono
           />
           <Button
-            title="Generate a new token"
+            title={t("mcp.token.generateTitle")}
             onClick={async () => {
               setServerToken(await invoke<string>("generate_mcp_token"));
               stageChange();
             }}
           >
-            <RefreshCw size={14} /> Generate
+            <RefreshCw size={14} /> {t("mcp.token.generate")}
           </Button>
           <Button
             disabled={!serverToken}
-            title="Copy token"
+            title={t("mcp.token.copyTitle")}
             onClick={() => copy("token", serverToken)}
           >
             {copied === "token" ? <Check size={14} /> : <Copy size={14} />}
           </Button>
         </div>
-        <p className={helpText}>
-          Clients must send this as a bearer token. Leave blank for no auth — the
-          localhost-only bind is then the sole protection.
-        </p>
+        <p className={helpText}>{t("mcp.token.help")}</p>
       </div>
 
       {/* Apply */}
       <div>
         <ApplyButton disabled={busy || !pendingRestart} onClick={() => apply(serverEnabled)}>
-          {busy ? "Applying…" : serverEnabled ? "Apply & restart server" : "Apply"}
+          {t(busy ? "mcp.apply.applying" : serverEnabled ? "mcp.apply.applyRestart" : "mcp.apply.apply")}
         </ApplyButton>
-        <p className={`${helpText} mt-2`}>{applyMessage}</p>
+        <p className={`${helpText} mt-2`}>{t(`mcp.apply.status.${applyStatus}`)}</p>
       </div>
 
       {/* Connection snippet */}
       <div className="space-y-2 max-w-2xl">
-        <label className={labelDefault}>Connect a client</label>
-        <p className={helpText}>For Claude Code, run:</p>
+        <label className={labelDefault}>{t("mcp.connect.label")}</label>
+        <p className={helpText}>{t("mcp.connect.claudeCode")}</p>
         <div className="flex items-start gap-2">
           <pre className="flex-1 text-xs font-mono whitespace-pre-wrap break-all bg-primary border border-default rounded p-3 text-primary">
             {addCommand}
           </pre>
-          <Button
-            title="Copy command"
-            onClick={() => copy("cmd", addCommand)}
-          >
+          <Button title={t("mcp.connect.copyTitle")} onClick={() => copy("cmd", addCommand)}>
             {copied === "cmd" ? <Check size={14} /> : <Copy size={14} />}
           </Button>
         </div>
-        <p className={helpText}>
-          Every read tool answers with no window open; the tools that
-          drive the page (open_app and the DOM tools) need it.
-        </p>
+        <p className={helpText}>{t("mcp.connect.windowNote")}</p>
       </div>
     </div>
   );

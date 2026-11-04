@@ -660,6 +660,72 @@
       "delete": "Delete graph layout"
     }
   },
+  "mcp": {
+    "title": "MCP Server",
+    "intro": "Exposes live WireTAP runtime state — sessions, captures, frame data, payload analysis and decoded signals — to an external MCP client such as Claude Code, over a localhost-only HTTP transport. Everything is off by default; the server binds to 127.0.0.1 and stays read-only unless you grant control below.",
+    "enable": {
+      "label": "Enable MCP server",
+      "help": "Starts the server listening on the port below.",
+      "running": "Running on 127.0.0.1:{{port}}",
+      "stopped": "Stopped"
+    },
+    "permissions": {
+      "title": "Permissions",
+      "help": "Grant only what the client needs. Read-only tools are always available; each gate below adds a group of write/control tools. Permission, port and token changes take effect when you press <strong>Apply & restart server</strong>.",
+      "control": {
+        "label": "Allow control tools",
+        "help": "Lets the client <strong>drive the app</strong> — transmit frames on the bus, write Modbus registers and replay captures. Leave off for read-only introspection."
+      },
+      "sessionControl": {
+        "label": "Allow session open/stop",
+        "help": "Lets the client <strong>open and stop sessions</strong> — e.g. start a Modbus session polling from a profile's catalogue. Separate from the control gate above."
+      },
+      "catalogueCreate": {
+        "label": "Allow catalogue create (new files)",
+        "help": "Lets the client <strong>create new decoder catalogues</strong> in the decoder directory. Validated before writing; existing files are never overwritten."
+      },
+      "catalogueModify": {
+        "label": "Allow catalogue modify (overwrite existing)",
+        "help": "Lets the client <strong>overwrite existing decoder catalogues</strong>. Validated before writing. Separate from the create gate above."
+      },
+      "dashboardWrite": {
+        "label": "Allow dashboard write",
+        "help": "Lets the client <strong>create or overwrite dashboard files</strong> in the dashboards directory. The JSON shape is validated; any embedded custom-widget code is stored opaque and only ever runs later inside the sandboxed worker."
+      },
+      "uiControl": {
+        "label": "Allow UI control (open panels, click and type)",
+        "help": "Lets the client <strong>open or focus a panel</strong> in the running window — e.g. show a dashboard it just authored. Requires the WireTAP window to be open."
+      }
+    },
+    "port": {
+      "label": "Port"
+    },
+    "token": {
+      "label": "Bearer token",
+      "placeholder": "(no auth — leave blank for local-only)",
+      "generate": "Generate",
+      "generateTitle": "Generate a new token",
+      "copyTitle": "Copy token",
+      "help": "Clients must send this as a bearer token. Leave blank for no auth — the localhost-only bind is then the sole protection."
+    },
+    "apply": {
+      "applying": "Applying…",
+      "applyRestart": "Apply & restart server",
+      "apply": "Apply",
+      "status": {
+        "unappliedRunning": "Unapplied changes — press Apply & restart server for them to take effect.",
+        "notRunning": "Server is enabled but not running — press Apply to start it.",
+        "matches": "The running server matches these settings.",
+        "off": "The MCP server is off — enable it above to start."
+      }
+    },
+    "connect": {
+      "label": "Connect a client",
+      "claudeCode": "For Claude Code, run:",
+      "copyTitle": "Copy command",
+      "windowNote": "Every read tool answers with no window open; the tools that drive the page (open_app and the DOM tools) need it."
+    }
+  },
   "sidebar": {
     "captures": "Captures",
     "catalogs": "Catalogs",
@@ -668,6 +734,7 @@
     "devices": "Devices",
     "general": "General",
     "dashboardLayouts": "Dashboard Layouts",
+    "mcp": "MCP Server",
     "privacy": "Privacy",
     "selectionSets": "Selection Sets",
     "storage": "Storage"
