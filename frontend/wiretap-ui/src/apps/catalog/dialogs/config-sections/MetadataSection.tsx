@@ -1,6 +1,7 @@
 // ui/src/apps/catalog/dialogs/config-sections/MetadataSection.tsx
 // Catalog metadata section for unified config dialog
 
+import { useTranslation } from "react-i18next";
 import { textMedium } from "../../../../styles";
 import { Input } from "../../../../components/forms";
 
@@ -17,28 +18,29 @@ export default function MetadataSection({
   version,
   setVersion,
 }: MetadataSectionProps) {
+  const { t } = useTranslation("catalog");
   return (
     <div className="space-y-4">
       <h3 className="text-sm font-semibold text-primary uppercase tracking-wide">
-        Catalog Metadata
+        {t("configSections.metadata")}
       </h3>
 
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className={`block ${textMedium} mb-2`}>
-            Name <span className="text-danger">*</span>
+            {t("configSections.name")} <span className="text-danger">*</span>
           </label>
           <Input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
             size="lg"
-            placeholder="My Catalog"
+            placeholder={t("configSections.namePlaceholder")}
           />
         </div>
         <div>
           <label className={`block ${textMedium} mb-2`}>
-            Version <span className="text-danger">*</span>
+            {t("configSections.version")} <span className="text-danger">*</span>
           </label>
           <Input
             type="number"

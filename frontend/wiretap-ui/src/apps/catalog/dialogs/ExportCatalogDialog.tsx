@@ -26,8 +26,6 @@ export type ExportCatalogDialogProps = {
 };
 
 interface FormatInfo {
-  name: string;
-  description: string;
   icon: typeof FileText;
   extension: string;
   filters: DialogFilter[];
@@ -36,48 +34,36 @@ interface FormatInfo {
 
 const FORMAT_INFO: Record<CatalogExportFormat, FormatInfo> = {
   toml: {
-    name: "TOML Catalog",
-    description: "Native WireTAP format. Preserves all features including nested multiplexing, confidence levels, and decode sets.",
     icon: FileText,
     extension: ".toml",
     filters: CATALOG_FILTERS,
     group: "data",
   },
   dbc: {
-    name: "DBC (Vector CANdb++)",
-    description: "Industry-standard format for CAN database files.",
     icon: Database,
     extension: ".dbc",
     filters: DBC_FILTERS,
     group: "data",
   },
   "html-screen": {
-    name: "HTML Report (Screen)",
-    description: "Rich HTML with dark theme colors and styling. Best for viewing on screen.",
     icon: FileCode,
     extension: ".html",
     filters: HTML_FILTERS,
     group: "report",
   },
   "html-print": {
-    name: "HTML Report (Print)",
-    description: "Light theme HTML optimized for printing or PDF export via browser print.",
     icon: FileCode,
     extension: ".html",
     filters: HTML_FILTERS,
     group: "report",
   },
   markdown: {
-    name: "Markdown Report",
-    description: "Structured markdown with tables and sections. Compatible with documentation tools.",
     icon: BookOpen,
     extension: ".md",
     filters: MARKDOWN_FILTERS,
     group: "report",
   },
   text: {
-    name: "Text Report",
-    description: "Plain text report with visual formatting. Works anywhere.",
     icon: FileText,
     extension: ".txt",
     filters: TEXT_FILTERS,
@@ -85,16 +71,10 @@ const FORMAT_INFO: Record<CatalogExportFormat, FormatInfo> = {
   },
 };
 
+const FORMATS = Object.keys(FORMAT_INFO) as CatalogExportFormat[];
+
 const optionCard = cardClass({ interactive: true }, "flex items-start gap-3");
 
-const FORMAT_OPTIONS: { value: CatalogExportFormat; label: string }[] = [
-  { value: "toml", label: "TOML Catalog (.toml)" },
-  { value: "dbc", label: "DBC File (.dbc)" },
-  { value: "html-screen", label: "HTML Report - Screen (.html)" },
-  { value: "html-print", label: "HTML Report - Print (.html)" },
-  { value: "markdown", label: "Markdown Report (.md)" },
-  { value: "text", label: "Text Report (.txt)" },
-];
 
 export default function ExportCatalogDialog({
   open,
@@ -108,7 +88,7 @@ export default function ExportCatalogDialog({
   const [isExporting, setIsExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { settings } = useSettings();
-  const { t } = useTranslation();
+  const { t } = useTranslation("catalog");
 
   const handleExport = async () => {
     setError(null);
@@ -166,13 +146,13 @@ export default function ExportCatalogDialog({
     <Dialog
       isOpen={open}
       onClose={onCancel}
-      title="Export Catalog"
+      title={t("exportDialog.title")}
       icon={<Download className="text-orange" />}
     >
       <DialogBody className="space-y-4">
         <div>
           <label className={`block ${sectionHeaderText} mb-2`}>
-            Export Format
+            {t("exportDialog.format")}
           </label>
           <Select
             value={format}
@@ -182,16 +162,13 @@ export default function ExportCatalogDialog({
             }}
             size="lg"
           >
-            <optgroup label="Data Formats">
-              {FORMAT_OPTIONS.filter(o => FORMAT_INFO[o.value].group === "data").map(opt => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </optgroup>
-            <optgroup label="Documentation Reports">
-              {FORMAT_OPTIONS.filter(o => FORMAT_INFO[o.value].group === "report").map(opt => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </optgroup>
+            {(["data", "report"] as const).map((group) => (
+              <optgroup key={group} label={t(`exportDialog.groups.${group}`)}>
+                {FORMATS.filter((f) => FORMAT_INFO[f].group === group).map((f) => (
+                  <option key={f} value={f}>{t(`exportDialog.formats.${f}.option`)}</option>
+                ))}
+              </optgroup>
+            ))}
           </Select>
         </div>
 
@@ -200,10 +177,10 @@ export default function ExportCatalogDialog({
             <FormatIcon className={`${iconLg} text-muted mt-0.5`} />
             <div>
               <div className="font-medium text-primary">
-                {formatInfo.name}
+                {t(`exportDialog.formats.${format}.name`)}
               </div>
               <div className="text-sm text-muted mt-1">
-                {formatInfo.description}
+                {t(`exportDialog.formats.${format}.description`)}
               </div>
             </div>
           </div>
@@ -212,7 +189,7 @@ export default function ExportCatalogDialog({
         {format === "dbc" && (
           <div>
             <label className={`block ${sectionHeaderText} mb-2`}>
-              Multiplexing Mode
+              {t("exportDialog.muxMode")}
             </label>
             <div className="space-y-2">
               <label className={optionCard}>
@@ -225,10 +202,10 @@ export default function ExportCatalogDialog({
                 />
                 <div>
                   <div className="font-medium text-primary text-sm">
-                    Extended (SG_MUL_VAL_)
+                    {t("exportDialog.muxExtended")}
                   </div>
                   <div className={`${caption} mt-0.5`}>
-                    Uses SG_MUL_VAL_ section with mNM notation for nested multiplexors. Best for modern tools.
+                    {t("exportDialog.muxExtendedHint")}
                   </div>
                 </div>
               </label>
@@ -242,10 +219,10 @@ export default function ExportCatalogDialog({
                 />
                 <div>
                   <div className="font-medium text-primary text-sm">
-                    Flattened (Legacy)
+                    {t("exportDialog.muxFlattened")}
                   </div>
                   <div className={`${caption} mt-0.5`}>
-                    Flattens nested mux into composite values. Compatible with older tools.
+                    {t("exportDialog.muxFlattenedHint")}
                   </div>
                 </div>
               </label>
@@ -264,7 +241,7 @@ export default function ExportCatalogDialog({
           onClick={onCancel}
           disabled={isExporting}
         >
-          {t("actions.cancel")}
+          {t("common:actions.cancel")}
         </SecondaryButton>
         <Button
           onClick={handleExport}
@@ -276,12 +253,12 @@ export default function ExportCatalogDialog({
           {isExporting ? (
             <>
               <div className="w-4 h-4 border-2 border-current/30 border-t-current rounded-full animate-spin" />
-              Saving...
+              {t("exportDialog.saving")}
             </>
           ) : (
             <>
               <Download className={iconMd} />
-              Save As...
+              {t("exportDialog.saveAs")}
             </>
           )}
         </Button>

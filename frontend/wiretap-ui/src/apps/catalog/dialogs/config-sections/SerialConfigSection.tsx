@@ -3,6 +3,7 @@
 
 import { useState, useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import { Cable, Plus, Trash2, ChevronDown, ChevronRight } from "lucide-react";
 import { iconMd, flexRowGap2 } from "../../../../styles/spacing";
 import { caption, textMedium } from "../../../../styles";
@@ -15,17 +16,13 @@ import { Button, IconButton } from "../../../../components/Button";
 import { Select, Input, Checkbox } from "../../../../components/forms";
 import { Badge } from "../../../../components/Badge";
 import { Card } from "../../../../components/Card";
+import { protocolLabel } from "../../../../utils/profileTraits";
 import { ConfigSectionHeader } from "./ConfigSectionHeader";
 import SerialEncodingSelect from "./SerialEncodingSelect";
 /** Predefined header field types */
 type FieldType = "id" | "source_address" | "destination_address" | "custom";
 
-const FIELD_TYPE_OPTIONS: Array<{ value: FieldType; label: string }> = [
-  { value: "id", label: "ID" },
-  { value: "source_address", label: "Source Address" },
-  { value: "destination_address", label: "Destination Address" },
-  { value: "custom", label: "Custom" },
-];
+const FIELD_TYPES: FieldType[] = ["id", "source_address", "destination_address", "custom"];
 
 /** Format a mask number as a hex string */
 function formatMaskHex(mask: number, numBytes: number = 2): string {
@@ -34,8 +31,8 @@ function formatMaskHex(mask: number, numBytes: number = 2): string {
 }
 
 /** Compute byte position info from mask */
-function computeByteInfo(mask: number, headerLength: number): string {
-  if (mask === 0 || headerLength === 0) return "no bits selected";
+function computeByteInfo(mask: number, headerLength: number, t: TFunction): string {
+  if (mask === 0 || headerLength === 0) return t("configSections.noBitsSelected");
 
   // Find first and last set bit
   let firstBit = -1;
@@ -47,13 +44,10 @@ function computeByteInfo(mask: number, headerLength: number): string {
     }
   }
 
-  if (firstBit === -1) return "no bits selected";
+  if (firstBit === -1) return t("configSections.noBitsSelected");
 
-  const startByte = Math.floor(firstBit / 8);
   const numBits = lastBit - firstBit + 1;
-  const numBytes = Math.ceil(numBits / 8);
-
-  return `${numBytes} byte${numBytes !== 1 ? 's' : ''} @ offset ${startByte}`;
+  return t("configSections.serial.byteInfo", { count: Math.ceil(numBits / 8), offset: Math.floor(firstBit / 8) });
 }
 
 export type SerialConfigSectionProps = {
@@ -201,19 +195,18 @@ export default function SerialConfigSection({
     }
   };
 
-  // Status indicator
   const showWarning = hasFrames && !isConfigured;
 
-  // Filter field type options - disable 'id' if already exists
-  const availableFieldTypes = FIELD_TYPE_OPTIONS.map((opt) => ({
-    ...opt,
-    disabled: opt.value === "id" && hasIdField,
+  const availableFieldTypes = FIELD_TYPES.map((value) => ({
+    value,
+    label: t(`configSections.fieldTypes.${value}`),
+    disabled: value === "id" && hasIdField,
   }));
 
   return (
     <Card padding="none" className="overflow-hidden">
       <ConfigSectionHeader
-        label="Serial"
+        label={protocolLabel("serial")}
         icon={<Cable className={iconMd} />}
         tone="purple"
         isConfigured={isConfigured}
@@ -224,48 +217,40 @@ export default function SerialConfigSection({
         onRemove={onRemove}
       />
 
-      {/* Content */}
       {isExpanded && isConfigured && (
         <div className="p-4 space-y-4 border-t border-default">
-          {/* Encoding and Byte Order row */}
           <div className="grid grid-cols-2 gap-4">
-            {/* Encoding */}
             <div>
               <label className={`block ${textMedium} mb-2`}>
-                Encoding <span className="text-danger">*</span>
+                {t("serialConfig.encoding")} <span className="text-danger">*</span>
               </label>
               <SerialEncodingSelect value={encoding} onChange={setEncoding} />
             </div>
 
-            {/* Byte Order */}
             <div>
               <label className={`block ${textMedium} mb-2`}>
-                Byte Order <span className="text-danger">*</span>
+                {t("configSections.serial.byteOrder")} <span className="text-danger">*</span>
               </label>
               <Select
                 value={byteOrder}
                 onChange={(e) => setByteOrder(e.target.value as "little" | "big")}
                 size="lg"
               >
-                <option value="big">Big Endian (MSB first)</option>
-                <option value="little">Little Endian (LSB first)</option>
+                <option value="big">{t("configSections.serial.bigEndian")}</option>
+                <option value="little">{t("configSections.serial.littleEndian")}</option>
               </Select>
               <p className={`mt-1 ${caption}`}>
-                Default byte order for signal decoding
+                {t("configSections.serial.byteOrderHint")}
               </p>
             </div>
           </div>
 
-          {/* Header Section */}
           <div className="border-t border-default pt-4 mt-4">
-            <h3 className={`${textMedium} mb-3`}>
-              Header
-            </h3>
+            <h3 className={`${textMedium} mb-3`}>{t("configSections.serial.header")}</h3>
 
-            {/* Header Length */}
             <div className="mb-4">
               <label className="block text-xs font-medium text-secondary mb-1">
-                Header Length (bytes)
+                {t("configSections.serial.headerLength")}
               </label>
               <Input
                 type="number"
@@ -281,21 +266,16 @@ export default function SerialConfigSection({
                 placeholder="2"
               />
               <p className={`mt-1 ${caption}`}>
-                Fixed header size for all frames. Required when defining header fields.
+                {t("configSections.serial.headerLengthHint")}
               </p>
             </div>
           </div>
 
-          {/* Header Fields Section */}
           <div className="border-t border-default pt-4 mt-4">
             <div className="flex items-center justify-between mb-3">
               <div>
-                <h3 className={textMedium}>
-                  Header Fields
-                </h3>
-                <p className={caption}>
-                  Define named masks over the header bytes. The "ID" field is used for frame matching.
-                </p>
+                <h3 className={textMedium}>{t("configSections.headerFields")}</h3>
+                <p className={caption}>{t("configSections.serial.headerFieldsHint")}</p>
               </div>
               {!isAddingField && (
                 <Button
@@ -309,13 +289,11 @@ export default function SerialConfigSection({
               )}
             </div>
 
-            {/* Existing fields list */}
             {headerFields.length > 0 && (
               <div className="space-y-2 mb-3">
                 {headerFields.map((field, index) => (
                   <div key={index} className="space-y-2">
                     <Card padding="sm" className="flex items-center gap-2">
-                      {/* Expand/collapse toggle */}
                       <IconButton
                         onClick={() => toggleFieldPicker(index)}
                         size="sm"
@@ -329,7 +307,6 @@ export default function SerialConfigSection({
                         )}
                       </IconButton>
 
-                      {/* Field name */}
                       <span className="w-28 font-medium text-sm text-primary truncate">
                         {field.name}
                       </span>
@@ -340,7 +317,7 @@ export default function SerialConfigSection({
                             type="number"
                             size="sm"
                             className="w-16"
-                            title="Start byte (negative counts from the end)"
+                            title={t("configSections.serial.startByteTooltip")}
                             value={field.startByte ?? 0}
                             onChange={(e) => handleUpdateField(index, { startByte: Number(e.target.value) })}
                           />
@@ -349,7 +326,7 @@ export default function SerialConfigSection({
                             size="sm"
                             className="w-16"
                             min={1}
-                            title="Bytes"
+                            title={t("configSections.serial.bytesTooltip")}
                             value={field.bytes ?? 1}
                             onChange={(e) => handleUpdateField(index, { bytes: Number(e.target.value) })}
                           />
@@ -358,27 +335,24 @@ export default function SerialConfigSection({
                         <>
                           <Badge mono>{formatMaskHex(field.mask, effectiveHeaderLength)}</Badge>
                           <span className={caption}>
-                            ({computeByteInfo(field.mask, effectiveHeaderLength)})
+                            ({computeByteInfo(field.mask, effectiveHeaderLength, t)})
                           </span>
                         </>
                       )}
 
-                      {/* Spacer */}
                       <div className="flex-1" />
 
-                      {/* Endianness */}
                       <Select
                         value={field.endianness}
                         onChange={(e) => handleUpdateField(index, { endianness: e.target.value as "big" | "little" })}
                         size="sm"
                         className="w-16"
-                        title="Byte order"
+                        title={t("configSections.serial.byteOrderTooltip")}
                       >
                         <option value="big">BE</option>
                         <option value="little">LE</option>
                       </Select>
 
-                      {/* Format */}
                       <Select
                         value={field.format}
                         onChange={(e) => handleUpdateField(index, { format: e.target.value as HeaderFieldFormat })}
@@ -389,18 +363,16 @@ export default function SerialConfigSection({
                         <option value="decimal">{t("common:frameIdFormat.dec")}</option>
                       </Select>
 
-                      {/* Remove button */}
                       <IconButton
                         onClick={() => handleRemoveField(index)}
                         tone="danger"
                         size="sm"
-                        title="Remove field"
+                        title={t("configSections.removeField")}
                       >
                         <Trash2 className={iconMd} />
                       </IconButton>
                     </Card>
 
-                    {/* Expanded bit picker */}
                     {expandedFieldPickers[index] && field.mask !== undefined && (
                       <Card className="ml-8">
                         <MaskBitPicker
@@ -416,11 +388,9 @@ export default function SerialConfigSection({
               </div>
             )}
 
-            {/* Add new field form */}
             {isAddingField && (
               <div className="p-3 bg-purple rounded-lg border border-purple">
                 <div className="flex items-center gap-2 mb-3">
-                  {/* Field type dropdown */}
                   <Select
                     value={newFieldType}
                     onChange={(e) => setNewFieldType(e.target.value as FieldType)}
@@ -428,12 +398,11 @@ export default function SerialConfigSection({
                   >
                     {availableFieldTypes.map((opt) => (
                       <option key={opt.value} value={opt.value} disabled={opt.disabled}>
-                        {opt.label}{opt.disabled ? " (exists)" : ""}
+                        {opt.disabled ? t("configSections.fieldTypeExists", { label: opt.label }) : opt.label}
                       </option>
                     ))}
                   </Select>
 
-                  {/* Custom name input (only shown for custom type) */}
                   {newFieldType === "custom" && (
                     <Input
                       type="text"
@@ -445,18 +414,16 @@ export default function SerialConfigSection({
                     />
                   )}
 
-                  {/* Endianness */}
                   <Select
                     value={newFieldEndianness}
                     onChange={(e) => setNewFieldEndianness(e.target.value as "big" | "little")}
                     className="w-16"
-                    title="Byte order"
+                    title={t("configSections.serial.byteOrderTooltip")}
                   >
                     <option value="big">BE</option>
                     <option value="little">LE</option>
                   </Select>
 
-                  {/* Format */}
                   <Select
                     value={newFieldFormat}
                     onChange={(e) => setNewFieldFormat(e.target.value as HeaderFieldFormat)}
@@ -469,7 +436,7 @@ export default function SerialConfigSection({
 
                 <div className="flex items-center justify-between">
                   <p className={caption}>
-                    Use the bit picker to select which header bytes this field covers.
+                    {t("configSections.serial.addFieldHint")}
                   </p>
                   <div className="flex gap-2">
                     <Button
@@ -484,7 +451,7 @@ export default function SerialConfigSection({
                       variant="solid"
                       tone="purple"
                     >
-                      Add
+                      {t("common:actions.add")}
                     </Button>
                   </div>
                 </div>
@@ -493,21 +460,16 @@ export default function SerialConfigSection({
 
             {headerFields.length === 0 && !isAddingField && (
               <p className={`${caption} italic`}>
-                No header fields defined. Add an "ID" field to enable frame matching.
+                {t("configSections.serial.noHeaderFields")}
               </p>
             )}
           </div>
 
-          {/* Protocol-Level Checksum Section */}
           <div className="border-t border-default pt-4 mt-4">
             <div className="flex items-center justify-between mb-3">
               <div>
-                <h3 className={textMedium}>
-                  Protocol Checksum
-                </h3>
-                <p className={caption}>
-                  Default checksum settings for all frames
-                </p>
+                <h3 className={textMedium}>{t("configSections.serial.checksum")}</h3>
+                <p className={caption}>{t("configSections.serial.checksumHint")}</p>
               </div>
               {!checksum ? (
                 <Button
@@ -516,7 +478,7 @@ export default function SerialConfigSection({
                   tone="purple"
                 >
                   <Plus className={iconMd} />
-                  Add Checksum
+                  {t("checksumDialog.addTitle")}
                 </Button>
               ) : (
                 <Button
@@ -525,17 +487,16 @@ export default function SerialConfigSection({
                   tone="danger"
                 >
                   <Trash2 className={iconMd} />
-                  Remove
+                  {t("common:actions.remove")}
                 </Button>
               )}
             </div>
 
             {checksum && (
               <Card className="space-y-3">
-                {/* Algorithm */}
                 <div>
                   <label className="block text-xs font-medium text-secondary mb-1">
-                    Algorithm
+                    {t("checksumDialog.algorithm")}
                   </label>
                   <Select
                     value={checksum.algorithm}
@@ -552,66 +513,63 @@ export default function SerialConfigSection({
                   </p>
                 </div>
 
-                {/* Checksum location */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-medium text-secondary mb-1">
-                      Start Byte
+                      {t("checksumDialog.startByte")}
                     </label>
                     <Input
                       type="number"
                       value={checksum.start_byte}
                       onChange={(e) => handleUpdateChecksum({ start_byte: parseInt(e.target.value) || 0 })}
-                      title="Byte position where checksum is stored (-1 = last byte)"
+                      title={t("configSections.serial.checksumStartTooltip")}
                     />
                     <p className={`mt-0.5 ${caption}`}>
-                      -1 = last byte
+                      {t("configSections.serial.lastByteHint")}
                     </p>
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-secondary mb-1">
-                      Byte Length
+                      {t("checksumDialog.byteLength")}
                     </label>
                     <Select
                       value={checksum.byte_length}
                       onChange={(e) => handleUpdateChecksum({ byte_length: parseInt(e.target.value) })}
                     >
-                      <option value={1}>1 byte</option>
-                      <option value={2}>2 bytes</option>
+                      <option value={1}>{t("configSections.serial.byteCount", { count: 1 })}</option>
+                      <option value={2}>{t("configSections.serial.byteCount", { count: 2 })}</option>
                     </Select>
                   </div>
                 </div>
 
-                {/* Calculation range */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-medium text-secondary mb-1">
-                      Calc Start Byte
+                      {t("configSections.serial.calcStart")}
                     </label>
                     <Input
                       type="number"
                       value={checksum.calc_start_byte}
                       onChange={(e) => handleUpdateChecksum({ calc_start_byte: parseInt(e.target.value) || 0 })}
-                      title="First byte included in calculation"
+                      title={t("configSections.serial.calcStartTooltip")}
                     />
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-secondary mb-1">
-                      Calc End Byte
+                      {t("configSections.serial.calcEnd")}
                     </label>
                     <Input
                       type="number"
                       value={checksum.calc_end_byte}
                       onChange={(e) => handleUpdateChecksum({ calc_end_byte: parseInt(e.target.value) || 0 })}
-                      title="Last byte (exclusive) included in calculation (-1 = up to checksum)"
+                      title={t("configSections.serial.calcEndTooltip")}
                     />
                     <p className={`mt-0.5 ${caption}`}>
-                      -1 = up to checksum
+                      {t("configSections.serial.upToChecksumHint")}
                     </p>
                   </div>
                 </div>
 
-                {/* Big endian checkbox (only show for 2-byte checksums) */}
                 {checksum.byte_length === 2 && (
                   <div className={flexRowGap2}>
                     <Checkbox
@@ -620,7 +578,7 @@ export default function SerialConfigSection({
                       onChange={(e) => handleUpdateChecksum({ big_endian: e.target.checked })}
                     />
                     <label htmlFor="checksum-big-endian" className="text-sm text-secondary">
-                      Big endian (MSB first)
+                      {t("configSections.serial.checksumBigEndian")}
                     </label>
                   </div>
                 )}
@@ -629,21 +587,23 @@ export default function SerialConfigSection({
 
             {!checksum && (
               <p className={`${caption} italic`}>
-                No protocol-level checksum configured. Click "Add Checksum" to define defaults.
+                {t("configSections.serial.noChecksum")}
               </p>
             )}
           </div>
         </div>
       )}
 
-      {/* Collapsed preview when configured but not expanded */}
       {!isExpanded && isConfigured && (
         <div className={`px-4 py-2 ${caption} border-t border-default`}>
-          Encoding: {encoding?.toUpperCase() ?? "Not set"} • {byteOrder === 'big' ? 'BE' : 'LE'}
-          {headerLength !== undefined && headerLength > 0 && ` • Header: ${headerLength}B`}
-          {headerFields.length > 0 && ` • ${headerFields.length} field(s)`}
-          {hasIdField && " • ID field"}
-          {checksum && ` • Checksum: ${checksum.algorithm.toUpperCase()}`}
+          {[
+            t("configSections.serial.summaryEncoding", { encoding: encoding?.toUpperCase() ?? t("serialConfig.encodingNotSet") }),
+            byteOrder === "big" ? "BE" : "LE",
+            headerLength !== undefined && headerLength > 0 && t("configSections.serial.summaryHeader", { bytes: headerLength }),
+            headerFields.length > 0 && t("configSections.serial.summaryFields", { count: headerFields.length }),
+            hasIdField && t("configSections.serial.summaryIdField"),
+            checksum && t("configSections.serial.summaryChecksum", { algorithm: checksum.algorithm.toUpperCase() }),
+          ].filter(Boolean).join(" • ")}
         </div>
       )}
     </Card>

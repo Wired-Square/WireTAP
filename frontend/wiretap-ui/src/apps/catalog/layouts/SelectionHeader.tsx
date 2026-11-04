@@ -1,8 +1,11 @@
 // ui/src/apps/catalog/layout/SelectionHeader.tsx
 
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import { Link2, Layers, Pencil, Trash2 } from "lucide-react";
 import { iconMd, iconXl, flexRowGap2 } from "../../../styles/spacing";
 import type { TomlNode } from "../types";
+import { nodeLabel } from "../tree/treeUtils";
 import type { Frame } from "../../../types/catalogModel";
 import type { FormattedId } from "../utils";
 import { muxSignalCount } from "../views/signalRanges";
@@ -21,32 +24,33 @@ function modbusSignalCount(node: TomlNode): number {
   return (frame?.signals.length ?? 0) + (frame?.mux ? muxSignalCount(frame.mux) : 0);
 }
 
-function labelForNode(node: TomlNode): string {
+function labelForNode(node: TomlNode, t: TFunction): string {
   switch (node.type) {
     case "section":
-      return "Table";
+      return t("selection.table");
     case "signal":
-      return "Signal";
+      return t("selection.signal");
     case "meta":
-      return "Metadata";
+      return t("selection.metadata");
     case "can-frame":
-      return "CAN Frame";
+      return t("selection.canFrame");
     case "modbus-frame":
       // A register decodes one signal; more than one makes it a register group.
-      return modbusSignalCount(node) > 1 ? "Register Group" : "Register";
+      return t(modbusSignalCount(node) > 1 ? "selection.registerGroup" : "selection.register");
     case "node":
       // A Modbus node owns a device address; CAN/serial nodes are peers.
-      return node.metadata?.nodeDef?.deviceAddress != null ? "Slave" : "Peer";
+      return t(node.metadata?.nodeDef?.deviceAddress != null ? "selection.slave" : "selection.peer");
     case "mux":
-      return "Mux";
+      return t("selection.mux");
     case "mux-case":
-      return "Mux Case";
+      return t("selection.muxCase");
     default:
       return node.type;
   }
 }
 
 export default function SelectionHeader({ selectedNode, formatFrameId, onEdit, onDelete }: SelectionHeaderProps) {
+  const { t } = useTranslation("catalog");
   const frame = selectedNode.metadata?.frame;
   const copyFrom = frame?.copyFrom;
   const mirrorOf = frame?.mirrorOf;
@@ -57,12 +61,12 @@ export default function SelectionHeader({ selectedNode, formatFrameId, onEdit, o
       <div className="flex items-center justify-between mb-2">
         <h2 className="text-2xl font-bold text-primary flex items-center gap-3">
           {copyFrom && (
-            <span title={`Copied from ${copyFrom}`}>
+            <span title={t("selection.copiedFrom", { source: copyFrom })}>
               <Link2 className={`${iconXl} text-accent-primary`} />
             </span>
           )}
           {mirrorOf && (
-            <span title={`Mirror of ${mirrorOf}`}>
+            <span title={t("selection.mirrorOf", { source: mirrorOf })}>
               <Layers className={`${iconXl} text-purple`} />
             </span>
           )}
@@ -74,18 +78,18 @@ export default function SelectionHeader({ selectedNode, formatFrameId, onEdit, o
               )}
             </span>
           ) : (
-            selectedNode.key
+            nodeLabel(selectedNode)
           )}
         </h2>
         {(onEdit || onDelete) && (
           <div className="flex gap-2">
             {onEdit && (
-              <IconButton onClick={onEdit} title="Edit frame">
+              <IconButton onClick={onEdit} title={t("selection.editFrame")}>
                 <Pencil className={`${iconMd} text-secondary`} />
               </IconButton>
             )}
             {onDelete && (
-              <IconButton onClick={onDelete} tone="danger" title="Delete frame">
+              <IconButton onClick={onDelete} tone="danger" title={t("selection.deleteFrame")}>
                 <Trash2 className={`${iconMd} text-danger`} />
               </IconButton>
             )}
@@ -94,13 +98,13 @@ export default function SelectionHeader({ selectedNode, formatFrameId, onEdit, o
       </div>
 
       <div className={`${flexRowGap2} text-sm text-muted`}>
-        <Badge size="lg">{labelForNode(selectedNode)}</Badge>
+        <Badge size="lg">{labelForNode(selectedNode, t)}</Badge>
         <span className="font-mono text-xs">{selectedNode.path.join(".")}</span>
         {copyFrom && (
-          <Badge tone="primary" size="lg">Copy of {copyFrom}</Badge>
+          <Badge tone="primary" size="lg">{t("selection.copyOf", { source: copyFrom })}</Badge>
         )}
         {mirrorOf && (
-          <Badge tone="purple" variant="outline" size="lg">Mirror of {mirrorOf}</Badge>
+          <Badge tone="purple" variant="outline" size="lg">{t("selection.mirrorOf", { source: mirrorOf })}</Badge>
         )}
       </div>
     </div>

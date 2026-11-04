@@ -1,6 +1,7 @@
 // ui/src/apps/catalog/hooks/handlers/useFrameHandlers.ts
 // Frame, node, and config operations for catalog editor
 
+import i18n from "../../../../i18n";
 import { useCatalogEditorStore } from "../../../../stores/catalogEditorStore";
 import {
   saveFrameToml,
@@ -79,7 +80,7 @@ export function useFrameHandlers({
       setSelectedPath(null);
     } catch (error) {
       console.error("Failed to delete ID:", error);
-      setValidation([{ field: "canid", message: "Failed to delete ID" }]);
+      setValidation([{ field: "canid", message: i18n.t("catalog:errors.deleteId") }]);
     }
   };
 
@@ -109,7 +110,7 @@ export function useFrameHandlers({
 
     const frameKey = frameKeyOf(frameFields);
     if (!frameKey) {
-      setValidation([{ field: "frame", message: "Frame identifier is required" }]);
+      setValidation([{ field: "frame", message: i18n.t("catalog:errors.frameIdRequired") }]);
       return;
     }
 
@@ -153,7 +154,7 @@ export function useFrameHandlers({
       setSelectedPath(null);
     } catch (error) {
       console.error("Failed to delete frame:", error);
-      setValidation([{ field: "frame", message: "Failed to delete frame" }]);
+      setValidation([{ field: "frame", message: i18n.t("catalog:errors.deleteFrame") }]);
     }
   };
 
@@ -182,7 +183,7 @@ export function useFrameHandlers({
       setSelectedPath(null);
     } catch (error) {
       console.error("Failed to delete node:", error);
-      setValidation([{ field: "node", message: "Failed to delete node" }]);
+      setValidation([{ field: "node", message: i18n.t("catalog:errors.deleteNode") }]);
     } finally {
       closeDialog("deleteNode");
       setDialogPayload({ nodeToDelete: null });
@@ -237,7 +238,7 @@ export function useFrameHandlers({
       );
 
       if (!success) {
-        setValidation([{ field: "node", message: error || "Failed to edit node" }]);
+        setValidation([{ field: "node", message: error || i18n.t("catalog:errors.editNode") }]);
         return;
       }
 
@@ -255,7 +256,7 @@ export function useFrameHandlers({
       }
     } catch (error) {
       console.error("Failed to edit node:", error);
-      setValidation([{ field: "node", message: "Failed to edit node" }]);
+      setValidation([{ field: "node", message: i18n.t("catalog:errors.editNode") }]);
     }
   };
 
@@ -277,7 +278,7 @@ export function useFrameHandlers({
       setSelectedPath(null);
     } catch (error) {
       console.error("Failed to delete item:", error);
-      setValidation([{ field: "generic", message: "Failed to delete item" }]);
+      setValidation([{ field: "generic", message: i18n.t("catalog:errors.deleteItem") }]);
     } finally {
       closeDialog("deleteGeneric");
       setDialogPayload({ genericPathToDelete: null, genericLabel: null });

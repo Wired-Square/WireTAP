@@ -7,10 +7,12 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { iconMd, iconSm } from "../../../styles/spacing";
+import i18n from "../../../i18n";
 import { hoverLight } from "../../../styles";
 import { textMuted, textSecondary } from "../../../styles/colourTokens";
 import { formatFrameId as formatId } from "../../../utils/frameIds";
 import type { TomlNode } from "../types";
+import { nodeLabel } from "./treeUtils";
 import { IconButton } from "../../../components/Button";
 import { Badge } from "../../../components/Badge";
 import { MODBUS_REGISTER_TONES } from "../../../utils/profileTraits";
@@ -97,12 +99,12 @@ export function createRenderTreeNode({
 
           <span className="text-sm truncate flex items-center gap-1.5">
             {frame?.copyFrom && (
-              <span title={`Copied from ${frame.copyFrom}`}>
+              <span title={i18n.t("catalog:selection.copiedFrom", { source: frame.copyFrom })}>
                 <Link2 className={`${iconSm} text-blue flex-shrink-0`} />
               </span>
             )}
             {frame?.mirrorOf && (
-              <span title={`Mirror of ${frame.mirrorOf}`}>
+              <span title={i18n.t("catalog:selection.mirrorOf", { source: frame.mirrorOf })}>
                 <Layers className={`${iconSm} text-purple flex-shrink-0`} />
               </span>
             )}
@@ -181,7 +183,7 @@ export function createRenderTreeNode({
                 <span className="flex flex-col">
                   <span className="flex items-center gap-1">
                     {typeof sigReg === "number" && (
-                      <Badge size="sm" mono title="Register" className="font-semibold tabular-nums">
+                      <Badge size="sm" mono title={i18n.t("catalog:selection.register")} className="font-semibold tabular-nums">
                         {formatId(sigReg, displayFrameIdFormat)}
                       </Badge>
                     )}
@@ -209,7 +211,7 @@ export function createRenderTreeNode({
                       [{checksum.algorithm}]
                     </span>
                     <span className={`${textSecondary} text-xs`}>
-                      (byte {checksum.startByte}:{checksum.byteLength})
+                      {i18n.t("catalog:tree.checksumBytes", { start: checksum.startByte, length: checksum.byteLength })}
                     </span>
                   </span>
                   {truncatedNote && (
@@ -232,7 +234,7 @@ export function createRenderTreeNode({
                 </span>
               );
             })() : (
-              node.key
+              nodeLabel(node)
             )}
           </span>
         </div>

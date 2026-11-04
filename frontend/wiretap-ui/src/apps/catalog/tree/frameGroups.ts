@@ -11,7 +11,7 @@ export type CatalogViewMode = "tree" | "frames" | "nodes";
 export type FrameGroup = { label: string; frames: TomlNode[] };
 
 const FRAME_TYPES = new Set(["can-frame", "modbus-frame", "serial-frame"]);
-const UNASSIGNED = "Unassigned";
+export const UNASSIGNED = "Unassigned";
 
 /**
  * Narrow the tree to a single protocol's frames (used by the protocol badges).

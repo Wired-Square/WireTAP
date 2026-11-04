@@ -445,7 +445,7 @@ function CatalogEditorInner() {
               size="sm"
               banner
               action={
-                <IconButton onClick={dismissBanner} aria-label={t("common.dismiss", "Dismiss")} size="sm">
+                <IconButton onClick={dismissBanner} aria-label={t("common:actions.dismiss")} size="sm">
                   <X className={iconSm} />
                 </IconButton>
               }
@@ -462,7 +462,7 @@ function CatalogEditorInner() {
                   }}
                   className="underline font-semibold hover:no-underline"
                 >
-                  {t("editor.textViewDiff", "Diff")}
+                  {t("editor.textViewDiff")}
                 </button>
                 .
               </p>
@@ -481,10 +481,10 @@ function CatalogEditorInner() {
                 <div className="flex items-center px-3 py-1.5 border-b border-default bg-surface">
                   <Tabs variant="segmented">
                     <Tab selected={textView === "edit"} onClick={() => setTextView("edit")}>
-                      {t("editor.textViewEdit", "Edit")}
+                      {t("editor.textViewEdit")}
                     </Tab>
                     <Tab selected={textView === "diff"} onClick={() => setTextView("diff")}>
-                      {t("editor.textViewDiff", "Diff")}
+                      {t("editor.textViewDiff")}
                       {hasUnsavedChanges && <TabDot tone="warning" />}
                     </Tab>
                   </Tabs>

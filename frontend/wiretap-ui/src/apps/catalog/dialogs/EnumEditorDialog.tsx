@@ -89,16 +89,16 @@ export default function EnumEditorDialog({
     for (const v of nonEmpty) {
       const trimmed = v.rawValue.trim();
       if (trimmed === "") {
-        setError("Raw value cannot be empty");
+        setError(t("enumDialog.rawEmpty"));
         return false;
       }
       if (!isValidIntValue(trimmed)) {
-        setError(`Invalid raw value: "${trimmed}" (must be an integer or hex like 0x1F)`);
+        setError(t("enumDialog.rawInvalid", { value: trimmed }));
         return false;
       }
       if (v.label.trim() === "") {
         const num = parseIntValue(trimmed);
-        setError(`Label for value ${num} cannot be empty`);
+        setError(t("enumDialog.labelEmpty", { value: num }));
         return false;
       }
     }
@@ -108,7 +108,7 @@ export default function EnumEditorDialog({
     for (const v of nonEmpty) {
       const num = parseIntValue(v.rawValue);
       if (seen.has(num)) {
-        setError(`Duplicate raw value: ${v.rawValue.trim()} (same as ${seen.get(num)})`);
+        setError(t("enumDialog.duplicate", { value: v.rawValue.trim(), existing: seen.get(num) }));
         return false;
       }
       seen.set(num, v.rawValue.trim());
@@ -128,16 +128,16 @@ export default function EnumEditorDialog({
   if (!open) return null;
 
   return (
-    <Dialog isOpen={open} size="lg" onClose={onCancel} title="Edit Enum Values">
+    <Dialog isOpen={open} size="lg" onClose={onCancel} title={t("enumDialog.title")}>
       <DialogBody>
         <p className={`${helpText} mb-4`}>
-          Map raw signal values to human-readable labels.
+          {t("enumDialog.description")}
         </p>
 
         <div className="space-y-2 max-h-80 overflow-y-auto">
           <div className={`grid grid-cols-[1fr_2fr_auto] gap-2 ${labelSmall} px-1`}>
-            <span>Raw Value</span>
-            <span>Label</span>
+            <span>{t("enumDialog.rawValue")}</span>
+            <span>{t("enumDialog.label")}</span>
             <span className="w-8"></span>
           </div>
 
@@ -148,19 +148,19 @@ export default function EnumEditorDialog({
                 type="text"
                 value={v.rawValue}
                 onChange={(e) => handleChange(i, "rawValue", e.target.value)}
-                placeholder="0 or 0x1F"
+                placeholder={t("enumDialog.rawPlaceholder")}
               />
               <Input
                 size="lg"
                 type="text"
                 value={v.label}
                 onChange={(e) => handleChange(i, "label", e.target.value)}
-                placeholder="Label"
+                placeholder={t("enumDialog.label")}
               />
               <IconButton
                 onClick={() => handleRemove(i)}
                 tone="danger"
-                title="Remove"
+                title={t("common:actions.remove")}
               >
                 <Trash2 className={iconMd} />
               </IconButton>
@@ -176,7 +176,7 @@ export default function EnumEditorDialog({
           className="mt-3"
         >
           <Plus className={iconMd} />
-          Add Value
+          {t("enumDialog.addValue")}
         </Button>
 
         {error && (
@@ -185,7 +185,7 @@ export default function EnumEditorDialog({
       </DialogBody>
       <DialogFooter>
         <SecondaryButton onClick={onCancel}>{t("common:actions.cancel")}</SecondaryButton>
-        <PrimaryButton onClick={handleSave}>Save</PrimaryButton>
+        <PrimaryButton onClick={handleSave}>{t("common:actions.save")}</PrimaryButton>
       </DialogFooter>
     </Dialog>
   );

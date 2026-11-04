@@ -10,10 +10,10 @@ import FindBar from "../components/FindBar";
 import type { TomlNode, ProtocolType } from "../types";
 import type { Catalog } from "../../../types/catalogModel";
 import { hasFrames } from "../model";
-import type { CatalogViewMode, FrameGroup } from "../tree/frameGroups";
+import { UNASSIGNED, type CatalogViewMode, type FrameGroup } from "../tree/frameGroups";
 import { Button, IconButton } from "../../../components/Button";
 import { Tab, Tabs } from "../../../components/Tabs";
-import { protocolTone } from "../../../utils/profileTraits";
+import { protocolLabel, protocolTone } from "../../../utils/profileTraits";
 
 const VIEW_MODES: CatalogViewMode[] = ["tree", "frames", "nodes"];
 
@@ -83,11 +83,11 @@ export default function CatalogTreePanel({
   // Protocol filter badges — shown when a protocol has config or frames.
   // Clicking one filters the tree to that protocol (toggles off when re-clicked).
   const protocolBadges = ([
-    { protocol: "can", Icon: Network, label: "CAN" },
-    { protocol: "modbus", Icon: Server, label: "Modbus" },
-    { protocol: "serial", Icon: Cable, label: "Serial" },
+    { protocol: "can", Icon: Network },
+    { protocol: "modbus", Icon: Server },
+    { protocol: "serial", Icon: Cable },
   ] as const)
-    .map((b) => ({ ...b, configured: !!catalog?.[b.protocol] }))
+    .map((b) => ({ ...b, label: protocolLabel(b.protocol), configured: !!catalog?.[b.protocol] }))
     .filter((b) => b.configured || hasFrames(catalog, b.protocol));
   const hasAnyBadge = protocolBadges.length > 0;
 
@@ -233,7 +233,7 @@ export default function CatalogTreePanel({
                       ) : (
                         <ChevronDown className={`${iconXs} flex-shrink-0`} />
                       )}
-                      <span className="truncate">{group.label}</span>
+                      <span className="truncate">{group.label === UNASSIGNED ? t("tree.unassigned") : group.label}</span>
                       <span className="text-muted opacity-70">· {group.frames.length}</span>
                     </button>
                   )}

@@ -3,6 +3,7 @@
 
 import { useState, useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import { Network, Plus, Trash2, ChevronDown, ChevronRight } from "lucide-react";
 import { iconMd, iconXs, flexRowGap2 } from "../../../../styles/spacing";
 import { caption, textMedium } from "../../../../styles";
@@ -12,14 +13,12 @@ import MaskBitPicker from "../../../../components/MaskBitPicker";
 import { Button, IconButton } from "../../../../components/Button";
 import { Select, Input } from "../../../../components/forms";
 import { Card } from "../../../../components/Card";
+import { protocolLabel } from "../../../../utils/profileTraits";
 import { ConfigSectionHeader } from "./ConfigSectionHeader";
 /** Predefined CAN header field types */
 type CanFieldType = "source_address" | "custom";
 
-const CAN_FIELD_TYPE_OPTIONS: Array<{ value: CanFieldType; label: string }> = [
-  { value: "source_address", label: "Source Address" },
-  { value: "custom", label: "Custom" },
-];
+const CAN_FIELD_TYPES: CanFieldType[] = ["source_address", "custom"];
 
 /** Parse a hex string like "0x000000FF" or "255" to a number */
 function parseMaskString(maskStr: string): number {
@@ -38,8 +37,8 @@ function formatMaskHex(mask: number, shift: number = 0): string {
 }
 
 /** Compute byte position info from mask for display */
-function computeBitInfo(mask: number): string {
-  if (mask === 0) return "no bits selected";
+function computeBitInfo(mask: number, t: TFunction): string {
+  if (mask === 0) return t("configSections.noBitsSelected");
 
   // Find first and last set bit
   let firstBit = -1;
@@ -51,10 +50,9 @@ function computeBitInfo(mask: number): string {
     }
   }
 
-  if (firstBit === -1) return "no bits selected";
+  if (firstBit === -1) return t("configSections.noBitsSelected");
 
-  const numBits = lastBit - firstBit + 1;
-  return `${numBits} bit${numBits !== 1 ? 's' : ''} @ bit ${firstBit}`;
+  return t("configSections.bitInfo", { count: lastBit - firstBit + 1, first: firstBit });
 }
 
 export type CanConfigSectionProps = {
@@ -189,18 +187,18 @@ export default function CanConfigSection({
   };
 
   // Filter field type options - disable source_address if already exists
-  const availableFieldTypes = CAN_FIELD_TYPE_OPTIONS.map((opt) => ({
-    ...opt,
-    disabled: opt.value === "source_address" && hasSourceAddressField,
+  const availableFieldTypes = CAN_FIELD_TYPES.map((value) => ({
+    value,
+    label: t(`configSections.fieldTypes.${value}`),
+    disabled: value === "source_address" && hasSourceAddressField,
   }));
 
-  // Status indicator
   const showWarning = hasFrames && !isConfigured;
 
   return (
     <Card padding="none" className="overflow-hidden">
       <ConfigSectionHeader
-        label="CAN"
+        label={protocolLabel("can")}
         icon={<Network className={iconMd} />}
         tone="success"
         isConfigured={isConfigured}
@@ -211,13 +209,11 @@ export default function CanConfigSection({
         onRemove={onRemove}
       />
 
-      {/* Content */}
       {isExpanded && isConfigured && (
         <div className="p-4 space-y-4 border-t border-default">
-          {/* Default Byte Order */}
           <div>
             <label className={`block ${textMedium} mb-2`}>
-              Default Byte Order <span className="text-danger">*</span>
+              {t("canConfig.defaultByteOrder")} <span className="text-danger">*</span>
             </label>
             <Select
               value={defaultEndianness}
@@ -228,14 +224,13 @@ export default function CanConfigSection({
               <option value="big">{t("shared.bigEndian")}</option>
             </Select>
             <p className={`mt-1 ${caption}`}>
-              Byte order used for multi-byte signals
+              {t("configSections.can.byteOrderHint")}
             </p>
           </div>
 
-          {/* Default Interval */}
           <div>
             <label className={`block ${textMedium} mb-2`}>
-              Default Interval (ms) <span className="text-muted text-xs font-normal">(optional)</span>
+              {t("configSections.can.interval")} <span className="text-muted text-xs font-normal">{t("configSections.optional")}</span>
             </label>
             <Input
               type="number"
@@ -249,16 +244,14 @@ export default function CanConfigSection({
               placeholder="1000"
             />
             <p className={`mt-1 ${caption}`}>
-              Default transmit interval for frames
+              {t("configSections.can.intervalHint")}
             </p>
           </div>
 
-          {/* Default Extended ID and CAN FD row */}
           <div className="grid grid-cols-2 gap-4">
-            {/* Default Extended ID */}
             <div>
               <label className={`block ${textMedium} mb-2`}>
-                Default Extended ID <span className="text-muted text-xs font-normal">(optional)</span>
+                {t("canConfig.defaultExtendedId")} <span className="text-muted text-xs font-normal">{t("configSections.optional")}</span>
               </label>
               <Select
                 value={defaultExtended === undefined ? "auto" : defaultExtended ? "true" : "false"}
@@ -268,19 +261,18 @@ export default function CanConfigSection({
                 }}
                 size="lg"
               >
-                <option value="auto">Auto-detect from ID</option>
-                <option value="false">No (11-bit standard)</option>
-                <option value="true">Yes (29-bit extended)</option>
+                <option value="auto">{t("configSections.can.extendedAuto")}</option>
+                <option value="false">{t("configSections.can.extendedNo")}</option>
+                <option value="true">{t("configSections.can.extendedYes")}</option>
               </Select>
               <p className={`mt-1 ${caption}`}>
-                Default ID type for frames without explicit setting
+                {t("configSections.can.extendedHint")}
               </p>
             </div>
 
-            {/* Default CAN FD */}
             <div>
               <label className={`block ${textMedium} mb-2`}>
-                Default CAN FD <span className="text-muted text-xs font-normal">(optional)</span>
+                {t("canConfig.defaultCanFd")} <span className="text-muted text-xs font-normal">{t("configSections.optional")}</span>
               </label>
               <Select
                 value={defaultFd === undefined ? "auto" : defaultFd ? "true" : "false"}
@@ -290,21 +282,20 @@ export default function CanConfigSection({
                 }}
                 size="lg"
               >
-                <option value="auto">Classic CAN (default)</option>
-                <option value="false">No (Classic CAN)</option>
-                <option value="true">Yes (CAN FD)</option>
+                <option value="auto">{t("configSections.can.fdAuto")}</option>
+                <option value="false">{t("canConfig.noClassic")}</option>
+                <option value="true">{t("configSections.can.fdYes")}</option>
               </Select>
               <p className={`mt-1 ${caption}`}>
-                Default to CAN FD frames (64-byte payload, BRS)
+                {t("configSections.can.fdHint")}
               </p>
             </div>
           </div>
 
-          {/* Frame ID Mask */}
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className={textMedium}>
-                Frame ID Mask <span className="text-muted text-xs font-normal">(optional, hex)</span>
+                {t("configSections.can.idMask")} <span className="text-muted text-xs font-normal">{t("configSections.can.optionalHex")}</span>
               </label>
               <Button
                 onClick={() => setShowFrameIdMaskPicker(!showFrameIdMaskPicker)}
@@ -327,13 +318,13 @@ export default function CanConfigSection({
                 placeholder="0x1FFFFF00"
               />
               <div className="flex items-center gap-1">
-                <span className={caption}>ID type:</span>
+                <span className={caption}>{t("configSections.can.idType")}</span>
                 <Select
                   value={useExtendedId ? "extended" : "standard"}
                   onChange={(e) => setUseExtendedId(e.target.value === "extended")}
                   size="lg"
                   className="w-24"
-                  title="CAN ID type"
+                  title={t("configSections.can.idTypeTooltip")}
                 >
                   <option value="extended">29-bit</option>
                   <option value="standard">11-bit</option>
@@ -352,20 +343,15 @@ export default function CanConfigSection({
               </Card>
             )}
             <p className={`mt-1 ${caption}`}>
-              Mask applied to frame ID before catalog matching. For J1939, use 0x1FFFFF00 to mask off the source address.
+              {t("configSections.can.idMaskHint")}
             </p>
           </div>
 
-          {/* Header Fields Section */}
           <div className="border-t border-default pt-4 mt-4">
             <div className="flex items-center justify-between mb-3">
               <div>
-                <h3 className={textMedium}>
-                  Header Fields
-                </h3>
-                <p className={caption}>
-                  Extract named values from the CAN ID using bitmasks. The "Source Address" field enables per-source view.
-                </p>
+                <h3 className={textMedium}>{t("configSections.headerFields")}</h3>
+                <p className={caption}>{t("configSections.can.headerFieldsHint")}</p>
               </div>
               {!isAddingField && (
                 <Button
@@ -379,7 +365,6 @@ export default function CanConfigSection({
               )}
             </div>
 
-            {/* Existing fields list */}
             {headerFields.length > 0 && (
               <div className="space-y-2 mb-3">
                 {headerFields.map((field, index) => {
@@ -393,7 +378,6 @@ export default function CanConfigSection({
                   return (
                     <div key={index} className="space-y-2">
                       <Card padding="sm" className="flex items-center gap-2">
-                        {/* Expand/collapse toggle */}
                         <IconButton
                           onClick={() => toggleFieldPicker(index)}
                           size="sm"
@@ -406,12 +390,10 @@ export default function CanConfigSection({
                           )}
                         </IconButton>
 
-                        {/* Field name */}
                         <span className="w-28 font-medium text-sm text-primary truncate">
                           {field.name}
                         </span>
 
-                        {/* Mask value */}
                         <Input
                           type="text"
                           value={field.mask}
@@ -419,10 +401,9 @@ export default function CanConfigSection({
                           size="xs"
                           mono
                           className="w-28"
-                          title="Mask (hex)"
+                          title={t("configSections.can.maskTooltip")}
                         />
 
-                        {/* Shift value input */}
                         <div className="flex items-center gap-1">
                           <span className={caption}>&gt;&gt;</span>
                           <Input
@@ -434,19 +415,16 @@ export default function CanConfigSection({
                             size="xs"
                             mono
                             className="w-12 text-center"
-                            title="Right shift (bits)"
+                            title={t("configSections.can.shiftTooltip")}
                           />
                         </div>
 
-                        {/* Bit info */}
                         <span className={caption}>
-                          ({computeBitInfo(fieldMask)})
+                          ({computeBitInfo(fieldMask, t)})
                         </span>
 
-                        {/* Spacer */}
                         <div className="flex-1" />
 
-                        {/* Format */}
                         <Select
                           value={field.format}
                           onChange={(e) => handleUpdateField(index, { format: e.target.value as HeaderFieldFormat })}
@@ -457,18 +435,16 @@ export default function CanConfigSection({
                           <option value="decimal">{t("common:frameIdFormat.dec")}</option>
                         </Select>
 
-                        {/* Remove button */}
                         <IconButton
                           onClick={() => handleRemoveField(index)}
                           tone="danger"
                           size="sm"
-                          title="Remove field"
+                          title={t("configSections.removeField")}
                         >
                           <Trash2 className={iconMd} />
                         </IconButton>
                       </Card>
 
-                      {/* Expanded bit picker */}
                       {isFieldExpanded && (
                         <Card className="ml-8">
                           <MaskBitPicker
@@ -486,11 +462,9 @@ export default function CanConfigSection({
               </div>
             )}
 
-            {/* Add new field form */}
             {isAddingField && (
               <div className="p-3 bg-success rounded-lg border border-success">
                 <div className="flex items-center gap-2 mb-3">
-                  {/* Field type dropdown */}
                   <Select
                     value={newFieldType}
                     onChange={(e) => setNewFieldType(e.target.value as CanFieldType)}
@@ -498,12 +472,11 @@ export default function CanConfigSection({
                   >
                     {availableFieldTypes.map((opt) => (
                       <option key={opt.value} value={opt.value} disabled={opt.disabled}>
-                        {opt.label}{opt.disabled ? " (exists)" : ""}
+                        {opt.disabled ? t("configSections.fieldTypeExists", { label: opt.label }) : opt.label}
                       </option>
                     ))}
                   </Select>
 
-                  {/* Custom name input (only shown for custom type) */}
                   {newFieldType === "custom" && (
                     <Input
                       type="text"
@@ -515,7 +488,6 @@ export default function CanConfigSection({
                     />
                   )}
 
-                  {/* Format */}
                   <Select
                     value={newFieldFormat}
                     onChange={(e) => setNewFieldFormat(e.target.value as HeaderFieldFormat)}
@@ -528,7 +500,7 @@ export default function CanConfigSection({
 
                 <div className="flex items-center justify-between">
                   <p className={caption}>
-                    Use the bit picker after adding to select which CAN ID bits this field covers.
+                    {t("configSections.can.addFieldHint")}
                   </p>
                   <div className="flex gap-2">
                     <Button
@@ -543,7 +515,7 @@ export default function CanConfigSection({
                       variant="solid"
                       tone="success"
                     >
-                      Add
+                      {t("common:actions.add")}
                     </Button>
                   </div>
                 </div>
@@ -552,22 +524,23 @@ export default function CanConfigSection({
 
             {headerFields.length === 0 && !isAddingField && (
               <p className={`${caption} italic`}>
-                No header fields defined. Add a "Source Address" field to enable per-source view in the decoder.
+                {t("configSections.can.noHeaderFields")}
               </p>
             )}
           </div>
         </div>
       )}
 
-      {/* Collapsed preview when configured but not expanded */}
       {!isExpanded && isConfigured && (
         <div className={`px-4 py-2 ${caption} border-t border-default`}>
-          Byte order: {defaultEndianness}
-          {defaultInterval !== undefined && ` • Interval: ${defaultInterval}ms`}
-          {defaultExtended !== undefined && ` • Extended: ${defaultExtended ? "Yes" : "No"}`}
-          {defaultFd !== undefined && ` • FD: ${defaultFd ? "Yes" : "No"}`}
-          {frameIdMask && ` • Mask: ${frameIdMask}`}
-          {headerFields.length > 0 && ` • ${headerFields.length} header field(s)`}
+          {[
+            t("configSections.can.summaryByteOrder", { order: defaultEndianness }),
+            defaultInterval !== undefined && t("configSections.can.summaryInterval", { ms: defaultInterval }),
+            defaultExtended !== undefined && t(defaultExtended ? "configSections.can.summaryExtendedYes" : "configSections.can.summaryExtendedNo"),
+            defaultFd !== undefined && t(defaultFd ? "configSections.can.summaryFdYes" : "configSections.can.summaryFdNo"),
+            frameIdMask && t("configSections.can.summaryMask", { mask: frameIdMask }),
+            headerFields.length > 0 && t("configSections.can.summaryHeaderFields", { count: headerFields.length }),
+          ].filter(Boolean).join(" • ")}
         </div>
       )}
     </Card>

@@ -5,6 +5,14 @@ import { frameLayout } from "../../../api/catalog";
 import { useCatalogEditorStore } from "../../../stores/catalogEditorStore";
 import type { BitRange } from "../../../components/BitPreview";
 import type { FrameLayout, Protocol } from "../../../types/catalogModel";
+import type { RangeKind } from "../../../generated/RangeKind";
+import i18n from "../../../i18n";
+
+const RANGE_FALLBACK_KEYS = {
+  selector: "common:bitPreview.muxShort",
+  checksum: "common:bitPreview.checksumShort",
+  signal: "common:bitPreview.signalShort",
+} satisfies Record<RangeKind, string>;
 
 /** The layout around the item at a tree path `["frame", protocol, key, …]`. */
 export function useFrameLayout(path: readonly string[] | null): FrameLayout | null {
@@ -35,7 +43,7 @@ export function previewRanges(layout: FrameLayout | null, omitEdited = false): B
   return (layout?.ranges ?? [])
     .filter((r) => !(omitEdited && r.edited))
     .map((r) => ({
-      name: r.name ?? (r.kind === "selector" ? "Mux" : r.kind === "checksum" ? "Checksum" : "Signal"),
+      name: r.name ?? i18n.t(RANGE_FALLBACK_KEYS[r.kind]),
       start_bit: r.startBit,
       bit_length: r.bitLength,
       type: r.kind === "selector" ? "mux" : "signal",

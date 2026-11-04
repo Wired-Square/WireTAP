@@ -74,16 +74,16 @@ export default function ModbusConfigSection({
             onChange({ ...config, register_number: v === "" || Number.isNaN(n) ? undefined : n });
           }}
           size="lg"
-          placeholder={keyIsRegister ? `${parseInt(frameKey)} (from name)` : t("protocolEditors.modbusRegisterNumberPlaceholder")}
+          placeholder={keyIsRegister ? t("protocolEditors.modbusRegisterFromName", { register: parseInt(frameKey) }) : t("protocolEditors.modbusRegisterNumberPlaceholder")}
         />
         {needsRegisterNumber ? (
           <p className="mt-1 text-xs text-amber">
-            ⚠ Name isn't a register — enter a register number, or name the frame by its register (e.g. 2581 or 0x32F9).
+            {t("protocolEditors.modbusNameNotRegister")}
           </p>
         ) : (
           <p className={`${caption} mt-1`}>
             {keyIsRegister
-              ? "Optional — taken from the frame name. Set a value only to override it."
+              ? t("protocolEditors.modbusRegisterFromNameHint")
               : t("protocolEditors.modbusRegisterNumberHint")}
           </p>
         )}

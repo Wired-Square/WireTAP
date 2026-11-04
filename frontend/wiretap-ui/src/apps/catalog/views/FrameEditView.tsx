@@ -17,12 +17,13 @@ import type {
 } from "../types";
 import { defaultFrameConfig } from "./frameEditUtils";
 import { CANConfigSection, ModbusConfigSection, SerialConfigSection } from "./protocol-editors";
+import { protocolLabel } from "../../../utils/profileTraits";
 import { SecondaryButton, PrimaryButton, Input, Select, Checkbox, Textarea } from "../../../components/forms";
 
-const PROTOCOLS: { type: ProtocolType; displayName: string; Icon: React.ComponentType<{ className?: string }> }[] = [
-  { type: "can", displayName: "CAN", Icon: Network },
-  { type: "modbus", displayName: "Modbus", Icon: Server },
-  { type: "serial", displayName: "Serial (RS-485)", Icon: Cable },
+const PROTOCOLS: { type: ProtocolType; Icon: React.ComponentType<{ className?: string }> }[] = [
+  { type: "can", Icon: Network },
+  { type: "modbus", Icon: Server },
+  { type: "serial", Icon: Cable },
 ];
 
 export interface FrameEditFields {
@@ -169,6 +170,7 @@ export default function FrameEditView({
   };
 
   const currentProtocol = PROTOCOLS.find((p) => p.type === fields.protocol);
+  const displayName = (type: ProtocolType) => (type === "serial" ? t("frameEditView.serialRs485") : protocolLabel(type));
 
   return (
     <div className="max-w-4xl">
@@ -185,7 +187,7 @@ export default function FrameEditView({
               {t("frameEditView.protocolLabel")}
             </label>
             <div className="grid grid-cols-3 gap-3">
-              {PROTOCOLS.map(({ type, displayName, Icon }) => {
+              {PROTOCOLS.map(({ type, Icon }) => {
                 const isSelected = fields.protocol === type;
                 return (
                   <button
@@ -208,7 +210,7 @@ export default function FrameEditView({
                         isSelected ? "text-info" : "text-secondary"
                       }`}
                     >
-                      {displayName}
+                      {displayName(type)}
                     </span>
                   </button>
                 );
@@ -223,7 +225,7 @@ export default function FrameEditView({
             {currentProtocol && (
               <>
                 <currentProtocol.Icon className={iconMd} />
-                {currentProtocol.displayName} {t("frameEditView.configurationSuffix")}
+                {displayName(currentProtocol.type)} {t("frameEditView.configurationSuffix")}
               </>
             )}
           </h3>

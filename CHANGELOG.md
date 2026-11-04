@@ -6,7 +6,7 @@ All notable changes to WireTAP will be documented in this file.
 
 ### Changed
 
-- **More of the interface follows your language.** Discovery, the Decoder, the frames table, session menu, status badges, time display, device connection fields, frame context menus and the catalogue editor's common buttons used to stay in English whatever language you chose; they now translate. The English wording is unchanged.
+- **More of the interface follows your language.** Discovery, the Decoder, the frames table, session menu, status badges, time display, device connection fields, frame context menus and the Catalogue (its editor views, tree, configuration, node, mux, checksum, enum, export and validation dialogs) used to stay in English whatever language you chose; they now translate. The English wording is unchanged.
 
 ### Fixed
 

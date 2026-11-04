@@ -1,6 +1,7 @@
 // ui/src/apps/catalog/hooks/handlers/useMuxHandlers.ts
 // Mux and mux case operations for catalog editor
 
+import i18n from "../../../../i18n";
 import { useCatalogEditorStore } from "../../../../stores/catalogEditorStore";
 import {
   upsertMuxToml,
@@ -116,7 +117,7 @@ export function useMuxHandlers({
         notesToSave
       );
       if (!didAdd) {
-        setValidation([{ field: "case", message: `Case ${caseValue} already exists` }]);
+        setValidation([{ field: "case", message: i18n.t("catalog:errors.caseExists", { value: caseValue }) }]);
         return;
       }
 
@@ -127,7 +128,7 @@ export function useMuxHandlers({
       clearValidation();
     } catch (error) {
       console.error("Failed to add case:", error);
-      setValidation([{ field: "case", message: "Failed to add case" }]);
+      setValidation([{ field: "case", message: i18n.t("catalog:errors.addCase") }]);
     }
   };
 
@@ -159,7 +160,7 @@ export function useMuxHandlers({
       );
 
       if (!success) {
-        setValidation([{ field: "case", message: error || "Failed to edit case" }]);
+        setValidation([{ field: "case", message: error || i18n.t("catalog:errors.editCase") }]);
         return;
       }
 
@@ -176,7 +177,7 @@ export function useMuxHandlers({
       }
     } catch (error) {
       console.error("Failed to edit case:", error);
-      setValidation([{ field: "case", message: "Failed to edit case" }]);
+      setValidation([{ field: "case", message: i18n.t("catalog:errors.editCase") }]);
     }
   };
 

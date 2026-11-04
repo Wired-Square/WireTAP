@@ -6,6 +6,7 @@
 
 import type { Catalog, Frame, Signal, Mux, FrameChecksum, NodeDef } from "../../../types/catalogModel";
 import type { TomlNode, TomlNodeType, ProtocolType } from "../types";
+import i18n from "../../../i18n";
 
 const FRAME_NODE_TYPE: Record<ProtocolType, TomlNodeType> = {
   can: "can-frame",
@@ -19,7 +20,7 @@ const byStartBit = (a: TomlNode, b: TomlNode) => startBitOf(a) - startBitOf(b);
 /** `prefix` is the path between the frame and `signals`: `[]` or `["mux", …cases]`. */
 function signalNode(signal: Signal, index: number, framePath: string[], prefix: string[], inherited: boolean): TomlNode {
   return {
-    key: signal.name || `Signal ${index + 1}`,
+    key: signal.name || i18n.t("catalog:tree.fallback.signal", { number: index + 1 }),
     type: "signal",
     path: [...framePath, ...prefix, "signals", String(index)],
     metadata: { signal, signalIndex: index, inherited: inherited || !!signal.inherited },
@@ -33,7 +34,7 @@ function muxNode(mux: Mux, framePath: string[], muxPath: string[], inherited: bo
     const children = muxCase.signals.map((s, i) => signalNode(s, i, framePath, casePrefix, inherited)).sort(byStartBit);
     if (muxCase.mux) children.push(muxNode(muxCase.mux, framePath, [...muxPath, caseValue, "mux"], inherited));
     return {
-      key: `Case ${caseValue}`,
+      key: i18n.t("catalog:tree.fallback.case", { value: caseValue }),
       type: "mux-case",
       path: [...framePath, ...casePrefix],
       children: children.length > 0 ? children : undefined,
@@ -41,7 +42,7 @@ function muxNode(mux: Mux, framePath: string[], muxPath: string[], inherited: bo
     };
   });
   return {
-    key: mux.name || "Mux",
+    key: mux.name || i18n.t("catalog:tree.fallback.mux"),
     type: "mux",
     path: [...framePath, "mux", ...muxPath],
     children: cases,
@@ -51,7 +52,7 @@ function muxNode(mux: Mux, framePath: string[], muxPath: string[], inherited: bo
 
 function checksumNode(checksum: FrameChecksum, index: number, framePath: string[]): TomlNode {
   return {
-    key: checksum.name || `Checksum ${index + 1}`,
+    key: checksum.name || i18n.t("catalog:tree.fallback.checksum", { number: index + 1 }),
     type: "checksum",
     path: [...framePath, "checksum", String(index)],
     metadata: { checksum, checksumIndex: index },

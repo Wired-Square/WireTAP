@@ -1,6 +1,7 @@
 // ui/src/apps/catalog/dialogs/NodeDeviceAddressField.tsx
 // Shared device-address input for the add/edit node dialogs (Modbus slaves).
 
+import { useTranslation } from "react-i18next";
 import { Input, FormField } from "../../../components/forms";
 import { caption } from "../../../styles";
 
@@ -12,9 +13,10 @@ export type NodeDeviceAddressFieldProps = {
 };
 
 export default function NodeDeviceAddressField({ show, value, onChange }: NodeDeviceAddressFieldProps) {
+  const { t } = useTranslation("catalog");
   if (!show) return null;
   return (
-    <FormField label="Device Address" variant="default">
+    <FormField label={t("modbusConfig.deviceAddress")} variant="default">
       <Input
         size="lg"
         type="number"
@@ -27,7 +29,7 @@ export default function NodeDeviceAddressField({ show, value, onChange }: NodeDe
         }}
         placeholder="1"
       />
-      <p className={`mt-2 ${caption}`}>Modbus slave address (1-247) this node is polled at.</p>
+      <p className={`mt-2 ${caption}`}>{t("nodeDialog.deviceAddressHint")}</p>
     </FormField>
   );
 }

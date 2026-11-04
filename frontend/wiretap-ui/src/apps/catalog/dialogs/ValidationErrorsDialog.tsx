@@ -3,6 +3,7 @@
 import { AlertTriangle, CheckCircle } from "lucide-react";
 import { iconXl } from "../../../styles/spacing";
 import Dialog, { DialogBody, DialogFooter, DialogHeader, DialogTitle } from "../../../components/Dialog";
+import { useTranslation } from "react-i18next";
 import { SecondaryButton } from "../../../components/forms";
 import type { ValidationError } from "../types";
 import { Alert } from "../../../components/Alert";
@@ -14,6 +15,7 @@ type Props = {
 };
 
 export default function ValidationErrorsDialog({ open, errors, isValid, onClose }: Props) {
+  const { t } = useTranslation("catalog");
   const hasErrors = errors.length > 0;
   const isValidCatalog = isValid === true && !hasErrors;
 
@@ -36,11 +38,11 @@ export default function ValidationErrorsDialog({ open, errors, isValid, onClose 
           </div>
           <div>
             <DialogTitle>
-              {isValidCatalog ? "Validation Passed" : "Validation Warnings"}
+              {t(isValidCatalog ? "validationDialog.passed" : "validationDialog.warnings")}
             </DialogTitle>
             {hasErrors && (
               <p className="text-sm text-muted">
-                {errors.length} {errors.length === 1 ? "issue" : "issues"} found
+                {t("validationDialog.issuesFound", { count: errors.length })}
               </p>
             )}
           </div>
@@ -49,7 +51,7 @@ export default function ValidationErrorsDialog({ open, errors, isValid, onClose 
       <DialogBody>
         {isValidCatalog ? (
           <p className="text-secondary">
-            The catalog is valid and ready for use.
+            {t("validationDialog.valid")}
           </p>
         ) : (
           <div className="space-y-2">
@@ -63,7 +65,7 @@ export default function ValidationErrorsDialog({ open, errors, isValid, onClose 
         )}
       </DialogBody>
       <DialogFooter>
-        <SecondaryButton onClick={onClose}>Close</SecondaryButton>
+        <SecondaryButton onClick={onClose}>{t("common:actions.close")}</SecondaryButton>
       </DialogFooter>
     </Dialog>
   );

@@ -35,13 +35,13 @@ export default function MuxEditDialog({
   onSave,
 }: MuxEditDialogProps) {
   const { t } = useTranslation("catalog");
-  const title = isAddingNestedMux ? "Add Nested Mux" : isEditingExistingMux ? "Edit Mux" : "Add Mux";
+  const title = t(isAddingNestedMux ? "muxDialog.addNestedTitle" : isEditingExistingMux ? "muxDialog.editTitle" : "muxDialog.addTitle");
   const layout = useFrameLayout(open ? currentMuxPath : null);
 
   const bitPreview = layout && (
     <div className="p-4 bg-surface rounded-lg">
       <div className={`${textMedium} mb-3`}>
-        Bit Layout Preview ({layout.byteLength} bytes)
+        {t("muxDialog.layoutPreview", { count: layout.byteLength })}
       </div>
       <BitPreview
         numBytes={layout.byteLength}
@@ -57,19 +57,17 @@ export default function MuxEditDialog({
   return (
     <Dialog isOpen={open} onClose={onCancel} size="xl" title={title}>
       <DialogBody className="space-y-4">
-        {/* Name */}
-        <FormField label="Name" variant="default">
+        <FormField label={t("muxDialog.name")} variant="default">
           <Input
             size="lg"
             value={fields.name ?? ""}
             onChange={(e) => setFields({ ...fields, name: e.target.value })}
-            placeholder="Named from the frame and bits when left blank"
+            placeholder={t("muxDialog.namePlaceholder")}
           />
         </FormField>
 
-        {/* Start Bit & Bit Length */}
         <div className="grid grid-cols-2 gap-4">
-          <FormField label="Start Bit" required variant="default">
+          <FormField label={t("muxDialog.startBit")} required variant="default">
             <Input
               size="lg"
               type="number"
@@ -78,7 +76,7 @@ export default function MuxEditDialog({
               min={0}
             />
           </FormField>
-          <FormField label="Bit Length" required variant="default">
+          <FormField label={t("muxDialog.bitLength")} required variant="default">
             <Input
               size="lg"
               type="number"
@@ -89,10 +87,8 @@ export default function MuxEditDialog({
           </FormField>
         </div>
 
-        {/* Bit Preview */}
         {bitPreview}
 
-        {/* Notes */}
         <FormField label={t("shared.notes")} variant="default">
           <Textarea
             size="lg"
@@ -106,7 +102,7 @@ export default function MuxEditDialog({
       <DialogFooter>
         <SecondaryButton onClick={onCancel}>{t("common:actions.cancel")}</SecondaryButton>
         <PrimaryButton onClick={onSave} disabled={(fields.bit_length ?? 0) < 1}>
-          OK
+          {t("common:actions.ok")}
         </PrimaryButton>
       </DialogFooter>
     </Dialog>

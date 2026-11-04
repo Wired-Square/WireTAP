@@ -1,11 +1,13 @@
 // ui/src/apps/catalog/dialogs/config-sections/ModbusConfigSection.tsx
 // Modbus protocol configuration section for unified config dialog
 
+import { useTranslation } from "react-i18next";
 import { Network } from "lucide-react";
 import { iconMd } from "../../../../styles/spacing";
 import { caption, textMedium } from "../../../../styles/typography";
 import { Select, Input } from "../../../../components/forms";
 import { Card } from "../../../../components/Card";
+import { protocolLabel } from "../../../../utils/profileTraits";
 import { ConfigSectionHeader } from "./ConfigSectionHeader";
 export type ModbusConfigSectionProps = {
   isConfigured: boolean;
@@ -42,13 +44,13 @@ export default function ModbusConfigSection({
   defaultWordOrder,
   setDefaultWordOrder,
 }: ModbusConfigSectionProps) {
-  // Status indicator
+  const { t } = useTranslation("catalog");
   const showWarning = hasFrames && !isConfigured;
 
   return (
     <Card padding="none" className="overflow-hidden">
       <ConfigSectionHeader
-        label="Modbus"
+        label={protocolLabel("modbus")}
         icon={<Network className={iconMd} />}
         tone="warning"
         isConfigured={isConfigured}
@@ -59,31 +61,28 @@ export default function ModbusConfigSection({
         onRemove={onRemove}
       />
 
-      {/* Content */}
       {isExpanded && isConfigured && (
         <div className="p-4 space-y-4 border-t border-default">
-          {/* Register Base */}
           <div>
             <label className={`block ${textMedium} mb-2`}>
-              Register Base <span className="text-danger">*</span>
+              {t("modbusConfig.registerBase")} <span className="text-danger">*</span>
             </label>
             <Select
               value={registerBase}
               onChange={(e) => setRegisterBase(parseInt(e.target.value) as 0 | 1)}
               size="lg"
             >
-              <option value={0}>0-based (register 0 = address 0)</option>
-              <option value={1}>1-based (register 1 = address 0)</option>
+              <option value={0}>{t("configSections.modbus.base0")}</option>
+              <option value={1}>{t("configSections.modbus.base1")}</option>
             </Select>
             <p className={`mt-1 ${caption}`}>
-              Register addressing convention used by the device
+              {t("configSections.modbus.registerBaseHint")}
             </p>
           </div>
 
-          {/* Default Poll Interval */}
           <div>
             <label className={`block ${textMedium} mb-2`}>
-              Default Poll Interval
+              {t("configSections.modbus.pollInterval")}
             </label>
             <div className="flex items-center gap-2">
               <Input
@@ -101,56 +100,56 @@ export default function ModbusConfigSection({
               <span className="text-sm text-muted whitespace-nowrap">ms</span>
             </div>
             <p className={`mt-1 ${caption}`}>
-              Default polling interval for frames without an explicit interval
+              {t("configSections.modbus.pollIntervalHint")}
             </p>
           </div>
 
-          {/* Byte Order & Word Order */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className={`block ${textMedium} mb-2`}>
-                Default Byte Order
+                {t("canConfig.defaultByteOrder")}
               </label>
               <Select
                 value={defaultByteOrder}
                 onChange={(e) => setDefaultByteOrder(e.target.value as "big" | "little")}
                 size="lg"
               >
-                <option value="big">Big-endian</option>
-                <option value="little">Little-endian</option>
+                <option value="big">{t("modbusConfig.endianBE")}</option>
+                <option value="little">{t("modbusConfig.endianLE")}</option>
               </Select>
               <p className={`mt-1 ${caption}`}>
-                Byte order within each register
+                {t("configSections.modbus.byteOrderHint")}
               </p>
             </div>
 
             <div>
               <label className={`block ${textMedium} mb-2`}>
-                Default Word Order
+                {t("configSections.modbus.wordOrder")}
               </label>
               <Select
                 value={defaultWordOrder}
                 onChange={(e) => setDefaultWordOrder(e.target.value as "big" | "little")}
                 size="lg"
               >
-                <option value="big">Big-endian (high word first)</option>
-                <option value="little">Little-endian (low word first)</option>
+                <option value="big">{t("configSections.modbus.wordBig")}</option>
+                <option value="little">{t("configSections.modbus.wordLittle")}</option>
               </Select>
               <p className={`mt-1 ${caption}`}>
-                Word order for multi-register values
+                {t("configSections.modbus.wordOrderHint")}
               </p>
             </div>
           </div>
         </div>
       )}
 
-      {/* Collapsed preview when configured but not expanded */}
       {!isExpanded && isConfigured && (
         <div className={`px-4 py-2 ${caption} border-t border-default`}>
-          Base: {registerBase}-based
-          {defaultInterval !== undefined && ` • ${defaultInterval}ms`}
-          {` • Byte: ${defaultByteOrder === "big" ? "BE" : "LE"}`}
-          {` • Word: ${defaultWordOrder === "big" ? "BE" : "LE"}`}
+          {[
+            t("configSections.modbus.summaryBase", { base: registerBase }),
+            defaultInterval !== undefined && t("configSections.summaryInterval", { ms: defaultInterval }),
+            t("configSections.modbus.summaryByte", { order: defaultByteOrder === "big" ? "BE" : "LE" }),
+            t("configSections.modbus.summaryWord", { order: defaultWordOrder === "big" ? "BE" : "LE" }),
+          ].filter(Boolean).join(" • ")}
         </div>
       )}
     </Card>
