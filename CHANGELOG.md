@@ -8,6 +8,7 @@ All notable changes to WireTAP will be documented in this file.
 
 - **A Dashboard List shows an enum signal by its label.** A signal with enum labels used to show its raw value with decimals, such as "3.000"; it now shows the label the Decoder shows.
 - **Query's source picker no longer says no sources are configured beside a capture.** The line telling you to add a source in Settings now shows only when the picker has nothing to list.
+- **Query's session button names the capture it is connected to.** It used to read "Capture"; it now shows the capture's name, as the other apps do.
 
 ## [0.16.0] - 2026-11-03
 

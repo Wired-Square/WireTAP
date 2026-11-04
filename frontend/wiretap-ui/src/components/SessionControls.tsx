@@ -144,6 +144,7 @@ export function SessionButton({
   isCaptureMode: isCaptureModeProp,
 }: SessionButtonProps) {
   const openedOnCapture = useSessionStore((s) => isCaptureSession(s, ioProfile));
+  const sessionCaptureName = useSessionStore((s) => (ioProfile ? s.sessions[ioProfile]?.capture?.name : null));
   const isCaptureProfile = isCaptureModeProp ?? openedOnCapture;
   const selectedProfile = useSourceProfile(ioProfiles, ioProfile);
 
@@ -156,8 +157,7 @@ export function SessionButton({
   // Track whether sessionId is already shown in displayName (to avoid duplication)
   let sessionIdInDisplayName = false;
   if (isCaptureProfile) {
-    // Capture: show label if set, then capture ID, then fallback
-    displayName = captureMetadata?.name || captureMetadata?.id || "Capture";
+    displayName = captureMetadata?.name || sessionCaptureName || captureMetadata?.id || "Capture";
     sessionIdInDisplayName = true;
   } else if (showAsMultiBus) {
     // Multi-bus: show sessionId with profile count (e.g., "f_abc123 (2)")
