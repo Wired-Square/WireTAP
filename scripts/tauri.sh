@@ -5,6 +5,7 @@ set -euo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 export TAURI_APP_PATH="$root/crates/wiretap-app"
 export TAURI_FRONTEND_PATH="$root/frontend/wiretap-ui"
+export APPLE_DEVELOPMENT_TEAM="${APPLE_DEVELOPMENT_TEAM:-${APPLE_TEAM_ID:-}}"
 
 # Every installer carries wiretap-can-cli.
 if [[ "${1:-}" == "build" ]]; then
