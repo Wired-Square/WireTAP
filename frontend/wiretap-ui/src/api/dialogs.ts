@@ -1,11 +1,22 @@
 // ui/src/api/dialogs.ts
 // File dialog utilities using Tauri dialog plugin
 
+import i18n from "i18next";
 import { open, save } from "@tauri-apps/plugin-dialog";
 
 export interface DialogFilter {
   name: string;
   extensions: string[];
+}
+
+/** A filter whose name follows the language at the moment the dialog opens. */
+export function fileFilter(key: string, extensions: string[]): DialogFilter {
+  return {
+    get name() {
+      return i18n.t(`common:fileFilters.${key}`);
+    },
+    extensions,
+  };
 }
 
 export interface OpenDialogOptions {
@@ -94,92 +105,47 @@ export async function pickFileToSave(options: SaveDialogOptions = {}): Promise<s
 /**
  * Common dialog filters for catalog files
  */
-export const CATALOG_FILTERS: DialogFilter[] = [
-  {
-    name: "TOML Catalog Files",
-    extensions: ["toml"],
-  },
-];
+export const CATALOG_FILTERS: DialogFilter[] = [fileFilter("tomlCatalog", ["toml"])];
 
 /**
  * Dialog filter for DBC files
  */
-export const DBC_FILTERS: DialogFilter[] = [
-  {
-    name: "DBC Files",
-    extensions: ["dbc"],
-  },
-];
+export const DBC_FILTERS: DialogFilter[] = [fileFilter("dbc", ["dbc"])];
 
 /**
  * Dialog filter for HTML files
  */
-export const HTML_FILTERS: DialogFilter[] = [
-  {
-    name: "HTML Files",
-    extensions: ["html", "htm"],
-  },
-];
+export const HTML_FILTERS: DialogFilter[] = [fileFilter("html", ["html", "htm"])];
 
 /**
  * Dialog filter for Markdown files
  */
-export const MARKDOWN_FILTERS: DialogFilter[] = [
-  {
-    name: "Markdown Files",
-    extensions: ["md"],
-  },
-];
+export const MARKDOWN_FILTERS: DialogFilter[] = [fileFilter("markdown", ["md"])];
 
 /**
  * Dialog filter for Text files
  */
-export const TEXT_FILTERS: DialogFilter[] = [
-  {
-    name: "Text Files",
-    extensions: ["txt"],
-  },
-];
+export const TEXT_FILTERS: DialogFilter[] = [fileFilter("text", ["txt"])];
 
 /**
  * Dialog filter for JSON files
  */
-export const JSON_FILTERS: DialogFilter[] = [
-  {
-    name: "JSON Files",
-    extensions: ["json"],
-  },
-];
+export const JSON_FILTERS: DialogFilter[] = [fileFilter("json", ["json"])];
 
 /**
  * Dialog filter for data files (CSV, CAN dump, log)
  */
-export const CSV_FILTERS: DialogFilter[] = [
-  {
-    name: "Data Files (CSV, CAN Dump)",
-    extensions: ["csv", "log", "dump"],
-  },
-];
+export const CSV_FILTERS: DialogFilter[] = [fileFilter("data", ["csv", "log", "dump"])];
 
 /**
  * Dialog filter for PNG image files
  */
-export const PNG_FILTERS: DialogFilter[] = [
-  {
-    name: "PNG Images",
-    extensions: ["png"],
-  },
-];
+export const PNG_FILTERS: DialogFilter[] = [fileFilter("png", ["png"])];
 
 /**
  * Dialog filter for SVG image files
  */
-export const SVG_FILTERS: DialogFilter[] = [
-  {
-    name: "SVG Images",
-    extensions: ["svg"],
-  },
-];
+export const SVG_FILTERS: DialogFilter[] = [fileFilter("svg", ["svg"])];
 
 /**
  * Pick a catalog file to open

@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useSettings } from '../hooks/useSettings';
 import { flexRowGap2 } from '../styles/spacing';
 
@@ -36,6 +37,7 @@ export default function ByteBits({
   usedBitStart,
   usedBitEnd,
 }: ByteBitsProps) {
+  const { t } = useTranslation();
   const { settings } = useSettings();
   // Use props if provided, otherwise fall back to settings, then defaults
   const bitColor = bitColorProp ?? settings?.binary_one_colour ?? '#14b8a6';
@@ -145,7 +147,7 @@ export default function ByteBits({
                       !isUsed ? 'opacity-40' : ''
                     } ${canToggle ? 'cursor-pointer hover:ring-2 hover:ring-accent-primary transition-all' : ''}`}
                     style={{ backgroundColor: isUsed ? (bitValue === 1 ? bitColor : zeroColor) : unusedColor }}
-                    title={`Bit ${bitIdx}: ${bitValue}${!isUsed ? ' (unused)' : ''}${canToggle ? ' (click to toggle)' : ''}`}
+                    title={[t('byteBits.bit', { bit: bitIdx, value: bitValue }), !isUsed && t('byteBits.unused'), canToggle && t('byteBits.clickToToggle')].filter(Boolean).join(' ')}
                   >
                     <span className={`text-xs font-medium ${isUsed ? 'text-white' : 'text-muted'}`}>
                       {bitIdx}

@@ -114,7 +114,7 @@ export default function MuxCaseView({
 
       {muxCase.notes && (
         <div className={`p-3 ${bgSurface} rounded-lg`}>
-          <div className={labelSmallMuted}>{t("muxCaseView.notes")}</div>
+          <div className={labelSmallMuted}>{t("shared.notes")}</div>
           <div className="text-sm text-secondary whitespace-pre-wrap">
             {muxCase.notes.join("\n")}
           </div>
@@ -226,8 +226,8 @@ export default function MuxCaseView({
       <ConfirmDeleteDialog
         open={confirmOpen}
         title={t("muxCaseView.deleteCaseTitle")}
-        message={t("muxCaseView.deleteCaseMessage")}
-        highlightText={caseValue || undefined}
+        messageKey="catalog:muxCaseView.deleteCaseMessage"
+        name={caseValue || undefined}
         confirmText={t("muxCaseView.deleteLabel")}
         onCancel={() => {
           setConfirmOpen(false);

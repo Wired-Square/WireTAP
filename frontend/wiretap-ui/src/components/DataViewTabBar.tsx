@@ -141,7 +141,7 @@ export default function DataViewTabBar({
       {/* Frame index display (for debugging/playback position) */}
       {frameIndex != null && (
         <Badge mono className="ml-2">
-          <span>Frame</span>
+          <span>{t("frameBadge")}</span>
           <span className={textDataPrimary}>{(frameIndex + 1).toLocaleString()}</span>
           {totalFrames != null && (
             <>

@@ -19,7 +19,7 @@ import Dialog, { DialogBody, DialogFooter } from "../../components/Dialog";
 import { CatalogSyncIcon } from "../../components/catalogSyncPresentation";
 import Input from "../../components/forms/Input";
 import { openCatalog, importCatalog, importDbcWs } from "../../api/catalog";
-import { pickFileToOpen } from "../../api/dialogs";
+import { fileFilter, pickFileToOpen } from "../../api/dialogs";
 import { useCatalogList } from "../../hooks/useCatalogList";
 import { useSettingsStore } from "../../apps/settings/stores/settingsStore";
 import { buildCatalogPath, catalogBaseName } from "../../utils/catalogUtils";
@@ -36,11 +36,7 @@ const RepositoryDialog = lazy(() => import("../catalog-share/RepositoryDialog"))
 /** Below this many catalogues the list is short enough to scan without a filter. */
 const SEARCH_THRESHOLD = 8;
 
-const FILE_FILTERS = [
-  { name: "Catalog Files", extensions: ["toml", "dbc"] },
-  { name: "TOML Files", extensions: ["toml"] },
-  { name: "DBC Files", extensions: ["dbc"] },
-];
+const FILE_FILTERS = [fileFilter("catalog", ["toml", "dbc"]), fileFilter("toml", ["toml"]), fileFilter("dbc", ["dbc"])];
 
 type Props = {
   isOpen: boolean;

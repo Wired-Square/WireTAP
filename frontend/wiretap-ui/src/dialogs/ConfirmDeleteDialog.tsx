@@ -1,6 +1,6 @@
 // ui/src/dialogs/ConfirmDeleteDialog.tsx
 
-import { useTranslation } from "react-i18next";
+import { Trans, useTranslation } from "react-i18next";
 import Dialog, { DialogBody, DialogFooter } from '../components/Dialog';
 import { SecondaryButton, DangerButton } from '../components/forms';
 import { bodyDefault, textDanger } from '../styles';
@@ -13,7 +13,9 @@ export type ConfirmDeleteDialogProps = {
   // Optional overrides
   title?: string;
   message?: string;
-  highlightText?: string;
+  /** A full key whose sentence places the highlighted `name` with `<name>{{name}}</name>`. */
+  messageKey?: string;
+  name?: string;
   confirmText?: string;
   cancelText?: string;
 };
@@ -24,7 +26,8 @@ export default function ConfirmDeleteDialog({
   onConfirm,
   title,
   message,
-  highlightText,
+  messageKey,
+  name,
   confirmText,
   cancelText,
 }: ConfirmDeleteDialogProps) {
@@ -34,9 +37,14 @@ export default function ConfirmDeleteDialog({
     <Dialog isOpen={open} title={title ?? t("confirmDelete.defaultTitle")}>
       <DialogBody>
         <p className={bodyDefault}>
-          {message ?? t("confirmDelete.defaultMessage")}{" "}
-          {highlightText && (
-            <span className={`font-semibold ${textDanger}`}>{highlightText}</span>
+          {messageKey ? (
+            <Trans
+              i18nKey={messageKey}
+              values={{ name: name ?? "" }}
+              components={{ name: <span className={`font-semibold ${textDanger}`} /> }}
+            />
+          ) : (
+            message ?? t("confirmDelete.defaultMessage")
           )}
         </p>
       </DialogBody>

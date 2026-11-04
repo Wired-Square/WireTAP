@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 import { useDashboardStore, flowSignals, getSignalLabel, type LayoutItem, type DashboardPanel } from "../../../stores/dashboardStore";
 import PanelWrapper from "./panels/PanelWrapper";
 import { getWidget, FALLBACK_WIDGET } from "../widgets/registry";
+import { panelTitle } from "../widgets/widgetMeta";
 import { useCallback, useMemo, useRef } from "react";
 import { emptyStateContainer, emptyStateText } from "../../../styles/typography";
 import { exportHistoryCsv, readSeries } from "../../../api/dashboardHistory";
@@ -70,7 +71,7 @@ export default function DashboardGrid({ onOpenPanelConfig }: Props) {
     if (!csv) return;
 
     const path = await pickFileToSave({
-      defaultPath: `${panel.title.replace(/[^a-zA-Z0-9_-]/g, '_')}.csv`,
+      defaultPath: `${panelTitle(panel).replace(/[^a-zA-Z0-9_-]/g, '_')}.csv`,
       filters: [{ name: "CSV", extensions: ["csv"] }],
     });
     if (!path) return;
@@ -83,7 +84,7 @@ export default function DashboardGrid({ onOpenPanelConfig }: Props) {
     if (!panel) return;
 
     const path = await pickFileToSave({
-      defaultPath: `${panel.title.replace(/[^a-zA-Z0-9_-]/g, '_')}.png`,
+      defaultPath: `${panelTitle(panel).replace(/[^a-zA-Z0-9_-]/g, '_')}.png`,
       filters: PNG_FILTERS,
     });
     if (!path) return;
@@ -115,7 +116,7 @@ export default function DashboardGrid({ onOpenPanelConfig }: Props) {
     if (!panel) return;
 
     const path = await pickFileToSave({
-      defaultPath: `${panel.title.replace(/[^a-zA-Z0-9_-]/g, '_')}.svg`,
+      defaultPath: `${panelTitle(panel).replace(/[^a-zA-Z0-9_-]/g, '_')}.svg`,
       filters: SVG_FILTERS,
     });
     if (!path) return;

@@ -32,7 +32,7 @@ describe("ExportAnalysisDialog", () => {
         />,
       ),
     );
-    const saveAs = [...document.querySelectorAll("button")].find((b) => b.textContent === "Save As...")!;
+    const saveAs = [...document.querySelectorAll("button")].find((b) => b.textContent === "common:actions.saveAs")!;
     await act(async () => saveAs.click());
     expect(onExport.mock.calls[0][1]).toMatch(/^\d{8}-payload-changes-report\.txt$/);
     act(() => root.unmount());

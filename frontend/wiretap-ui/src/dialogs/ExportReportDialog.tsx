@@ -2,12 +2,12 @@
 // Generic export dialog for analysis reports
 
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import Dialog, { DialogBody, DialogFooter } from "../components/Dialog";
 import { Select, FormField, SecondaryButton } from "../components/forms";
 import {
   type ExportFormat,
-  FORMAT_DESCRIPTIONS,
-  FORMAT_OPTIONS,
+  FORMAT_EXTENSIONS,
   getFullFilename,
 } from "../utils/reportExport";
 import { caption } from "../styles/typography";
@@ -32,6 +32,7 @@ export default function ExportReportDialog({
   onCancel,
   onExport,
 }: ExportReportDialogProps) {
+  const { t } = useTranslation("dialogs");
   const [format, setFormat] = useState<ExportFormat>("text");
 
   const handleExport = () => {
@@ -54,20 +55,20 @@ export default function ExportReportDialog({
         </div>
 
         <div className="grid grid-cols-1 gap-3">
-          <FormField label="Format" variant="simple">
+          <FormField label={t("exportReport.format")} variant="simple">
             <Select
               size="lg"
               value={format}
               onChange={(e) => setFormat(e.target.value as ExportFormat)}
             >
-              {FORMAT_OPTIONS.map(opt => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              {(Object.keys(FORMAT_EXTENSIONS) as ExportFormat[]).map((f) => (
+                <option key={f} value={f}>{t(`exportReport.formats.${f}.label`)}</option>
               ))}
             </Select>
           </FormField>
 
           <div className={`${caption} -mt-1`}>
-            {FORMAT_DESCRIPTIONS[format]}
+            {t(`exportReport.formats.${format}.description`)}
           </div>
         </div>
       </DialogBody>
@@ -75,7 +76,7 @@ export default function ExportReportDialog({
         <SecondaryButton
           onClick={onCancel}
         >
-          Cancel
+          {t("common:actions.cancel")}
         </SecondaryButton>
         <Button
           onClick={handleExport}
@@ -83,7 +84,7 @@ export default function ExportReportDialog({
           tone="purple"
           size="lg"
         >
-          Save As...
+          {t("common:actions.saveAs")}
         </Button>
       </DialogFooter>
     </Dialog>

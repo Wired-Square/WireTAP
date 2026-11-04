@@ -137,7 +137,7 @@ export default function ModbusFrameView({
       {notes.length > 0 && (
         <div className={`p-4 ${bgSurface} rounded-lg`}>
           <div className={`${labelSmall} mb-2`}>
-            {t("modbusFrame.notes")}
+            {t("shared.notes")}
           </div>
           <div className="text-sm text-secondary whitespace-pre-wrap">
             {notes.join("\n")}

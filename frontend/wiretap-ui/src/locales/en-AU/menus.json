@@ -25,7 +25,8 @@
     "updateLabel": "Update"
   },
   "watermark": {
-    "tagline": "Open an app to begin"
+    "tagline": "Open an app to begin",
+    "byline": "by Wired Square"
   },
   "nativeMenu": {
     "appsMenu": "Apps",

@@ -10,6 +10,7 @@
 // - Rust tracks all subscribers and destroys session when last one leaves
 
 import { useEffect, useRef, useCallback } from "react";
+import i18n from "i18next";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { useShallow } from "@wired-square/store/react";
 import { useSessionStore, type CreateSessionOptions, type Session, type SessionCallbacks } from "../stores/sessionStore";
@@ -552,7 +553,7 @@ export function useIOSession(
         return {
           success: false,
           timestamp_us: Date.now() * 1000,
-          error: "No session",
+          error: i18n.t("common:errors.noSession"),
         };
       }
       try {

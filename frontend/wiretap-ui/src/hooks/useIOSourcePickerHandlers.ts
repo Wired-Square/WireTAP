@@ -5,6 +5,7 @@
 // that use IoSourcePickerDialog.
 
 import { useCallback } from "react";
+import i18n from "i18next";
 import type { UseIOSessionManagerResult, LoadOptions as ManagerLoadOptions } from "./useIOSessionManager";
 import { buildModbusPollsFromRanges, type ModbusRangeSpec } from "../api/io";
 import { withAppError } from "../utils/appError";
@@ -96,8 +97,8 @@ export function useIOSourcePickerHandlers({
       const mode = closeDialogFlag ? "connect" : "load";
 
       await withAppError(
-        closeDialogFlag ? "Connect Error" : "Load Error",
-        closeDialogFlag ? "Failed to start session" : "Failed to start load",
+        i18n.t(closeDialogFlag ? "common:errors.connectTitle" : "common:errors.loadTitle"),
+        i18n.t(closeDialogFlag ? "common:errors.startSessionFailed" : "common:errors.startLoadFailed"),
         async () => {
           if (profileIds.length === 1) {
             await onBeforeStart?.(profileIds[0], options, mode);

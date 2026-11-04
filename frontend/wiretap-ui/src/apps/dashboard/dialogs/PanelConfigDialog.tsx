@@ -11,6 +11,7 @@ import { useFrameIdFormat } from "../../../hooks/useFrameIdFormat";
 import { Button, IconButton } from "../../../components/Button";
 import { Tab, Tabs } from "../../../components/Tabs";
 import { PrimaryButton, Input, Select, Textarea } from "../../../components/forms";
+import { panelTitle } from "../widgets/widgetMeta";
 
 interface Props {
   isOpen: boolean;
@@ -57,7 +58,7 @@ export default function PanelConfigDialog({ isOpen, onClose, panelId, onAddSigna
   // Sync local state when dialog opens (or switches to a different panel)
   useEffect(() => {
     if (panel) {
-      setTitle(panel.title);
+      setTitle(panelTitle(panel));
       setMinValue(String(panel.minValue));
       setMaxValue(String(panel.maxValue));
       setPrimarySignalIndex(String(panel.primarySignalIndex ?? 0));
@@ -100,8 +101,9 @@ export default function PanelConfigDialog({ isOpen, onClose, panelId, onAddSigna
       }
     }
 
+    const typedTitle = title.trim();
     updatePanel(panel.id, {
-      title: title.trim() || panel.title,
+      title: typedTitle && typedTitle !== panelTitle(panel) ? typedTitle : panel.title,
       minValue: parseFloat(minValue) || 0,
       maxValue: parseFloat(maxValue) || 100,
       ...(panel.type === "gauge" ? { primarySignalIndex: parseInt(primarySignalIndex, 10) || 0 } : {}),

@@ -2,6 +2,8 @@
 //
 // Timezone helpers used by `TimeBoundsInput`.
 
+import i18n from "i18next";
+
 export type TimezoneMode = "default" | "local" | "utc";
 
 /** Get the local timezone abbreviation (e.g., "AEDT", "PST") */
@@ -9,19 +11,7 @@ export function getLocalTimezoneAbbr(): string {
   const formatter = new Intl.DateTimeFormat("en", { timeZoneName: "short" });
   const parts = formatter.formatToParts(new Date());
   const tzPart = parts.find((p) => p.type === "timeZoneName");
-  return tzPart?.value || "Local";
-}
-
-/** Get the display label for a timezone mode */
-export function getTimezoneLabel(mode: TimezoneMode, defaultTz: "local" | "utc"): string {
-  switch (mode) {
-    case "default":
-      return defaultTz === "utc" ? "Default (UTC)" : `Default (${getLocalTimezoneAbbr()})`;
-    case "local":
-      return getLocalTimezoneAbbr();
-    case "utc":
-      return "UTC";
-  }
+  return tzPart?.value || i18n.t("common:timezone.local");
 }
 
 /** Get the effective timezone for a mode */

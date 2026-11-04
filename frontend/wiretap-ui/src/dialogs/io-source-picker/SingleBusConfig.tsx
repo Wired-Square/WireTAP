@@ -129,7 +129,7 @@ export default function SingleBusConfig({
     >
       {Array.from({ length: 8 }, (_, i) => (
         <option key={i} value={i}>
-          {t("ioSourcePicker.busConfig.busLabel", { bus: i })}
+          {t("common:busNumber", { bus: i })}
         </option>
       ))}
     </Select>

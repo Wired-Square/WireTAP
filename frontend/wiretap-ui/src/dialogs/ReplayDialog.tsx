@@ -285,7 +285,7 @@ export default function ReplayDialog({ isOpen, onClose, captureId }: Props) {
                     size="sm"
                     pressed={targetBus === b}
                   >
-                    {t("replay.busLabel", { bus: b })}
+                    {t("common:busNumber", { bus: b })}
                   </Button>
                 ))}
               </div>

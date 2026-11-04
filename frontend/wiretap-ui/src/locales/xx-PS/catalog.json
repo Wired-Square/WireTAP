@@ -143,7 +143,6 @@
     "addSerialFrame": "⟦Add Serial frame⟧",
     "addModbusFrame": "⟦Add Modbus frame⟧",
     "noFramesYet": "⟦No frames defined yet⟧",
-    "notes": "⟦Notes⟧",
     "items": "⟦Items ({{count}})⟧",
     "noItems": "⟦No items⟧",
     "transmittedFrames": "⟦Transmitted CAN Frames ({{count}})⟧",
@@ -183,7 +182,6 @@
     "noClassic": "⟦No (Classic)⟧",
     "none": "⟦None⟧",
     "notSet": "⟦Not set⟧",
-    "notes": "⟦Notes⟧",
     "signalsHeader": "⟦Signals ({{count}})⟧",
     "muxSignalsHint": "⟦(includes {{count}} mux signals)⟧",
     "totalBytes": "⟦{{count}} bytes total⟧",
@@ -204,7 +202,7 @@
     "editMux": "⟦Edit mux⟧",
     "deleteMux": "⟦Delete mux⟧",
     "deleteMuxTitle": "⟦Delete Mux⟧",
-    "deleteMuxMessage": "⟦Are you sure you want to delete mux⟧",
+    "deleteMuxMessage": "⟦Are you sure you want to delete mux <name>{{name}}</name>⟧",
     "deleteLabel": "⟦Delete⟧",
     "signalsCount_one": "⟦{{count}} signal⟧",
     "signalsCount_other": "⟦{{count}} signals⟧",
@@ -224,7 +222,6 @@
     "intervalInheritedTooltip": "⟦Inherited from default_interval⟧",
     "intervalInheritedSuffix": "⟦(inherited)⟧",
     "intervalMs": "⟦{{ms}} ms⟧",
-    "notes": "⟦Notes⟧",
     "signalsHeader": "⟦Signals ({{count}})⟧",
     "muxSignalsHint": "⟦(includes {{count}} mux signals)⟧",
     "totalBytes": "⟦{{count}} bytes total⟧",
@@ -256,7 +253,6 @@
     "intervalInheritedSuffix": "⟦(inherited)⟧",
     "intervalMs": "⟦{{ms}} ms⟧",
     "notSet": "⟦Not set⟧",
-    "notes": "⟦Notes⟧",
     "editFrame": "⟦Edit frame⟧",
     "deleteFrame": "⟦Delete frame⟧",
     "childNodesHint": "⟦This Modbus frame has {{count}} child node(s). Use the tree to navigate.⟧"
@@ -365,8 +361,6 @@
     "calcStart": "⟦Calc Start⟧",
     "calcEnd": "⟦Calc End⟧",
     "byteOrder": "⟦Byte Order⟧",
-    "endianBE": "⟦Big Endian⟧",
-    "endianLE": "⟦Little Endian⟧",
     "rangeFrom": "⟦bytes {{start}}⟧",
     "rangeTo": "⟦to {{end}}⟧",
     "rangeResolved": "⟦= bytes {{start}} to {{last}}⟧",
@@ -380,14 +374,13 @@
     "name": "⟦Name⟧",
     "nameNa": "⟦N/A⟧",
     "byteLayout": "⟦Byte Layout (LSB first)⟧",
-    "notes": "⟦Notes⟧",
     "defaultCase": "⟦Default Case⟧",
     "casesHeader": "⟦Cases ({{count}})⟧",
     "signalsCount_one": "⟦{{count}} signal⟧",
     "signalsCount_other": "⟦{{count}} signals⟧",
     "signalDefault": "⟦Signal {{idx}}⟧",
     "deleteMuxTitle": "⟦Delete Mux⟧",
-    "deleteMuxMessage": "⟦Are you sure you want to delete mux⟧",
+    "deleteMuxMessage": "⟦Are you sure you want to delete mux <name>{{name}}</name>⟧",
     "deleteLabel": "⟦Delete⟧"
   },
   "muxCaseView": {
@@ -398,7 +391,6 @@
     "addNestedMuxTooltip": "⟦Add nested mux⟧",
     "editCase": "⟦Edit case⟧",
     "deleteCase": "⟦Delete case⟧",
-    "notes": "⟦Notes⟧",
     "bitLayoutTitle": "⟦Bit Layout (includes frame signals and this case)⟧",
     "signalsHeader": "⟦Signals ({{count}})⟧",
     "noSignals": "⟦No signals in this case yet.⟧",
@@ -408,7 +400,7 @@
     "otherContents": "⟦Other Contents ({{count}})⟧",
     "bitsRangeShort": "⟦Bits {{start}} - {{end}}⟧",
     "deleteCaseTitle": "⟦Delete Mux Case⟧",
-    "deleteCaseMessage": "⟦Are you sure you want to delete mux case⟧",
+    "deleteCaseMessage": "⟦Are you sure you want to delete mux case <name>{{name}}</name>⟧",
     "deleteLabel": "⟦Delete⟧"
   },
   "canConfig": {
@@ -419,8 +411,6 @@
     "defaultInterval": "⟦Default Interval⟧",
     "defaultExtendedId": "⟦Default Extended ID⟧",
     "defaultCanFd": "⟦Default CAN FD⟧",
-    "endianBE": "⟦Big Endian⟧",
-    "endianLE": "⟦Little Endian⟧",
     "notSet": "⟦Not set⟧",
     "notSpecified": "⟦Not specified⟧",
     "yes29bit": "⟦Yes (29-bit)⟧",
@@ -484,8 +474,6 @@
     "frameIdMask": "⟦Frame ID mask⟧",
     "headerFields": "⟦Header Fields⟧",
     "noHeaderFields": "⟦No header fields defined⟧",
-    "endianBE": "⟦Big Endian⟧",
-    "endianLE": "⟦Little Endian⟧",
     "headerFieldName": "⟦Field⟧",
     "startBit": "⟦Start bit⟧",
     "length": "⟦Length⟧"
@@ -500,8 +488,6 @@
     "fields": "⟦Header Fields⟧",
     "noFields": "⟦No fields defined⟧",
     "checksumLabel": "⟦Checksum⟧",
-    "endianBE": "⟦Big Endian⟧",
-    "endianLE": "⟦Little Endian⟧",
     "noChecksum": "⟦Not configured⟧"
   },
   "modbusConfigView": {
@@ -512,9 +498,7 @@
     "registerBase": "⟦Register base⟧",
     "interval": "⟦Default interval (ms)⟧",
     "byteOrder": "⟦Default byte order⟧",
-    "wordOrder": "⟦Default word order⟧",
-    "endianBE": "⟦Big Endian⟧",
-    "endianLE": "⟦Little Endian⟧"
+    "wordOrder": "⟦Default word order⟧"
   },
   "canFrameEditView": {
     "addTitle": "⟦Add New CAN Frame⟧",
@@ -528,7 +512,6 @@
     "transmitterNone": "⟦None⟧",
     "interval": "⟦Interval (ms)⟧",
     "intervalPlaceholder": "⟦1000⟧",
-    "notes": "⟦Notes⟧",
     "notesPlaceholder": "⟦Add notes about this frame (one per line)⟧",
     "cancel": "⟦Cancel⟧"
   },
@@ -547,7 +530,6 @@
     "intervalLabel": "⟦Interval (ms)⟧",
     "useDefault": "⟦Use default ({{value}})⟧",
     "intervalPlaceholder": "⟦1000⟧",
-    "notesLabel": "⟦Notes⟧",
     "notesPlaceholder": "⟦Add notes about this frame (one per line)⟧",
     "cancel": "⟦Cancel⟧",
     "serialRs485": "⟦Serial (RS-485)⟧"
@@ -639,8 +621,6 @@
     "name": "⟦Name⟧",
     "version": "⟦Version⟧",
     "defaultByteOrder": "⟦Default Byte Order⟧",
-    "endianLE": "⟦Little Endian⟧",
-    "endianBE": "⟦Big Endian⟧",
     "defaultIntervalOptional": "⟦Default Interval (ms) (optional)⟧",
     "intervalPlaceholder": "⟦1000⟧",
     "deviceAddress": "⟦First Slave Address⟧",
@@ -688,9 +668,6 @@
     "inheritOptionLE": "⟦Inherit (Little Endian)⟧",
     "inheritOptionBE": "⟦Inherit (Big Endian)⟧",
     "byteOrderNotSet": "⟦Not set⟧",
-    "endianLE": "⟦Little Endian⟧",
-    "endianBE": "⟦Big Endian⟧",
-    "notes": "⟦Notes⟧",
     "notesPlaceholder": "⟦Optional notes about this signal...⟧",
     "bitPreview": "⟦Bit Preview⟧",
     "cancel": "⟦Cancel⟧",
@@ -1058,8 +1035,7 @@
     "muxExtendedHint": "⟦Uses SG_MUL_VAL_ section with mNM notation for nested multiplexors. Best for modern tools.⟧",
     "muxFlattened": "⟦Flattened (Legacy)⟧",
     "muxFlattenedHint": "⟦Flattens nested mux into composite values. Compatible with older tools.⟧",
-    "saving": "⟦Saving...⟧",
-    "saveAs": "⟦Save As...⟧"
+    "saving": "⟦Saving...⟧"
   },
   "configDialog": {
     "title": "⟦Catalog Configuration⟧",
@@ -1079,7 +1055,6 @@
     "name": "⟦Name⟧",
     "namePlaceholder": "⟦My Catalog⟧",
     "version": "⟦Version⟧",
-    "optional": "⟦(optional)⟧",
     "headerFields": "⟦Header Fields⟧",
     "removeField": "⟦Remove field⟧",
     "fieldTypeExists": "⟦{{label}} (exists)⟧",
@@ -1178,14 +1153,14 @@
   },
   "deleteConfirm": {
     "canFrameTitle": "⟦Delete CAN Frame⟧",
-    "canFrame": "⟦Are you sure you want to delete CAN frame⟧",
+    "canFrame": "⟦Are you sure you want to delete CAN frame <name>{{name}}</name>⟧",
     "signalTitle": "⟦Delete Signal⟧",
-    "signal": "⟦Are you sure you want to delete signal⟧",
+    "signal": "⟦Are you sure you want to delete signal <name>{{name}}</name>⟧",
     "checksumTitle": "⟦Delete Checksum⟧",
-    "checksum": "⟦Are you sure you want to delete checksum⟧",
+    "checksum": "⟦Are you sure you want to delete checksum <name>{{name}}</name>⟧",
     "nodeTitle": "⟦Delete Node⟧",
-    "node": "⟦Are you sure you want to delete node⟧",
-    "generic": "⟦Are you sure you want to delete⟧"
+    "node": "⟦Are you sure you want to delete node <name>{{name}}</name>⟧",
+    "generic": "⟦Are you sure you want to delete <name>{{name}}</name>⟧"
   },
   "errors": {
     "createCatalog": "⟦Failed to create catalog⟧",

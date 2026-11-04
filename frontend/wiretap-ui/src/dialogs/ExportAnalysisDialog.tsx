@@ -27,7 +27,7 @@ export default function ExportAnalysisDialog({
   if (!results) return null;
 
   const handleExport = (format: ExportFormat, filename: string) =>
-    withAppError("Export Error", "The report was not exported", async () => {
+    withAppError(t("common:errors.exportTitle"), t("common:errors.reportNotExported"), async () => {
       const content = format === "json"
         ? JSON.stringify(results, null, 2)
         : await renderReport(format, t("reports:changes.title"), (f) => payloadChangesReport(results.window, f));

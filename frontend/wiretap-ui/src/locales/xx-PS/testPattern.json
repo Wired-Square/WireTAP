@@ -23,7 +23,8 @@
     "busNumber": "⟦Bus number⟧",
     "fdMode": "⟦CAN FD mode⟧",
     "extendedIds": "⟦Extended (29-bit) IDs⟧",
-    "extendedShort": "⟦Ext⟧"
+    "extendedShort": "⟦Ext⟧",
+    "fullSuite": "⟦{{mode}} (Full Suite)⟧"
   },
   "states": {
     "noSession": "⟦No Session Connected⟧",

@@ -147,7 +147,7 @@ export default function BulkAddToTransmitDialog({ isOpen, onClose, captureId }: 
             >
               {availableBuses.map((b) => (
                 <option key={b} value={b}>
-                  {t("bulkAddToTransmit.busLabel", { bus: b })}
+                  {t("common:busNumber", { bus: b })}
                 </option>
               ))}
             </Select>

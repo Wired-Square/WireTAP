@@ -1,6 +1,7 @@
 // ui/src/dialogs/IoSourcePickerDialog.tsx
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import i18n from "i18next";
 import { useTranslation } from "react-i18next";
 import { emit } from "@tauri-apps/api/event";
 import Dialog, { DialogBody } from "../components/Dialog";
@@ -741,7 +742,7 @@ export default function IoSourcePickerDialog({
           source_type: isMultiBus ? "multi" : "single",
           is_multi_bus: isMultiBus,
           bus_count: profileBusMappings(profileId).length || 1,
-          primary_info: "Session active",
+          primary_info: i18n.t("dialogs:ioSourcePicker.sources.sessionActive"),
           secondary_info: null,
           supports_fd: null,
           error: null,

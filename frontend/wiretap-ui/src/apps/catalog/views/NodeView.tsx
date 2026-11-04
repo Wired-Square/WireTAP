@@ -165,7 +165,7 @@ export default function NodeView({
 
       {nodeNotes && (
         <div className={`p-3 ${bgSurface} rounded-lg`}>
-          <div className={labelSmallMuted}>{t("nodeView.notes")}</div>
+          <div className={labelSmallMuted}>{t("shared.notes")}</div>
           <div className="text-sm text-secondary whitespace-pre-wrap">
             {nodeNotes.join("\n")}
           </div>

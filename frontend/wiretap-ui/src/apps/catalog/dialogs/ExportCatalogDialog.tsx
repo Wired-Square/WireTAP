@@ -258,7 +258,7 @@ export default function ExportCatalogDialog({
           ) : (
             <>
               <Download className={iconMd} />
-              {t("exportDialog.saveAs")}
+              {t("common:actions.saveAs")}
             </>
           )}
         </Button>

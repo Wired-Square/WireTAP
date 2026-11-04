@@ -6,6 +6,7 @@
 // Only the focused panel responds to each event.
 
 import { useEffect, useRef } from "react";
+import i18n from "i18next";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { useFocusStore } from "../stores/focusStore";
 import { updateMenuState, updateEventsMenu } from "../api/menu";
@@ -87,7 +88,7 @@ export function useMenuSessionControl({
 
     // Show "Capture" instead of the original device name when in capture replay mode
     const effectiveProfileName =
-      capabilities?.traits.temporal_mode === "capture" ? "Capture" : profileName;
+      capabilities?.traits.temporal_mode === "capture" ? i18n.t("common:session.types.capture") : profileName;
 
     updateMenuState({
       hasSession: true,

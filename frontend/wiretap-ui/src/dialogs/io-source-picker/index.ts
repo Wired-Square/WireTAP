@@ -15,8 +15,6 @@ export type { InterfaceFramingConfig } from "./SingleBusConfig";
 
 export {
   localToIsoWithOffset,
-  getLocalTimezoneAbbr,
-  formatBufferTimestamp,
   SPEED_OPTIONS,
   CSV_EXTERNAL_ID,
 } from "./utils";

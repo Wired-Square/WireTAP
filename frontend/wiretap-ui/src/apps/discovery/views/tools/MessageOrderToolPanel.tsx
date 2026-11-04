@@ -16,7 +16,7 @@ export default function MessageOrderToolPanel() {
     <div className="space-y-2 text-xs">
       <div className="space-y-1">
         <label className={toolPanelLabel}>
-          {t("toolPanels.messageOrder.startId")} <span className="text-muted">{t("common:securePassword.optional")}</span>
+          {t("toolPanels.messageOrder.startId")} <span className="text-muted">{t("common:forms.optional")}</span>
         </label>
         <Input
           type="text"

@@ -181,7 +181,7 @@ export default function TestPatternTopBar({
             title={t("topBar.testMode")}
           >
             {TEST_MODE_KEYS.map((m) => (
-              <option key={m.value} value={m.value}>{m.value === "auto" ? `${t("modes.auto")} (Full Suite)` : t(`modes.${m.i18nKey}`)}</option>
+              <option key={m.value} value={m.value}>{m.value === "auto" ? t("topBar.fullSuite", { mode: t("modes.auto") }) : t(`modes.${m.i18nKey}`)}</option>
             ))}
           </Select>
 

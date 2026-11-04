@@ -230,7 +230,7 @@ export default function CanConfigSection({
 
           <div>
             <label className={`block ${textMedium} mb-2`}>
-              {t("configSections.can.interval")} <span className="text-muted text-xs font-normal">{t("configSections.optional")}</span>
+              {t("configSections.can.interval")} <span className="text-muted text-xs font-normal">{t("common:forms.optional")}</span>
             </label>
             <Input
               type="number"
@@ -251,7 +251,7 @@ export default function CanConfigSection({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className={`block ${textMedium} mb-2`}>
-                {t("canConfig.defaultExtendedId")} <span className="text-muted text-xs font-normal">{t("configSections.optional")}</span>
+                {t("canConfig.defaultExtendedId")} <span className="text-muted text-xs font-normal">{t("common:forms.optional")}</span>
               </label>
               <Select
                 value={defaultExtended === undefined ? "auto" : defaultExtended ? "true" : "false"}
@@ -272,7 +272,7 @@ export default function CanConfigSection({
 
             <div>
               <label className={`block ${textMedium} mb-2`}>
-                {t("canConfig.defaultCanFd")} <span className="text-muted text-xs font-normal">{t("configSections.optional")}</span>
+                {t("canConfig.defaultCanFd")} <span className="text-muted text-xs font-normal">{t("common:forms.optional")}</span>
               </label>
               <Select
                 value={defaultFd === undefined ? "auto" : defaultFd ? "true" : "false"}

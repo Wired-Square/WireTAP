@@ -311,7 +311,7 @@ export default function FrameEditView({
             {/* Notes */}
             <div>
               <label className={`block ${textMedium} mb-2`}>
-                {t("frameEditView.notesLabel")}
+                {t("shared.notes")}
               </label>
               <Textarea
                 rows={3}

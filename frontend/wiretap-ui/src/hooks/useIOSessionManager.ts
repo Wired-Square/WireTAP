@@ -9,6 +9,7 @@
 // - Common handlers (detach, rejoin, start multi-bus)
 
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { useIOSession, type UseIOSessionOptions, type UseIOSessionResult } from "./useIOSession";
 import type { AdhocSignalsMsg, DecodedSignalsEntry } from "../services/wsProtocol";
 import type { StreamEndedInfo as IngestStreamEndedInfo } from "../api/io";
@@ -274,6 +275,7 @@ export interface UseIOSessionManagerResult {
 export function useIOSessionManager(
   options: UseIOSessionManagerOptions
 ): UseIOSessionManagerResult {
+  const { t } = useTranslation();
   const {
     appName,
     ioProfiles,
@@ -369,11 +371,11 @@ export function useIOSessionManager(
   // Profile name for display
   const ioProfileName = useMemo(() => {
     if (multiBusProfiles.length > 1) {
-      return `Multi-Bus (${multiBusProfiles.length} sources)`;
+      return t("common:session.multiBusSources", { count: multiBusProfiles.length });
     }
     const lookupId = multiBusProfiles.length === 1 ? multiBusProfiles[0] : sourceProfileId;
     return lookupId ? ioProfiles.find((p) => p.id === lookupId)?.name : undefined;
-  }, [sourceProfileId, multiBusProfiles, ioProfiles]);
+  }, [sourceProfileId, multiBusProfiles, ioProfiles, t]);
 
   // ---- Ingest frame suppression ----
   const isLoadingRef = useRef(isLoading);

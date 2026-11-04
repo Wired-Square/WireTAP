@@ -17,7 +17,8 @@ import {
   type DashboardLayout,
 } from '../utils/dashboardLayouts';
 import { storeGet, storeSet, storeDelete } from '../api/store';
-import { WIDGET_META } from '../apps/dashboard/widgets/widgetMeta';
+import i18n from 'i18next';
+import { WIDGET_META, hasDefaultTitle, panelTitle } from '../apps/dashboard/widgets/widgetMeta';
 import type { WidgetConfig } from '../apps/dashboard/widgets/configTypes';
 import { widgetForSignal } from '../apps/dashboard/widgets/autoWidget';
 import type { DashboardFileContent } from '../utils/dashboards';
@@ -352,7 +353,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     const newPanel: DashboardPanel = {
       id,
       type,
-      title: meta?.defaultConfig.title ?? 'Panel',
+      title: '',
       signals: [],
       minValue: 0,
       maxValue: 100,
@@ -425,7 +426,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     const cloned: DashboardPanel = {
       ...source,
       id,
-      title: `${source.title} (copy)`,
+      title: i18n.t('dashboard:panel.copyTitle', { title: panelTitle(source) }),
       signals: source.signals.map((s) => ({ ...s })),
     };
 
@@ -490,9 +491,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
 
     const newSignal: SignalRef = { frameId, signalName, unit, colour, confidence };
 
-    // Auto-set title to first signal name when panel still has its default title
-    const isDefaultTitle = Object.values(WIDGET_META).some((m) => m.defaultConfig.title === panel.title);
-    const newTitle = (panel.signals.length === 0 && isDefaultTitle) ? signalName : panel.title;
+    const newTitle = (panel.signals.length === 0 && hasDefaultTitle(panel)) ? signalName : panel.title;
 
     set({
       panels: panels.map((p) =>

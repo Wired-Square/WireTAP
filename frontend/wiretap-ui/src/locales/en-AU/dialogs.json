@@ -101,7 +101,6 @@
     "targetSession": "Target session",
     "noSession": "Transmit is not connected. Connect a session in the Transmit panel first.",
     "outputBus": "Output bus",
-    "busLabel": "Bus {{bus}}",
     "frameIdRange": "Frame ID range (hex)",
     "minPlaceholder": "Min (e.g. 100)",
     "maxPlaceholder": "Max (e.g. 7FF)",
@@ -143,7 +142,6 @@
     "transmitSession": "Transmit session",
     "targetBus": "Target bus",
     "perFrame": "Per frame",
-    "busLabel": "Bus {{bus}}",
     "perFrameHelp": "Each frame is sent on its original bus.",
     "fixedBusHelp": "All frames will be sent on bus {{bus}}.",
     "speed": "Speed",
@@ -220,7 +218,6 @@
       "empty": "No frames discovered yet.",
       "bytesLabel": "{{count}} bytes",
       "extBadge": "EXT",
-      "busLabel": "Bus {{bus}}",
       "muxBadge": "Mux",
       "muxBadgeTwoByte": "2D Mux",
       "burstBadge": "Burst",
@@ -331,7 +328,30 @@
   },
   "exportReport": {
     "title": "Export Report",
-    "filename": "Filename"
+    "filename": "Filename",
+    "format": "Format",
+    "formats": {
+      "text": {
+        "label": "Text",
+        "description": "Plain text report with visual formatting"
+      },
+      "markdown": {
+        "label": "Markdown",
+        "description": "Structured markdown with tables and sections"
+      },
+      "html-screen": {
+        "label": "HTML (Screen Optimised)",
+        "description": "Rich HTML with dark theme colors and styling"
+      },
+      "html-print": {
+        "label": "HTML (Print Optimised)",
+        "description": "Light theme HTML optimized for printing or PDF export"
+      },
+      "json": {
+        "label": "JSON",
+        "description": "Raw JSON data for programmatic processing"
+      }
+    }
   },
   "csvColumnMapperPreview": {
     "roles": {
@@ -475,7 +495,6 @@
       "live": "Live",
       "active": "Active",
       "framesCount": "{{count}} frames",
-      "busLabel": "Bus {{bus}}",
       "configLocked": "Config locked (in use by multiple sessions)",
       "newDevice": "New device…",
       "editDevice": "Edit connection",
@@ -483,7 +502,8 @@
       "unsaved": "Unsaved",
       "unsavedHint": "Created here and kept for this run only. Save it in the editor to keep it.",
       "subscribers_one": "{{count}} subscriber",
-      "subscribers_other": "{{count}} subscribers"
+      "subscribers_other": "{{count}} subscribers",
+      "sessionActive": "Session active"
     },
     "singleBusConfig": {
       "deviceNotResponding": "Device not responding",
@@ -522,8 +542,7 @@
       "output": "→ Output:",
       "configLocked": "Configuration locked — this source is in use by multiple sessions.",
       "noBusesEnabled": "No buses enabled. Enable at least one bus to capture frames.",
-      "duplicateOutputs": "Warning: Some output bus numbers conflict with other sources",
-      "busLabel": "Bus {{bus}}"
+      "duplicateOutputs": "Warning: Some output bus numbers conflict with other sources"
     },
     "captures": {
       "title": "Captures",

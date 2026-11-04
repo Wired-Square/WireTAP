@@ -111,7 +111,7 @@ export default function DeviceBusConfig({
       (value) => updateBus(mapping.device_bus, { output_bus: parseInt(value, 10) }),
       Array.from({ length: OUTPUT_BUS_COUNT }, (_, i) => ({
         value: i,
-        label: t("ioSourcePicker.busConfig.busLabel", { bus: i }),
+        label: t("common:busNumber", { bus: i }),
       })),
       isDuplicate,
     );
@@ -276,10 +276,10 @@ export default function DeviceBusConfig({
                   <span className="text-muted">{t("ioSourcePicker.busConfig.output")}</span>
                   {outputBusSelect(mapping, !!isDuplicate)}
                   {isDuplicate && !configLocked && (
-                    <span className="text-warning" title="Another source uses this bus number">⚠</span>
+                    <span className="text-warning" title={t("ioSourcePicker.busConfig.duplicateBusTooltip")}>⚠</span>
                   )}
                   {configLocked && (
-                    <span className="text-amber" title="Config locked - source in use by multiple sessions">
+                    <span className="text-amber" title={t("ioSourcePicker.busConfig.configLockedTooltip")}>
                       <Lock className={iconXs} />
                     </span>
                   )}

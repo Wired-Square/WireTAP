@@ -177,7 +177,7 @@ export default function CANFrameView({
       {notes.length > 0 && (
         <div className={`p-4 ${bgSurface} rounded-lg`}>
           <div className={`${labelSmall} mb-2`}>
-            {t("canFrameView.notes")}
+            {t("shared.notes")}
           </div>
           <div className="text-sm text-secondary whitespace-pre-wrap">
             {notes.join("\n")}
@@ -438,8 +438,8 @@ export default function CANFrameView({
         <ConfirmDeleteDialog
           open={confirmDeleteMux}
           title={t("canFrameView.deleteMuxTitle")}
-          message={t("canFrameView.deleteMuxMessage")}
-          highlightText={mux?.name || undefined}
+          messageKey="catalog:canFrameView.deleteMuxMessage"
+          name={mux?.name || undefined}
           confirmText={t("canFrameView.deleteLabel")}
           onCancel={() => setConfirmDeleteMux(false)}
           onConfirm={() => {
