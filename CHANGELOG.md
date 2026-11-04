@@ -6,11 +6,11 @@ All notable changes to WireTAP will be documented in this file.
 
 ### Fixed
 
-- **A Dashboard List shows an enum signal by its label.** A signal with enum labels used to show its raw value with decimals, such as "3.000"; it now shows the label the Decoder shows.
 - **Query's source picker no longer says no sources are configured beside a capture.** The line telling you to add a source in Settings now shows only when the picker has nothing to list.
 - **Query's session button names the capture it is connected to.** It used to read "Capture"; it now shows the capture's name, as the other apps do.
 - **Query's Frame menu labels a frame by its name.** A frame with a `name` used to be labelled by its transmitter; the transmitter now shows only for a frame without a name.
 - **The Calculator shows what you type.** Its input used to show everything in capitals, so `0x12345678` read `0X12345678` and text in String mode looked upper-cased.
+- **Dashboard readouts show a value as the Decoder does.** The List, level bar, gauge, rotary, custom SVG text and hover tooltip used to pad a signal without `precision` to three decimals and show an enum signal as a number; they now show the decoded text, so 90 reads 90 and a gear reads Drive. Statistics and chart values still use the Dashboard's own rounding.
 
 ## [0.16.0] - 2026-11-03
 

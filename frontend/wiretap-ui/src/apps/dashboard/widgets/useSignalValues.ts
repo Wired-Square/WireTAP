@@ -3,6 +3,7 @@
 // Each widget's latest values, re-read when new values arrive.
 
 import { useDashboardStore, signalKey, type SignalRef } from "../../../stores/dashboardStore";
+import { formatValue } from "../utils/dashboardFormat";
 
 /** Latest value per signal, aligned to `signals` order. Missing signals → NaN. */
 export function useSignalValues(signals: SignalRef[]): number[] {
@@ -10,10 +11,19 @@ export function useSignalValues(signals: SignalRef[]): number[] {
   return signals.map((s) => latest.get(signalKey(s.frameId, s.signalName)) ?? NaN);
 }
 
-/** Each enum signal's latest label, aligned to `signals` order. */
-export function useSignalLabels(signals: SignalRef[]): (string | undefined)[] {
-  const labels = useDashboardStore((s) => s.latestLabels);
-  return signals.map((s) => labels.get(signalKey(s.frameId, s.signalName)));
+/** A getter for a key's latest value as text: Rust's decoded text, else the value
+ *  formatted to the signal's precision. */
+export function useReadoutOf(): (key: string) => string {
+  const latest = useDashboardStore((s) => s.latest);
+  const displays = useDashboardStore((s) => s.latestDisplays);
+  const precisions = useDashboardStore((s) => s.signalPrecisions);
+  return (key) => displays.get(key) ?? formatValue(latest.get(key), precisions.get(key));
+}
+
+/** Each signal's latest value as text, aligned to `signals` order. */
+export function useSignalReadouts(signals: SignalRef[]): string[] {
+  const readoutOf = useReadoutOf();
+  return signals.map((s) => readoutOf(signalKey(s.frameId, s.signalName)));
 }
 
 /** Each signal's catalogue `precision`, aligned to `signals` order. */

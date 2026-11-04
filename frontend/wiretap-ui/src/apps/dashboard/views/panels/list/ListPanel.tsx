@@ -1,10 +1,9 @@
 // ui/src/apps/dashboard/views/panels/list/ListPanel.tsx
 
 import { getSignalLabel, getConfidenceColour, type DashboardPanel } from "../../../../../stores/dashboardStore";
-import { useSignalLabels, useSignalPrecisions, useSignalValues } from "../../../widgets/useSignalValues";
+import { useSignalReadouts } from "../../../widgets/useSignalValues";
 import { useSettings } from "../../../../../hooks/useSettings";
 import { emptyStateContainer, emptyStateText } from "../../../../../styles/typography";
-import { formatValue } from "../../../utils/dashboardFormat";
 import PanelTooltip from "../PanelTooltip";
 
 interface Props {
@@ -14,9 +13,7 @@ interface Props {
 export default function ListPanel({ panel }: Props) {
   const { settings } = useSettings();
 
-  const values = useSignalValues(panel.signals);
-  const precisions = useSignalPrecisions(panel.signals);
-  const labels = useSignalLabels(panel.signals);
+  const readouts = useSignalReadouts(panel.signals);
 
   if (panel.signals.length === 0) {
     return (
@@ -29,7 +26,6 @@ export default function ListPanel({ panel }: Props) {
   return (
     <PanelTooltip
       signals={panel.signals}
-      values={values}
       settings={settings}
       className="h-full overflow-y-auto px-2 py-1"
     >
@@ -51,7 +47,7 @@ export default function ListPanel({ panel }: Props) {
 
           {/* Value */}
           <span className="text-xs font-mono font-medium text-primary tabular-nums shrink-0">
-            {labels[i] ?? formatValue(values[i], precisions[i])}
+            {readouts[i]}
           </span>
 
           {/* Unit */}

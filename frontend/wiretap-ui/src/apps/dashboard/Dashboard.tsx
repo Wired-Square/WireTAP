@@ -140,16 +140,16 @@ function DashboardInner() {
   // only each signal's newest value, for the instruments, and the cue to re-read.
   const autoImportRef = useRef(false);
   const pendingLatestRef = useRef(new Map<string, number>());
-  const pendingLabelsRef = useRef(new Map<string, string>());
+  const pendingDisplaysRef = useRef(new Map<string, string>());
   const flushScheduledRef = useRef(false);
 
   const flushPendingValues = useCallback(() => {
     flushScheduledRef.current = false;
     const values = pendingLatestRef.current;
-    const labels = pendingLabelsRef.current;
+    const displays = pendingDisplaysRef.current;
     pendingLatestRef.current = new Map();
-    pendingLabelsRef.current = new Map();
-    useDashboardStore.getState().setLatest(values, labels);
+    pendingDisplaysRef.current = new Map();
+    useDashboardStore.getState().setLatest(values, displays);
   }, []);
 
   const scheduleFlush = useCallback(() => {
@@ -177,7 +177,7 @@ function DashboardInner() {
       for (const s of msg.signals) {
         const key = signalKey(msg.maskedFrameId, s.name);
         if (s.scaled !== null) pendingLatestRef.current.set(key, s.scaled);
-        if (s.format === "enum") pendingLabelsRef.current.set(key, s.display);
+        pendingDisplaysRef.current.set(key, s.display);
       }
     }
     scheduleFlush();

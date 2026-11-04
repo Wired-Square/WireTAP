@@ -3,9 +3,8 @@
 import { useRef } from "react";
 import { type DashboardPanel } from "../../../../../stores/dashboardStore";
 import { useSettings } from "../../../../../hooks/useSettings";
-import { formatValue } from "../../../utils/dashboardFormat";
 import { fraction } from "../../../widgets/svgArc";
-import { useSignalPrecisions, useSignalValues } from "../../../widgets/useSignalValues";
+import { useSignalReadouts, useSignalValues } from "../../../widgets/useSignalValues";
 import { useSvgExportRef } from "../../../widgets/useExportRef";
 import WidgetEmpty from "../../../widgets/WidgetEmpty";
 import PanelTooltip from "../PanelTooltip";
@@ -35,7 +34,7 @@ export default function RotaryPanel({ panel, svgRef: svgRefProp }: Props) {
   useSvgExportRef(svgElRef, svgRefProp);
 
   const values = useSignalValues(panel.signals);
-  const precisions = useSignalPrecisions(panel.signals);
+  const readouts = useSignalReadouts(panel.signals);
   const cfg = panel.widgetConfig?.rotary;
 
   if (panel.signals.length === 0) {
@@ -54,7 +53,6 @@ export default function RotaryPanel({ panel, svgRef: svgRefProp }: Props) {
   return (
     <PanelTooltip
       signals={[sig]}
-      values={[value]}
       settings={settings}
       showColourDot
       className="flex items-center justify-center h-full p-2"
@@ -77,7 +75,7 @@ export default function RotaryPanel({ panel, svgRef: svgRefProp }: Props) {
             strokeWidth={2}
             paintOrder="stroke"
           >
-            {formatValue(value, precisions[idx])}{sig.unit ? ` ${sig.unit}` : ""}
+            {readouts[idx]}{sig.unit ? ` ${sig.unit}` : ""}
           </text>
         )}
       </svg>

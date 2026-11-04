@@ -3,10 +3,9 @@
 import { useRef, useEffect } from "react";
 import { useDashboardStore, getConfidenceColour, signalKey, type DashboardPanel } from "../../../../../stores/dashboardStore";
 import { useSettings } from "../../../../../hooks/useSettings";
-import { formatValue } from "../../../utils/dashboardFormat";
 import { polarToCartesian, describeArc } from "../../../widgets/svgArc";
 import WidgetEmpty from "../../../widgets/WidgetEmpty";
-import { useSignalPrecisions } from "../../../widgets/useSignalValues";
+import { useSignalReadouts } from "../../../widgets/useSignalValues";
 import PanelTooltip from "../PanelTooltip";
 
 interface Props {
@@ -39,7 +38,7 @@ export default function GaugePanel({ panel, svgRef: svgRefProp }: Props) {
 
   const latest = useDashboardStore((s) => s.latest);
   const values = panel.signals.map((sig) => latest.get(signalKey(sig.frameId, sig.signalName)));
-  const precisions = useSignalPrecisions(panel.signals);
+  const readouts = useSignalReadouts(panel.signals);
 
   const { minValue, maxValue } = panel;
   const range = maxValue - minValue;
@@ -69,7 +68,7 @@ export default function GaugePanel({ panel, svgRef: svgRefProp }: Props) {
   // Display selected signal's value in the centre
   const primaryIdx = Math.min(panel.primarySignalIndex ?? 0, Math.max(0, signalCount - 1));
   const primarySignal = panel.signals[primaryIdx];
-  const displayValue = formatValue(values[primaryIdx], precisions[primaryIdx]);
+  const displayValue = readouts[primaryIdx];
 
   if (signalCount === 0) {
     return <WidgetEmpty>Click + to add a signal</WidgetEmpty>;
@@ -78,7 +77,6 @@ export default function GaugePanel({ panel, svgRef: svgRefProp }: Props) {
   return (
     <PanelTooltip
       signals={panel.signals}
-      values={values}
       settings={settings}
       showColourDot
       className="flex items-center justify-center h-full p-1"
