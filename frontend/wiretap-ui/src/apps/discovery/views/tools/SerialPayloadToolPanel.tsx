@@ -3,6 +3,7 @@
 // Options panel for Serial Payload Analysis tool in the Toolbox dialog.
 // Analyzes framed data to identify ID bytes and checksum positions.
 
+import { useTranslation } from "react-i18next";
 import { Alert } from "../../../../components/Alert";
 
 type Props = {
@@ -10,22 +11,23 @@ type Props = {
 };
 
 export default function SerialPayloadToolPanel({ framesCount }: Props) {
+  const { t } = useTranslation("discovery");
   return (
     <div className="space-y-3 text-xs">
       <Alert tone="success" size="sm">
-        <p className="font-medium">Analyze Frame Structure</p>
-        <p className="mt-1">Analyze {framesCount.toLocaleString()} frames to identify payload structure.</p>
+        <p className="font-medium">{t("toolPanels.serialPayload.title")}</p>
+        <p className="mt-1">{t("toolPanels.serialPayload.description", { frames: framesCount.toLocaleString() })}</p>
       </Alert>
       <p className="text-muted">
-        Will identify:
+        {t("toolPanels.serialPayload.willIdentify")}
       </p>
       <ul className="text-muted list-disc list-inside space-y-0.5">
-        <li>Candidate ID byte positions (frame type identifiers)</li>
-        <li>Candidate source address positions</li>
-        <li>Candidate checksum positions and algorithms</li>
+        <li>{t("toolPanels.serialPayload.idBytes")}</li>
+        <li>{t("toolPanels.serialPayload.sourceAddress")}</li>
+        <li>{t("toolPanels.serialPayload.checksums")}</li>
       </ul>
       <p className="text-muted mt-2 italic">
-        Works best with structured protocol frames.
+        {t("toolPanels.serialPayload.worksBest")}
       </p>
     </div>
   );

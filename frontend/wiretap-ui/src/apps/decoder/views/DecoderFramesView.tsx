@@ -331,6 +331,7 @@ export function RawFrameRow({
   onContextMenu: (e: React.MouseEvent, frame: UnmatchedFrame) => void;
   children?: React.ReactNode;
 }) {
+  const { t } = useTranslation("decoder");
   const date = new Date(frame.timestamp * 1000);
   const timeStr = date.toLocaleTimeString('en-US', {
     hour12: false,
@@ -348,7 +349,7 @@ export function RawFrameRow({
         {formatProtocolFrameId(frame.protocol, frame.frameId, displayFrameIdFormat, frame.isExtended)}
       </span>
       {frame.sourceAddress !== undefined && (
-        <span className={`${textDataCyan} text-xs`}>src: 0x{frame.sourceAddress.toString(16).toUpperCase()}</span>
+        <span className={`${textDataCyan} text-xs`}>{t("framesView.sourceAddress", { address: `0x${frame.sourceAddress.toString(16).toUpperCase()}` })}</span>
       )}
       {frame.isRtr ? (
         <span className="flex-1"><RemoteRequest dlc={frame.dlc} /></span>
@@ -606,12 +607,13 @@ function FrameCard({
 
   const headerFields = decodedFrame?.headerFields ?? [];
   const checksumResult = decodedFrame?.checksum;
+  const sourceAddressField = { name: t("frameCard.source"), value: `0x${(sourceAddressLabel ?? 0).toString(16).toUpperCase().padStart(2, '0')}` };
 
   // Map built-in field names to friendly display names
   const getFriendlyFieldName = (name: string): string => {
     switch (name) {
-      case 'source_address': return 'Source';
-      case 'destination_address': return 'Dest';
+      case 'source_address': return t("frameCard.source");
+      case 'destination_address': return t("frameCard.destination");
       default: return name;
     }
   };
@@ -630,7 +632,7 @@ function FrameCard({
         } : undefined}
       >
         <span className="font-mono">{renderFrameId(frame.frameId, frame.isExtended)}</span>
-        <span className={caption}>len {frame.length}</span>
+        <span className={caption}>{t("frameCard.length", { length: frame.length })}</span>
         {/* Modbus register adornments (modbusRegisterType only set for Modbus catalogues) */}
         {frame.modbusRegisterType && (
           <>
@@ -638,7 +640,7 @@ function FrameCard({
               {frame.modbusRegisterType}
             </Badge>
             {frame.interval != null && (
-              <span className={caption} title="Poll interval">
+              <span className={caption} title={t("frameCard.pollInterval")}>
                 {frame.interval >= 1000 ? `${(frame.interval / 1000).toFixed(1)}s` : `${frame.interval}ms`}
               </span>
             )}
@@ -646,9 +648,9 @@ function FrameCard({
         )}
         {/* Mirror frame badge */}
         {frame.mirrorOf && (
-          <Badge tone="cyan" mono title={`Inherits signals from frame ${frame.mirrorOf}`}>
+          <Badge tone="cyan" mono title={t("frameCard.inheritsFrom", { frame: frame.mirrorOf })}>
             <Layers className={iconXs} />
-            Mirror of {formatFrameId(parseFrameId(frame.mirrorOf) ?? 0, displayFrameIdFormat)}
+            {t("frameCard.mirrorOf", { frame: formatFrameId(parseFrameId(frame.mirrorOf) ?? 0, displayFrameIdFormat) })}
           </Badge>
         )}
         {/* Mirror validation badge */}
@@ -656,13 +658,13 @@ function FrameCard({
           <Badge
             tone={mirrorValidation.isValid === true ? 'success' : mirrorValidation.isValid === false ? 'danger' : 'primary'}
             mono
-            title={`Last comparison: ${mirrorValidation.timeDeltaMs.toFixed(0)}ms apart`}
+            title={t("frameCard.lastComparison", { ms: mirrorValidation.timeDeltaMs.toFixed(0) })}
           >
             {mirrorValidation.isValid === true && <Check className={iconXs} />}
             {mirrorValidation.isValid === false && <X className={iconXs} />}
             {mirrorValidation.isValid === null && <Clock className={iconXs} />}
-            {mirrorValidation.isValid === true ? 'Match' :
-             mirrorValidation.isValid === false ? 'Mismatch' : 'Pending'}
+            {mirrorValidation.isValid === true ? t("frameCard.match") :
+             mirrorValidation.isValid === false ? t("frameCard.mismatch") : t("frameCard.pending")}
           </Badge>
         )}
         {/* Header field badges - clickable to toggle filter */}
@@ -675,13 +677,13 @@ function FrameCard({
               size="xs"
               className="font-mono"
               onClick={() => onToggleHeaderFieldFilter(field.name, field.value)}
-              title={`Click to filter by ${getFriendlyFieldName(field.name)}: ${field.display}`}
+              title={t("frameCard.filterBy", { name: getFriendlyFieldName(field.name), value: field.display })}
             >
-              {getFriendlyFieldName(field.name)}: {field.display}
+              {t("frameCard.headerField", { name: getFriendlyFieldName(field.name), value: field.display })}
             </Button>
           ) : (
             <Badge key={field.name} tone={fieldBadgeTone(field.name)} mono>
-              {getFriendlyFieldName(field.name)}: {field.display}
+              {t("frameCard.headerField", { name: getFriendlyFieldName(field.name), value: field.display })}
             </Badge>
           )
         ))}
@@ -694,13 +696,13 @@ function FrameCard({
               size="xs"
               className="font-mono"
               onClick={() => onToggleHeaderFieldFilter('source_address', sourceAddressLabel)}
-              title={`Click to filter by Source: 0x${sourceAddressLabel.toString(16).toUpperCase().padStart(2, '0')}`}
+              title={t("frameCard.filterBy", sourceAddressField)}
             >
-              Source: 0x{sourceAddressLabel.toString(16).toUpperCase().padStart(2, '0')}
+              {t("frameCard.headerField", sourceAddressField)}
             </Button>
           ) : (
             <Badge tone="primary" mono>
-              Source: 0x{sourceAddressLabel.toString(16).toUpperCase().padStart(2, '0')}
+              {t("frameCard.headerField", sourceAddressField)}
             </Badge>
           )
         )}
@@ -708,7 +710,7 @@ function FrameCard({
         {checksumResult && (
           <Badge tone={checksumResult.valid ? "success" : "danger"} mono>
             {checksumResult.valid ? <Check className={iconXs} /> : <X className={iconXs} />}
-            Checksum: 0x{checksumResult.extracted.toString(16).toUpperCase().padStart(2, '0')}
+            {t("frameCard.checksum", { value: `0x${checksumResult.extracted.toString(16).toUpperCase().padStart(2, '0')}` })}
           </Badge>
         )}
       </div>
@@ -787,7 +789,7 @@ function FrameCard({
                     {decoded.name}
                   </span>
                   {signalDef?.modbusRegister != null && (
-                    <span className={`${caption} font-mono`} title="Modbus register">
+                    <span className={`${caption} font-mono`} title={t("frameCard.modbusRegister")}>
                       {modbusRegisterLabel(signalDef.modbusRegister, signalDef.modbusRegisterCount ?? undefined, displayFrameIdFormat)}
                     </span>
                   )}
@@ -798,14 +800,14 @@ function FrameCard({
                         signalMismatch === false ? 'text-success' : 'text-cyan'
                       }`}
                       title={
-                        signalMismatch === true ? `Mismatch with source frame ${frame.mirrorOf}` :
-                        signalMismatch === false ? `Matches source frame ${frame.mirrorOf}` :
-                        frame.mirrorOf ? `Inherited from ${frame.mirrorOf}` : 'Inherited signal'
+                        signalMismatch === true ? t("frameCard.signalMismatch", { frame: frame.mirrorOf }) :
+                        signalMismatch === false ? t("frameCard.signalMatches", { frame: frame.mirrorOf }) :
+                        frame.mirrorOf ? t("frameCard.inheritedFrom", { frame: frame.mirrorOf }) : t("frameCard.inheritedSignal")
                       }
                     >
                       {signalMismatch === true && <X className={iconXs} />}
                       {signalMismatch === false && <Check className={iconXs} />}
-                      {signalMismatch === undefined && '(inherited)'}
+                      {signalMismatch === undefined && t("frameCard.inherited")}
                     </span>
                   )}
                 </div>
@@ -835,7 +837,7 @@ function FrameCard({
           if (!hasContent) {
             return (
               <div className={`px-3 py-2 ${emptyStateText}`}>
-                No signals decoded yet.
+                {t("frameCard.noSignals")}
               </div>
             );
           }
@@ -859,7 +861,7 @@ function FrameCard({
                     <div className="px-3 py-1.5 text-xs bg-purple border-t border-default flex items-center gap-2">
                       <span className="text-purple">🔀</span>
                       <span className="font-medium text-purple">
-                        Mux {muxValue}
+                        {t("frameCard.muxGroup", { value: muxValue })}
                       </span>
                       <span className="text-purple font-mono">
                         (0x{muxValueHex})
@@ -970,12 +972,12 @@ export default function DecoderFramesView({
       const encodingLabel = serialConfig.encoding.toUpperCase();
       badges.push({ label: encodingLabel, tone: 'primary' });
     } else {
-      badges.push({ label: 'None' });
+      badges.push({ label: t('framesView.noFraming') });
     }
 
     // Header length badge
     if (serialConfig?.header_length && serialConfig.header_length > 0) {
-      badges.push({ label: `${serialConfig.header_length}B hdr`, tone: 'cyan' });
+      badges.push({ label: t('framesView.headerLength', { bytes: serialConfig.header_length }), tone: 'cyan' });
     }
 
     // Min frame length filter badge
@@ -989,7 +991,7 @@ export default function DecoderFramesView({
     }
 
     return badges;
-  }, [protocol, serialConfig]);
+  }, [protocol, serialConfig, t]);
 
   // Build header field filter options from accumulated seen values (persists across frame updates)
   const headerFieldNames = useMemo(
@@ -1059,9 +1061,9 @@ export default function DecoderFramesView({
     const unmatchedAtMax = unmatchedFrames.length >= decoderMaxUnmatchedFrames;
     const filteredAtMax = filteredFrames.length >= decoderMaxFilteredFrames;
     const tabDefs: TabDefinition[] = [
-      { id: 'signals', label: 'Signals', count: selectedFrames.length, countTone: "success" as const },
-      { id: 'unmatched', label: 'Unmatched', count: unmatchedFrames.length, countTone: "warning" as const, countPrefix: unmatchedAtMax ? '>' : undefined },
-      { id: 'filtered', label: 'Filtered', count: filteredFrames.length + deselectedFrames.length, countTone: "purple" as const, countPrefix: filteredAtMax ? '>' : undefined },
+      { id: 'signals', label: t('tabs.signals'), count: selectedFrames.length, countTone: "success" as const },
+      { id: 'unmatched', label: t('tabs.unmatched'), count: unmatchedFrames.length, countTone: "warning" as const, countPrefix: unmatchedAtMax ? '>' : undefined },
+      { id: 'filtered', label: t('discovery:tabs.filtered'), count: filteredFrames.length + deselectedFrames.length, countTone: "purple" as const, countPrefix: filteredAtMax ? '>' : undefined },
     ];
     if (hasTunnel) {
       tabDefs.push({
@@ -1333,7 +1335,7 @@ export default function DecoderFramesView({
         className={`px-1.5 text-xs font-mono tabular-nums text-center ${textSecondary}`}
         style={{ minWidth: `${maxChars}ch` }}
       >
-        {currentStr} of {totalStr}
+        {t("common:playback.framePosition", { current: currentStr, total: totalStr })}
       </span>
     );
   })();
@@ -1349,7 +1351,7 @@ export default function DecoderFramesView({
     >
       {([0.125, 0.25, 0.5, 1, 2, 10, 30, 60] as PlaybackSpeed[]).map((s) => (
         <option key={s} value={s}>
-          {s === 1 ? "1x (realtime)" : `${s}x`}
+          {s === 1 ? t("common:playback.speedRealtime") : `${s}x`}
         </option>
       ))}
     </Select>
@@ -1517,7 +1519,7 @@ export default function DecoderFramesView({
             )}
             {selectedFrames.length === 0 && (
               <div className={emptyStateContainer}>
-                <p className={emptyStateText}>No frames selected.</p>
+                <p className={emptyStateText}>{t('framesView.noneSelected')}</p>
               </div>
             )}
           </>
@@ -1526,7 +1528,7 @@ export default function DecoderFramesView({
           <div className="space-y-1">
             {unmatchedFrames.length === 0 ? (
               <div className={emptyStateContainer}>
-                <p className={emptyStateText}>No unmatched frames.</p>
+                <p className={emptyStateText}>{t('framesView.noneUnmatched')}</p>
               </div>
             ) : (
               unmatchedFrames.slice(-100).reverse().map((frame) => (
@@ -1545,7 +1547,7 @@ export default function DecoderFramesView({
           <>
             {deselectedFrames.length === 0 && filteredFrames.length === 0 && (
               <div className={emptyStateContainer}>
-                <p className={emptyStateText}>No filtered frames.</p>
+                <p className={emptyStateText}>{t('framesView.noneFiltered')}</p>
               </div>
             )}
             {deselectedFrames.map((f) => (
@@ -1576,7 +1578,7 @@ export default function DecoderFramesView({
                     onContextMenu={handleUnmatchedContextMenu}
                   >
                     <span className={`${textDataAmber} text-xs`}>
-                      {frame.reason === 'id_filter' ? 'ID filter' : 'too short'}
+                      {frame.reason === 'id_filter' ? t('framesView.reasonIdFilter') : t('framesView.reasonTooShort')}
                     </span>
                     <IconButton
                       onClick={() => sendHexDataToCalculator(bytesToHex(frame.bytes))}

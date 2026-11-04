@@ -1,6 +1,7 @@
 // ui/src/apps/discovery/dialogs/AnalysisProgressDialog.tsx
 
 import { Loader2 } from "lucide-react";
+import { Trans, useTranslation } from "react-i18next";
 import Dialog, { DialogBody } from "../../../components/Dialog";
 import { bgSurface, captionMuted } from "../../../styles";
 
@@ -15,6 +16,7 @@ export default function AnalysisProgressDialog({
   frameCount,
   toolName,
 }: AnalysisProgressDialogProps) {
+  const { t } = useTranslation("discovery");
   return (
     <Dialog isOpen={isOpen} size="sm">
       <DialogBody className="text-center">
@@ -25,7 +27,7 @@ export default function AnalysisProgressDialog({
 
         {/* Title */}
         <h2 className="text-lg font-semibold text-primary mb-2">
-          Analyzing Frames
+          {t("analysisProgress.title")}
         </h2>
 
         {/* Frame count */}
@@ -33,12 +35,17 @@ export default function AnalysisProgressDialog({
           {frameCount.toLocaleString()}
         </div>
         <p className="text-sm text-muted mb-4">
-          frames being processed
+          {t("analysisProgress.framesProcessed")}
         </p>
 
         {/* Tool info */}
         <div className={`${captionMuted} px-4 py-2 ${bgSurface} rounded`}>
-          Running <span className="font-medium text-secondary">{toolName}</span> analysis...
+          <Trans
+            t={t}
+            i18nKey="analysisProgress.running"
+            values={{ tool: toolName }}
+            components={{ tool: <span className="font-medium text-secondary" /> }}
+          />
         </div>
       </DialogBody>
     </Dialog>

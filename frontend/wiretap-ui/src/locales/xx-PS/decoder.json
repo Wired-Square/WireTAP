@@ -9,14 +9,30 @@
     "start": "⟦Start⟧",
     "end": "⟦End⟧",
     "playbackSpeed": "⟦Playback speed⟧",
-    "addEvent": "⟦Add event at current position⟧"
+    "addEvent": "⟦Add event at current position⟧",
+    "noFraming": "⟦None⟧",
+    "headerLength": "⟦{{bytes}}B hdr⟧",
+    "noneSelected": "⟦No frames selected.⟧",
+    "noneUnmatched": "⟦No unmatched frames.⟧",
+    "noneFiltered": "⟦No filtered frames.⟧",
+    "reasonIdFilter": "⟦ID filter⟧",
+    "reasonTooShort": "⟦too short⟧",
+    "sourceAddress": "⟦src: {{address}}⟧"
   },
   "topBar": {
     "showRawBytes": "⟦Show raw bytes⟧",
     "hideRawBytes": "⟦Hide raw bytes⟧",
     "clearDecoded": "⟦Clear decoded values⟧",
     "showAsciiColumn": "⟦Show ASCII column⟧",
-    "hideAsciiColumn": "⟦Hide ASCII column⟧"
+    "hideAsciiColumn": "⟦Hide ASCII column⟧",
+    "showPerSource": "⟦Show per source address⟧",
+    "showSingle": "⟦Show single (most recent)⟧",
+    "setFilters": "⟦Set frame filters⟧",
+    "activeFilters": "⟦Filters: {{filters}}⟧",
+    "filterMinLength": "⟦min {{min}}B⟧",
+    "filterIds": "⟦ID: {{ids}}⟧",
+    "showingSeen": "⟦Showing only seen frames⟧",
+    "showingAll": "⟦Showing all frames⟧"
   },
   "filterDialog": {
     "title": "⟦Frame Filters⟧",
@@ -56,5 +72,33 @@
     "dashboardSignal": "⟦Dashboard Signal⟧",
     "copySignalName": "⟦Copy Signal Name⟧",
     "copyValue": "⟦Copy Value⟧"
+  },
+  "catalogUpdated": "⟦Catalog updated⟧",
+  "tabs": {
+    "signals": "⟦Signals⟧",
+    "unmatched": "⟦Unmatched⟧"
+  },
+  "frameCard": {
+    "length": "⟦len {{length}}⟧",
+    "source": "⟦Source⟧",
+    "destination": "⟦Dest⟧",
+    "headerField": "⟦{{name}}: {{value}}⟧",
+    "filterBy": "⟦Click to filter by {{name}}: {{value}}⟧",
+    "checksum": "⟦Checksum: {{value}}⟧",
+    "pollInterval": "⟦Poll interval⟧",
+    "inheritsFrom": "⟦Inherits signals from frame {{frame}}⟧",
+    "mirrorOf": "⟦Mirror of {{frame}}⟧",
+    "lastComparison": "⟦Last comparison: {{ms}}ms apart⟧",
+    "match": "⟦Match⟧",
+    "mismatch": "⟦Mismatch⟧",
+    "pending": "⟦Pending⟧",
+    "modbusRegister": "⟦Modbus register⟧",
+    "signalMismatch": "⟦Mismatch with source frame {{frame}}⟧",
+    "signalMatches": "⟦Matches source frame {{frame}}⟧",
+    "inheritedFrom": "⟦Inherited from {{frame}}⟧",
+    "inheritedSignal": "⟦Inherited signal⟧",
+    "inherited": "⟦(inherited)⟧",
+    "noSignals": "⟦No signals decoded yet.⟧",
+    "muxGroup": "⟦Mux {{value}}⟧"
   }
 }

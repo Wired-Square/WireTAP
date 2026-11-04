@@ -6,6 +6,7 @@
 
 import { Fragment, useState } from "react";
 import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import { ShieldCheck, ChevronDown, ChevronRight, Copy, Check, X } from "lucide-react";
 import { iconXs, iconMd, iconSm, flexRowGap2 } from "../../../../styles/spacing";
 import {
@@ -59,18 +60,18 @@ const hex = (value: number, digits: number) =>
  * an offset sum reads `Sum + 0xA5`, a recovered polynomial reads
  * `CRC-8 poly 0x4D`.
  */
-function describeSpecification(spec: ChecksumSpecification): string {
+function describeSpecification(spec: ChecksumSpecification, t: TFunction): string {
   switch (spec.kind) {
     case "named":
       return getAlgorithmInfo(spec.algorithm)?.name ?? spec.algorithm;
     case "additive": {
       const offset = hex(spec.offset, 2);
-      if (spec.op === "negatedSum") return `${offset} − Sum`;
-      const [name, sign] = spec.op === "xor" ? ["XOR", "^"] : ["Sum", "+"];
-      return `${name} ${sign} ${offset}`;
+      if (spec.op === "negatedSum") return t("checksumDiscovery.specification.negatedSum", { offset });
+      if (spec.op === "xor") return `XOR ^ ${offset}`;
+      return t("checksumDiscovery.specification.sum", { offset });
     }
     case "crc":
-      return `CRC-${spec.width} poly ${hex(spec.polynomial, spec.width / 4)}`;
+      return t("checksumDiscovery.specification.crc", { width: spec.width, polynomial: hex(spec.polynomial, spec.width / 4) });
   }
 }
 
@@ -216,10 +217,10 @@ function FrameCard({ finding }: { finding: FrameChecksumFinding }) {
   const copy = () => {
     const lines = finding.candidates.map(
       (c) =>
-        `${describeSpecification(c.specification)} @ ${c.position} [${c.calcStartByte}:${c.calcEndByte}]` +
+        `${describeSpecification(c.specification, t)} @ ${c.position} [${c.calcStartByte}:${c.calcEndByte}]` +
         ` — ${formatMatchRate(c.matchRate, c.matchCount, t)}` +
         `${c.matchRate === null ? "" : ` (${c.matchCount}/${c.totalCount})`}` +
-        `, confidence ${c.confidence}`,
+        t("checksumDiscovery.copyConfidence", { confidence: c.confidence }),
     );
     void navigator.clipboard.writeText(
       `${formatFrameId(finding.frameId, frameIdFormat, finding.isExtended)}\n${lines.join("\n")}`,
@@ -243,7 +244,7 @@ function FrameCard({ finding }: { finding: FrameChecksumFinding }) {
           {best ? (
             <>
               <span className={`text-sm ${textSecondary} font-mono truncate`}>
-                {describeSpecification(best.specification)}
+                {describeSpecification(best.specification, t)}
               </span>
               <span className={`text-xs ${matchRateTextClass(best.matchRate)}`}>
                 {formatMatchRate(best.matchRate, best.matchCount, t)}
@@ -304,7 +305,7 @@ function CandidateRow({ candidate }: { candidate: DiscoveredChecksum }) {
   return (
     <Card padding="sm" className="space-y-1">
       <div className="flex items-baseline gap-2 flex-wrap">
-        <span className={`font-mono text-sm ${textPrimary}`}>{describeSpecification(spec)}</span>
+        <span className={`font-mono text-sm ${textPrimary}`}>{describeSpecification(spec, t)}</span>
         {spec.kind === "crc" && spec.wellKnown && (
           <Badge tone="success" size="sm">{t("checksumDiscovery.wellKnownPolynomial")}</Badge>
         )}

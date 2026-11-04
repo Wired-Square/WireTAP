@@ -597,12 +597,13 @@ const PATTERN_CHIPS: Record<MultiBytePattern['kind'], { tone: BadgeTone; icon: s
 };
 
 function MultiByteChip({ pattern }: MultiByteChipProps) {
+  const { t } = useTranslation("discovery");
   const { tone, icon } = PATTERN_CHIPS[pattern.kind];
   const end = pattern.start + pattern.len - 1;
   const endianChar = pattern.endianness === 'little' ? 'LE' : pattern.endianness === 'big' ? 'BE' : '';
   const rangeStr = pattern.range ? ` ${pattern.range[0]}–${pattern.range[1]}` : '';
   const textSample = pattern.sampleText ? ` "${pattern.sampleText}"` : '';
-  const title = `${pattern.kind} @ byte[${pattern.start}:${end}]${endianChar ? ` ${endianChar}` : ''}${rangeStr}${textSample}${pattern.correlatedRollover ? ' (rollover correlation)' : ''}`;
+  const title = `${pattern.kind} @ byte[${pattern.start}:${end}]${endianChar ? ` ${endianChar}` : ''}${rangeStr}${textSample}${pattern.correlatedRollover ? t('changes.rolloverCorrelation') : ''}`;
 
   return (
     <Badge tone={tone} size="sm" mono title={title}>

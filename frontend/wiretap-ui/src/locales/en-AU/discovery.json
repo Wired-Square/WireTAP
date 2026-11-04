@@ -56,7 +56,10 @@
   "errors": {
     "scanTitle": "Scan Error",
     "modbusRegisterScanMessage": "An error occurred during Modbus register scan.",
-    "modbusUnitScanMessage": "An error occurred during Modbus unit ID scan."
+    "modbusUnitScanMessage": "An error occurred during Modbus unit ID scan.",
+    "dumpDirMissing": "Dump directory not configured",
+    "dumpDirMissingHint": "Please set a dump directory in Settings.",
+    "exportFailed": "Failed to export"
   },
   "speedChangeDialog": {
     "title": "Change Speed Mode?",
@@ -82,6 +85,11 @@
       "showColumn": "Show {{column}} column",
       "find": "Find in frames (⌘F)",
       "closeFind": "Close find (Escape)"
+    },
+    "empty": {
+      "loading": "Loading frames...",
+      "noneInCapture": "No frames in capture",
+      "waiting": "Waiting for frames..."
     }
   },
   "modbusView": {
@@ -252,7 +260,8 @@
       "slowUpper": " +slow-upper",
       "correlated": " +correlated",
       "text": "Text byte[{{start}}:{{end}}]{{sample}}"
-    }
+    },
+    "rolloverCorrelation": " (rollover correlation)"
   },
   "checksumDiscovery": {
     "byte": "byte {{position}}",
@@ -302,7 +311,13 @@
     "unknown": "unknown",
     "wellKnownPolynomial": "standard",
     "withChecksum": "with checksum",
-    "yes": "Yes"
+    "yes": "Yes",
+    "specification": {
+      "negatedSum": "{{offset}} − Sum",
+      "sum": "Sum + {{offset}}",
+      "crc": "CRC-{{width}} poly {{polynomial}}"
+    },
+    "copyConfidence": ", confidence {{confidence}}"
   },
   "modbusUnitId": {
     "startUnitId": "Start Unit ID",
@@ -527,7 +542,12 @@
       "noneLastByteConstant": "No checksum found. The last byte is {{value}} in all {{frames}} frames, so it is unlikely to be a checksum at all — try another position, or check the framing.",
       "shortRange": "Calculation covers fewer than 2 bytes",
       "startsAfterHeader": "Calculation starts after a declared header field (byte {{byte}})"
-    }
+    },
+    "filteredOut_one": "{{count}} frames filtered out",
+    "filteredOut_other": "{{count}} frames filtered out",
+    "shorterThan": "Frames shorter than {{min}} bytes",
+    "noFiltered": "No filtered frames. Adjust the minimum frame length filter to see excluded frames.",
+    "checksumUnknown": "Unknown"
   },
   "modbusPoll": {
     "pause": "Pause polling",
@@ -578,5 +598,45 @@
     "bus": "Bus Column",
     "ascii": "ASCII Column",
     "source": "Source Column"
-  }
+  },
+  "filteredTab": {
+    "none": "No filtered frames. All discovered frame IDs are currently selected.",
+    "loading": "Loading filtered frames...",
+    "empty": "No filtered frames to display"
+  },
+  "analysisProgress": {
+    "title": "Analyzing Frames",
+    "framesProcessed": "frames being processed",
+    "running": "Running <tool>{{tool}}</tool> analysis..."
+  },
+  "toolPanels": {
+    "changes": {
+      "maxExamples": "Max Change Examples",
+      "maxExamplesHint": "Maximum unique payload samples to analyse per frame ID."
+    },
+    "messageOrder": {
+      "startId": "Start Message ID",
+      "autoDetect": "Auto-detect",
+      "startIdHint": "Leave empty to auto-detect from gap analysis"
+    },
+    "serialFraming": {
+      "title": "Detect Framing Protocol",
+      "description": "Analyze {{bytes}} raw bytes to identify the framing protocol.",
+      "willTest": "Will test for:",
+      "slip": "SLIP framing (0xC0 delimiter with escapes)",
+      "modbusRtu": "Modbus RTU (CRC-16 validation)",
+      "delimiters": "Common delimiters (CRLF, LF, NUL, etc.)",
+      "afterDetecting": "After detecting framing, apply it to get frames for payload analysis."
+    },
+    "serialPayload": {
+      "title": "Analyze Frame Structure",
+      "description": "Analyze {{frames}} frames to identify payload structure.",
+      "willIdentify": "Will identify:",
+      "idBytes": "Candidate ID byte positions (frame type identifiers)",
+      "sourceAddress": "Candidate source address positions",
+      "checksums": "Candidate checksum positions and algorithms",
+      "worksBest": "Works best with structured protocol frames."
+    }
+  },
+  "exportFilesFilter": "Export Files"
 }
