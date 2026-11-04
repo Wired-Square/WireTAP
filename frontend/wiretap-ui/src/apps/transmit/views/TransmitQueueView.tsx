@@ -172,12 +172,8 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
       <div className={emptyStateContainer}>
         <div className={emptyStateText}>
           <p className={emptyStateHeading}>{t("queue.emptyHeading")}</p>
-          <p className={emptyStateDescription}>
-            Add frames from the CAN or Serial tab to build a transmit queue.
-          </p>
-          <p className={emptyStateHint}>
-            Queue items can repeat at configurable intervals.
-          </p>
+          <p className={emptyStateDescription}>{t("queue.emptyDescription")}</p>
+          <p className={emptyStateHint}>{t("queue.emptyHint")}</p>
         </div>
       </div>
     );
@@ -190,7 +186,7 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
         className={`flex items-center gap-3 px-4 py-2 ${bgSurface} border-b ${borderDefault}`}
       >
         <span className={`${textSecondary} text-sm`}>
-          {queue.length} item{queue.length !== 1 ? "s" : ""} in queue
+          {t("queue.itemCount", { count: queue.length })}
         </span>
 
         <div className="flex-1" />
@@ -224,7 +220,7 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
               <th className="w-12" />
               <th className="w-28">{t("queue.columns.bus")}</th>
               <th className="w-16">{t("queue.columns.type")}</th>
-              <th>Frame / Data</th>
+              <th>{t("queue.columns.frameData")}</th>
               <th className="w-24">{t("queue.columns.interval")}</th>
               <th className="w-28">{t("queue.columns.group")}</th>
               <th className="w-24">{t("queue.columns.actions")}</th>
@@ -267,7 +263,7 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
                             variant="solid"
                             tone="danger"
                             size="sm"
-                            title={`Stop group '${item.group}'`}
+                            title={t("queue.actions.stopGroup", { group: item.group })}
                           >
                             <Square size={12} fill="currentColor" />
                           </Button>
@@ -280,8 +276,8 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
                             size="sm"
                             title={
                               !hasIOSession
-                                ? "Group repeat requires an IO session (start Discovery or Decoder first)"
-                                : `Start group '${item.group}'`
+                                ? t("queue.actions.groupNeedsSession")
+                                : t("queue.actions.startGroup", { group: item.group })
                             }
                           >
                             <Play size={12} fill="currentColor" />
@@ -314,7 +310,7 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
                           size="sm"
                           title={
                             !hasIOSession
-                              ? "Requires an IO session (connect via the CAN tab)"
+                              ? t("queue.actions.needsSession")
                               : t("queue.actions.startRepeatTooltip")
                           }
                         >
@@ -371,7 +367,7 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
                   {/* Type */}
                   <td>
                     <Badge tone={formatted.type === "CAN" ? "primary" : "purple"}>
-                      {formatted.type}
+                      {t(formatted.type === "CAN" ? "queue.typeCAN" : "queue.typeSerial")}
                     </Badge>
                   </td>
 
@@ -449,7 +445,7 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
                             })
                           }
                           size="sm"
-                          title={`Assign to ${activeSession.profileName}`}
+                          title={t("queue.actions.assignTo", { profile: activeSession.profileName })}
                         >
                           <Link size={14} />
                         </IconButton>

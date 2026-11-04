@@ -21,6 +21,13 @@ import { sectionHeaderText } from "../../styles/typography";
 import { Button, IconButton } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { AppIcon } from "../../components/AppIcon";
+const BYTE_ORDER_LABEL_KEYS: Record<GroupOrder, string> = {
+  little: "byteOrder.little",
+  big: "byteOrder.big",
+  "mid-little": "byteOrder.midLittle",
+  "mid-big": "byteOrder.midBig",
+};
+
 type GroupModeChoice = "1B" | "2B" | "4B" | "8B" | "custom-bits" | "custom-bytes";
 export type CustomUnit = "bits" | "bytes";
 export type InputMode = "hex" | "number" | "string";
@@ -371,7 +378,7 @@ export default function FrameCalculator() {
           variant="surface"
           tone="warning"
           pressed={isRotating}
-          title={isRotating ? "Stop auto-rotation" : "Start auto-rotation"}
+          title={isRotating ? t("tooltips.stopRotation") : t("tooltips.startRotation")}
           onClick={toggleRotate}
         >
           <RotateCcw className={`${iconMd} ${isRotating ? "animate-spin" : ""}`} />
@@ -390,7 +397,7 @@ export default function FrameCalculator() {
           onClick={() => setShowEndiannessDialog(true)}
           title={t("tooltips.byteOrder")}
         >
-          {endianness === "little" ? "Little" : endianness === "big" ? "Big" : endianness === "mid-little" ? "Mid-Little" : "Mid-Big"}
+          {t(BYTE_ORDER_LABEL_KEYS[endianness])}
         </Button>
 
         {/* Separator */}
@@ -446,7 +453,7 @@ export default function FrameCalculator() {
         <Button
           onClick={openHistoryDialog}
           tone={history.length > 0 ? "primary" : "neutral"}
-          title={history.length > 0 ? `Memory (${history.length})` : "Memory empty"}
+          title={history.length > 0 ? t("tooltips.memoryCount", { count: history.length }) : t("tooltips.memoryEmpty")}
         >
           M{history.length > 0 && <span className="ml-1 text-xs opacity-70">{history.length}</span>}
         </Button>
@@ -500,7 +507,7 @@ export default function FrameCalculator() {
               ? "01020304"
               : inputMode === "number"
               ? "16909060"
-              : "Hello"
+              : t("labels.stringPlaceholder")
           }
         />
         {inputMode !== "hex" && hexInput && (
@@ -534,10 +541,10 @@ export default function FrameCalculator() {
                     {/* Header */}
                     <div className="mb-3">
                       <div className="text-sm font-semibold text-primary">
-                        Group {g.index}
+                        {t("labels.group", { index: g.index })}
                       </div>
                       <div className={captionMuted}>
-                        {g.bits} bits
+                        {t("labels.bitCount", { count: g.bits })}
                       </div>
                     </div>
 
@@ -572,7 +579,7 @@ export default function FrameCalculator() {
                         </div>
                       </div>
                       <div className="flex justify-between items-center group">
-                        <span>Signed (2's)</span>
+                        <span>{t("labels.signedTwos")}</span>
                         <div className={flexRowGap2}>
                           <span className="font-mono">{g.signedTwos}</span>
                           <IconButton
@@ -586,7 +593,7 @@ export default function FrameCalculator() {
                         </div>
                       </div>
                       <div className="flex justify-between items-center group">
-                        <span>Signed (1's)</span>
+                        <span>{t("labels.signedOnes")}</span>
                         <div className={flexRowGap2}>
                           <span className="font-mono">{g.signedOnes}</span>
                           <IconButton
@@ -600,7 +607,7 @@ export default function FrameCalculator() {
                         </div>
                       </div>
                       <div className="flex justify-between items-center group">
-                        <span>Sign-Magnitude</span>
+                        <span>{t("labels.signMagnitude")}</span>
                         <div className={flexRowGap2}>
                           <span className="font-mono">{g.signedMag}</span>
                           <IconButton
@@ -675,7 +682,7 @@ export default function FrameCalculator() {
           {/* Preset options */}
           <div>
             <label className={`block ${sectionHeaderText} mb-2`}>
-              Preset
+              {t("dialogs.groupingMode.preset")}
             </label>
             <div className="grid grid-cols-4 gap-2">
               {(["1B", "2B", "4B", "8B"] as GroupModeChoice[]).map((mode) => (
@@ -695,14 +702,14 @@ export default function FrameCalculator() {
           {/* Divider */}
           <div className="flex items-center gap-3">
             <div className="flex-1 h-px bg-hover" />
-            <span className={captionMuted}>or custom</span>
+            <span className={captionMuted}>{t("dialogs.groupingMode.orCustom")}</span>
             <div className="flex-1 h-px bg-hover" />
           </div>
 
           {/* Custom unit selector */}
           <div>
             <label className={`block ${sectionHeaderText} mb-2`}>
-              Unit
+              {t("dialogs.groupingMode.unit")}
             </label>
             <div className="flex gap-2">
               <Button
@@ -712,7 +719,7 @@ export default function FrameCalculator() {
                 pressed={dialogUnit === "bits"}
                 className="flex-1"
               >
-                Bits
+                {t("dialogs.groupingMode.bits")}
               </Button>
               <Button
                 onClick={() => setDialogUnit("bytes")}
@@ -721,7 +728,7 @@ export default function FrameCalculator() {
                 pressed={dialogUnit === "bytes"}
                 className="flex-1"
               >
-                Bytes
+                {t("dialogs.groupingMode.bytes")}
               </Button>
             </div>
           </div>
@@ -729,7 +736,7 @@ export default function FrameCalculator() {
           {/* Custom sizes input */}
           <div>
             <label className={`block ${sectionHeaderText} mb-2`}>
-              Group Sizes
+              {t("dialogs.groupingMode.groupSizes")}
             </label>
             <Input
               type="text"
@@ -740,7 +747,7 @@ export default function FrameCalculator() {
               placeholder={dialogUnit === "bits" ? t("dialogs.groupingMode.customPlaceholderBits") : t("dialogs.groupingMode.customPlaceholderBytes")}
             />
             <p className={`${caption} mt-1`}>
-              Comma-separated list of {dialogUnit === "bits" ? "bit" : "byte"} sizes
+              {dialogUnit === "bits" ? t("dialogs.groupingMode.bitSizesHint") : t("dialogs.groupingMode.byteSizesHint")}
             </p>
           </div>
         </DialogBody>
@@ -750,7 +757,7 @@ export default function FrameCalculator() {
             onClick={handleCustomOk}
             disabled={!dialogInput.trim()}
           >
-            Apply Custom
+            {t("dialogs.groupingMode.applyCustom")}
           </PrimaryButton>
         </DialogFooter>
       </Dialog>
@@ -820,7 +827,7 @@ export default function FrameCalculator() {
             title={t("tooltips.copyAllHistory")}
           >
             <CopyPlus className={iconMd} />
-            Copy All
+            {t("dialogs.memory.copyAll")}
           </Button>
           <SecondaryButton onClick={handleHistoryDialogClose}>{t("common:actions.close")}</SecondaryButton>
         </DialogFooter>
@@ -835,23 +842,18 @@ export default function FrameCalculator() {
       >
         <DialogBody>
           <div className="grid grid-cols-2 gap-2">
-            {([
-              { value: "little", label: "Little" },
-              { value: "big", label: "Big" },
-              { value: "mid-little", label: "Mid-Little" },
-              { value: "mid-big", label: "Mid-Big" },
-            ] as const).map((option) => (
+            {(Object.keys(BYTE_ORDER_LABEL_KEYS) as GroupOrder[]).map((order) => (
               <Button
-                key={option.value}
+                key={order}
                 onClick={() => {
-                  setEndianness(option.value);
+                  setEndianness(order);
                   setShowEndiannessDialog(false);
                 }}
                 variant="outline"
                 tone="primary"
-                pressed={endianness === option.value}
+                pressed={endianness === order}
               >
-                {option.label}
+                {t(BYTE_ORDER_LABEL_KEYS[order])}
               </Button>
             ))}
           </div>
@@ -903,7 +905,7 @@ export default function FrameCalculator() {
           {/* Raw value display */}
           <div>
             <label className={`block ${sectionHeaderText} mb-1`}>
-              Raw Value (from hex)
+              {t("dialogs.scale.rawValue")}
             </label>
             <div className="px-3 py-2 rounded border bg-surface border-default font-mono text-sm">
               {groups.length > 0 ? groups[0].unsigned : "—"}
@@ -913,7 +915,7 @@ export default function FrameCalculator() {
           {/* Target value input */}
           <div>
             <label className={`block ${sectionHeaderText} mb-1`}>
-              Target Value (desired result)
+              {t("dialogs.scale.targetValue")}
             </label>
             <Input
               type="text"
@@ -947,7 +949,7 @@ export default function FrameCalculator() {
             return (
               <Card tone="info" padding="lg">
                 <div className="text-sm text-secondary mb-1">
-                  Scale Factor (DBC)
+                  {t("dialogs.scale.scaleFactor")}
                 </div>
                 <div className={flexRowGap2}>
                   <span className="text-2xl font-mono font-semibold text-accent-primary">
@@ -965,7 +967,7 @@ export default function FrameCalculator() {
                   {targetValue} ÷ {rawValue} = {scale.toPrecision(6)}
                 </div>
                 <div className={`${caption} mt-1`}>
-                  raw × {scale.toPrecision(6)} = physical
+                  {t("dialogs.scale.formula", { scale: scale.toPrecision(6) })}
                 </div>
               </Card>
             );

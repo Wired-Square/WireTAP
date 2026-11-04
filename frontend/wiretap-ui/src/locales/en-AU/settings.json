@@ -491,7 +491,6 @@
       "interfaces": "Interfaces",
       "interfacesCount_one": "{{count}} interface",
       "interfacesCount_other": "{{count}} interfaces",
-      "busLabel": "Bus {{bus}}",
       "hz": "Hz",
       "signalGenerator": "Signal Generator"
     },
@@ -521,7 +520,8 @@
       "persistChanges": "Save changes to device (persist across reboots)",
       "readingConfig": "Reading configuration from device...",
       "configWillLoad": "Configuration will be loaded when the device is reachable.",
-      "groupOther": "Other"
+      "groupOther": "Other",
+      "deviceIdRequired": "Device ID and interfaces are required"
     },
     "serial": {
       "title": "Serial Port Connection",
@@ -643,6 +643,23 @@
         "60": "60x",
         "noLimit": "No Limit"
       }
+    },
+    "copyName": "{{name}} (Copy)",
+    "validation": {
+      "nameRequired": "Profile name is required.",
+      "nameDuplicate": "A profile with this name already exists. Please choose a unique name.",
+      "portRequired": "Serial port is required. Please select a port from the dropdown.",
+      "hostRequired": "Host is required.",
+      "fieldRequired": "Connection field \"{{field}}\" is required.",
+      "fieldInvalid": "Connection field \"{{field}}\" has a value the device cannot use."
+    },
+    "errors": {
+      "deleteFailedTitle": "Delete Failed",
+      "deleteFailed": "Could not delete this device.",
+      "duplicateFailedTitle": "Duplicate Failed",
+      "saveFailedTitle": "Could Not Save Profile",
+      "saveProbeFailedTitle": "Could Not Save Probe",
+      "clearUnsavedFailed": "Saved, but could not clear the unsaved copy."
     }
   },
   "dashboardLayouts": {

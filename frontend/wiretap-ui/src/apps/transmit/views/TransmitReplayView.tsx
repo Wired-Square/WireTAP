@@ -80,7 +80,7 @@ export default function TransmitReplayView({ useLocalTimezone, sessionId }: Tran
                       {info.profileName && (
                         <span className="mr-1.5">{info.profileName}</span>
                       )}
-                      Replaying{info.loopReplay ? " (loop)" : ""}
+                      {info.loopReplay ? t("replay.replayingLoop") : t("replay.replaying")}
                       <span className="ml-1.5 font-mono">
                         {info.framesSent} / {info.totalFrames}
                       </span>

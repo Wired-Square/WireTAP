@@ -1,5 +1,6 @@
 // ui/src/apps/settings/hooks/handlers/useIOProfileHandlers.ts
 
+import i18n from 'i18next';
 import { getCredential, SECURE_FIELDS } from '../../../../api/credentials';
 import { useSettingsStore } from '../../stores/settingsStore';
 import type {
@@ -9,20 +10,12 @@ import type {
   ProfileKindId,
 } from '../../../../hooks/useSettings';
 import { addDevice, deviceWriteMessage, uniqueName } from '../../../../settings/devices';
-import type { ProfileValidationError, ValidationCode } from '../../../../api/deviceKinds';
+import type { ProfileValidationError } from '../../../../api/deviceKinds';
 import { deleteDevice, reconfigureDevice, saveAdHocDevice, updateDevice } from '../../../../api/ephemeralProfiles';
 import { useSessionStore } from '../../../../stores/sessionStore';
 import { useAdHocProfileStore } from '../../../../stores/adHocProfileStore';
 import { withAppError } from '../../../../utils/appError';
 
-const VALIDATION_MESSAGES: Record<ValidationCode, string> = {
-  nameRequired: 'Profile name is required.',
-  nameDuplicate: 'A profile with this name already exists. Please choose a unique name.',
-  portRequired: 'Serial port is required. Please select a port from the dropdown.',
-  hostRequired: 'Host is required.',
-  fieldRequired: 'Connection field "{field}" is required.',
-  fieldInvalid: 'Connection field "{field}" has a value the device cannot use.',
-};
 
 /** The profile with each secret it keeps in the keyring filled back in. */
 async function withStoredSecrets(profile: IOProfile): Promise<IOProfile> {
@@ -41,7 +34,7 @@ async function withStoredSecrets(profile: IOProfile): Promise<IOProfile> {
 }
 
 const validationMessage = (invalid: ProfileValidationError) =>
-  VALIDATION_MESSAGES[invalid.code].replace('{field}', invalid.field ?? '');
+  i18n.t(`settings:ioProfileDialog.validation.${invalid.code}`, { field: invalid.field ?? '' });
 
 export function useIOProfileHandlers() {
   // Store selectors
@@ -95,7 +88,7 @@ export function useIOProfileHandlers() {
       return;
     }
 
-    const deleted = await withAppError('Delete Failed', 'Could not delete this device.', () =>
+    const deleted = await withAppError(i18n.t('settings:ioProfileDialog.errors.deleteFailedTitle'), i18n.t('settings:ioProfileDialog.errors.deleteFailed'), () =>
       deleteDevice(profile.id)
     );
     if (deleted) removeProfile(profile.id);
@@ -120,9 +113,9 @@ export function useIOProfileHandlers() {
   const handleDuplicateIOProfile = async (profile: IOProfile) => {
     const copy = await withStoredSecrets(profile);
     try {
-      await addDevice({ ...copy, name: uniqueName(`${profile.name} (Copy)`, takenNames()) }, true);
+      await addDevice({ ...copy, name: uniqueName(i18n.t('settings:ioProfileDialog.copyName', { name: profile.name }), takenNames()) }, true);
     } catch (e) {
-      showWriteError('Duplicate Failed', e);
+      showWriteError(i18n.t('settings:ioProfileDialog.errors.duplicateFailedTitle'), e);
     }
   };
 
@@ -135,7 +128,7 @@ export function useIOProfileHandlers() {
         await addDevice(profileForm, true);
       }
     } catch (e) {
-      showWriteError('Could Not Save Profile', e);
+      showWriteError(i18n.t('settings:ioProfileDialog.errors.saveFailedTitle'), e);
       return;
     }
     closeDialog('ioProfile');
@@ -178,7 +171,7 @@ export function useIOProfileHandlers() {
     const stored = ioProfiles.profiles.find((p) => p.id === id);
     if (!id || !stored) return;
     reconfigureDevice(id, { ...stored.connection, ...fields }).catch((e) =>
-      showWriteError('Could Not Save Probe', e)
+      showWriteError(i18n.t('settings:ioProfileDialog.errors.saveProbeFailedTitle'), e)
     );
   };
 
@@ -190,18 +183,18 @@ export function useIOProfileHandlers() {
     try {
       saved = await saveAdHocDevice(profile.id, name);
     } catch (e) {
-      showWriteError('Could Not Save Profile', e);
+      showWriteError(i18n.t('settings:ioProfileDialog.errors.saveFailedTitle'), e);
       return;
     }
     useSettingsStore.getState().addProfile(saved);
-    await withAppError('Discard Failed', 'Saved, but could not clear the unsaved copy.', () =>
+    await withAppError(i18n.t('dialogs:ioSourcePicker.deviceEditor.discardFailedTitle'), i18n.t('settings:ioProfileDialog.errors.clearUnsavedFailed'), () =>
       useAdHocProfileStore.getState().discard(profile.id)
     );
   };
 
   const handleDiscardAdHocProfile = async (profileId: string) => {
     // The backend refuses while a session still holds the device.
-    await withAppError('Discard Failed', 'Could not discard this device.', () =>
+    await withAppError(i18n.t('dialogs:ioSourcePicker.deviceEditor.discardFailedTitle'), i18n.t('dialogs:ioSourcePicker.deviceEditor.discardFailed'), () =>
       useAdHocProfileStore.getState().discard(profileId)
     );
   };

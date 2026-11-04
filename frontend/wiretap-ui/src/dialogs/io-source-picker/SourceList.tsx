@@ -6,6 +6,7 @@ import type { IOProfile } from "../../hooks/useSettings";
 import type { Session } from "../../stores/sessionStore";
 import type { ActiveSessionInfo, ProfileUsageInfo } from "../../api/io";
 import { CSV_EXTERNAL_ID } from "./utils";
+import { getIOKindLabel } from "../../utils/ioKindLabel";
 import { isRealtime, useProfileTraits } from "../../stores/profileBusStore";
 import TabStrip from "../../components/TabStrip";
 import type { SourceTab } from "./types";
@@ -150,7 +151,7 @@ export default function SourceList({
       : checkedProfile?.name ?? t("ioSourcePicker.sources.unknown");
     const subtitle = isCsvSelected
       ? t("ioSourcePicker.sources.csvImport")
-      : checkedProfile?.kind ?? checkedSourceId ?? "";
+      : checkedProfile ? getIOKindLabel(checkedProfile.kind) : checkedSourceId ?? "";
 
     return (
       <div>
@@ -176,7 +177,7 @@ export default function SourceList({
     const isCapture = session.source_type === "capture";
     // Always use session ID as the primary display name
     const displayName = session.session_id;
-    const subtitle = `${session.subscriber_count} subscriber${session.subscriber_count !== 1 ? "s" : ""}`;
+    const subtitle = t("ioSourcePicker.sources.subscribers", { count: session.subscriber_count });
 
     if (isMultiSource) {
       // Multi-source session: show sources with bus mappings
@@ -208,7 +209,7 @@ export default function SourceList({
       // Look up profile via sourceProfileIds (session IDs like t_XXXXX differ from profile IDs)
       const profile = readProfiles.find((p) => session.source_profile_ids.includes(p.id));
       const profileName = profile?.name || session.source_type;
-      const deviceKind = profile?.kind || session.source_type;
+      const deviceKind = getIOKindLabel(profile?.kind || session.source_type);
       return { displayName, subtitle, sourceDetails: `${profileName} (${deviceKind})`, icon: Database, kind: "recorded" as const };
     }
   };
@@ -523,6 +524,7 @@ function SourceButton({
   onDiscard?: (profileId: string) => void;
 }) {
   const { t } = useTranslation("dialogs");
+  const kindLabel = getIOKindLabel(profile.kind);
   // Determine badge text and colors based on session state
   const isStopped = sessionState === "stopped";
   const isRunning = isLive && sessionState === "running";
@@ -567,10 +569,10 @@ function SourceButton({
         </div>
         <div className={`text-xs ${isDisabled ? "text-muted" : "text-muted"}`}>
           {isDisabled && disabledReason ? (
-            <span>{profile.kind} · <span className="text-muted">{disabledReason}</span></span>
+            <span>{kindLabel} · <span className="text-muted">{disabledReason}</span></span>
           ) : usageInfo && usageInfo.session_count > 0 ? (
             <span className="flex items-center gap-1.5">
-              <span>{profile.kind}</span>
+              <span>{kindLabel}</span>
               {usageInfo.config_locked && (
                 <span title={t("ioSourcePicker.sources.configLocked")}>
                   <Lock className={`${iconXs} text-amber`} />
@@ -586,7 +588,7 @@ function SourceButton({
               )}
             </span>
           ) : (
-            profile.kind
+            kindLabel
           )}
         </div>
       </div>

@@ -1,5 +1,6 @@
 // ui/src/apps/settings/stores/settingsStore.ts
 
+import i18n from 'i18next';
 import { create } from '@wired-square/store/react';
 import {
   loadSettings as loadSettingsApi,
@@ -415,7 +416,7 @@ async function validateDir(path: string): Promise<DirectoryValidation | null> {
   try {
     return await validateDirectoryApi(path);
   } catch {
-    return { exists: false, writable: false, error: 'Validation failed' };
+    return { exists: false, writable: false, error: i18n.t('common:errors.validationFailed') };
   }
 }
 
@@ -665,7 +666,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         set((state) => ({
           locations: {
             ...state.locations,
-            decoderValidation: { exists: false, writable: false, error: 'Validation failed' },
+            decoderValidation: { exists: false, writable: false, error: i18n.t('common:errors.validationFailed') },
           },
         }));
       }
@@ -687,7 +688,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         set((state) => ({
           locations: {
             ...state.locations,
-            dumpValidation: { exists: false, writable: false, error: 'Validation failed' },
+            dumpValidation: { exists: false, writable: false, error: i18n.t('common:errors.validationFailed') },
           },
         }));
       }
@@ -709,7 +710,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         set((state) => ({
           locations: {
             ...state.locations,
-            reportValidation: { exists: false, writable: false, error: 'Validation failed' },
+            reportValidation: { exists: false, writable: false, error: i18n.t('common:errors.validationFailed') },
           },
         }));
       }

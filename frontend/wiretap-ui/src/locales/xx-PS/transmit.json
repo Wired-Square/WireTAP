@@ -48,7 +48,6 @@
     "brs": "⟦BRS⟧",
     "rtr": "⟦RTR⟧",
     "bus": "⟦Bus⟧",
-    "busLabel": "⟦Bus {{bus}}⟧",
     "dlc": "⟦DLC⟧",
     "data": "⟦Data⟧",
     "dataBytes": "⟦Data Bytes:⟧",
@@ -107,19 +106,29 @@
       "sessionDisconnected": "⟦Session disconnected⟧",
       "disableItem": "⟦Disable item⟧",
       "enableItem": "⟦Enable item⟧",
-      "removeFromQueue": "⟦Remove from queue⟧"
+      "removeFromQueue": "⟦Remove from queue⟧",
+      "stopGroup": "⟦Stop group '{{group}}'⟧",
+      "startGroup": "⟦Start group '{{group}}'⟧",
+      "groupNeedsSession": "⟦Group repeat requires an IO session (start Discovery or Decoder first)⟧",
+      "needsSession": "⟦Requires an IO session (connect via the CAN tab)⟧",
+      "assignTo": "⟦Assign to {{profile}}⟧"
     },
     "columns": {
       "bus": "⟦Bus⟧",
       "type": "⟦Type⟧",
       "interval": "⟦Interval⟧",
       "group": "⟦Group⟧",
-      "actions": "⟦Actions⟧"
+      "actions": "⟦Actions⟧",
+      "frameData": "⟦Frame / Data⟧"
     },
     "groupPlaceholder": "⟦—⟧",
     "groupTooltip": "⟦Group name (items with same group transmit together)⟧",
     "typeCAN": "⟦CAN⟧",
-    "typeSerial": "⟦Serial⟧"
+    "typeSerial": "⟦Serial⟧",
+    "emptyDescription": "⟦Add frames from the CAN or Serial tab to build a transmit queue.⟧",
+    "emptyHint": "⟦Queue items can repeat at configurable intervals.⟧",
+    "itemCount_one": "⟦{{count}} item in queue⟧",
+    "itemCount_other": "⟦{{count}} items in queue⟧"
   },
   "history": {
     "emptyHeading": "⟦No History⟧",
@@ -131,7 +140,11 @@
     "liveTooltip": "⟦Showing latest frames (click to browse)⟧",
     "browsingTooltip": "⟦Browsing history (click for live)⟧",
     "frameSummary_one": "⟦{{formatted}} frame⟧",
-    "frameSummary_other": "⟦{{formatted}} frames⟧"
+    "frameSummary_other": "⟦{{formatted}} frames⟧",
+    "emptyDescription": "⟦Transmitted frames will appear here.⟧",
+    "transmitFailed": "⟦Transmit failed⟧",
+    "exporting": "⟦Exporting…⟧",
+    "noFrames": "⟦No frames to display⟧"
   },
   "replay": {
     "emptyHeading": "⟦No Replay Activity⟧",
@@ -166,6 +179,8 @@
       "session": "⟦Session⟧",
       "event": "⟦Event⟧",
       "details": "⟦Details⟧"
-    }
+    },
+    "replaying": "⟦Replaying⟧",
+    "replayingLoop": "⟦Replaying (loop)⟧"
   }
 }

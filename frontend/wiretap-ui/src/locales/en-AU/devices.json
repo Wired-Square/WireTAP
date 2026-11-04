@@ -124,7 +124,9 @@
       "sendingConnect": "Sending connect command",
       "waitingForDevice": "Waiting for device"
     },
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "deviceStatus": "Device status: {{status}}",
+    "wifiError": "Device reported an error while connecting to WiFi"
   },
   "complete": {
     "successTitle": "Provisioning Complete",
@@ -230,7 +232,8 @@
       "unknown": "—",
       "seconds": "{{seconds}}s",
       "minutes": "{{minutes}}m {{seconds}}s"
-    }
+    },
+    "rate": "{{rate}} kB/s · ETA {{eta}}"
   },
   "frameLink": {
     "title": "FrameLink Setup",
@@ -252,5 +255,9 @@
     "addToDataIo": "Add Device to Data I/O",
     "addedSuccess_one": "Device added to Data I/O with {{count}} interface. You can configure it in Settings.",
     "addedSuccess_other": "Device added to Data I/O with {{count}} interfaces. You can configure it in Settings."
+  },
+  "connection": {
+    "noBle": "BLE not available for this device",
+    "noFrameLinkAddress": "No FrameLink address for this device"
   }
 }

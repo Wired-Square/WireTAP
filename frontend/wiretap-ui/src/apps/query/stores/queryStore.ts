@@ -3,6 +3,7 @@
 // Zustand store for the Query app: the form, the catalogue it reads, and this
 // window's view of the queue Rust runs.
 
+import i18n from "i18next";
 import { create } from "@wired-square/store/react";
 import { REFRESH_ACTIVITY_DELAY_MS } from "../../../constants";
 import {
@@ -32,49 +33,20 @@ export type { DatabaseActivity };
 
 export type QueryType = QuerySpec["type"];
 
-/** Query type metadata for UI display */
-export const QUERY_TYPE_INFO: Record<QueryType, { label: string; description: string }> = {
-  byte_changes: {
-    label: "Byte Changes",
-    description: "Find when a specific byte in a frame changed value",
-  },
-  frame_changes: {
-    label: "Frame Changes",
-    description: "Find when any byte in a frame's payload changed",
-  },
-  mirror_validation: {
-    label: "Mirror Validation",
-    description: "Find timestamps where mirror frames don't match their source",
-  },
-  mux_statistics: {
-    label: "Mux Statistics",
-    description: "Per-mux-case MIN/MAX/AVG statistics for each byte position",
-  },
-  first_last: {
-    label: "First/Last Occurrence",
-    description: "Find the first or last occurrence of a frame matching a pattern",
-  },
-  frequency: {
-    label: "Frame Frequency",
-    description: "Analyse transmission frequency over time",
-  },
-  distribution: {
-    label: "Value Distribution",
-    description: "Find all unique values for a byte range",
-  },
-  gap_analysis: {
-    label: "Gap Analysis",
-    description: "Find transmission gaps longer than a threshold",
-  },
-  pattern_search: {
-    label: "Pattern Search",
-    description: "Search for a byte pattern across all frame IDs",
-  },
-  frame_inventory: {
-    label: "Frame Inventory",
-    description: "Every frame id in the source with its count, first and last sighting",
-  },
-};
+export const QUERY_TYPES: readonly QueryType[] = [
+  "byte_changes",
+  "frame_changes",
+  "mirror_validation",
+  "mux_statistics",
+  "first_last",
+  "frequency",
+  "distribution",
+  "gap_analysis",
+  "pattern_search",
+  "frame_inventory",
+];
+
+export const queryTypeLabel = (type: QueryType) => i18n.t(`query:types.${type}.label`);
 
 /** Query parameters */
 export interface QueryParams {
@@ -115,7 +87,7 @@ export const CONTEXT_PRESETS: { label: string; beforeMs: number; afterMs: number
 
 /** Generate a display name for a query */
 function generateQueryDisplayName(queryType: QueryType, queryParams: QueryParams): string {
-  const typeLabel = QUERY_TYPE_INFO[queryType].label;
+  const typeLabel = queryTypeLabel(queryType);
 
   let name: string;
   if (queryType === "mirror_validation") {
@@ -133,16 +105,16 @@ function generateQueryDisplayName(queryType: QueryType, queryParams: QueryParams
     const frameHex = formatFrameId(queryParams.frameId, "hex", queryParams.isExtended);
     name = `${typeLabel} - ${frameHex}`;
     if (queryType === "byte_changes" || queryType === "distribution") {
-      name += ` [byte ${queryParams.byteIndex}]`;
+      name += ` ${i18n.t("query:queryName.byte", { index: queryParams.byteIndex })}`;
     } else if (queryType === "mux_statistics") {
-      name += ` [mux byte ${queryParams.muxSelectorByte}]`;
+      name += ` ${i18n.t("query:queryName.muxByte", { index: queryParams.muxSelectorByte })}`;
     } else if (queryType === "gap_analysis") {
       name += ` [>${queryParams.gapThresholdMs}ms]`;
     } else if (queryType === "frequency") {
-      name += ` [${queryParams.bucketSizeMs}ms buckets]`;
+      name += ` ${i18n.t("query:queryName.buckets", { ms: queryParams.bucketSizeMs })}`;
     }
     if (queryParams.isExtended) {
-      name += " (ext)";
+      name += ` ${i18n.t("query:queryName.extended")}`;
     }
   }
   return name;
@@ -202,7 +174,7 @@ export function buildQuerySpec(queryType: QueryType, p: QueryParams, bounds: Tim
     case "gap_analysis":
       return { type: queryType, ...frame, gap_threshold_ms: p.gapThresholdMs, limit };
     case "pattern_search":
-      if (p.pattern.length === 0) throw new Error("Enter a pattern to search for");
+      if (p.pattern.length === 0) throw new Error(i18n.t("query:errors.patternRequired"));
       return { type: queryType, ...window, pattern: p.pattern, pattern_mask: p.patternMask, limit };
     case "frame_inventory":
       return { type: queryType, ...window, limit };

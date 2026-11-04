@@ -460,9 +460,7 @@
   .text-purple { color: var(--text-purple) }
   .text-red { color: var(--text-red) }
   .text-secondary { color: var(--text-secondary) }
-  .text-sky { color: var(--text-sky) }
   .text-success { color: var(--status-success-text) }
-  .text-teal { color: var(--text-teal) }
   .text-warning { color: var(--status-warning-text) }
   .text-white { color: #fff }
   .text-yellow { color: var(--text-yellow) }

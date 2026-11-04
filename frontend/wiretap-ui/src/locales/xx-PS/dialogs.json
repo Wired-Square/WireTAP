@@ -481,7 +481,9 @@
       "editDevice": "⟦Edit connection⟧",
       "discardDevice": "⟦Discard device⟧",
       "unsaved": "⟦Unsaved⟧",
-      "unsavedHint": "⟦Created here and kept for this run only. Save it in the editor to keep it.⟧"
+      "unsavedHint": "⟦Created here and kept for this run only. Save it in the editor to keep it.⟧",
+      "subscribers_one": "⟦{{count}} subscriber⟧",
+      "subscribers_other": "⟦{{count}} subscribers⟧"
     },
     "singleBusConfig": {
       "deviceNotResponding": "⟦Device not responding⟧",

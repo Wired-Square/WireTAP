@@ -2,11 +2,13 @@
 //
 // This window's copy of the Rust session log ring, plus the log view's UI state.
 
+import i18n from "i18next";
 import { create } from "@wired-square/store/react";
 import type { BadgeStyleProps } from "../../../components/Badge";
 import type { SessionLogEntry } from "../../../generated/SessionLogEntry";
 import type { SessionLogEvent } from "../../../generated/SessionLogEvent";
 import type { IOState } from "../../../generated/IOState";
+import type { SessionMode } from "../../../generated/SessionMode";
 import type { IOProfile } from "../../../hooks/useSettings";
 import { SESSION_LOG_CAPACITY } from "../../../generated/wireConstants";
 import { getStateType } from "../../../api/io";
@@ -73,23 +75,15 @@ export const useSessionLogStore = create<SessionLogState>((set) => ({
 // Rendering
 // ============================================================================
 
-const MODE_LABELS = { live: "Live", recorded: "Playback", capture: "Capture", replaying: "Replaying" } as const;
+const EVENTS = "sessionManager:log.events";
 
-const TRANSITION_LABELS = {
-  suspended: "Suspended",
-  switched_to_capture: "Switched to capture",
-  resuming: "Resuming",
-  returned_to_live: "Returned to live",
-  capabilities_changed: "Capabilities changed",
-} as const;
+const modeLabel = (mode: SessionMode) => i18n.t(`${EVENTS}.modes.${mode}`);
 
 function stateLabel(state: IOState): string {
   return state.type === "Error" ? `error: ${state.message}` : getStateType(state);
 }
 
-function listeners(count: number): string {
-  return `${count} listener${count === 1 ? "" : "s"}`;
-}
+const listeners = (count: number) => i18n.t(`${EVENTS}.listeners`, { count });
 
 /** The kinds the badge and filter treat as one: a stream that ended at its end is a completion. */
 export function displayKind(event: SessionLogEvent): SessionLogKind | "stream_complete" {
@@ -97,44 +91,65 @@ export function displayKind(event: SessionLogEvent): SessionLogKind | "stream_co
 }
 
 export function describeEvent(event: SessionLogEvent, who: string | null): string {
+  const subject = who ?? i18n.t(`${EVENTS}.listener`);
   switch (event.kind) {
     case "created":
-      return `Session created (${MODE_LABELS[event.mode]})`;
+      return i18n.t(`${EVENTS}.created`, { mode: modeLabel(event.mode) });
     case "joined":
-      return `${who ?? "Listener"} joined (${listeners(event.subscriber_count)})`;
+      return i18n.t(`${EVENTS}.joined`, { who: subject, listeners: listeners(event.subscriber_count) });
     case "left":
-      return `${who ?? "Listener"} left (${listeners(event.subscriber_count)})`;
+      return i18n.t(`${EVENTS}.left`, { who: subject, listeners: listeners(event.subscriber_count) });
     case "destroyed":
-      return event.reset ? "Session destroyed (reset)" : "Session destroyed";
+      return i18n.t(event.reset ? `${EVENTS}.destroyedReset` : `${EVENTS}.destroyed`);
     case "state":
-      return `State: ${stateLabel(event.state)}`;
+      return i18n.t(`${EVENTS}.state`, { state: stateLabel(event.state) });
     case "transitioned":
-      return `${TRANSITION_LABELS[event.transition]} (${MODE_LABELS[event.mode]})`;
+      return i18n.t(`${EVENTS}.transitioned`, {
+        transition: i18n.t(`${EVENTS}.transitions.${event.transition}`),
+        mode: modeLabel(event.mode),
+      });
     case "speed":
-      return `Speed: ${event.speed}x`;
+      return i18n.t(`${EVENTS}.speed`, { speed: event.speed });
     case "reconfigured":
-      return "Session reconfigured";
+      return i18n.t(`${EVENTS}.reconfigured`);
     case "capture_changed":
-      return "Session captures changed";
+      return i18n.t(`${EVENTS}.captureChanged`);
     case "stream_ended":
-      if (event.reason === "paused") return "Stream completed";
-      return `Reason: ${event.reason}, capture: ${event.capture_count === null ? "none" : `${event.capture_count} items`}`;
+      if (event.reason === "paused") return i18n.t(`${EVENTS}.streamCompleted`);
+      return i18n.t(`${EVENTS}.streamEnded`, {
+        reason: event.reason,
+        capture: event.capture_count === null
+          ? i18n.t(`${EVENTS}.noCapture`)
+          : i18n.t(`${EVENTS}.captureItems`, { count: event.capture_count }),
+      });
     case "error":
       return event.message;
     case "device_connected":
-      return `${event.source_type} connected: ${event.address}${event.bus === null ? "" : ` (bus ${event.bus})`}`;
+      return event.bus === null
+        ? i18n.t(`${EVENTS}.deviceConnected`, { source: event.source_type, address: event.address })
+        : i18n.t(`${EVENTS}.deviceConnectedOnBus`, { source: event.source_type, address: event.address, bus: event.bus });
     case "device_probe": {
-      const outcome = event.success ? `${event.bus_count} bus(es)` : (event.error ?? "failed");
-      return `${event.source_type} at ${event.address}: ${outcome}${event.cached ? " (cached)" : ""}`;
+      const outcome = event.success
+        ? i18n.t(`${EVENTS}.busCount`, { count: event.bus_count })
+        : (event.error ?? i18n.t(`${EVENTS}.probeFailed`));
+      return i18n.t(event.cached ? `${EVENTS}.probeCached` : `${EVENTS}.probe`, {
+        source: event.source_type,
+        address: event.address,
+        outcome,
+      });
     }
     case "mcp_connected":
-      return `MCP client connected (${event.client.slice(0, 8)})`;
+      return i18n.t(`${EVENTS}.mcpConnected`, { client: event.client.slice(0, 8) });
     case "mcp_disconnected":
-      return `MCP client disconnected (${event.client.slice(0, 8)})`;
+      return i18n.t(`${EVENTS}.mcpDisconnected`, { client: event.client.slice(0, 8) });
     case "stats":
-      return `State: ${getStateType(event.state)}, Listeners: ${event.subscriber_count}, Frames: ${event.frame_count}`;
+      return i18n.t(`${EVENTS}.stats`, {
+        state: getStateType(event.state),
+        listeners: event.subscriber_count,
+        frames: event.frame_count,
+      });
     case "cleared":
-      return "Log cleared";
+      return i18n.t(`${EVENTS}.cleared`);
   }
 }
 
@@ -170,26 +185,7 @@ export function useUniqueSessionIds(): string[] {
   return [...new Set(entries.flatMap((e) => (e.session_id ? [e.session_id] : [])))].sort();
 }
 
-export const KIND_LABELS: Record<SessionLogKind | "stream_complete", string> = {
-  created: "Created",
-  joined: "Joined",
-  left: "Left",
-  destroyed: "Destroyed",
-  state: "State",
-  transitioned: "Transition",
-  stream_ended: "Ended",
-  stream_complete: "Complete",
-  error: "Error",
-  speed: "Speed",
-  reconfigured: "Reconfigured",
-  capture_changed: "Capture",
-  stats: "Stats",
-  device_connected: "Connected",
-  device_probe: "Probe",
-  mcp_connected: "MCP Connect",
-  mcp_disconnected: "MCP Disconnect",
-  cleared: "Cleared",
-};
+export const kindLabel = (kind: SessionLogKind | "stream_complete") => i18n.t(`sessionManager:log.kinds.${kind}`);
 
 export const KIND_BADGE: Record<SessionLogKind | "stream_complete", BadgeStyleProps> = {
   created: { tone: "success" },

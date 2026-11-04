@@ -22,7 +22,7 @@ import {
   describeEntry,
   displayKind,
   profileNames,
-  KIND_LABELS,
+  kindLabel,
   KIND_BADGE,
   KIND_GROUPS,
   ALL_KINDS,
@@ -86,12 +86,12 @@ export default function SessionLogView() {
   const handleCopy = useCallback(async () => {
     const lines = entries.map((entry) => {
       const time = formatTime(entry.timestamp_ms);
-      const event = KIND_LABELS[displayKind(entry.event)];
+      const event = kindLabel(displayKind(entry.event));
       const session = entry.session_id ?? "-";
       const profile = profileNames(entry, profiles) ?? "-";
       return `${time}\t${event}\t${session}\t${profile}\t${describeEntry(entry)}`;
     });
-    const header = "Time\tEvent\tSession\tProfile\tDetails";
+    const header = (["time", "event", "session", "profile", "details"] as const).map((h) => t(`log.headers.${h}`)).join("\t");
     const text = [header, ...lines].join("\n");
 
     try {
@@ -101,7 +101,7 @@ export default function SessionLogView() {
     } catch (e) {
       console.error("Failed to copy log:", e);
     }
-  }, [entries, profiles]);
+  }, [entries, profiles, t]);
 
   // Auto-scroll to bottom when new entries arrive
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -168,7 +168,7 @@ export default function SessionLogView() {
                     pressed={!filter.kinds || filter.kinds.has(kind)}
                     onClick={() => toggleKind(kind)}
                   >
-                    {KIND_LABELS[kind]}
+                    {kindLabel(kind)}
                   </Button>
                 ))}
               </div>
@@ -310,7 +310,7 @@ export default function SessionLogView() {
                     </td>
                     <td>
                       <Badge size="sm" {...KIND_BADGE[kind]}>
-                        {KIND_LABELS[kind]}
+                        {kindLabel(kind)}
                       </Badge>
                     </td>
                     <td
