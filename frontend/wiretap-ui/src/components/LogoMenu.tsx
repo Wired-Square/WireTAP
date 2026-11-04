@@ -54,7 +54,7 @@ export default function LogoMenu({ onPanelClick }: LogoMenuProps) {
         <img
           src={logo}
           alt="WireTAP"
-          className="w-full h-full object-contain"
+          className="w-7 h-7"
         />
       </Button>
 

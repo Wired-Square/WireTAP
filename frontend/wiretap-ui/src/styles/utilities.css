@@ -360,7 +360,6 @@
   .from-black\/15 { --tw-gradient-from: color-mix(in oklab, #000 15%, transparent) }
   .to-transparent { --tw-gradient-to: transparent }
   .fill-yellow { fill: var(--text-yellow) }
-  .object-contain { object-fit: contain }
   .object-cover { object-fit: cover }
   .p-0 { padding: 0 }
   .p-0\.5 { padding: 0.125rem }
