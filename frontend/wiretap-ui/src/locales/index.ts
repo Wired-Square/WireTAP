@@ -30,6 +30,13 @@ export const SUPPORTED_LANGUAGES = ['en-AU'] as const;
 
 export type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number];
 
+/** en-AU wrapped in ⟦…⟧ by `npm run gen:pseudo`, for spotting untranslated text; dev builds only. */
+export const PSEUDO_LANGUAGE = 'xx-PS';
+
+export const PICKER_LANGUAGES: readonly string[] = import.meta.env.DEV
+  ? [...SUPPORTED_LANGUAGES, PSEUDO_LANGUAGE]
+  : SUPPORTED_LANGUAGES;
+
 export const NAMESPACES = ['common', 'settings', 'menus', 'dialogs', 'calculator', 'transmit', 'discovery', 'decoder', 'testPattern', 'analysis', 'devices', 'query', 'rules', 'catalog', 'dashboard', 'sessionManager', 'serial', 'events', 'reports'] as const;
 export type Namespace = (typeof NAMESPACES)[number];
 
@@ -55,4 +62,10 @@ export const resources = {
     events: enAUEvents,
     reports: enAUReports,
   },
+  ...(import.meta.env.DEV && { [PSEUDO_LANGUAGE]: pseudoResources() }),
 } as const;
+
+function pseudoResources() {
+  const files = import.meta.glob<object>('./xx-PS/*.json', { eager: true, import: 'default' });
+  return Object.fromEntries(Object.entries(files).map(([file, tree]) => [file.slice('./xx-PS/'.length, -'.json'.length), tree]));
+}

@@ -1,0 +1,710 @@
+{
+  "general": {
+    "title": "⟦General⟧",
+    "defaultFrameType": {
+      "label": "⟦Default Frame Type⟧",
+      "help": "⟦Protocol type used when adding new frames (can be overridden per catalog)⟧",
+      "options": {
+        "can": "⟦CAN⟧",
+        "modbus": "⟦Modbus⟧",
+        "serial": "⟦Serial⟧"
+      }
+    },
+    "modbus": {
+      "title": "⟦Modbus⟧",
+      "maxRegisterErrors": {
+        "label": "⟦Max Consecutive Register Errors⟧",
+        "help": "⟦Stop polling a register group after this many consecutive connection errors. Set to 0 to retry indefinitely. A register the device rejects is not counted: it is read less often instead, down to once every 10 minutes.⟧"
+      }
+    },
+    "power": {
+      "title": "⟦Power Management⟧",
+      "preventIdleSleep": {
+        "label": "⟦Prevent idle sleep during active sessions⟧",
+        "help": "⟦Keep the system awake while a session is actively streaming data⟧"
+      },
+      "keepDisplayAwake": {
+        "label": "⟦Keep display awake during active sessions⟧",
+        "help": "⟦Prevent the display from turning off while a session is active⟧"
+      }
+    },
+    "diagnostics": {
+      "title": "⟦Diagnostics⟧",
+      "logLevel": {
+        "label": "⟦Log Level⟧",
+        "help": "⟦Diagnostic log verbosity. Logs are written to ~/Documents/WireTAP/Reports/⟧",
+        "options": {
+          "off": "⟦Off⟧",
+          "info": "⟦Info⟧",
+          "debug": "⟦Debug⟧",
+          "verbose": "⟦Verbose⟧"
+        }
+      }
+    },
+    "networking": {
+      "title": "⟦Networking⟧",
+      "smpPort": {
+        "label": "⟦SMP UDP Port⟧",
+        "help": "⟦Default port for SMP firmware upgrade over UDP⟧"
+      }
+    },
+    "language": {
+      "title": "⟦Language⟧",
+      "label": "⟦Display Language⟧",
+      "help": "⟦Language used throughout the WireTAP interface. Additional locales will appear here as they become available.⟧",
+      "options": {
+        "en-AU": "⟦English (Australian)⟧",
+        "xx-PS": "⟦Pseudo (untranslated text check)⟧"
+      }
+    }
+  },
+  "display": {
+    "title": "⟦Display⟧",
+    "appearance": {
+      "label": "⟦Appearance⟧",
+      "help": "⟦Choose light or dark theme, or follow your system preference.⟧",
+      "options": {
+        "auto": "⟦System⟧",
+        "light": "⟦Light⟧",
+        "dark": "⟦Dark⟧"
+      }
+    },
+    "themeColours": {
+      "title": "⟦Theme Colours⟧",
+      "help": "⟦Customise the app's colour scheme.⟧",
+      "resetAll": "⟦Reset All⟧",
+      "lightMode": "⟦Light Mode⟧",
+      "darkMode": "⟦Dark Mode⟧",
+      "accentTitle": "⟦Accent Colours⟧",
+      "labels": {
+        "background": "⟦Background⟧",
+        "surface": "⟦Surface⟧",
+        "text": "⟦Text⟧",
+        "secondaryText": "⟦Secondary Text⟧",
+        "border": "⟦Border⟧",
+        "dataBackground": "⟦Data Background⟧",
+        "dataText": "⟦Data Text⟧",
+        "primary": "⟦Primary⟧",
+        "success": "⟦Success⟧",
+        "danger": "⟦Danger⟧",
+        "warning": "⟦Warning⟧"
+      }
+    },
+    "frameIdFormat": {
+      "label": "⟦Display Frame ID as⟧",
+      "help": "⟦Choose how CAN frame IDs are shown in the editor.⟧",
+      "options": {
+        "hex": "⟦Hex⟧",
+        "decimal": "⟦Decimal⟧"
+      }
+    },
+    "saveFrameIdFormat": {
+      "label": "⟦Save Frame ID Format⟧",
+      "help": "⟦Format used when saving frames to file⟧"
+    },
+    "timeFormat": {
+      "label": "⟦Display time as⟧",
+      "help": "⟦Controls how timestamps are rendered in discovery and other views.⟧",
+      "options": {
+        "human": "⟦Human friendly⟧",
+        "timestamp": "⟦Timestamp⟧",
+        "delta-start": "⟦Delta since start⟧",
+        "delta-last": "⟦Delta since last message⟧"
+      }
+    },
+    "timezone": {
+      "label": "⟦Default timezone⟧",
+      "help": "⟦Default timezone for clock displays. Click the timezone badge in views to temporarily override.⟧",
+      "options": {
+        "local": "⟦Local timezone⟧",
+        "utc": "⟦UTC⟧"
+      }
+    },
+    "signals": {
+      "title": "⟦Signals⟧",
+      "help": "⟦Configure colours for signal confidence indicators.⟧",
+      "levels": {
+        "none": "⟦No confidence⟧",
+        "low": "⟦Low confidence⟧",
+        "medium": "⟦Medium confidence⟧",
+        "high": "⟦High confidence⟧"
+      },
+      "resetTooltip": "⟦Reset to default⟧"
+    },
+    "binary": {
+      "title": "⟦Binary Display⟧",
+      "help": "⟦Configure colours for binary bits in the Frame Calculator and bit previews.⟧",
+      "oneLabel": "⟦Binary 1 colour⟧",
+      "zeroLabel": "⟦Binary 0 colour⟧",
+      "unusedLabel": "⟦Unused bits colour⟧"
+    },
+    "frameEditor": {
+      "title": "⟦Frame Editor⟧",
+      "resetAll": "⟦Reset All⟧",
+      "help": "⟦Colours for signal slots in the frame definition bit grid editor.⟧",
+      "signalLabel": "⟦Signal {{index}}⟧"
+    }
+  },
+  "locations": {
+    "title": "⟦Storage⟧",
+    "filesTitle": "⟦Files⟧",
+    "directoryPlaceholder": "⟦Click folder icon to select…⟧",
+    "browseTooltip": "⟦Browse for directory⟧",
+    "decoderDir": {
+      "label": "⟦Decoder Directory⟧",
+      "help": "⟦Directory where decoder catalog files (.toml) are stored⟧"
+    },
+    "dumpDir": {
+      "label": "⟦Dump Directory⟧",
+      "help": "⟦Directory where CAN bus dump files are stored⟧"
+    },
+    "reportDir": {
+      "label": "⟦Report Directory⟧",
+      "help": "⟦Default directory for exported analysis reports⟧"
+    },
+    "saveFrameIdFormat": {
+      "label": "⟦Save frame ID format⟧",
+      "help": "⟦Controls default decoder file names when saving/creating catalogs.⟧",
+      "options": {
+        "hex": "⟦Hex⟧",
+        "decimal": "⟦Decimal⟧"
+      }
+    },
+    "validation": {
+      "notExist": "⟦Directory does not exist⟧",
+      "notWritable": "⟦Directory is not writable⟧",
+      "ok": "⟦OK⟧"
+    }
+  },
+  "captures": {
+    "title": "⟦Captures⟧",
+    "storage": {
+      "title": "⟦Storage⟧",
+      "label": "⟦Capture Storage⟧",
+      "help": "⟦Storage backend for captured frame data and imported captures.⟧",
+      "options": {
+        "sqlite": "⟦SQLite⟧"
+      }
+    },
+    "clearOnStart": {
+      "label": "⟦Clear captures on start⟧",
+      "help": "⟦Delete all captured frame and byte data when the app launches. Disable to preserve capture data across sessions (uses disk space).⟧"
+    },
+    "buffers": {
+      "title": "⟦Buffer Sizes⟧",
+      "discoveryHistory": {
+        "label": "⟦Discovery History Buffer⟧",
+        "help": "⟦How many of a live stream's most recent frames Frame Order and Payload Changes analyse⟧"
+      },
+      "queryResultLimit": {
+        "label": "⟦Query Result Limit⟧",
+        "help": "⟦Maximum number of results returned by database queries in the Query app⟧"
+      },
+      "graphBuffer": {
+        "label": "⟦Dashboard Buffer Size⟧",
+        "help": "⟦Samples per signal in graph ring buffers. Higher values show more history but use more memory.⟧"
+      }
+    },
+    "decoderLimits": {
+      "title": "⟦Decoder Limits⟧",
+      "maxUnmatched": {
+        "label": "⟦Max Unmatched Frames⟧",
+        "help": "⟦Maximum frames kept in the unmatched (no catalog match) list⟧"
+      },
+      "maxFiltered": {
+        "label": "⟦Max Filtered Frames⟧",
+        "help": "⟦Maximum frames kept in the filtered (excluded by selection set) list⟧"
+      },
+      "maxDecoded": {
+        "label": "⟦Max Decoded Frames⟧",
+        "help": "⟦Maximum decoded frames displayed in the Decoder view⟧"
+      },
+      "maxDecodedPerSource": {
+        "label": "⟦Max Decoded Per Source⟧",
+        "help": "⟦Maximum decoded frames cached per unique source address. Higher values keep more history but use more memory.⟧"
+      }
+    },
+    "transmit": {
+      "title": "⟦Transmit⟧",
+      "maxHistory": {
+        "label": "⟦Max History Items⟧",
+        "help": "⟦Maximum number of transmitted frames to keep in the Transmit history log⟧"
+      }
+    }
+  },
+  "privacy": {
+    "title": "⟦Privacy⟧",
+    "telemetry": {
+      "label": "⟦Send anonymous crash reports⟧",
+      "help": "⟦Help improve WireTAP by sending anonymous crash and error reports via Sentry. This option collects no CAN bus data and no personal data — only error stack traces.⟧"
+    },
+    "usageAnalytics": {
+      "label": "⟦Share anonymous usage analytics⟧",
+      "help": "⟦Help decide which features to keep by sharing anonymous usage events — which IO source types get started, which app panels are opened, and which operating system you're on. No CAN bus data, connection details, or personal data are collected.⟧"
+    }
+  },
+  "catalogs": {
+    "title": "⟦Decoder Catalogs⟧",
+    "empty": {
+      "heading": "⟦No catalogs found in decoder directory⟧",
+      "description": "⟦Add .toml catalog files to {{path}}⟧",
+      "fallbackPath": "⟦the decoder directory⟧"
+    },
+    "actions": {
+      "menu": "⟦Catalogue actions⟧",
+      "sourceMenu": "⟦Actions for {{repo}}⟧",
+      "pull": "⟦Pull latest⟧",
+      "push": "⟦Push changes…⟧",
+      "openRepo": "⟦Open the repository on GitHub⟧",
+      "viewPr": "⟦View pull request #{{number}}⟧",
+      "revealClone": "⟦Reveal the local clone⟧",
+      "duplicate": "⟦Duplicate catalogue⟧",
+      "edit": "⟦Edit name/filename⟧",
+      "forget": "⟦Stop tracking the Git source⟧",
+      "delete": "⟦Delete catalogue⟧",
+      "pullAvailable": "⟦Pull latest (update available)⟧",
+      "pushChanges": "⟦Push local changes…⟧"
+    },
+    "repository": "⟦Repository⟧",
+    "sharingHint": "⟦Catalogues pulled from Git keep a link to where they came from. Each one is cloned as a real git repository, so its status is the repository's own answer rather than a guess.⟧",
+    "account": {
+      "connect": "⟦Connect GitHub⟧",
+      "connected": "⟦GitHub: {{login}}⟧"
+    },
+    "checkUpdates": "⟦Check for updates⟧",
+    "updateSummary": "⟦{{count}} updates available across {{repos}} repositories.⟧",
+    "updateSummary_one": "⟦{{count}} update available across {{repos}} repositories.⟧",
+    "updateSummaryNone": "⟦Everything is up to date ({{repos}} repositories checked).⟧",
+    "updateFailures": "⟦{{count}} could not be reached⟧",
+    "prOpen": "⟦PR #{{number}} open⟧",
+    "prMerged": "⟦PR #{{number}} merged⟧",
+    "goneUpstream": "⟦That catalogue is no longer in the repository. Use “Stop tracking the Git source” to unlink it, or push your copy back.⟧",
+    "notCloned": "⟦Nothing is cloned for that repository yet. Pull it, or browse it from Repository, and try again.⟧"
+  },
+  "selectionSets": {
+    "title": "⟦Selection Sets⟧",
+    "empty": {
+      "heading": "⟦No selection sets saved yet⟧",
+      "description": "⟦Create selection sets from the Decoder or Discovery apps⟧"
+    },
+    "frameSummary_one": "⟦{{selected}}/{{total}} frame selected⟧",
+    "frameSummary_other": "⟦{{selected}}/{{total}} frames selected⟧",
+    "createdAt": "⟦Created {{date}}⟧",
+    "lastUsed": "⟦Last used {{date}}⟧",
+    "actions": {
+      "edit": "⟦Edit selection set⟧",
+      "delete": "⟦Delete selection set⟧"
+    }
+  },
+  "dataIO": {
+    "title": "⟦Data IO Profiles⟧",
+    "addProfile": "⟦Profile⟧",
+    "empty": {
+      "heading": "⟦No IO profiles configured⟧",
+      "description": "⟦Click \"Add Profile\" to create your first IO profile⟧"
+    },
+    "actions": {
+      "setDefault": "⟦Set as default⟧",
+      "unsetDefault": "⟦Unset as default⟧",
+      "duplicate": "⟦Duplicate profile⟧",
+      "edit": "⟦Edit profile⟧",
+      "delete": "⟦Delete profile⟧",
+      "assignCatalogues": "⟦Catalogue assignments⟧"
+    },
+    "badges": {
+      "recorded": "⟦Recorded⟧"
+    },
+    "summary": {
+      "host": "⟦host⟧",
+      "port": "⟦port⟧",
+      "formats": "⟦formats⟧",
+      "formatsNone": "⟦none⟧",
+      "db": "⟦db⟧",
+      "url": "⟦url⟧",
+      "protocol": "⟦protocol⟧",
+      "framing": "⟦framing⟧",
+      "timeout": "⟦timeout⟧",
+      "baud": "⟦baud⟧",
+      "bitrate": "⟦bitrate⟧",
+      "mode": "⟦mode⟧",
+      "modeSilent": "⟦silent⟧",
+      "modeActive": "⟦active⟧",
+      "modeListen": "⟦listen⟧",
+      "interface": "⟦interface⟧",
+      "configSystem": "⟦system⟧",
+      "device": "⟦device⟧",
+      "interfaces": "⟦interfaces⟧",
+      "buses": "⟦buses⟧",
+      "loopback": "⟦loopback⟧",
+      "loopbackOn": "⟦on⟧",
+      "loopbackOff": "⟦off⟧",
+      "signalGen": "⟦signal gen⟧",
+      "signalGenAll": "⟦all⟧",
+      "signalGenOff": "⟦off⟧",
+      "rate": "⟦rate⟧",
+      "rateMixed": "⟦mixed⟧",
+      "unit": "⟦unit⟧",
+      "config": "⟦config⟧",
+      "notSet": "⟦(not set)⟧"
+    },
+    "unsaved": {
+      "heading": "⟦Unsaved devices⟧",
+      "description": "⟦Created in a source picker and kept for this run only. Save one to keep it after a restart.⟧",
+      "badge": "⟦This run only⟧",
+      "save": "⟦Save to Settings⟧",
+      "discard": "⟦Discard⟧"
+    }
+  },
+  "dialogs": {
+    "catalogueAssignment": {
+      "title": "⟦Catalogue Assignments⟧",
+      "columns": {
+        "interface": "⟦Interface⟧",
+        "assigned": "⟦Assigned⟧",
+        "running": "⟦Running⟧",
+        "status": "⟦Status⟧"
+      },
+      "source": {
+        "assigned": "⟦Assigned⟧",
+        "local": "⟦Local⟧",
+        "none": "⟦None⟧"
+      },
+      "status": {
+        "unassigned": "⟦Unassigned⟧",
+        "applied": "⟦Applied⟧",
+        "pending": "⟦Pending⟧",
+        "refused": "⟦Refused: {{reason}}⟧"
+      },
+      "refusal": {
+        "hash_mismatch": "⟦hash mismatch⟧",
+        "did_not_parse": "⟦did not parse⟧",
+        "fetch_failed": "⟦fetch failed⟧",
+        "other": "⟦other⟧"
+      },
+      "notReported": "⟦Not reported⟧",
+      "noDaemons": "⟦No daemon has connected to this gateway with a device it could assign.⟧",
+      "assign": "⟦Assign⟧",
+      "clear": "⟦Clear⟧",
+      "copy": "⟦Save a copy to the decoder library⟧",
+      "refresh": "⟦Refresh⟧",
+      "pick": "⟦Choose a catalogue from the decoder library for {{interface}} on {{daemon}}. The daemon reconnects that device's sessions to take it up.⟧",
+      "confirmClear": "⟦Clear the catalogue assigned to {{interface}} on {{daemon}}? The daemon reconnects that device's sessions and falls back to its own configuration.⟧",
+      "emptyLibrary": "⟦The decoder library has no catalogues.⟧",
+      "assigned": "⟦Assigned. The device shows Applied once its daemon reports it.⟧",
+      "cleared": "⟦Cleared.⟧",
+      "copied": "⟦Saved to {{path}}.⟧",
+      "doneWithWarnings": "⟦Done, with warnings:⟧",
+      "rejected": "⟦The gateway refused the catalogue:⟧",
+      "conflict": "⟦Someone else changed this assignment since it was shown. The list has been refreshed; check it and try again.⟧"
+    },
+    "duplicateCatalog": {
+      "title": "⟦Duplicate Catalog⟧",
+      "newName": "⟦New Name⟧",
+      "newFilename": "⟦New Filename⟧",
+      "namePlaceholder": "⟦Catalog name⟧",
+      "filenamePlaceholder": "⟦filename.toml⟧"
+    },
+    "editCatalog": {
+      "title": "⟦Edit Catalog⟧",
+      "name": "⟦Name⟧",
+      "filename": "⟦Filename⟧",
+      "namePlaceholder": "⟦Catalog name⟧",
+      "filenamePlaceholder": "⟦filename.toml⟧"
+    },
+    "editDashboardLayout": {
+      "title": "⟦Edit Dashboard Layout⟧",
+      "name": "⟦Name⟧",
+      "namePlaceholder": "⟦Dashboard layout name⟧"
+    },
+    "editSelectionSet": {
+      "title": "⟦Edit Selection Set⟧",
+      "name": "⟦Name⟧",
+      "namePlaceholder": "⟦Selection set name⟧"
+    }
+  },
+  "ioProfileDialog": {
+    "edit": "⟦Edit IO Profile⟧",
+    "add": "⟦Add IO Profile⟧",
+    "type": "⟦Type⟧",
+    "kinds": {
+      "framelink": "⟦FrameLink⟧",
+      "gs_usb": "⟦gs_usb (candleLight)⟧",
+      "gvret_tcp": "⟦GVRET TCP⟧",
+      "gvret_usb": "⟦GVRET USB (Serial)⟧",
+      "modbus_tcp": "⟦Modbus TCP⟧",
+      "mqtt": "⟦MQTT⟧",
+      "wiretap": "⟦WireTAP Backend⟧",
+      "serial": "⟦Serial Port⟧",
+      "slcan": "⟦slcan (CANable, USB-CAN)⟧",
+      "socketcan": "⟦SocketCAN (Linux)⟧",
+      "virtual": "⟦Virtual Adapter (Testing)⟧"
+    },
+    "profileName": "⟦Profile Name⟧",
+    "profileNamePlaceholder": "⟦My IO Profile⟧",
+    "preferredDecoder": "⟦Preferred Decoder⟧",
+    "none": "⟦None⟧",
+    "probeFailed": "⟦Probe failed⟧",
+    "common": {
+      "host": "⟦Host⟧",
+      "port": "⟦Port⟧",
+      "usernameOptional": "⟦Username (optional)⟧",
+      "connectionTimeout": "⟦Connection Timeout (seconds)⟧",
+      "tcpKeepalive": "⟦TCP Keepalive⟧",
+      "canInterfaces": "⟦CAN Interfaces⟧",
+      "deviceOnline": "⟦(device online)⟧",
+      "probing": "⟦Probing...⟧",
+      "probeDevice": "⟦Probe Device⟧",
+      "saveFirstHint": "⟦Save the profile first to probe the device and configure interfaces.⟧",
+      "clickProbeHint": "⟦Click \"Probe Device\" to detect available interfaces.⟧"
+    },
+    "mqtt": {
+      "title": "⟦MQTT Connection⟧",
+      "hostPlaceholder": "⟦localhost⟧",
+      "portPlaceholder": "⟦1883⟧",
+      "messageFormats": "⟦Message Formats⟧",
+      "jsonFormat": "⟦JSON Format⟧",
+      "savvycanFormat": "⟦SavvyCAN Format⟧",
+      "decodeFormat": "⟦Decode Format⟧",
+      "baseTopic": "⟦Base Topic⟧",
+      "jsonTopicPlaceholder": "⟦wiretap/json/{bus}/{id_hex}/{signal}⟧",
+      "savvycanTopicPlaceholder": "⟦wiretap-savvycan/{id_dec}⟧",
+      "decodeTopicPlaceholder": "⟦wiretap/decode/{signal_name}/{id_hex}/{signal}⟧"
+    },
+    "modbus": {
+      "title": "⟦Modbus TCP Connection⟧",
+      "hostPlaceholder": "⟦192.168.1.100⟧",
+      "portPlaceholder": "⟦502⟧",
+      "unitId": "⟦Unit ID (1-247)⟧",
+      "unitIdPlaceholder": "⟦1⟧"
+    },
+    "virtual": {
+      "title": "⟦Virtual Device Settings⟧",
+      "description": "⟦Generates synthetic traffic for testing without real hardware.⟧",
+      "trafficType": "⟦Traffic Type⟧",
+      "trafficTypes": {
+        "can": "⟦CAN (8-byte frames)⟧",
+        "canfd": "⟦CAN-FD (up to 64-byte frames)⟧",
+        "modbus": "⟦Modbus (register polling)⟧",
+        "serial": "⟦Serial (raw byte stream)⟧"
+      },
+      "loopback": "⟦Loopback⟧",
+      "interfaces": "⟦Interfaces⟧",
+      "interfacesCount_one": "⟦{{count}} interface⟧",
+      "interfacesCount_other": "⟦{{count}} interfaces⟧",
+      "busLabel": "⟦Bus {{bus}}⟧",
+      "hz": "⟦Hz⟧",
+      "signalGenerator": "⟦Signal Generator⟧"
+    },
+    "gvret": {
+      "tcpTitle": "⟦GVRET TCP Connection⟧",
+      "usbTitle": "⟦GVRET USB Connection⟧",
+      "hostPlaceholder": "⟦192.168.1.100⟧",
+      "portPlaceholder": "⟦23⟧",
+      "timeoutPlaceholder": "⟦5⟧",
+      "serialPort": "⟦Serial Port⟧",
+      "serialBaudRate": "⟦Serial Baud Rate⟧",
+      "baudDefault": "⟦default⟧",
+      "usbHint": "⟦Works with ESP32-RET, M2RET, CANDue, and other GVRET-compatible hardware over USB serial. Supports multi-bus devices and frame transmission.⟧"
+    },
+    "framelink": {
+      "title": "⟦FrameLink Connection⟧",
+      "hostPlaceholder": "⟦192.168.1.100⟧",
+      "portPlaceholder": "⟦120⟧",
+      "interfacesTitle": "⟦Interfaces ({{count}})⟧",
+      "reprobing": "⟦Probing...⟧",
+      "reprobe": "⟦Re-probe⟧",
+      "notProbed": "⟦No interfaces known yet — probe the device to read them.⟧",
+      "deviceConfig": "⟦Device Configuration⟧",
+      "reading": "⟦Reading...⟧",
+      "refresh": "⟦Refresh⟧",
+      "interfaceUnknown": "⟦Unknown⟧",
+      "persistChanges": "⟦Save changes to device (persist across reboots)⟧",
+      "readingConfig": "⟦Reading configuration from device...⟧",
+      "configWillLoad": "⟦Configuration will be loaded when the device is reachable.⟧",
+      "groupOther": "⟦Other⟧"
+    },
+    "serial": {
+      "title": "⟦Serial Port Connection⟧",
+      "port": "⟦Port⟧",
+      "baudRate": "⟦Baud Rate⟧",
+      "dataBits": "⟦Data Bits⟧",
+      "stopBits": "⟦Stop Bits⟧",
+      "parity": "⟦Parity⟧",
+      "parityOptions": {
+        "none": "⟦None⟧",
+        "odd": "⟦Odd⟧",
+        "even": "⟦Even⟧"
+      }
+    },
+    "slcan": {
+      "title": "⟦slcan Connection (CANable)⟧",
+      "serialPort": "⟦Serial Port⟧",
+      "serialBaudRate": "⟦Serial Baud Rate⟧",
+      "baudDefault": "⟦default for CANable⟧",
+      "firmwareLabel": "⟦Firmware⟧",
+      "hwLabel": "⟦HW⟧",
+      "probingText": "⟦Testing connection...⟧",
+      "successText": "⟦CANable connected⟧",
+      "errorText": "⟦CANable not responding⟧",
+      "idleText": "⟦Select a port to check device⟧",
+      "canBitrate": "⟦CAN Bitrate⟧",
+      "silentMode": "⟦Silent mode (no ACK, no transmit)⟧",
+      "silentModeHint": "⟦Does not participate in bus arbitration. Ideal for passive monitoring.⟧",
+      "enableFd": "⟦Enable CAN FD⟧",
+      "fdCapable": "⟦(FD capable)⟧",
+      "fdNotSupported": "⟦(device does not support FD)⟧",
+      "fdHint": "⟦Enables CAN Flexible Data-rate for higher throughput and larger payloads (up to 64 bytes). Requires ELMUE CANable firmware with CAN FD support.⟧",
+      "dataPhaseBitrate": "⟦Data Phase Bitrate⟧",
+      "advancedSerial": "⟦Advanced Serial Options⟧",
+      "advancedHint": "⟦Most slcan devices use 8N1 (8 data bits, no parity, 1 stop bit). Only change these if your device requires different settings.⟧",
+      "supportHint": "⟦Works with CANable, CANable Pro (slcan firmware), and other USB-CAN adapters using the Lawicel/slcan ASCII protocol.⟧"
+    },
+    "socketcan": {
+      "title": "⟦SocketCAN (Linux)⟧",
+      "interfaceName": "⟦Interface Name⟧",
+      "interfacePlaceholder": "⟦can0⟧",
+      "canBitrate": "⟦CAN Bitrate (optional)⟧",
+      "useSystemConfig": "⟦Use system configuration⟧",
+      "enableFd": "⟦Enable CAN FD⟧",
+      "fdHint": "⟦Enables CAN Flexible Data-rate. Requires FD-capable hardware.⟧",
+      "dataPhaseBitrate": "⟦Data Phase Bitrate⟧",
+      "linuxHintBold": "⟦Linux only.⟧",
+      "linuxHintRest": "⟦ Works with CANable Pro (Candlelight firmware), native CAN hardware, or virtual CAN (vcan).⟧",
+      "configureAuto": "⟦WireTAP will configure the interface automatically (requires authentication).⟧",
+      "configureManual": "⟦Leave bitrate empty to use the interface as already configured by the system.⟧"
+    },
+    "gsUsb": {
+      "title": "⟦gs_usb (candleLight)⟧",
+      "device": "⟦Device⟧",
+      "canBitrate": "⟦CAN Bitrate⟧",
+      "samplePoint": "⟦Sample Point⟧",
+      "samplePoints": {
+        "750": "⟦75.0%⟧",
+        "800": "⟦80.0%⟧",
+        "875": "⟦87.5% (recommended)⟧"
+      },
+      "listenOnly": "⟦Listen-only mode (no ACK, no transmit)⟧",
+      "enableFd": "⟦Enable CAN FD⟧",
+      "fdNotSupported": "⟦(device does not support FD)⟧",
+      "fdCapable": "⟦(FD capable)⟧",
+      "fdHint": "⟦Enables CAN Flexible Data-rate for higher throughput and larger payloads (up to 64 bytes).⟧",
+      "dataPhaseBitrate": "⟦Data Phase Bitrate⟧",
+      "dataPhaseSamplePoint": "⟦Data Phase Sample Point⟧",
+      "dataPhaseSamplePoints": {
+        "600": "⟦60.0%⟧",
+        "700": "⟦70.0%⟧",
+        "750": "⟦75.0% (recommended)⟧",
+        "800": "⟦80.0%⟧"
+      },
+      "channelsLabel": "⟦Channels⟧",
+      "featuresLabel": "⟦Features⟧",
+      "probingText": "⟦Checking device...⟧",
+      "successText": "⟦Device connected⟧",
+      "errorText": "⟦Device not responding⟧",
+      "supportHint": "⟦Works with CANable, CANable Pro and other gs_usb-compatible devices. For a CANable, Elmue's CANable 2.5 firmware is recommended over upstream candleLight.⟧",
+      "winNote": "⟦ WinUSB driver should install automatically.⟧",
+      "macNote": "⟦ macOS allows direct USB access - no driver needed.⟧",
+      "linuxNote": "⟦ On Linux, the kernel gs_usb driver exposes devices as SocketCAN interfaces.⟧"
+    },
+    "cancel": "⟦Cancel⟧",
+    "update": "⟦Update Profile⟧",
+    "addBtn": "⟦Add Profile⟧",
+    "wiretap": {
+      "title": "⟦WireTAP Backend Connection⟧",
+      "description": "⟦Connect to a WireTAP backend gateway over its HTTP API. The backend owns the TimescaleDB database; no direct database credentials are needed here.⟧",
+      "url": "⟦Backend URL⟧",
+      "urlPlaceholder": "⟦http://gateway.local:8423⟧",
+      "apiKey": "⟦API Key⟧",
+      "database": "⟦Capture Database⟧",
+      "databasePlaceholder": "⟦wiretap⟧",
+      "versionLabel": "⟦Gateway⟧",
+      "databasesLabel": "⟦Databases⟧",
+      "probingText": "⟦Contacting gateway…⟧",
+      "successText": "⟦Gateway reachable⟧",
+      "errorText": "⟦Gateway not reachable⟧",
+      "keyRefused": "⟦Gateway {{version}} reachable, key refused⟧",
+      "idleText": "⟦Enter a backend URL⟧",
+      "protocol": "⟦Protocol⟧",
+      "protocols": {
+        "can": "⟦CAN⟧",
+        "modbus": "⟦Modbus (whole RTU messages)⟧"
+      },
+      "protocolHint": "⟦Every read on the gateway is CAN unless the profile says otherwise. Set from what the database holds once it has been asked.⟧",
+      "databaseHolds": "⟦This database holds: {{protocols}}⟧",
+      "databaseEmpty": "⟦This database holds no frames yet, or the key cannot read it.⟧",
+      "defaultSpeed": "⟦Default Playback Speed⟧",
+      "speeds": {
+        "1": "⟦1x (realtime)⟧",
+        "2": "⟦2x⟧",
+        "10": "⟦10x⟧",
+        "30": "⟦30x⟧",
+        "60": "⟦60x⟧",
+        "025": "⟦0.25x⟧",
+        "05": "⟦0.5x⟧",
+        "noLimit": "⟦No Limit⟧"
+      }
+    }
+  },
+  "dashboardLayouts": {
+    "title": "⟦Dashboard Layouts⟧",
+    "empty": {
+      "heading": "⟦No graph layouts saved yet⟧",
+      "description": "⟦Save layouts from the Dashboard app⟧"
+    },
+    "panelCount_one": "⟦{{count}} panel⟧",
+    "panelCount_other": "⟦{{count}} panels⟧",
+    "createdAt": "⟦Created {{date}}⟧",
+    "updatedAt": "⟦Updated {{date}}⟧",
+    "actions": {
+      "edit": "⟦Edit graph layout⟧",
+      "delete": "⟦Delete graph layout⟧"
+    }
+  },
+  "sidebar": {
+    "captures": "⟦Captures⟧",
+    "catalogs": "⟦Catalogs⟧",
+    "dataIo": "⟦Data IO⟧",
+    "display": "⟦Display⟧",
+    "devices": "⟦Devices⟧",
+    "general": "⟦General⟧",
+    "dashboardLayouts": "⟦Dashboard Layouts⟧",
+    "privacy": "⟦Privacy⟧",
+    "selectionSets": "⟦Selection Sets⟧",
+    "storage": "⟦Storage⟧"
+  },
+  "confirmDelete": {
+    "deleteIoProfileTitle": "⟦Delete IO Profile⟧",
+    "deleteCatalogTitle": "⟦Delete Catalog⟧",
+    "deleteSelectionSetTitle": "⟦Delete Selection Set⟧",
+    "deleteDashboardLayoutTitle": "⟦Delete Dashboard Layout⟧",
+    "areYouSure": "⟦Are you sure you want to delete⟧"
+  },
+  "ioDeviceStatus": {
+    "firmware": "⟦Firmware⟧",
+    "hardware": "⟦Hardware⟧",
+    "checking": "⟦Checking device...⟧",
+    "connected": "⟦Device connected⟧",
+    "notResponding": "⟦Device not responding⟧",
+    "selectPort": "⟦Select a port to check device⟧",
+    "canFd": "⟦CAN FD⟧",
+    "can20": "⟦CAN 2.0⟧",
+    "testConnection": "⟦Test connection⟧"
+  },
+  "serialPortPicker": {
+    "selectPort": "⟦Select a port...⟧",
+    "refreshPortList": "⟦Refresh port list⟧",
+    "manualEntryPlaceholder": "⟦Or enter port manually (e.g., COM3, /dev/ttyUSB0)⟧",
+    "vidPidLabel": "⟦VID:PID⟧",
+    "serialNumberLabel": "⟦S/N:⟧"
+  },
+  "gsUsbDevicePicker": {
+    "selectDevice": "⟦Select a device...⟧",
+    "refreshDeviceList": "⟦Refresh device list⟧",
+    "noDevicesFound": "⟦No gs_usb devices found. Connect a CANable or other candleLight device.⟧",
+    "serialNumberLabel": "⟦S/N:⟧",
+    "usbBusAddress": "⟦USB {{bus}}:{{address}}⟧",
+    "interfaceLabel": "⟦Interface: {{name}}⟧",
+    "interfaceUp": "⟦(interface up)⟧",
+    "interfaceDown": "⟦(interface down)⟧"
+  }
+}

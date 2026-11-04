@@ -1,0 +1,288 @@
+{
+  "actions": {
+    "save": "⟦Save⟧",
+    "cancel": "⟦Cancel⟧",
+    "ok": "⟦OK⟧",
+    "close": "⟦Close⟧",
+    "dismiss": "⟦Dismiss⟧",
+    "delete": "⟦Delete⟧",
+    "edit": "⟦Edit⟧",
+    "add": "⟦Add⟧",
+    "remove": "⟦Remove⟧",
+    "create": "⟦Create⟧",
+    "duplicate": "⟦Duplicate⟧",
+    "browse": "⟦Browse⟧",
+    "import": "⟦Import⟧",
+    "export": "⟦Export⟧",
+    "apply": "⟦Apply⟧",
+    "reset": "⟦Reset⟧",
+    "confirm": "⟦Confirm⟧",
+    "discard": "⟦Discard⟧",
+    "ingest": "⟦Ingest⟧"
+  },
+  "states": {
+    "loading": "⟦Loading…⟧",
+    "saving": "⟦Saving…⟧",
+    "noData": "⟦No data⟧",
+    "notConnected": "⟦Not connected⟧",
+    "empty": "⟦Empty⟧"
+  },
+  "errors": {
+    "generic": "⟦Something went wrong⟧",
+    "loadFailed": "⟦Failed to load⟧",
+    "saveFailed": "⟦Failed to save⟧",
+    "validationFailed": "⟦Validation failed⟧"
+  },
+  "units": {
+    "seconds": "⟦seconds⟧",
+    "milliseconds": "⟦ms⟧",
+    "bytes": "⟦bytes⟧",
+    "frames": "⟦frames⟧"
+  },
+  "tooltips": {
+    "selectFrames": "⟦Select frames⟧"
+  },
+  "tabs": {
+    "close": "⟦Close tab⟧"
+  },
+  "framelinkPicker": {
+    "selectDevice": "⟦Select device…⟧",
+    "empty": "⟦No FrameLink devices configured⟧",
+    "state": {
+      "connected": "⟦Connected⟧",
+      "connecting": "⟦Connecting…⟧",
+      "checking": "⟦Checking…⟧",
+      "missing": "⟦Missing⟧"
+    }
+  },
+  "serialPortPicker": {
+    "buttonChoose": "⟦Choose port⟧",
+    "buttonTitle": "⟦Pick a serial port⟧",
+    "headerTitle": "⟦Serial ports ({{count}})⟧",
+    "refresh": "⟦Refresh⟧",
+    "refreshTooltip": "⟦Refresh port list⟧",
+    "empty": "⟦No serial ports detected. Plug in a device and refresh.⟧",
+    "fields": {
+      "baud": "⟦Baud⟧",
+      "data": "⟦Data⟧",
+      "stop": "⟦Stop⟧",
+      "parity": "⟦Parity⟧"
+    },
+    "parity": {
+      "none": "⟦None⟧",
+      "odd": "⟦Odd⟧",
+      "even": "⟦Even⟧"
+    },
+    "connect": "⟦Connect⟧",
+    "connecting": "⟦Connecting…⟧",
+    "disconnect": "⟦Disconnect⟧",
+    "dfuButtonChoose": "⟦Choose DFU device⟧",
+    "dfuHeader": "⟦USB DFU ({{count}})⟧",
+    "dfuEmpty": "⟦No DFU devices detected. Hold BOOT0 high and reset the µC.⟧"
+  },
+  "pagination": {
+    "firstPage": "⟦First page⟧",
+    "previousPage": "⟦Previous page⟧",
+    "nextPage": "⟦Next page⟧",
+    "lastPage": "⟦Last page⟧",
+    "rowsPerPage": "⟦Rows per page⟧",
+    "auto": "⟦Auto⟧"
+  },
+  "playback": {
+    "skipToStart": "⟦Skip to start⟧",
+    "skipToEnd": "⟦Skip to end⟧",
+    "skipBackFrames": "⟦Skip back ~{{count}} frames⟧",
+    "skipBackSeconds": "⟦Skip back 10 seconds⟧",
+    "skipForwardFrames": "⟦Skip forward ~{{count}} frames⟧",
+    "skipForwardSeconds": "⟦Skip forward 10 seconds⟧",
+    "playBackward": "⟦Play backward⟧",
+    "playForward": "⟦Play forward⟧",
+    "resumeForward": "⟦Resume forward⟧",
+    "resumeStream": "⟦Resume stream⟧",
+    "resumeStreamTooltip": "⟦Resume stream (continue fetching from database)⟧",
+    "pauseStream": "⟦Pause stream⟧",
+    "play": "⟦Play⟧",
+    "pause": "⟦Pause⟧",
+    "streaming": "⟦Streaming⟧",
+    "atStart": "⟦At start of buffer⟧",
+    "atEnd": "⟦At end of buffer⟧",
+    "stepBack": "⟦Step backward one frame⟧",
+    "stepForward": "⟦Step forward one frame⟧"
+  },
+  "framePicker": {
+    "selectAll": "⟦Select all⟧",
+    "deselectAll": "⟦Deselect all⟧",
+    "saveSelectionSet": "⟦Save selection set⟧",
+    "selectionSet": "⟦Selection set⟧"
+  },
+  "transmitBlocked": {
+    "silent_mode": "⟦Silent mode — cannot transmit⟧",
+    "listen_only": "⟦Listen-only mode — cannot transmit⟧"
+  },
+  "session": {
+    "state": "⟦State:⟧",
+    "type": "⟦Type:⟧",
+    "capture": "⟦Capture:⟧",
+    "frames": "⟦Frames:⟧",
+    "renameCapture": "⟦Rename capture⟧",
+    "captureName": "⟦Capture name⟧",
+    "resumeIo": "⟦Resume IO stream⟧",
+    "pinCapture": "⟦Pin capture (survives restart)⟧",
+    "unpinCapture": "⟦Unpin capture (will be cleared on restart)⟧",
+    "interfaceSettings": "⟦Interface settings — {{name}}⟧",
+    "showEvents": "⟦Show events⟧"
+  },
+  "busStatus": {
+    "noAck": "⟦No ACK⟧",
+    "warning": "⟦Error warning⟧",
+    "passive": "⟦Error passive⟧",
+    "busOff": "⟦Bus off⟧",
+    "onBus": "⟦Bus {{bus}}: {{label}}⟧",
+    "counters": "⟦TEC {{tx}} · REC {{rx}}⟧",
+    "sendsLost_one": "⟦At least {{count}} send lost on bus {{bus}}⟧",
+    "sendsLost_other": "⟦At least {{count}} sends lost on bus {{bus}}⟧",
+    "sendsLostNoAck_one": "⟦At least {{count}} send lost on bus {{bus}} (no ACK)⟧",
+    "sendsLostNoAck_other": "⟦At least {{count}} sends lost on bus {{bus}} (no ACK)⟧"
+  },
+  "timezone": {
+    "changeTooltip": "⟦Click to change timezone⟧"
+  },
+  "catalogButton": {
+    "selectCatalog": "⟦Select catalog⟧",
+    "noCatalog": "⟦No catalog⟧"
+  },
+  "frameIdFormat": {
+    "auto": "⟦Auto⟧",
+    "hex": "⟦Hex⟧",
+    "dec": "⟦Dec⟧",
+    "tooltip": "⟦Frame ID format for this panel — click to flip Auto → Dec → Hex. Auto follows the global setting ({{default}}).⟧"
+  },
+  "baudRate": {
+    "placeholder": "⟦Baud rate⟧",
+    "custom": "⟦Custom...⟧",
+    "presets": "⟦Presets⟧",
+    "switchBack": "⟦Switch back to preset list⟧"
+  },
+  "maskBitPicker": {
+    "tooltipUnused": "⟦Bit {{bit}} (not used in {{activeBits}}-bit ID)⟧",
+    "tooltipSelecting": "⟦Selecting bit {{bit}}⟧",
+    "tooltipInMask": "⟦Bit {{bit}} (in mask)⟧",
+    "tooltipBit": "⟦Bit {{bit}}⟧",
+    "legendSelected": "⟦Selected⟧",
+    "legendDragging": "⟦Dragging⟧",
+    "fullMaskLabel": "⟦Full mask:⟧",
+    "extractingLabel": "⟦Extracting:⟧",
+    "extractingRange": "⟦bits {{start}}-{{end}} ({{count}} bits)⟧",
+    "extractingNone": "⟦none⟧",
+    "instruction": "⟦Click and drag to select bits⟧",
+    "rowLabelBits": "⟦bits {{end}}-{{start}}⟧",
+    "rowLabelByte": "⟦byte {{byte}}⟧"
+  },
+  "bitPreview": {
+    "muxFallback": "⟦Mux selector⟧",
+    "signalFallback": "⟦Signal⟧",
+    "muxShort": "⟦Mux⟧",
+    "signalShort": "⟦Signal⟧",
+    "tooltipSelecting": "⟦Selecting bit {{bit}}⟧",
+    "tooltipOverlap": "⟦OVERLAP: {{names}}⟧",
+    "tooltipCurrent": "⟦Bit {{bit}} (current)⟧",
+    "tooltipNamed": "⟦Bit {{bit}}: {{name}}⟧",
+    "tooltipAvailable": "⟦Bit {{bit}} (available)⟧",
+    "legendOverlap": "⟦Overlap (error!)⟧",
+    "instruction": "⟦Click and drag to select⟧"
+  },
+  "timeBounds": {
+    "timeZone": "⟦Time Zone⟧",
+    "startTime": "⟦Start Time⟧",
+    "endTime": "⟦End Time⟧",
+    "clear": "⟦Clear⟧",
+    "maxFrames": "⟦Max Frames⟧",
+    "noLimitPlaceholder": "⟦No limit⟧"
+  },
+  "timeController": {
+    "play": "⟦Play⟧",
+    "pausePlayback": "⟦Pause playback⟧",
+    "pause": "⟦Pause⟧",
+    "streaming": "⟦Streaming...⟧",
+    "live": "⟦Live⟧",
+    "from": "⟦From:⟧",
+    "to": "⟦To:⟧"
+  },
+  "framingOptions": {
+    "slipTitle": "⟦SLIP⟧",
+    "slipDescription": "⟦RFC 1055 framing with 0xC0 delimiter⟧",
+    "delimiterTitle": "⟦Delimiter⟧",
+    "delimiterDescription": "⟦Split on custom delimiter bytes⟧",
+    "delimiterHexLabel": "⟦Delimiter (hex):⟧",
+    "delimiterHexLabelShort": "⟦Delimiter (hex)⟧",
+    "delimiterPlaceholder": "⟦0A or 0D0A⟧",
+    "maxFrameLengthLabel": "⟦Max frame length:⟧",
+    "maxFrameLengthLabelShort": "⟦Max frame length⟧",
+    "modbusRtuTitle": "⟦Modbus RTU⟧",
+    "modbusRtuDescription": "⟦CRC-16 validation based framing⟧",
+    "validateCrc": "⟦Require valid CRC-16⟧",
+    "allowBroadcast": "⟦Allow broadcast (address 0)⟧",
+    "anyFunction": "⟦Frame every function code⟧",
+    "anyFunctionHint": "⟦For a line you do not know yet. Costs about one invented message per 260 resyncs — declare the codes instead for a session you will export.⟧",
+    "deviceAddressLabel": "⟦Slave address⟧",
+    "deviceAddressPlaceholder": "⟦Any (1–247)⟧",
+    "vendorFunctionsLabel": "⟦Vendor function codes⟧",
+    "vendorFunctionsPlaceholder": "⟦0x20 0x60 0x65⟧",
+    "vendorFunctionsHint": "⟦Codes standard Modbus does not define. Run the Serial Framing tool to find them.⟧",
+    "encoding": "⟦Encoding⟧",
+    "modeNone": "⟦None⟧",
+    "modeSlip": "⟦SLIP⟧",
+    "modeDelimiter": "⟦Delimiter⟧",
+    "modeModbusRtu": "⟦Modbus RTU⟧",
+    "delimiterHint": "⟦LF=0A, CR=0D, CRLF=0D0A⟧"
+  },
+  "findBar": {
+    "placeholderCatalog": "⟦Search id or signal name…⟧",
+    "placeholderText": "⟦Find in text...⟧",
+    "placeholderFrames": "⟦Find in frames…⟧",
+    "noResults": "⟦No results⟧",
+    "currentOfTotal": "⟦{{current}}/{{total}}⟧",
+    "matchesFound": "⟦{{count}} found⟧",
+    "previous": "⟦Previous match (Shift+Enter)⟧",
+    "next": "⟦Next match (Enter)⟧",
+    "close": "⟦Close (Escape)⟧",
+    "modeBoth": "⟦Both⟧",
+    "modeId": "⟦ID⟧",
+    "modeData": "⟦Data⟧",
+    "searchModeTooltipBoth": "⟦Search ID and Data columns⟧",
+    "searchModeTooltipId": "⟦Search ID column⟧",
+    "searchModeTooltipData": "⟦Search Data column⟧"
+  },
+  "sendToBackend": {
+    "title": "⟦Send capture to backend⟧",
+    "description": "⟦Upload \"{{name}}\" to a WireTAP backend for permanent storage.⟧",
+    "noProfiles": "⟦No WireTAP backend profiles configured. Add one in Settings → Data I/O first.⟧",
+    "profile": "⟦Backend profile⟧",
+    "database": "⟦Target database⟧",
+    "newDatabase": "⟦Create a new database⟧",
+    "invalidName": "⟦Use at most {{max}} lowercase letters, digits and underscores, starting with a letter.⟧",
+    "upload": "⟦Upload⟧",
+    "starting": "⟦Starting upload…⟧",
+    "progress": "⟦Uploaded {{sent}} of {{total}} frames⟧",
+    "done": "⟦Uploaded {{count}} frames to {{database}}.⟧"
+  },
+  "catalogSync": {
+    "status": {
+      "localOnly": "⟦Local only⟧",
+      "inSync": "⟦In sync⟧",
+      "localAhead": "⟦Local ahead⟧",
+      "remoteAhead": "⟦Remote ahead⟧",
+      "diverged": "⟦Diverged⟧",
+      "missing": "⟦File missing⟧",
+      "unchecked": "⟦Not checked⟧"
+    },
+    "repos_one": "⟦{{count}} repository⟧",
+    "repos_other": "⟦{{count}} repositories⟧"
+  },
+  "modbus": {
+    "holding": "⟦Holding (FC 3)⟧",
+    "input": "⟦Input (FC 4)⟧",
+    "coil": "⟦Coil (FC 1)⟧",
+    "discrete": "⟦Discrete (FC 2)⟧"
+  }
+}

@@ -3,7 +3,7 @@
 import { useTranslation } from "react-i18next";
 import Select from "../../../components/forms/Select";
 import { h2 } from "../../../styles";
-import { SUPPORTED_LANGUAGES } from "../../../locales";
+import { PICKER_LANGUAGES } from "../../../locales";
 import type { DefaultFrameType } from "../../../settings/appSettings";
 import {
   SettingSection,
@@ -71,7 +71,7 @@ export default function GeneralView({
       <SettingSection title={t("general.language.title")}>
         <SettingRow label={t("general.language.label")} help={t("general.language.help")}>
           <Select size="lg" value={language} onChange={(e) => onChangeLanguage(e.target.value)}>
-            {SUPPORTED_LANGUAGES.map((code) => (
+            {PICKER_LANGUAGES.map((code) => (
               <option key={code} value={code}>
                 {t(`general.language.options.${code}`, code)}
               </option>

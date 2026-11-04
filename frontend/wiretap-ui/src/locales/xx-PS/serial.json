@@ -1,0 +1,34 @@
+{
+  "topBar": {
+    "connect": "⟦Connect⟧",
+    "connecting": "⟦Connecting…⟧",
+    "connectTooltip": "⟦Open the selected serial port⟧",
+    "connectNoPortTooltip": "⟦Pick a serial port first⟧",
+    "disconnect": "⟦Disconnect⟧",
+    "disconnectTooltip": "⟦Disconnect from the serial port⟧",
+    "reset": "⟦Reset⟧",
+    "resetTooltip": "⟦Pulse RTS/DTR to reset the connected µC⟧",
+    "echoOn": "⟦Echo on⟧",
+    "echoOff": "⟦Echo off⟧",
+    "echoTooltipOn": "⟦Local echo on — typed characters are mirrored to the terminal⟧",
+    "echoTooltipOff": "⟦Local echo off — only device output is shown⟧",
+    "copyAll": "⟦Copy all⟧",
+    "copiedAll": "⟦Copied⟧",
+    "copyAllTooltip": "⟦Copy the entire terminal buffer to the clipboard⟧",
+    "fontIncrease": "⟦Increase terminal font size⟧",
+    "fontDecrease": "⟦Decrease terminal font size⟧"
+  },
+  "tabs": {
+    "terminal": "⟦Terminal⟧",
+    "flash": "⟦Flash⟧"
+  },
+  "terminal": {
+    "emptyState": "⟦Pick a port from the top bar to begin.⟧"
+  },
+  "contextMenu": {
+    "copy": "⟦Copy⟧",
+    "paste": "⟦Paste⟧",
+    "selectAll": "⟦Select all⟧",
+    "copyAll": "⟦Copy all⟧"
+  }
+}

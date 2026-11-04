@@ -1,0 +1,58 @@
+{
+  "panels": {
+    "discovery": "⟦Discovery⟧",
+    "decoder": "⟦Decoder⟧",
+    "transmit": "⟦Transmit⟧",
+    "serial": "⟦Serial⟧",
+    "dashboard": "⟦Dashboard⟧",
+    "events": "⟦Events⟧",
+    "frameCalculator": "⟦Calculator⟧",
+    "catalogEditor": "⟦Catalog Editor⟧",
+    "devices": "⟦Devices⟧",
+    "settings": "⟦Settings⟧",
+    "provisioning": "⟦Provisioning⟧",
+    "upgrade": "⟦Firmware Upgrade⟧",
+    "query": "⟦Query⟧",
+    "rules": "⟦Rules⟧",
+    "payloadAnalysis": "⟦Payload Analysis⟧",
+    "frameOrderAnalysis": "⟦Frame Order Analysis⟧",
+    "testPattern": "⟦Test Pattern⟧",
+    "sessionManager": "⟦Sessions⟧"
+  },
+  "logo": {
+    "tooltip": "⟦Open app menu⟧",
+    "updateAvailable": "⟦Update available: {{version}}⟧",
+    "updateLabel": "⟦Update⟧"
+  },
+  "watermark": {
+    "tagline": "⟦Open an app to begin⟧"
+  },
+  "nativeMenu": {
+    "appsMenu": "⟦Apps⟧",
+    "editMenu": "⟦Edit⟧",
+    "sessionMenu": "⟦Session⟧",
+    "eventsMenu": "⟦Events⟧",
+    "jumpToEventMenu": "⟦Jump to Event⟧",
+    "viewMenu": "⟦View⟧",
+    "helpMenu": "⟦Help⟧",
+    "about": "⟦About WireTAP⟧",
+    "settings": "⟦Settings…⟧",
+    "newWindow": "⟦New Window⟧",
+    "find": "⟦Find…⟧",
+    "noSource": "⟦No source selected⟧",
+    "source": "⟦Source: {{name}}⟧",
+    "sessionPicker": "⟦Select Source…⟧",
+    "sessionImportFile": "⟦Import from File…⟧",
+    "sessionPlay": "⟦Play⟧",
+    "sessionPause": "⟦Pause⟧",
+    "sessionStop": "⟦Stop⟧",
+    "sessionDetach": "⟦Detach Session⟧",
+    "sessionStopAll": "⟦Stop Session⟧",
+    "sessionClear": "⟦Clear Frames⟧",
+    "eventAdd": "⟦Add Event…⟧",
+    "eventShow": "⟦Show Events⟧",
+    "helpIssues": "⟦Report an Issue…⟧",
+    "helpWiki": "⟦Documentation…⟧",
+    "helpSource": "⟦Source Code…⟧"
+  }
+}

@@ -1,0 +1,594 @@
+{
+  "error": {
+    "defaultTitle": "⟦Error⟧",
+    "technicalDetails": "⟦Technical Details:⟧"
+  },
+  "confirmDelete": {
+    "defaultTitle": "⟦Confirm Delete⟧",
+    "defaultMessage": "⟦Delete this item?⟧"
+  },
+  "unsavedChanges": {
+    "title": "⟦Unsaved Changes⟧",
+    "message": "⟦You have unsaved changes. Are you sure you want to leave without saving?⟧",
+    "leaveWithoutSaving": "⟦Leave Without Saving⟧"
+  },
+  "telemetryConsent": {
+    "title": "⟦Help improve WireTAP⟧",
+    "intro": "⟦Hey! I'm building WireTAP mostly on my own, and when something breaks in the field I often have no idea what happened. If you're happy to share anonymous crash reports it'd be a huge help — it means I can find and fix problems faster, even the ones nobody thinks to report.⟧",
+    "details": "⟦No personal data, no CAN bus data, no usage tracking — just error stack traces so I know what blew up and where. You can change your mind any time in <strong>Settings → Privacy</strong>.⟧",
+    "accept": "⟦Yes, help improve WireTAP⟧",
+    "decline": "⟦No thanks⟧"
+  },
+  "usageAnalyticsConsent": {
+    "title": "⟦Which features matter?⟧",
+    "intro": "⟦One more thing, and it's separate from crash reports. I'd love to know which parts of WireTAP actually get used — it's hard to know what to keep, improve, or retire when I can't see what people reach for.⟧",
+    "details": "⟦If you're happy to share, WireTAP will send anonymous events for things like which IO source types you start, which panels you open, and which operating system you're on. <strong>No CAN bus data, no connection details, no personal data</strong> — just feature names. You can change your mind any time in <strong>Settings → Privacy</strong>.⟧",
+    "accept": "⟦Sure, share usage analytics⟧",
+    "decline": "⟦No thanks⟧"
+  },
+  "about": {
+    "title": "⟦About WireTAP⟧",
+    "loading": "⟦Loading…⟧",
+    "unknown": "⟦Unknown⟧",
+    "by": "⟦by Wired Square⟧",
+    "version": "⟦Version {{version}}⟧",
+    "tagline": "⟦the artist formerly known as CANdor⟧",
+    "summary": "⟦A cross-platform toolkit for analyzing, decoding, and discovering CAN (Controller Area Network) bus messages, with a focus on reverse-engineering energy storage and vehicle communication protocols.⟧",
+    "featuresTitle": "⟦Features⟧",
+    "features": {
+      "canAnalysis": "⟦CAN bus analysis, decoding, and discovery⟧",
+      "modbus": "⟦Modbus TCP client/server polling⟧",
+      "serial": "⟦Serial device communication⟧",
+      "mqttBackend": "⟦MQTT and WireTAP backend integration⟧",
+      "multiSource": "⟦Multi-source I/O with real-time streaming⟧",
+      "catalogue": "⟦Signal catalogue editor⟧",
+      "transmission": "⟦Frame transmission and playback⟧",
+      "graphing": "⟦Dashboards and data visualisation⟧"
+    },
+    "licenseLabel": "⟦License:⟧",
+    "licenseValue": "⟦MIT License⟧",
+    "copyrightLabel": "⟦Copyright:⟧",
+    "copyrightValue": "⟦© 2026 Wired Square⟧"
+  },
+  "saveFrames": {
+    "title": "⟦Export Boilerplate Decoder⟧",
+    "name": "⟦Name⟧",
+    "version": "⟦Version⟧",
+    "byteOrder": "⟦Default byte order⟧",
+    "byteOrderLittle": "⟦Little⟧",
+    "byteOrderBig": "⟦Big⟧",
+    "interval": "⟦Default interval (ms)⟧",
+    "filename": "⟦Filename⟧",
+    "filenamePlaceholder": "⟦my-decoder.toml⟧",
+    "fromAnalysis": "⟦from analysis⟧",
+    "default": "⟦default⟧",
+    "filenameExists": "⟦A file with this name already exists⟧"
+  },
+  "saveSelectionSet": {
+    "title": "⟦Save Selection Set⟧",
+    "name": "⟦Name⟧",
+    "namePlaceholder": "⟦Selection set name⟧",
+    "defaultName": "⟦Selection Set {{date}}⟧",
+    "frameCount_one": "⟦{{count}} frame will be saved⟧",
+    "frameCount_other": "⟦{{count}} frames will be saved⟧"
+  },
+  "exportFrames": {
+    "titleFrames": "⟦Export Frames⟧",
+    "titleBytes": "⟦Export Bytes⟧",
+    "summary_frames_one": "⟦Export {{count}} frame to file⟧",
+    "summary_frames_other": "⟦Export {{count}} frames to file⟧",
+    "summary_bytes_one": "⟦Export {{count}} byte to file⟧",
+    "summary_bytes_other": "⟦Export {{count}} bytes to file⟧",
+    "format": "⟦Format⟧",
+    "formats": {
+      "csv": "⟦CSV⟧",
+      "json": "⟦JSON⟧",
+      "candump": "⟦candump log⟧",
+      "hex": "⟦Hex dump⟧",
+      "bin": "⟦Binary⟧"
+    },
+    "descriptions": {
+      "csv": "⟦GVRET/SavvyCAN compatible CSV format⟧",
+      "json": "⟦JSON array of frame objects with all fields⟧",
+      "candump": "⟦Linux can-utils candump format (timestamp interface frame#data)⟧",
+      "hex": "⟦Hex dump with timestamps⟧",
+      "bin": "⟦Raw binary bytes (no timestamps)⟧",
+      "csvBytes": "⟦CSV with timestamp and byte value columns⟧"
+    }
+  },
+  "bulkAddToTransmit": {
+    "title": "⟦Add to Transmit Queue⟧",
+    "targetSession": "⟦Target session⟧",
+    "noSession": "⟦Transmit is not connected. Connect a session in the Transmit panel first.⟧",
+    "outputBus": "⟦Output bus⟧",
+    "busLabel": "⟦Bus {{bus}}⟧",
+    "frameIdRange": "⟦Frame ID range (hex)⟧",
+    "minPlaceholder": "⟦Min (e.g. 100)⟧",
+    "maxPlaceholder": "⟦Max (e.g. 7FF)⟧",
+    "all": "⟦All⟧",
+    "errors": {
+      "invalidHex": "⟦Invalid hex value⟧",
+      "minMax": "⟦Min must be ≤ Max⟧"
+    },
+    "selectedSummary_one": "⟦{{count}} of {{total}} frame ID selected⟧",
+    "selectedSummary_other": "⟦{{count}} of {{total}} frame IDs selected⟧",
+    "noMatches": "⟦No frame IDs match this range⟧",
+    "noCaptured": "⟦No frames captured yet⟧",
+    "repeatInterval": "⟦Repeat interval (ms)⟧",
+    "repeatHelp": "⟦Used when you start repeat on a queue item.⟧",
+    "groupLabel": "⟦Group (optional)⟧",
+    "groupPlaceholder": "⟦e.g. Diagnostics⟧",
+    "groupHelp": "⟦Assign all frames to a group for sequence repeat.⟧",
+    "addToQueue": "⟦Add to Queue⟧",
+    "addNToQueue": "⟦Add {{count}} to Queue⟧"
+  },
+  "replay": {
+    "title": "⟦Replay Frames⟧",
+    "noSessionTitle": "⟦No transmit session active⟧",
+    "noSessionBody": "⟦Open the Transmit panel and connect to a session first.⟧",
+    "frameRangeLabel": "⟦Frame range (of {{total}} in capture)⟧",
+    "startPlaceholder": "⟦Start⟧",
+    "endPlaceholder": "⟦End⟧",
+    "all": "⟦All⟧",
+    "errors": {
+      "invalidNumber": "⟦Enter a valid frame number⟧",
+      "startMin": "⟦Start must be ≥ 1⟧",
+      "endMax": "⟦End must be ≤ {{max}}⟧",
+      "startEnd": "⟦Start must be ≤ End⟧"
+    },
+    "noFrames": "⟦No frames in capture.⟧",
+    "spanSummary_one": "⟦{{count}} frame spanning {{span}}⟧",
+    "spanSummary_other": "⟦{{count}} frames spanning {{span}}⟧",
+    "spanAtSpeed": "⟦ · {{adjusted}} at {{speed}}×⟧",
+    "transmitSession": "⟦Transmit session⟧",
+    "targetBus": "⟦Target bus⟧",
+    "perFrame": "⟦Per frame⟧",
+    "busLabel": "⟦Bus {{bus}}⟧",
+    "perFrameHelp": "⟦Each frame is sent on its original bus.⟧",
+    "fixedBusHelp": "⟦All frames will be sent on bus {{bus}}.⟧",
+    "speed": "⟦Speed⟧",
+    "loopLabel": "⟦Loop indefinitely⟧",
+    "starting": "⟦Starting…⟧",
+    "replayFrames": "⟦Replay {{count}} Frames⟧",
+    "replayFramesEmpty": "⟦Replay Frames⟧"
+  },
+  "speedPicker": {
+    "title": "⟦Playback Speed⟧"
+  },
+  "catalogPicker": {
+    "title": "⟦Select Catalog⟧",
+    "empty": "⟦No catalogs found. Add TOML catalog files to your decoder directory.⟧",
+    "noMatches": "⟦No catalogs match that search.⟧",
+    "search": "⟦Search catalogs…⟧",
+    "actions": {
+      "new": "⟦New⟧",
+      "import": "⟦Import⟧",
+      "repository": "⟦Repository⟧"
+    },
+    "actionTitles": {
+      "new": "⟦New catalog⟧",
+      "import": "⟦Import from file⟧",
+      "repository": "⟦Browse catalog repositories⟧"
+    },
+    "errors": {
+      "import": "⟦Import failed: {{message}}⟧"
+    }
+  },
+  "framePicker": {
+    "title": "⟦Select Frames⟧"
+  },
+  "selectionSetPicker": {
+    "title": "⟦Selection Sets⟧",
+    "loading": "⟦Loading…⟧",
+    "empty": "⟦No selection sets saved yet.⟧",
+    "selectedSummary": "⟦{{selected}}/{{total}} selected⟧",
+    "name": "⟦Name⟧",
+    "frames": "⟦Frames⟧",
+    "created": "⟦Created⟧",
+    "lastUsed": "⟦Last Used⟧",
+    "saving": "⟦Saving…⟧",
+    "load": "⟦Load⟧",
+    "selectPrompt": "⟦Select a set to edit or load⟧",
+    "clear": "⟦Clear Selection Set⟧",
+    "errors": {
+      "loadTitle": "⟦Load Error⟧",
+      "loadMessage": "⟦Failed to load selection sets.⟧",
+      "saveTitle": "⟦Save Error⟧",
+      "saveMessage": "⟦Failed to save selection set.⟧",
+      "deleteTitle": "⟦Delete Error⟧",
+      "deleteMessage": "⟦Failed to delete selection set.⟧"
+    }
+  },
+  "decoderInfo": {
+    "title": "⟦Decoder Knowledge⟧",
+    "subtitle": "⟦Accumulated information about discovered frames⟧",
+    "stats": {
+      "frames": "⟦frames⟧",
+      "mux": "⟦mux⟧",
+      "burst": "⟦burst⟧",
+      "multiBus": "⟦multi-bus⟧",
+      "analysisRun": "⟦✓ Analysis run⟧",
+      "runAnalysis": "⟦Run analysis for more info⟧"
+    },
+    "meta": {
+      "title": "⟦Meta (for [meta] section)⟧",
+      "notDetermined": "⟦not determined⟧"
+    },
+    "frames": {
+      "title": "⟦Frames⟧",
+      "titleWithCount": "⟦Frames ({{count}})⟧",
+      "empty": "⟦No frames discovered yet.⟧",
+      "bytesLabel": "⟦{{count}} bytes⟧",
+      "extBadge": "⟦EXT⟧",
+      "busLabel": "⟦Bus {{bus}}⟧",
+      "muxBadge": "⟦Mux⟧",
+      "muxBadgeTwoByte": "⟦2D Mux⟧",
+      "burstBadge": "⟦Burst⟧",
+      "multiBusBadge": "⟦Multi-bus⟧",
+      "burstDetails": "⟦Burst: ~{{count}} frames, {{period}} cycle⟧",
+      "seenOnBuses": "⟦Seen on buses:⟧",
+      "signalsTitle": "⟦Signals⟧",
+      "defaultSuffix": "⟦ (hex)⟧",
+      "notesTitle": "⟦Notes⟧"
+    },
+    "mux": {
+      "selectorOneByte": "⟦Mux selector:⟧",
+      "selectorTwoByte": "⟦Two-byte mux selector:⟧",
+      "casesLabel": "⟦Cases:⟧",
+      "more": "⟦+{{count}} more⟧"
+    }
+  },
+  "decoderConflict": {
+    "title": "⟦Choose Decoder⟧",
+    "intro": "⟦Multiple sources have different preferred decoders. Choose one for this session:⟧",
+    "usedBy": "⟦Used by: {{profiles}}⟧",
+    "none": "⟦None⟧"
+  },
+  "csvFileOrder": {
+    "title": "⟦Confirm File Order⟧",
+    "summary": "⟦{{count}} files selected. Files will be imported sequentially into a single buffer.⟧",
+    "columns": {
+      "file": "⟦File⟧",
+      "header": "⟦Header⟧"
+    },
+    "anomalies": {
+      "columnCount": "⟦Expected {{expected}} columns, found {{found}}⟧",
+      "headerDiffers": "⟦Header differs from first file⟧"
+    },
+    "dragTooltip": "⟦Drag to reorder⟧",
+    "headerTooltip": "⟦First row is a header⟧",
+    "noHeaderTooltip": "⟦No header row⟧",
+    "moveUp": "⟦Move up⟧",
+    "moveDown": "⟦Move down⟧",
+    "detectingHeaders": "⟦Detecting headers…⟧",
+    "removeFromList": "⟦Remove from list⟧",
+    "next": "⟦Next: Map Columns⟧"
+  },
+  "toolbox": {
+    "titleAnalysisAndScanning": "⟦Analysis & Scanning Tools⟧",
+    "showAllTools": "⟦Show all tools⟧",
+    "tools": {
+      "messageOrder": {
+        "label": "⟦Frame Order Analysis⟧",
+        "description": "⟦Analyse frame timing patterns and message order⟧"
+      },
+      "changes": {
+        "label": "⟦Payload Change Analysis⟧",
+        "description": "⟦Detect payload variations and potential mux patterns⟧"
+      },
+      "checksumDiscovery": {
+        "label": "⟦Checksum Discovery⟧",
+        "description": "⟦Detect checksum algorithms and CRC parameters per frame ID⟧"
+      },
+      "serialFraming": {
+        "label": "⟦Serial Framing Analysis⟧",
+        "description": "⟦Detect framing protocol (SLIP, Modbus RTU, delimiters)⟧"
+      },
+      "serialPayload": {
+        "label": "⟦Serial Payload Analysis⟧",
+        "description": "⟦Identify ID bytes and checksum positions in framed data⟧"
+      },
+      "modbusFunctionCodes": {
+        "label": "⟦Function Code Probe⟧",
+        "description": "⟦Find which read function codes a device answers, before sweeping⟧"
+      },
+      "modbusRegisterScan": {
+        "label": "⟦Register Scan⟧",
+        "description": "⟦Sweep an address range to discover registers — no decoder needed⟧"
+      },
+      "modbusUnitScan": {
+        "label": "⟦Unit ID Scan⟧",
+        "description": "⟦Find active Modbus devices on the network⟧"
+      }
+    },
+    "disabledReasons": {
+      "modbusHasSource": "⟦Disconnect the source first — these open their own connection to the device⟧",
+      "noFrames": "⟦No frames discovered⟧",
+      "noBytes": "⟦No raw bytes captured⟧",
+      "needFraming": "⟦Apply framing first to get frames⟧"
+    },
+    "selection": {
+      "bytes_one": "⟦{{count}} byte available for analysis⟧",
+      "bytes_other": "⟦{{count}} bytes available for analysis⟧",
+      "framesSelected_one": "⟦{{count}} frame selected for analysis⟧",
+      "framesSelected_other": "⟦{{count}} frames selected for analysis⟧",
+      "framesFilteredSelected_one": "⟦{{count}} filtered frame selected for analysis⟧",
+      "framesFilteredSelected_other": "⟦{{count}} filtered frames selected for analysis⟧",
+      "framesAvailable_one": "⟦{{count}} frame available for analysis⟧",
+      "framesAvailable_other": "⟦{{count}} frames available for analysis⟧",
+      "framesFilteredAvailable_one": "⟦{{count}} filtered frame available for analysis⟧",
+      "framesFilteredAvailable_other": "⟦{{count}} filtered frames available for analysis⟧"
+    },
+    "running": "⟦Running…⟧",
+    "runAnalysis": "⟦Run Analysis⟧",
+    "selectTool": "⟦Select a tool above to configure and run⟧",
+    "noDataSerial": "⟦Import serial data to enable analysis tools⟧",
+    "noDataDefault": "⟦Start streaming to discover frames for analysis⟧"
+  },
+  "exportAnalysis": {
+    "title": "⟦Export Analysis Results⟧",
+    "description": "⟦Export analysis of {{frameIds}} frame IDs ({{samples}} samples)⟧"
+  },
+  "exportReport": {
+    "title": "⟦Export Report⟧",
+    "filename": "⟦Filename⟧"
+  },
+  "csvColumnMapperPreview": {
+    "roles": {
+      "ignore": "⟦Ignore⟧",
+      "frame_id": "⟦Frame ID⟧",
+      "frame_id_data": "⟦ID#Data (candump)⟧",
+      "timestamp": "⟦Timestamp⟧",
+      "data_bytes": "⟦Data (hex string)⟧",
+      "data_byte": "⟦Data Byte⟧",
+      "dlc": "⟦DLC / Length⟧",
+      "extended": "⟦Extended Flag⟧",
+      "bus": "⟦Bus⟧",
+      "direction": "⟦Direction⟧",
+      "sequence": "⟦Sequence⟧"
+    },
+    "offset": "⟦Offset⟧"
+  },
+  "csvColumnMapper": {
+    "title": "⟦Map Columns⟧",
+    "previewingFirst": "⟦Previewing first file · {{count}} files selected⟧",
+    "rowsCount": "⟦ · {{count}} rows⟧",
+    "delimiter": "⟦Delimiter⟧",
+    "delimiterOptions": {
+      "comma": "⟦Comma⟧",
+      "tab": "⟦Tab⟧",
+      "space": "⟦Space⟧",
+      "semicolon": "⟦Semicolon⟧"
+    },
+    "protocol": "⟦Protocol⟧",
+    "firstRowHeader": "⟦First row is a header⟧",
+    "loadingPreview": "⟦Loading preview...⟧",
+    "raw": "⟦Raw⟧",
+    "preview": "⟦Preview⟧",
+    "timestampUnit": "⟦Timestamp unit⟧",
+    "tsUnits": {
+      "seconds": "⟦Seconds⟧",
+      "milliseconds": "⟦Milliseconds⟧",
+      "microseconds": "⟦Microseconds⟧",
+      "nanoseconds": "⟦Nanoseconds⟧"
+    },
+    "estimatedDuration": "⟦≈ {{duration}} estimated duration⟧",
+    "negateTimestamps": "⟦Negate timestamps⟧",
+    "duration": {
+      "ms": "⟦{{ms}} ms⟧",
+      "s": "⟦{{s}} s⟧",
+      "min": "⟦{{min}} min⟧",
+      "h": "⟦{{h}} h⟧",
+      "d": "⟦{{d}} d⟧"
+    },
+    "validation": {
+      "needFrameId": "⟦Assign a Frame ID column to continue⟧",
+      "noDataColumns": "⟦No data columns assigned — frames will be imported with empty payloads⟧"
+    },
+    "importingFile": "⟦Importing file {{current}} of {{total}}: {{filename}}⟧",
+    "importing": "⟦Importing...⟧",
+    "import": "⟦Import⟧",
+    "importN": "⟦Import {{count}} Files⟧",
+    "complete": "⟦Import Complete⟧",
+    "completeWithGaps": "⟦Import Complete — Sequence Gaps Detected⟧",
+    "copyTooltip": "⟦Copy summary to clipboard⟧",
+    "copied": "⟦Copied⟧",
+    "copy": "⟦Copy⟧",
+    "summaryFrames": "⟦{{count}} frames imported⟧",
+    "summaryFromFiles": "⟦ from {{count}} files⟧",
+    "summaryGaps_one": "⟦ · {{count}} gap detected⟧",
+    "summaryGaps_other": "⟦ · {{count}} gaps detected⟧",
+    "summaryDropped": "⟦ · ~{{count}} dropped⟧",
+    "summaryWraps": "⟦Sequence wraps at: {{values}}⟧",
+    "gapLineFile": "⟦{{filename}} line {{line}}:⟧",
+    "gapLine": "⟦line {{line}}:⟧",
+    "gapTransition": "⟦seq {{from}} → {{to}}⟧",
+    "gapDropped": "⟦({{count}} dropped)⟧",
+    "summaryHeading": "⟦Import Summary⟧",
+    "summaryFromFilesPlain": "⟦ from {{count}} files⟧",
+    "summaryFramesImported": "⟦Frames imported: {{count}}⟧",
+    "summaryGapsLine": "⟦Sequence gaps: {{count}}⟧",
+    "summaryEstimatedDropped": "⟦Estimated dropped frames: {{count}}⟧",
+    "summaryWraparound": "⟦Sequence wraparound at: {{values}}⟧",
+    "summaryGapsTitle": "⟦Gaps:⟧",
+    "summaryGapEntry": "⟦  {{loc}}: seq {{from}} → {{to}} ({{dropped}} dropped)⟧",
+    "done": "⟦Done⟧"
+  },
+  "candumpImport": {
+    "title": "⟦Lines Skipped⟧",
+    "summary": "⟦Imported {{frames}} frames. {{count}} lines were not candump frames and were skipped.⟧",
+    "more": "⟦…and {{count}} more⟧",
+    "line": "⟦{{file}} line {{line}}: {{message}}⟧",
+    "done": "⟦Done⟧"
+  },
+  "ioSourcePicker": {
+    "title": "⟦Data Source⟧",
+    "tabs": {
+      "sessions": "⟦Sessions⟧",
+      "captures": "⟦Captures⟧",
+      "devices": "⟦Devices⟧"
+    },
+    "decoder": {
+      "label": "⟦Decoder⟧",
+      "none": "⟦No decoder⟧",
+      "clear": "⟦Remove decoder⟧",
+      "pickerTitle": "⟦Select Decoder⟧"
+    },
+    "options": "⟦Options⟧",
+    "playbackSpeed": "⟦Playback Speed⟧",
+    "loadingMaxSpeed": "⟦Loading always runs at max speed⟧",
+    "loadingFrames": "⟦Loading: {{count}} frames⟧",
+    "stop": "⟦Stop⟧",
+    "actions": {
+      "leave": "⟦Leave⟧",
+      "leaveTooltip": "⟦Leave session and reset selection⟧",
+      "loadingFrom": "⟦Loading from {{profile}}...⟧",
+      "connect": "⟦Connect⟧",
+      "restart": "⟦Restart⟧",
+      "restartTooltip": "⟦Restart session with updated configuration⟧",
+      "selectRealtime": "⟦Select real-time sources to connect⟧",
+      "importing": "⟦Importing...⟧",
+      "import": "⟦Import⟧",
+      "join": "⟦Join⟧",
+      "resumeJoin": "⟦Resume and Join⟧",
+      "load": "⟦Load⟧",
+      "ok": "⟦OK⟧",
+      "continueWithoutSource": "⟦Continue Without Source⟧",
+      "selectDatabase": "⟦Select a database to connect⟧",
+      "selectSource": "⟦Select a source to continue⟧"
+    },
+    "sources": {
+      "unknown": "⟦Unknown⟧",
+      "source": "⟦Source⟧",
+      "change": "⟦Change⟧",
+      "activeSessions": "⟦Active Sessions⟧",
+      "external": "⟦External⟧",
+      "csv": "⟦CSV, CAN Dump⟧",
+      "csvImport": "⟦Import from file⟧",
+      "recorded": "⟦Recorded⟧",
+      "realtime": "⟦Real-time⟧",
+      "busesCount": "⟦{{count}} buses⟧",
+      "noSources": "⟦No sources configured. Add one in Settings.⟧",
+      "stopped": "⟦Stopped⟧",
+      "paused": "⟦Paused⟧",
+      "playing": "⟦Playing⟧",
+      "live": "⟦Live⟧",
+      "active": "⟦Active⟧",
+      "framesCount": "⟦{{count}} frames⟧",
+      "busLabel": "⟦Bus {{bus}}⟧",
+      "configLocked": "⟦Config locked (in use by multiple sessions)⟧",
+      "newDevice": "⟦New device…⟧",
+      "editDevice": "⟦Edit connection⟧",
+      "discardDevice": "⟦Discard device⟧",
+      "unsaved": "⟦Unsaved⟧",
+      "unsavedHint": "⟦Created here and kept for this run only. Save it in the editor to keep it.⟧"
+    },
+    "singleBusConfig": {
+      "deviceNotResponding": "⟦Device not responding⟧",
+      "online": "⟦Online⟧",
+      "deviceOnline": "⟦Device Online⟧",
+      "bus": "⟦Bus:⟧",
+      "outputBus": "⟦Output Bus:⟧",
+      "framing": "⟦Framing:⟧",
+      "duplicate": "⟦⚠ Duplicate⟧",
+      "delimiter": "⟦Delimiter:⟧",
+      "delimiterHex": "⟦Delimiter (hex):⟧",
+      "delimiterPlaceholder": "⟦0A⟧",
+      "max": "⟦Max:⟧",
+      "maxLength": "⟦Max length:⟧",
+      "validateCrc": "⟦Require valid CRC-16⟧",
+      "captureRawBytes": "⟦Capture raw bytes⟧",
+      "framingOptions": {
+        "raw": "⟦None (Raw)⟧",
+        "delimiter": "⟦Delimiter⟧",
+        "slip": "⟦SLIP⟧",
+        "modbus_rtu": "⟦Modbus RTU⟧"
+      },
+      "configLockedHint": "⟦Configuration locked — this source is in use by multiple sessions.⟧",
+      "configureSerial": "⟦Configure bus number and framing for this serial device.⟧",
+      "tagBus": "⟦Frames from this device will be tagged with the selected bus number.⟧"
+    },
+    "busConfig": {
+      "probing": "⟦Probing...⟧",
+      "probingNamed": "⟦Probing {{name}}...⟧",
+      "duplicateBusTooltip": "⟦Another source uses this bus number⟧",
+      "configLockedTooltip": "⟦Config locked - source in use by multiple sessions⟧",
+      "duplicateWarning": "⟦Duplicate bus numbers may cause confusion⟧",
+      "canBuses": "⟦CAN Buses ({{enabled}}/{{total}} enabled)⟧",
+      "namedCanBuses": "⟦{{name}} - CAN Buses ({{enabled}}/{{total}} enabled)⟧",
+      "protocol": "⟦Protocol:⟧",
+      "output": "⟦→ Output:⟧",
+      "configLocked": "⟦Configuration locked — this source is in use by multiple sessions.⟧",
+      "noBusesEnabled": "⟦No buses enabled. Enable at least one bus to capture frames.⟧",
+      "duplicateOutputs": "⟦Warning: Some output bus numbers conflict with other sources⟧",
+      "busLabel": "⟦Bus {{bus}}⟧"
+    },
+    "captures": {
+      "title": "⟦Captures⟧",
+      "clearAll": "⟦Clear All⟧",
+      "kindCount": "⟦{{count}} {{kind}}⟧",
+      "pinned": "⟦pinned⟧",
+      "rename": "⟦Rename buffer⟧",
+      "unpinTooltip": "⟦Unpin capture (will be cleared on restart)⟧",
+      "pinTooltip": "⟦Pin capture (survives restart)⟧",
+      "delete": "⟦Delete capture⟧",
+      "sendToBackend": "⟦Send to backend⟧"
+    },
+    "deviceEditor": {
+      "newTitle": "⟦New device⟧",
+      "newHint": "⟦Connect without saving, or tick Save to Settings to keep it.⟧",
+      "editTitle": "⟦Edit {{name}}⟧",
+      "editHint": "⟦Use once leaves the saved device untouched; Save writes the change back.⟧",
+      "kind": "⟦Device type⟧",
+      "name": "⟦Name⟧",
+      "namePlaceholder": "⟦Name this device⟧",
+      "saveToSettings": "⟦Save to Settings⟧",
+      "cancel": "⟦Cancel⟧",
+      "connect": "⟦Connect⟧",
+      "useOnce": "⟦Use once⟧",
+      "useOnceReconnect": "⟦Use once & reconnect⟧",
+      "save": "⟦Save⟧",
+      "saveReconnect": "⟦Save & reconnect⟧",
+      "modifiedName": "⟦{{name}} (modified)⟧",
+      "probeFailed": "⟦Save this device first to probe it⟧",
+      "errors": {
+        "nameRequired": "⟦Give the device a name.⟧",
+        "nameDuplicate": "⟦Another device already has this name.⟧",
+        "portRequired": "⟦Pick a serial port.⟧",
+        "hostRequired": "⟦This device needs a host.⟧",
+        "fieldRequired": "⟦Fill in {{field}}.⟧",
+        "fieldInvalid": "⟦{{field}} has a value this device cannot use.⟧"
+      },
+      "discardFailedTitle": "⟦Discard Failed⟧",
+      "discardFailed": "⟦Could not discard this device.⟧"
+    }
+  },
+  "modbusPoll": {
+    "enable": "⟦Poll a register range⟧",
+    "disabledHint": "⟦Without a range this source connects but reads nothing — a decoder is the other way to give it a poll plan. The scanning tools work either way.⟧",
+    "registerType": "⟦Type⟧",
+    "start": "⟦Start⟧",
+    "end": "⟦End⟧",
+    "intervalMs": "⟦Every (ms)⟧",
+    "summary": "⟦{{count}} registers every {{interval}} ms.⟧",
+    "rangeInvalid": "⟦Start must not be past End.⟧"
+  },
+  "deviceSettings": {
+    "unsaved": "⟦Unsaved · this run only⟧",
+    "liveHint": "⟦The device is streaming. Applying drops the connection and re-establishes it on the new settings — a bitrate or baud rate is fixed when the port opens and cannot change under a running session. The session and everything watching it stay put.⟧",
+    "savedFooter": "⟦Applying changes this device everywhere it is used.⟧",
+    "ephemeralFooter": "⟦This device is not saved; changes last for this run.⟧",
+    "cancel": "⟦Cancel⟧",
+    "apply": "⟦Save⟧",
+    "applyReconnect": "⟦Apply & reconnect⟧",
+    "probeFailed": "⟦Could not reach the device⟧",
+    "errors": {
+      "nameRequired": "⟦Give the device a name.⟧",
+      "nameDuplicate": "⟦Another device already has this name.⟧",
+      "portRequired": "⟦Pick a serial port.⟧",
+      "hostRequired": "⟦This device needs a host.⟧",
+      "fieldRequired": "⟦Fill in {{field}}.⟧",
+      "fieldInvalid": "⟦{{field}} has a value this device cannot use.⟧"
+    }
+  }
+}

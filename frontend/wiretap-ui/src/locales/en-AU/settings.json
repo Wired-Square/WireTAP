@@ -53,7 +53,8 @@
       "label": "Display Language",
       "help": "Language used throughout the WireTAP interface. Additional locales will appear here as they become available.",
       "options": {
-        "en-AU": "English (Australian)"
+        "en-AU": "English (Australian)",
+        "xx-PS": "Pseudo (untranslated text check)"
       }
     }
   },
