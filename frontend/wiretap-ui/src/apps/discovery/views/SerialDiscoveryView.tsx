@@ -6,6 +6,7 @@
 // - Toolbar with framing controls
 
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useDiscoveryStore, useDiscoverySerialStore, TOOL_TAB_CONFIG } from '../../../stores/discoveryStore';
 import { backendFramingConfig, framedSource } from '../../../stores/discoverySerialStore';
 import { useSessionStore } from '../../../stores/sessionStore';
@@ -44,6 +45,7 @@ interface SerialDiscoveryViewProps {
 }
 
 export default function SerialDiscoveryView({ isStreaming = false, displayTimeFormat = 'human', useLocalTimezone, isRecorded = false, emitsRawBytes, sessionFramesCaptureId, sessionFramesCount, sessionId, bytesCaptureId, byteCount }: SerialDiscoveryViewProps) {
+  const { t } = useTranslation("discovery");
   const [showFramingDialog, setShowFramingDialog] = useState(false);
   const [showFilterDialog, setShowFilterDialog] = useState(false);
   const [showRawBytesViewDialog, setShowRawBytesViewDialog] = useState(false);
@@ -187,11 +189,11 @@ export default function SerialDiscoveryView({ isStreaming = false, displayTimeFo
           <div className={emptyStateContainer}>
             {filteredCount > 0 ? (
               <div className={emptyStateText}>
-                <p className={`${emptyStateHeading} ${textWarning}`}>{filteredCount} frames filtered out</p>
-                <p className={emptyStateDescription}>Frames shorter than {minFrameLength} bytes</p>
+                <p className={`${emptyStateHeading} ${textWarning}`}>{t("serial.filteredOut", { count: filteredCount })}</p>
+                <p className={emptyStateDescription}>{t("serial.shorterThan", { min: minFrameLength })}</p>
               </div>
             ) : (
-              <p className={emptyStateText}>No filtered frames. Adjust the minimum frame length filter to see excluded frames.</p>
+              <p className={emptyStateText}>{t("serial.noFiltered")}</p>
             )}
           </div>
         )}

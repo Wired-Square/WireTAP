@@ -1,5 +1,6 @@
 // ui/src/apps/discovery/views/tools/MessageOrderToolPanel.tsx
 
+import { useTranslation } from "react-i18next";
 import { useDiscoveryStore } from "../../../../stores/discoveryStore";
 import { toolPanelLabel } from "../../../../styles/typography";
 import { Input } from "../../../../components/forms";
@@ -7,6 +8,7 @@ import { Input } from "../../../../components/forms";
 const MAX_STANDARD_ID = 0x7ff;
 
 export default function MessageOrderToolPanel() {
+  const { t } = useTranslation("discovery");
   const options = useDiscoveryStore((s) => s.toolbox.messageOrder);
   const updateOptions = useDiscoveryStore((s) => s.updateMessageOrderOptions);
 
@@ -14,11 +16,11 @@ export default function MessageOrderToolPanel() {
     <div className="space-y-2 text-xs">
       <div className="space-y-1">
         <label className={toolPanelLabel}>
-          Start Message ID <span className="text-muted">(optional)</span>
+          {t("toolPanels.messageOrder.startId")} <span className="text-muted">{t("common:securePassword.optional")}</span>
         </label>
         <Input
           type="text"
-          placeholder="Auto-detect"
+          placeholder={t("toolPanels.messageOrder.autoDetect")}
           value={options.start ? `0x${options.start.frameId.toString(16).toUpperCase()}` : ""}
           onChange={(e) => {
             const val = e.target.value.trim();
@@ -34,7 +36,7 @@ export default function MessageOrderToolPanel() {
           mono
         />
         <p className="text-muted text-2xs">
-          Leave empty to auto-detect from gap analysis
+          {t("toolPanels.messageOrder.startIdHint")}
         </p>
       </div>
     </div>

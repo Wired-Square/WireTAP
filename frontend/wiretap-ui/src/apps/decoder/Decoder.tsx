@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { listen, emit } from "@tauri-apps/api/event";
 import { useTranslation } from "react-i18next";
+import i18n from "i18next";
 import { useSettings } from "../../hooks/useSettings";
 import { useAllIOProfiles } from "../../hooks/useAllIOProfiles";
 import { useFrameIdFormat, withFrameIdFormat } from "../../hooks/useFrameIdFormat";
@@ -772,7 +773,7 @@ function DecoderInner() {
           // Only reload if this decoder is using that catalog. The path is
           // unchanged, so re-parse explicitly (re-attaching when bound to a session).
           if (catalogPath && savedPath === catalogPath) {
-            setCatalogNotification('Catalog updated');
+            setCatalogNotification(i18n.t('decoder:catalogUpdated'));
             try {
               const sid = session.sessionId;
               await (sid ? loadCatalogForSession(sid, savedPath) : loadCatalog(savedPath));

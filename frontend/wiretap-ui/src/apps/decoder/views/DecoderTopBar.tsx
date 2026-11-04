@@ -186,8 +186,8 @@ export default function DecoderTopBar({
   // Filter button state
   const hasFilters = minFrameLength > 0 || frameIdFilter.trim() !== '';
   const filterParts: string[] = [];
-  if (minFrameLength > 0) filterParts.push(`min ${minFrameLength}B`);
-  if (frameIdFilter.trim()) filterParts.push(`ID: ${frameIdFilter}`);
+  if (minFrameLength > 0) filterParts.push(t("topBar.filterMinLength", { min: minFrameLength }));
+  if (frameIdFilter.trim()) filterParts.push(t("topBar.filterIds", { ids: frameIdFilter }));
 
   return (
     <AppTopBar
@@ -282,7 +282,7 @@ export default function DecoderTopBar({
           variant="surface"
           tone="primary"
           pressed={viewMode === 'per-source'}
-          title={viewMode === 'single' ? 'Show per source address' : 'Show single (most recent)'}
+          title={viewMode === 'single' ? t("topBar.showPerSource") : t("topBar.showSingle")}
         >
           {viewMode === 'per-source' ? (
             <Users className={iconSm} />
@@ -299,7 +299,7 @@ export default function DecoderTopBar({
           variant="surface"
           tone="warning"
           pressed={hasFilters}
-          title={hasFilters ? `Filters: ${filterParts.join(', ')}` : 'Set frame filters'}
+          title={hasFilters ? t("topBar.activeFilters", { filters: filterParts.join(', ') }) : t("topBar.setFilters")}
         >
           <Filter className={iconSm} />
         </IconButton>
@@ -312,7 +312,7 @@ export default function DecoderTopBar({
           variant="surface"
           tone="primary"
           pressed={hideUnseen}
-          title={hideUnseen ? 'Showing only seen frames' : 'Showing all frames'}
+          title={hideUnseen ? t("topBar.showingSeen") : t("topBar.showingAll")}
         >
           {hideUnseen ? (
             <EyeOff className={iconSm} />

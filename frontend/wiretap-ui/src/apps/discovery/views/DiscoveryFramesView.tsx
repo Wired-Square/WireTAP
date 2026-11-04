@@ -482,14 +482,14 @@ function DiscoveryFramesView({
     const result: TabDefinition[] = [];
     if (hasFramesTab) {
       // Named for its one protocol; "Frames" when it holds several or nothing has said.
-      const label = tableProtocols.length === 1 ? protocolLabel(tableProtocols[0]) : 'Frames';
+      const label = tableProtocols.length === 1 ? protocolLabel(tableProtocols[0]) : t('tabs.frames');
       result.push({ id: 'frames', label, count: frameCount, countTone: "success" as const });
     }
     if (hasModbusTab) {
       // Counted while shown; a hidden tab keeps the count it last had.
       result.push({ id: 'modbus', label: t("modbusView.tab"), count: modbusCount, countTone: "success" as const });
     }
-    result.push({ id: 'filtered', label: 'Filtered', count: filteredOutCount, countTone: "warning" as const });
+    result.push({ id: 'filtered', label: t('tabs.filtered'), count: filteredOutCount, countTone: "warning" as const });
     if (toolboxResults.messageOrderResults) {
       result.push({ id: TOOL_TAB_CONFIG['message-order'].tabId, label: t(TOOL_TAB_CONFIG['message-order'].labelKey), closeable: true });
     }
@@ -921,7 +921,7 @@ function DiscoveryFramesView({
           className={`px-1.5 text-xs font-mono tabular-nums text-center ${textSecondary}`}
           style={{ minWidth: `${maxChars}ch` }}
         >
-          {currentStr} of {totalStr}
+          {t("common:playback.framePosition", { current: currentStr, total: totalStr })}
         </span>
       );
     }
@@ -950,7 +950,7 @@ function DiscoveryFramesView({
     >
       {DEFAULT_SPEED_OPTIONS.map((s) => (
         <option key={s} value={s}>
-          {s === 1 ? "1x (realtime)" : `${s}x`}
+          {s === 1 ? t("common:playback.speedRealtime") : `${s}x`}
         </option>
       ))}
     </Select>
@@ -1039,10 +1039,10 @@ function DiscoveryFramesView({
               // Reached only when the same fetch that produced the rows returned none,
               // so this can no longer appear beside rows.
               isCaptureFirstLoading
-                ? 'Loading frames...'
+                ? t('framesView.empty.loading')
                 : isStreamPaused
-                  ? 'No frames in capture'
-                  : isStreaming ? 'Waiting for frames...' : 'No frames to display'
+                  ? t('framesView.empty.noneInCapture')
+                  : isStreaming ? t('framesView.empty.waiting') : t('frameTable.empty')
             }
             showRef={showRefColumn}
             showAscii={showAsciiColumn}

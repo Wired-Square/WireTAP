@@ -3,6 +3,7 @@
 // Export and save handlers for Discovery: export frames, save frames, export formats.
 
 import { useCallback } from "react";
+import i18n from "i18next";
 import type { FramingStateMsg } from "../../../../generated/FramingStateMsg";
 import type { ExportFormat, ExportDataMode } from "../../../../dialogs/ExportFramesDialog";
 import { exportByteDump, exportFrameDump } from "../../../../api/capture";
@@ -55,18 +56,22 @@ export function useDiscoveryExportHandlers({
   // Handle export dialog confirm
   const handleExport = useCallback(async (format: ExportFormat, filename: string) => {
     if (!dumpDir) {
-      useSessionStore.getState().showAppError("Export Error", "Dump directory not configured", "Please set a dump directory in Settings.");
+      useSessionStore.getState().showAppError(
+        i18n.t("common:errors.exportTitle"),
+        i18n.t("discovery:errors.dumpDirMissing"),
+        i18n.t("discovery:errors.dumpDirMissingHint"),
+      );
       return;
     }
 
-    await withAppError("Export Error", "Failed to export", async () => {
+    await withAppError(i18n.t("common:errors.exportTitle"), i18n.t("discovery:errors.exportFailed"), async () => {
       const extension =
         exportDataMode === "bytes"
           ? format === "hex" ? "hex" : format === "bin" ? "bin" : "csv"
           : format === "csv" ? "csv" : format === "json" ? "json" : "log";
       const selectedPath = await pickFileToSave({
         defaultPath: `${dumpDir}/${filename}`,
-        filters: [{ name: "Export Files", extensions: [extension] }],
+        filters: [{ name: i18n.t("discovery:exportFilesFilter"), extensions: [extension] }],
       });
       if (!selectedPath) return;
 

@@ -8,6 +8,7 @@ import {
   calculateChecksum as calculateChecksumAsync,
   getAlgorithmOutputBytes,
 } from '../../../../utils/analysis/checksums';
+import type { TFunction } from 'i18next';
 
 // ============================================================================
 // Types
@@ -32,11 +33,12 @@ export interface ChecksumConfig extends ExtractionConfig {
 // Constants
 // ============================================================================
 
-// Build algorithm list for UI (adding 'unknown' option)
-export const CHECKSUM_ALGORITHMS: { value: DiscoveryChecksumAlgorithm; label: string }[] = [
-  ...SHARED_CHECKSUM_ALGORITHMS.map(a => ({ value: a.id, label: a.name })),
-  { value: 'unknown', label: 'Unknown' },
-];
+export function checksumAlgorithmOptions(t: TFunction): { value: DiscoveryChecksumAlgorithm; label: string }[] {
+  return [
+    ...SHARED_CHECKSUM_ALGORITHMS.map(a => ({ value: a.id, label: a.name })),
+    { value: 'unknown', label: t('discovery:serial.checksumUnknown') },
+  ];
+}
 
 // ============================================================================
 // Utilities

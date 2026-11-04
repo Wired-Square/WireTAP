@@ -33,7 +33,9 @@
     "generic": "⟦Something went wrong⟧",
     "loadFailed": "⟦Failed to load⟧",
     "saveFailed": "⟦Failed to save⟧",
-    "validationFailed": "⟦Validation failed⟧"
+    "validationFailed": "⟦Validation failed⟧",
+    "exportTitle": "⟦Export Error⟧",
+    "reportNotExported": "⟦The report was not exported⟧"
   },
   "units": {
     "seconds": "⟦seconds⟧",
@@ -109,13 +111,28 @@
     "atStart": "⟦At start of buffer⟧",
     "atEnd": "⟦At end of buffer⟧",
     "stepBack": "⟦Step backward one frame⟧",
-    "stepForward": "⟦Step forward one frame⟧"
+    "stepForward": "⟦Step forward one frame⟧",
+    "speedRealtime": "⟦1x (realtime)⟧",
+    "framePosition": "⟦{{current}} of {{total}}⟧"
   },
   "framePicker": {
     "selectAll": "⟦Select all⟧",
     "deselectAll": "⟦Deselect all⟧",
     "saveSelectionSet": "⟦Save selection set⟧",
-    "selectionSet": "⟦Selection set⟧"
+    "selectionSet": "⟦Selection set⟧",
+    "title": "⟦Frames⟧",
+    "all": "⟦All⟧",
+    "none": "⟦None⟧",
+    "noSet": "⟦-- None --⟧",
+    "noBus": "⟦No bus⟧",
+    "bus": "⟦bus {{bus}}⟧",
+    "varyingLengths_one": "⟦{{count}} frame with varying payload lengths⟧",
+    "varyingLengths_other": "⟦{{count}} frames with varying payload lengths⟧",
+    "lengthVaries": "⟦Payload length varies across frames⟧",
+    "noActiveSet": "⟦No selection set active⟧",
+    "saveChanges": "⟦Save changes to selection set⟧",
+    "noUnsavedChanges": "⟦No unsaved changes⟧",
+    "empty": "⟦No frames discovered yet.⟧"
   },
   "transmitBlocked": {
     "silent_mode": "⟦Silent mode — cannot transmit⟧",

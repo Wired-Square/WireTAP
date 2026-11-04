@@ -119,12 +119,12 @@ function FramePicker({
       result.push({
         type: "length-mismatch",
         count: lengthMismatchCount,
-        message: `${lengthMismatchCount} frame${lengthMismatchCount !== 1 ? "s" : ""} with varying payload lengths`,
+        message: t("framePicker.varyingLengths", { count: lengthMismatchCount }),
       });
     }
 
     return result;
-  }, [frames]);
+  }, [frames, t]);
 
   const hasWarnings = warnings.length > 0;
   const warningTooltip = warnings.map((w) => w.message).join("\n");
@@ -143,9 +143,9 @@ function FramePicker({
 
   const getSaveIconTitle = () => {
     if (!activeSelectionSetId) {
-      return "No selection set active";
+      return t("framePicker.noActiveSet");
     }
-    return selectionSetDirty ? "Save changes to selection set" : "No unsaved changes";
+    return selectionSetDirty ? t("framePicker.saveChanges") : t("framePicker.noUnsavedChanges");
   };
 
   return (
@@ -162,7 +162,7 @@ function FramePicker({
           <ChevronRight className={`${iconSm} text-muted`} />
         )}
         <span className={labelSmall}>
-          Frames
+          {t("framePicker.title")}
         </span>
         <span className={`${captionMuted} ml-1`}>
           ({selectedCount}/{sortedFrames.length})
@@ -245,7 +245,7 @@ function FramePicker({
                   className="max-w-35 w-auto"
                   title={t("framePicker.selectionSet")}
                 >
-                  <option value="">-- None --</option>
+                  <option value="">{t("framePicker.noSet")}</option>
                   {selectionSets.map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.name}
@@ -270,20 +270,20 @@ function FramePicker({
                       tone="success"
                       size="sm"
                     >
-                      All
+                      {t("framePicker.all")}
                     </Button>
                     <Button
                       onClick={() => onBulkSelect(bus, false)}
                       size="sm"
                     >
-                      None
+                      {t("framePicker.none")}
                     </Button>
                   </div>
                 ))}
                 {hasBuslessFrames && (
                   <div className="flex items-center gap-0.5 text-2xs">
                     <span className="px-1.5 py-0.5 rounded bg-surface border border-default text-muted italic">
-                      No bus
+                      {t("framePicker.noBus")}
                     </span>
                     <Button
                       onClick={() => onBulkSelect(null, true)}
@@ -291,13 +291,13 @@ function FramePicker({
                       tone="success"
                       size="sm"
                     >
-                      All
+                      {t("framePicker.all")}
                     </Button>
                     <Button
                       onClick={() => onBulkSelect(null, false)}
                       size="sm"
                     >
-                      None
+                      {t("framePicker.none")}
                     </Button>
                   </div>
                 )}
@@ -313,7 +313,7 @@ function FramePicker({
                   style={{
                     color: f.lenMismatch ? "#f97316" : undefined,
                   }}
-                  title={f.lenMismatch ? "Payload length varies across frames" : undefined}
+                  title={f.lenMismatch ? t("framePicker.lengthVaries") : undefined}
                 >
                   <span className="flex items-center gap-2">
                     <Checkbox
@@ -327,7 +327,7 @@ function FramePicker({
                     </span>
                     {typeof f.bus === "number" && (
                       <span className="text-2xs text-muted">
-                        bus {f.bus}
+                        {t("framePicker.bus", { bus: f.bus })}
                       </span>
                     )}
                     {isMultiProtocol && f.protocol && (
@@ -345,7 +345,7 @@ function FramePicker({
               ))}
               {!anyFrames && (
                 <div className={`px-3 py-4 ${emptyStateText}`}>
-                  No frames discovered yet.
+                  {t("framePicker.empty")}
                 </div>
               )}
             </div>

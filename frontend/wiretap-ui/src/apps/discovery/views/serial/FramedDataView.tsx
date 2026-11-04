@@ -17,7 +17,7 @@ import {
   type ExtractionConfig,
   type ChecksumConfig,
   type DiscoveryChecksumAlgorithm,
-  CHECKSUM_ALGORITHMS,
+  checksumAlgorithmOptions,
 } from './serialTypes';
 import { byteToHex } from '../../../../utils/byteUtils';
 import { formatHumanUs, formatIsoUs, renderDeltaNode } from '../../../../utils/timeFormat';
@@ -98,7 +98,7 @@ function ChecksumBadge({ config, onClick }: ChecksumBadgeProps) {
   const isActive = config !== null;
 
   const getAlgoLabel = (algo: DiscoveryChecksumAlgorithm) => {
-    return CHECKSUM_ALGORITHMS.find(a => a.value === algo)?.label ?? algo;
+    return checksumAlgorithmOptions(t).find(a => a.value === algo)?.label ?? algo;
   };
 
   return (

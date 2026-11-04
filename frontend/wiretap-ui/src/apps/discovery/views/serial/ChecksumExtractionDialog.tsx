@@ -24,7 +24,7 @@ import { configFromCandidate, matchesCandidate } from './checksumConfig';
 import ChecksumCandidateList from '../../components/ChecksumCandidateList';
 import {
   type ChecksumConfig,
-  CHECKSUM_ALGORITHMS,
+  checksumAlgorithmOptions,
   getChecksumByteCount,
 } from './serialTypes';
 import { getCaptureFramesTail } from '../../../../api/capture';
@@ -335,7 +335,7 @@ export default function ChecksumExtractionDialog({
               onChange={(e) => handleAlgorithmChange(e.target.value as ChecksumAlgorithm)}
               size="lg"
             >
-              {CHECKSUM_ALGORITHMS.map(algo => (
+              {checksumAlgorithmOptions(t).map(algo => (
                 <option key={algo.value} value={algo.value}>{algo.label}</option>
               ))}
             </Select>

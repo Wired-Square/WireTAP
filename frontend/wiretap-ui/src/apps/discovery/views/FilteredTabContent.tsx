@@ -191,7 +191,7 @@ export default function FilteredTabContent({
     return (
       <div className={`flex-1 min-h-0 flex items-center justify-center ${bgDataView}`}>
         <p className={`${emptyStateText} py-8`}>
-          No filtered frames. All discovered frame IDs are currently selected.
+          {t('filteredTab.none')}
         </p>
       </div>
     );
@@ -225,7 +225,7 @@ export default function FilteredTabContent({
         showSourceAddress={showSourceColumn}
         autoFit={pageSizeSetting === "auto"}
         onFitChange={setAutoRows}
-        emptyMessage={loading ? "Loading filtered frames..." : "No filtered frames to display"}
+        emptyMessage={loading ? t('filteredTab.loading') : t('filteredTab.empty')}
         onContextMenu={handleContextMenu}
         onHeaderContextMenu={handleHeaderContextMenu}
         useLocalTimezone={useLocalTimezone}

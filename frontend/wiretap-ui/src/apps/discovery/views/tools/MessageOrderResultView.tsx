@@ -51,7 +51,7 @@ export default function MessageOrderResultView({ embedded = false, onClose }: Pr
 
   const handleExport = async (format: ExportFormat, filename: string) => {
     if (!results || !orderWindow) return;
-    await withAppError("Export Error", "The report was not exported", async () => {
+    await withAppError(t("common:errors.exportTitle"), t("common:errors.reportNotExported"), async () => {
       const content = format === "json"
         ? JSON.stringify(results, null, 2)
         : await renderReport(format, t("reports:order.title"), (f) => frameOrderReport(orderWindow, orderWindow.start, f));
