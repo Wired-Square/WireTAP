@@ -41,9 +41,6 @@
       "minimumSystemVersion": "13.0",
       "entitlements": "Entitlements.plist",
       "infoPlist": "Info.plist"
-    },
-    "iOS": {
-      "developmentTeam": "YZ6PQTJH79"
     }
   }
 }

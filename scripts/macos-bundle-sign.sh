@@ -22,11 +22,13 @@ if [[ "$(uname)" != "Darwin" ]]; then
   exit 0
 fi
 
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+[[ -e "$script_dir/../.env" ]] && eval "$(cat "$script_dir/../.env")"
+
 if [[ -n "${APPLE_SIGNING_IDENTITY:-}" ]]; then
   exit 0
 fi
 
-script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 entitlements="$script_dir/../crates/wiretap-app/Entitlements.plist"
 
 if [[ $# -ge 1 ]]; then
