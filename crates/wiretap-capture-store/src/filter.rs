@@ -14,6 +14,9 @@ pub struct FrameRowFilter {
     pub protocols: Vec<CaptureProtocol>,
     pub start_us: Option<i64>,
     pub end_us: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub bus: Option<u8>,
 }
 
 /// A `frames` row's `protocol`.
@@ -129,6 +132,7 @@ impl FrameRowFilter {
                 .map(|us| ("timestamp_us >= ?".into(), vec![Integer(us)])),
             self.end_us
                 .map(|us| ("timestamp_us < ?".into(), vec![Integer(us)])),
+            self.bus.map(|bus| equals("bus", Integer(bus.into()))),
         ];
         let (conditions, values): (Vec<String>, Vec<_>) = terms.into_iter().flatten().unzip();
         Sql {

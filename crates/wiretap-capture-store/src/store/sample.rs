@@ -18,10 +18,11 @@ fn strided<T: Copy>(items: &[T], limit: u32) -> Vec<T> {
         .collect()
 }
 
-fn frame_filter(capture_id: &str, q: &PayloadQuery<'_>) -> Sql {
+fn frame_filter(capture_id: &str, q: &PayloadQuery<'_>, bus: Option<u8>) -> Sql {
     let filter = FrameRowFilter {
         frame_id: Some(q.frame_id),
         is_extended: q.is_extended,
+        bus,
         ..Default::default()
     };
     filter.sql_where_named(capture_id, q.protocol.as_slice())
@@ -33,11 +34,11 @@ fn payload(row: &sqlx::sqlite::SqliteRow) -> sqlx::Result<Vec<u8>> {
 
 impl Store {
     /// Up to `q.limit` of one frame's payloads, oldest first: the newest
-    /// contiguous run, or spread evenly across the whole capture. Passing
-    /// `is_extended` costs a row lookup per row, so leave it `None` when the id
-    /// is unambiguous.
-    pub async fn payloads(&self, capture_id: &str, q: &PayloadQuery<'_>) -> Result<Vec<Vec<u8>>> {
-        let filter = frame_filter(capture_id, q);
+    /// contiguous run, or spread evenly across the whole capture, on `bus` when
+    /// given. Passing `is_extended` costs a row lookup per row, so leave it
+    /// `None` when the id is unambiguous.
+    pub async fn payloads(&self, capture_id: &str, q: &PayloadQuery<'_>, bus: Option<u8>) -> Result<Vec<Vec<u8>>> {
+        let filter = frame_filter(capture_id, q, bus);
         match q.sampling {
             Sampling::Spread => self.spread_payloads(filter, q.limit).await,
             Sampling::Recent => self.recent_payloads(filter, q.limit).await,
@@ -122,14 +123,14 @@ mod tests {
 
     async fn spread(store: &Store, protocol: Option<&str>, limit: u32) -> Vec<Vec<u8>> {
         store
-            .payloads("c1", &query(protocol, limit, Sampling::Spread))
+            .payloads("c1", &query(protocol, limit, Sampling::Spread), None)
             .await
             .unwrap()
     }
 
     async fn recent(store: &Store, protocol: Option<&str>, limit: u32) -> Vec<Vec<u8>> {
         store
-            .payloads("c1", &query(protocol, limit, Sampling::Recent))
+            .payloads("c1", &query(protocol, limit, Sampling::Recent), None)
             .await
             .unwrap()
     }
@@ -227,7 +228,7 @@ mod tests {
     #[tokio::test]
     async fn payload_sampling_takes_its_rowids_from_the_covering_index() {
         let store = multi_protocol_capture().await;
-        let filter = frame_filter("c1", &query(Some("can"), 1, Sampling::Spread));
+        let filter = frame_filter("c1", &query(Some("can"), 1, Sampling::Spread), None);
         let inlined = Sql {
             sql: format!(
                 "SELECT rowid FROM frames WHERE {} ORDER BY rowid",

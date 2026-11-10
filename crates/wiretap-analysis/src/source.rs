@@ -36,17 +36,20 @@ pub trait Source: Sync {
 }
 
 /// A store of recorded frames the analysis levers read: what frames it holds and
-/// a sample of each one's payloads. Time bounds are epoch µs.
+/// a sample of each one's payloads. Time bounds are epoch µs; a `bus` reads
+/// only that bus's frames.
 pub trait PayloadSource: Source {
     fn inventory(
         &self,
         start_us: Option<i64>,
         end_us: Option<i64>,
+        bus: Option<u8>,
     ) -> impl Future<Output = Result<Vec<InventoryRow>, Self::Error>> + Send;
 
     fn payloads(
         &self,
         query: PayloadQuery<'_>,
+        bus: Option<u8>,
     ) -> impl Future<Output = Result<Vec<Vec<u8>>, Self::Error>> + Send;
 }
 
@@ -115,7 +118,7 @@ pub async fn byte_profile<S: PayloadSource>(
             is_extended,
             limit: sample_limit,
             sampling: Sampling::Recent,
-        })
+        }, None)
         .await?;
     Ok(FrameByteProfile::new(
         protocol,
@@ -182,7 +185,7 @@ pub async fn checksum_scan<S: PayloadSource>(
     sample_limit: u32,
     options: ChecksumScanOptions,
 ) -> Result<ChecksumScanResult, S::Error> {
-    let inventory = source.inventory(None, None).await?;
+    let inventory = source.inventory(None, None, None).await?;
 
     let mut result = ChecksumScanResult {
         findings: Vec::new(),
@@ -207,7 +210,7 @@ pub async fn checksum_scan<S: PayloadSource>(
                 is_extended,
                 limit: sample_limit,
                 sampling: Sampling::Spread,
-            })
+            }, None)
             .await?;
         chunk.push((FrameKey::new(row.frame_id, row.is_extended), payloads));
         if chunk.len() == SCAN_CHUNK_IDS {
@@ -237,7 +240,7 @@ pub async fn byte_profiles<S: PayloadSource>(
     sample_limit: u32,
     max_frames: usize,
 ) -> Result<ByteProfiles, S::Error> {
-    let inventory = source.inventory(None, None).await?;
+    let inventory = source.inventory(None, None, None).await?;
     let rows = selected_rows(&inventory, filter);
     let mut frames = Vec::with_capacity(rows.len().min(max_frames));
     for &(row, is_extended) in rows.iter().take(max_frames) {
@@ -248,7 +251,7 @@ pub async fn byte_profiles<S: PayloadSource>(
                 is_extended,
                 limit: sample_limit,
                 sampling: Sampling::Recent,
-            })
+            }, None)
             .await?;
         frames.push(FrameByteProfile::new(
             Some(&row.protocol),

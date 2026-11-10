@@ -923,6 +923,7 @@ impl WireTapTools {
             p.sample_limit,
             bound(&p.start_time)?,
             bound(&p.end_time)?,
+            p.bus,
         )
         .await
         .map_err(err)?;

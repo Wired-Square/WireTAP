@@ -334,11 +334,12 @@ impl PayloadSource for UnreadablePayloads {
         &self,
         start_us: Option<i64>,
         end_us: Option<i64>,
+        bus: Option<u8>,
     ) -> Result<Vec<InventoryRow>, String> {
-        Ok(self.0.inventory(start_us, end_us).await.unwrap())
+        Ok(self.0.inventory(start_us, end_us, bus).await.unwrap())
     }
 
-    async fn payloads(&self, _: PayloadQuery<'_>) -> Result<Vec<Vec<u8>>, String> {
+    async fn payloads(&self, _: PayloadQuery<'_>, _: Option<u8>) -> Result<Vec<Vec<u8>>, String> {
         Err("unreadable".into())
     }
 }
@@ -351,7 +352,7 @@ fn coverage_is_snake_case_and_says_unset_for_none_and_absent_alike() {
     source.push("can", 0x300, false, vec![3]);
 
     let report = block_on(catalog_coverage(
-        &source, "covered", &catalog, false, 10, None, None,
+        &source, "covered", &catalog, false, 10, None, None, None,
     ))
     .unwrap();
 
@@ -400,11 +401,79 @@ fn a_payload_read_failure_costs_coverage_its_byte_roles_not_the_report() {
         10,
         None,
         None,
+        None,
     ))
     .unwrap();
 
     let roles = report.present[0].byte_roles.as_ref().unwrap();
     assert_eq!(roles.sample_count, 0);
+}
+
+const INTER_TOWER: &str = r#"
+[meta]
+name = "inter_tower"
+[meta.can]
+frame_id_mask = 0x1FFFFF00
+
+[frame.can.0x18EF0000]
+length = 2
+"#;
+
+/// Bus 0 carries the catalogue's 29-bit ids, node in the low byte; bus 1 is a
+/// separate link with its own 11-bit ids and an extended id of its own.
+fn two_bus_capture() -> MemorySource {
+    let mut source = MemorySource::default();
+    let mut t = 0;
+    let mut push = |bus, id, ext, payload: Vec<u8>| {
+        t += 1;
+        source.push_at("can", bus, id, ext, t, payload);
+    };
+    for i in 0..3 {
+        push(0, 0x18EF_0001, true, vec![i, 0]);
+    }
+    push(0, 0x18EF_0002, true, vec![9, 0]);
+    push(0, 0x18AA_0001, true, vec![1]);
+    push(1, 0x18EF_0001, true, vec![1, 2, 3, 4]);
+    for _ in 0..5 {
+        push(1, 0x18AA_0005, true, vec![2]);
+    }
+    push(1, 0x70F, false, vec![3]);
+    push(1, 0x72F, false, vec![4]);
+    source
+}
+
+fn uncatalogued(report: &wiretap_analysis::source::CoverageReport) -> Vec<(String, i64, Option<String>)> {
+    let mut rows: Vec<_> = report
+        .uncatalogued
+        .iter()
+        .map(|u| (u.frame_id_hex.clone(), u.count, u.seen_as_hex.clone()))
+        .collect();
+    rows.sort();
+    rows
+}
+
+#[test]
+fn coverage_on_one_bus_diffs_the_catalogue_against_that_bus_alone() {
+    let catalog = Catalogue::parse(INTER_TOWER).unwrap();
+    let source = two_bus_capture();
+
+    let mixed = block_on(catalog_coverage(&source, "inter_tower", &catalog, true, 10, None, None, None)).unwrap();
+    assert_eq!(mixed.present[0].count, 5);
+    assert_eq!(
+        uncatalogued(&mixed),
+        [
+            ("0x18AA0000".into(), 6, Some("0x18AA0005".into())),
+            ("0x70F".into(), 1, None),
+            ("0x72F".into(), 1, None),
+        ],
+        "with no bus, bus 1's traffic is uncatalogued and folded under bus 0's mask"
+    );
+
+    let bus_0 = block_on(catalog_coverage(&source, "inter_tower", &catalog, true, 10, None, None, Some(0))).unwrap();
+    assert_eq!(bus_0.present[0].count, 4);
+    assert_eq!(uncatalogued(&bus_0), [("0x18AA0000".into(), 1, Some("0x18AA0001".into()))]);
+    let roles = bus_0.present[0].byte_roles.as_ref().unwrap();
+    assert_eq!((roles.sample_count, roles.max_len), (3, 2), "byte roles sample bus 0's payloads only");
 }
 
 #[test]
@@ -417,7 +486,7 @@ fn a_frames_byte_roles_read_only_its_own_protocols_payloads() {
     source.push("modbus", 256, false, vec![9, 9, 9, 9]);
 
     let report = block_on(catalog_coverage(
-        &source, "covered", &catalog, true, 10, None, None,
+        &source, "covered", &catalog, true, 10, None, None, None,
     ))
     .unwrap();
 
@@ -463,7 +532,7 @@ fn the_mcp_shapes_keep_their_casing() {
         json!({ "protocol": null, "frameId": 1, "isExtended": true })
     );
 
-    let rows = block_on(source.inventory(None, None)).unwrap();
+    let rows = block_on(source.inventory(None, None, None)).unwrap();
     assert_eq!(
         serde_json::to_value(&rows[0]).unwrap(),
         json!({
@@ -540,7 +609,7 @@ fn metered_line() -> MemorySource {
 fn metered_coverage(source: &MemorySource) -> wiretap_analysis::source::CoverageReport {
     let catalog = Catalogue::parse(METERED).unwrap();
     block_on(catalog_coverage(
-        source, "metered", &catalog, true, 10, None, None,
+        source, "metered", &catalog, true, 10, None, None, None,
     ))
     .unwrap()
 }

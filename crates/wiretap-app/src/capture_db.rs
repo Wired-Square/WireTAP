@@ -287,12 +287,12 @@ impl Source for Capture {
 }
 
 impl PayloadSource for Capture {
-    async fn inventory(&self, start_us: Option<i64>, end_us: Option<i64>) -> Result<Vec<InventoryRow>, CaptureError> {
-        self.store.frame_inventory(&self.id, start_us, end_us).await
+    async fn inventory(&self, start_us: Option<i64>, end_us: Option<i64>, bus: Option<u8>) -> Result<Vec<InventoryRow>, CaptureError> {
+        self.store.frame_inventory(&self.id, start_us, end_us, bus).await
     }
 
-    async fn payloads(&self, q: PayloadQuery<'_>) -> Result<Vec<Vec<u8>>, CaptureError> {
-        self.store.payloads(&self.id, &q).await
+    async fn payloads(&self, q: PayloadQuery<'_>, bus: Option<u8>) -> Result<Vec<Vec<u8>>, CaptureError> {
+        self.store.payloads(&self.id, &q, bus).await
     }
 }
 
@@ -780,7 +780,7 @@ mod tests {
         for meta in &captures {
             match meta.kind {
                 CaptureKind::Frames => {
-                    let inventory = store.frame_inventory(&meta.id, None, None).await.unwrap();
+                    let inventory = store.frame_inventory(&meta.id, None, None, None).await.unwrap();
                     let (page, _) = store.get_frames_paginated(&meta.id, 0, 50).await.unwrap();
                     let count = store.get_frame_count(&meta.id).await.unwrap();
                     println!("frames: {count} rows, {} identities, first page {}", inventory.len(), page.len());

@@ -329,7 +329,7 @@ pub async fn rank_hypotheses(
     let mask = crate::ws::dispatch::attached_catalog(&session_id)
         .and_then(|c| wslib_wiretap_catalogue::decode::frame_id_mask(&c));
     let src = crate::payload_source::AppSource::Capture(&capture_id);
-    let inventory = src.inventory(None, None).await?;
+    let inventory = src.inventory(None, None, None).await?;
     let mut per_frame = Vec::new();
     for &id in &request.frame_ids {
         let Some(row) = inventory

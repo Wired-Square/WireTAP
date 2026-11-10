@@ -62,7 +62,7 @@ fn capture_frame_info() {
 fn frame_row_filter() {
     assert_eq!(
         exported::<FrameRowFilter>(),
-        r#"import type { CaptureProtocol } from "./CaptureProtocol"; export type FrameRowFilter = { frame_id: number | null, is_extended: boolean | null, protocols?: Array<CaptureProtocol>, start_us: number | null, end_us: number | null, };"#
+        r#"import type { CaptureProtocol } from "./CaptureProtocol"; export type FrameRowFilter = { frame_id: number | null, is_extended: boolean | null, protocols?: Array<CaptureProtocol>, start_us: number | null, end_us: number | null, bus?: number, };"#
     );
 }
 

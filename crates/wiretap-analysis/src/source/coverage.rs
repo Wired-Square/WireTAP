@@ -251,6 +251,7 @@ async fn rtu_reads<'c, S: PayloadSource>(
     inventory: &[InventoryRow],
     catalog: &'c Catalogue,
     sample_limit: usize,
+    bus: Option<u8>,
 ) -> Result<RtuReads<'c>, S::Error> {
     let options = RtuSettings::tapped().options(Some(catalog));
     let mut reads = RtuReads::default();
@@ -270,7 +271,7 @@ async fn rtu_reads<'c, S: PayloadSource>(
                 is_extended: None,
                 limit: u32::MAX,
                 sampling: Sampling::Recent,
-            })
+            }, bus)
             .await?;
         let mut stream = options.stream();
         for msg in payloads.iter().filter_map(|raw| stream.interpret(raw)) {
@@ -327,6 +328,9 @@ async fn rtu_reads<'c, S: PayloadSource>(
 /// matched by register window instead; a register number and a row id never
 /// match each other.
 ///
+/// With a `bus`, only that bus's frames are diffed: a mask describes the frames
+/// the catalogue is about, not another link's.
+///
 /// A frame whose byte-role payloads fail to read is profiled over none, so one
 /// unreadable frame costs its byte roles and not the report. A `modbus_rtu` row
 /// is counted from its payloads, so its read error is returned.
@@ -338,9 +342,10 @@ pub async fn catalog_coverage<S: PayloadSource>(
     sample_limit: u32,
     start_us: Option<i64>,
     end_us: Option<i64>,
+    bus: Option<u8>,
 ) -> Result<CoverageReport, S::Error> {
     let mask = wslib_wiretap_catalogue::decode::frame_id_mask(catalog).unwrap_or(u32::MAX);
-    let inventory = source.inventory(start_us, end_us).await?;
+    let inventory = source.inventory(start_us, end_us, bus).await?;
     let rolled_up = |registers: bool| {
         let rows = inventory.iter().filter(move |r| {
             r.protocol != MODBUS_RTU_PROTOCOL
@@ -355,7 +360,7 @@ pub async fn catalog_coverage<S: PayloadSource>(
     } else {
         0
     };
-    let mut rtu = rtu_reads(source, &inventory, catalog, profile_limit).await?;
+    let mut rtu = rtu_reads(source, &inventory, catalog, profile_limit, bus).await?;
     let data_frames = by_register.len()
         + by_id.len()
         + rtu.present.len()
@@ -414,7 +419,7 @@ pub async fn catalog_coverage<S: PayloadSource>(
                         is_extended: Some(data.top.is_extended),
                         limit: sample_limit,
                         sampling: Sampling::Recent,
-                    })
+                    }, bus)
                     .await
                     .unwrap_or_default();
                 Some(profile_bytes(&payloads))

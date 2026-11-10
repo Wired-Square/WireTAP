@@ -7,6 +7,7 @@ All notable changes to WireTAP will be documented in this file.
 ### Changed
 
 - **Validate checks checksums.** The Catalogue Editor's Validate now reports a frame checksum or serial checksum it cannot use (an unknown algorithm, a position past the longest frame, a custom CRC with no polynomial), which used to be skipped without a word. Saving the serial configuration writes the checksum's byte order as `endianness` in place of `big_endian`, and keeps its name, CRC parameters and notes. Older catalogues open with the same byte order as before; no change is needed to them.
+- **Catalogue coverage can be limited to one bus.** The MCP `catalog_coverage` tool takes an optional `bus`, so a catalogue written for one link is diffed against that bus alone on a multi-bus capture: another bus's frames are no longer reported as uncatalogued or folded under the catalogue's id mask. A WireTAP backend profile refuses a bus for now, as its archive cannot be split by bus yet; leave it out there.
 
 ### Fixed
 
