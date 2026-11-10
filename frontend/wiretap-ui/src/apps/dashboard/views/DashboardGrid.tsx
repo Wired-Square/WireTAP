@@ -200,19 +200,14 @@ export default function DashboardGrid({ onOpenPanelConfig }: Props) {
     [layout],
   );
 
-  if (panels.length === 0) {
-    return (
-      <div className={emptyStateContainer}>
+  const empty = panels.length === 0;
+  return (
+    <div ref={containerRef} className={empty ? emptyStateContainer : "h-full overflow-auto p-2"}>
+      {empty ? (
         <p className={emptyStateText}>
           {t("grid.emptyState")}
         </p>
-      </div>
-    );
-  }
-
-  return (
-    <div ref={containerRef} className="h-full overflow-auto p-2">
-      {mounted && (
+      ) : mounted && (
         <GridLayout
           layout={rglLayout}
           width={width}
