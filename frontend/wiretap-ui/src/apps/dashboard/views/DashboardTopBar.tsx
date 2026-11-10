@@ -11,6 +11,7 @@ import { WIDGET_LIST } from "../widgets/registry";
 import { listDashboards, openDashboard, saveDashboard, type DashboardFile } from "../../../api/dashboards";
 import { buildDashboard, parseDashboard, dashboardFilename } from "../../../utils/dashboards";
 import { catalogFilenameFromPath } from "../../../utils/dashboardLayouts";
+import { withAppError } from "../../../utils/appError";
 import type { DashboardLayout } from "../../../utils/dashboardLayouts";
 import type { IOProfile } from "../../../types/common";
 import type { CatalogMetadata } from "../../../api/catalog";
@@ -128,8 +129,9 @@ export default function DashboardTopBar({
   };
 
   const handleOpenDashboardFile = async (file: DashboardFile) => {
-    const json = await openDashboard(file.path);
-    useDashboardStore.getState().loadDashboard(parseDashboard(json));
+    await withAppError(t("common:errors.loadTitle"), t("topBar.layouts.dashboardNotOpened"), async () => {
+      useDashboardStore.getState().loadDashboard(parseDashboard(await openDashboard(file.path)));
+    });
     closeLayoutMenu();
   };
 

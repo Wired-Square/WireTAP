@@ -17,6 +17,16 @@ export function getCssVar(name: string): string {
 const COMPACT_WIDTH = 350;
 const COMPACT_HEIGHT = 180;
 
+function useThemeVersion(): number {
+  const [version, setVersion] = useState(0);
+  useEffect(() => {
+    const observer = new MutationObserver(() => setVersion((v) => v + 1));
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class", "style"] });
+    return () => observer.disconnect();
+  }, []);
+  return version;
+}
+
 export const isCompact = (width: number, height: number) => ({ w: width < COMPACT_WIDTH, h: height < COMPACT_HEIGHT });
 
 function responsiveKey(w: number, h: number): string {
@@ -42,6 +52,7 @@ export function useUPlotPanel({ panel, signals, canvasRef, buildOptions, options
   const zoomResetVersion = useDashboardStore((s) => s.zoomResetVersion);
   const setFollowMode = useDashboardStore((s) => s.setFollowMode);
   const followMode = panel.followMode !== false;
+  const themeVersion = useThemeVersion();
 
   const signalsKey = signals.map((s) => `${s.frameId}:${s.signalName}`).join("|");
   const aligned = useHistoryQuery(signalsKey, (sessionId) => readAligned(sessionId, signals));
@@ -87,7 +98,7 @@ export function useUPlotPanel({ panel, signals, canvasRef, buildOptions, options
       if (chartRef.current === chart) chartRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [signals.length, optionsKey, respKey]);
+  }, [signals.length, optionsKey, respKey, themeVersion]);
 
   useEffect(() => {
     const chart = chartRef.current;
