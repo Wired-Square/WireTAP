@@ -22,6 +22,7 @@ All notable changes to WireTAP will be documented in this file.
 - **Serial Transmit takes a 0x prefix.** Its bytes and delimiter fields used to read `0x0d` as the bytes 00 0D; they now read it as 0D, and the delimiter field no longer reformats under you while you type.
 - **Dashboard histograms follow a theme change.** A histogram left open while you switched theme kept the old theme's grid and axis colours until its tab was reopened; it now redraws in the new theme straight away, as the line and flow charts do.
 - **Query reopens on the capture it was showing.** Closing and reopening the Query tab on a capture used to leave it on a session that had closed with the tab, its button showing an internal id; it now opens the capture again under its name, or shows no source if the capture was deleted meanwhile.
+- **The source picker reads Live while any session runs a device.** A device held by running sessions and a stopped one could show Stopped on the Devices tab; it now shows Live, and Stopped only once every session holding it has stopped.
 - **The Sessions graph names an MCP agent as one.** A session opened over MCP added an app node labelled with an internal `mcp_` id; the node now reads "MCP agent".
 - **A Virtual Device generating Modbus traffic opens a Modbus session.** Its session used to get a frames id, as a CAN source does; it now gets a Modbus one, as a Modbus device does.
 - **A stopped capture offers Play.** On a session opened on a capture or an imported file, the session menu used to offer "Resume IO stream" while stopped, although there is no device to resume; it now reads "Play", as it does while paused.
@@ -29,8 +30,8 @@ All notable changes to WireTAP will be documented in this file.
 - **The Decoder's times follow your language.** Signal update times and the Unmatched and Filtered frame times used to be formatted in US English whatever language you chose; they now follow it.
 - **The Decoder checks a serial custom CRC.** A serial catalogue whose checksum is a custom CRC or a negated sum showed no checksum badge on its frames; it is now checked, as a named algorithm is.
 - **The Sessions detail panel names an MCP agent's connection as one.** Selecting the link to an MCP agent used to show its internal `mcp_` id with "mcp" beneath; it now reads "MCP agent", as the node does.
-- **Discovery's serial times follow your language.** Frame times in Discovery's serial view used to be formatted in US English whatever language you chose; they now follow it.
 - **The session log and a panel's connection name apps as the graph does.** The session log now names an MCP agent "MCP agent" rather than "mcp", and selecting the link to an open panel shows the panel's short name rather than its internal id.
+- **Discovery's serial times follow your language.** Frame times in Discovery's serial view used to be formatted in US English whatever language you chose; they now follow it.
 - **A refused edit no longer marks a valid catalogue invalid.** When the Catalogue Editor turned down an edit (a frame with no identifier, a mux case that already exists, a failed delete), the toolbar badge read Invalid although the file had not changed; it now keeps the catalogue's last verdict.
 - **Dashboard statistics and cursors read like the signal.** The min/mean/max overlay and the line chart's cursor and measurement values padded a signal with no precision to three decimals, "89.000" beside a readout of "89". They now read as the signal's own value does, and a mean shows one decimal place more than the signal's readings carry.
 

@@ -3,8 +3,7 @@
 import { useTranslation } from "react-i18next";
 import { Bookmark, Wifi, Database, FolderOpen, GitMerge, Radio, Play, Lock, Plus, Pencil, Trash2 } from "lucide-react";
 import type { IOProfile } from "../../hooks/useSettings";
-import type { Session } from "../../stores/sessionStore";
-import type { ActiveSessionInfo, ProfileUsageInfo } from "../../api/io";
+import type { ActiveSessionInfo, IOStateType, ProfileUsageInfo } from "../../api/io";
 import { CSV_EXTERNAL_ID } from "./utils";
 import { getIOKindLabel } from "../../utils/ioKindLabel";
 import { isRealtime, useProfileTraits } from "../../stores/profileBusStore";
@@ -47,8 +46,7 @@ type Props = {
   onToggleSource?: (sourceId: string) => void;
   /** Check if a profile has an active session (is "live") */
   isProfileLive?: (profileId: string) => boolean;
-  /** Get session for a profile (to check state) */
-  getSessionForProfile?: (profileId: string) => Session | undefined;
+  profileIoState?: (profileId: string) => IOStateType | undefined;
   /** Render additional content below a profile when selected */
   renderProfileExtra?: (profileId: string) => ReactNode;
   /** Active multi-source sessions that can be joined */
@@ -96,7 +94,7 @@ export default function SourceList({
   onSelectSource,
   onToggleSource,
   isProfileLive,
-  getSessionForProfile,
+  profileIoState,
   renderProfileExtra,
   joinableSessions = [],
   onSelectMultiSourceSession,
@@ -292,7 +290,7 @@ export default function SourceList({
                 isDefault={profile.id === defaultId}
                 isLoading={isLoading}
                 isLive={isProfileLive?.(profile.id) ?? false}
-                sessionState={getSessionForProfile?.(profile.id)?.ioState}
+                sessionState={profileIoState?.(profile.id)}
                 onSelect={onSelectSource}
                 usageInfo={profileUsage?.[profile.id]}
                 isRealtime={false}
@@ -371,7 +369,7 @@ export default function SourceList({
                 isDefault={false}
                 isLoading={isLoading}
                 isLive={isLive}
-                sessionState={getSessionForProfile?.(profile.id)?.ioState}
+                sessionState={profileIoState?.(profile.id)}
                 onSelect={handleSelect}
                 useCheckbox={canMultiSelect}
                 busNumber={getBusNumber(profile)}
