@@ -198,8 +198,7 @@ function ConnectionSummary({ profile }: { profile: IOProfile }) {
   }
 
   if (profile.kind === "virtual") {
-    const interfaces: { bus: number; signal_generator: boolean; frame_rate_hz: number | string }[] =
-      c.interfaces || [{ bus: 0, signal_generator: c.signal_generator, frame_rate_hz: c.frame_rate_hz }];
+    const interfaces: { bus: number; signal_generator: boolean; frame_rate_hz: number | string }[] = c.interfaces;
     const busCount = interfaces.length;
     const sigGenCount = interfaces.filter((i) => i.signal_generator !== false).length;
     const loopback = c.loopback;

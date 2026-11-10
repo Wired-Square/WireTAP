@@ -262,33 +262,39 @@ pub fn apply_defaults(profile: &mut IOProfile) {
 }
 
 /// Rewrites a virtual device's top-level `bus_count`, `signal_generator` and
-/// `frame_rate_hz` into the `interfaces` list they read as.
+/// `frame_rate_hz` into the `interfaces` list they read as, or drops them
+/// beside a list that already wins.
 pub fn list_legacy_virtual_buses(profile: &mut IOProfile) {
+    if canonical_kind(&profile.kind) != "virtual" {
+        return;
+    }
     let listed = profile
         .connection
         .get("interfaces")
-        .and_then(ConnValue::as_list);
-    if canonical_kind(&profile.kind) != "virtual" || listed.is_some_and(|l| !l.is_empty()) {
-        return;
-    }
-    let interfaces: Vec<ConnValue> = profile
-        .virtual_interfaces()
-        .into_iter()
-        .map(|i| {
-            BTreeMap::from([
-                ("bus".to_string(), i64::from(i.bus).into()),
-                ("signal_generator".to_string(), i.signal_generator.into()),
-                ("frame_rate_hz".to_string(), i.frame_rate_hz.into()),
-            ])
-            .into()
-        })
-        .collect();
+        .and_then(ConnValue::as_list)
+        .is_some_and(|l| !l.is_empty());
+    let interfaces: Option<Vec<ConnValue>> = (!listed).then(|| {
+        profile
+            .virtual_interfaces()
+            .into_iter()
+            .map(|i| {
+                BTreeMap::from([
+                    ("bus".to_string(), i64::from(i.bus).into()),
+                    ("signal_generator".to_string(), i.signal_generator.into()),
+                    ("frame_rate_hz".to_string(), i.frame_rate_hz.into()),
+                ])
+                .into()
+            })
+            .collect()
+    });
     for key in ["bus_count", "signal_generator", "frame_rate_hz"] {
         profile.connection.remove(key);
     }
-    profile
-        .connection
-        .insert("interfaces".into(), interfaces.into());
+    if let Some(interfaces) = interfaces {
+        profile
+            .connection
+            .insert("interfaces".into(), interfaces.into());
+    }
 }
 
 /// What a serial source will run with: the framing, and whether raw bytes go
