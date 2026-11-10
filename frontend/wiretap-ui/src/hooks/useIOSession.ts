@@ -95,6 +95,8 @@ export interface UseIOSessionOptions {
    * last-subscriber auto-destroy). Never fires for a teardown this hook's own call caused.
    */
   onDestroyed?: (orphanedCaptureIds: string[], reset: boolean) => void;
+  /** Called when the session this hook mounts on no longer exists */
+  onSessionNotFound?: () => void;
 }
 
 export interface UseIOSessionResult {
@@ -193,6 +195,7 @@ export function useIOSession(
     onSwitchedToCapture,
     onResuming,
     onDestroyed,
+    onSessionNotFound,
   } = options;
 
   const effectiveSessionId = sessionIdOption || "";
@@ -245,6 +248,7 @@ export function useIOSession(
     onSwitchedToCapture,
     onResuming,
     onDestroyed,
+    onSessionNotFound,
   });
   useEffect(() => {
     callbacksRef.current = {
@@ -261,8 +265,9 @@ export function useIOSession(
       onSwitchedToCapture,
       onResuming,
       onDestroyed,
+      onSessionNotFound,
     };
-  }, [onFrames, onDecoded, onAdhocSignals, onError, onTimeUpdate, onStreamEnded, onStreamComplete, onSpeedChange, onReconfigure, onSuspended, onSwitchedToCapture, onResuming, onDestroyed]);
+  }, [onFrames, onDecoded, onAdhocSignals, onError, onTimeUpdate, onStreamEnded, onStreamComplete, onSpeedChange, onReconfigure, onSuspended, onSwitchedToCapture, onResuming, onDestroyed, onSessionNotFound]);
 
   const forwarding = useRef<SessionCallbacks>({
     onFrames: (frames) => callbacksRef.current.onFrames?.(frames),
@@ -366,7 +371,9 @@ export function useIOSession(
       })
       .catch((e) => {
         tlog.info(`[useIOSession:${appName}] open failed: ${messageOf(e)}`);
-        if (!cancelled && !isSessionNotFound(e)) callbacksRef.current.onError?.(messageOf(e));
+        if (cancelled) return;
+        if (isSessionNotFound(e)) callbacksRef.current.onSessionNotFound?.();
+        else callbacksRef.current.onError?.(messageOf(e));
       });
     return () => {
       cancelled = true;

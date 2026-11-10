@@ -187,6 +187,8 @@ export const takesLimit = (queryType: QueryType) =>
 
 interface QueryState {
   ioProfile: string | null;
+  /** The capture Query was last on, to reopen once its session is gone */
+  captureSourceId: string | null;
 
   queryType: QueryType;
   queryParams: QueryParams;
@@ -213,6 +215,7 @@ interface QueryState {
   };
 
   setIoProfile: (profile: string | null) => void;
+  setCaptureSourceId: (captureId: string | null) => void;
   setQueryType: (type: QueryType) => void;
   updateQueryParams: (params: Partial<QueryParams>) => void;
   setContextWindow: (window: ContextWindow) => void;
@@ -258,6 +261,7 @@ const initialContextWindow: ContextWindow = {
 
 export const useQueryStore = create<QueryState>((set, get) => ({
   ioProfile: null,
+  captureSourceId: null,
   queryType: "byte_changes",
   queryParams: initialQueryParams,
   contextWindow: initialContextWindow,
@@ -281,6 +285,7 @@ export const useQueryStore = create<QueryState>((set, get) => ({
   },
 
   setIoProfile: (profile) => set({ ioProfile: profile }),
+  setCaptureSourceId: (captureId) => set({ captureSourceId: captureId }),
 
   setQueryType: (type) => set({ queryType: type, error: null }),
 
