@@ -65,7 +65,7 @@ pub fn validate_checksum_cmd(
 /// Check a frame against its serial catalogue's `[meta.serial.checksum]`.
 /// `None` when the catalogue names an algorithm this build does not know.
 pub fn validate_serial_checksum(
-    config: &wslib_wiretap_catalogue::ChecksumConfig,
+    config: &wslib_wiretap_catalogue::model::FrameChecksum,
     data: &[u8],
 ) -> Option<ChecksumValidationResult> {
     let algo = ChecksumAlgorithm::from_str(&config.algorithm).ok()?;
@@ -74,7 +74,7 @@ pub fn validate_serial_checksum(
         data,
         config.start_byte,
         config.byte_length as usize,
-        config.big_endian,
+        config.endianness == Some(wslib_wiretap_catalogue::Endianness::Big),
         config.calc_start_byte,
         // Absent stops short of the last byte, as the Decoder has always read it.
         config.calc_end_byte.unwrap_or(-1),

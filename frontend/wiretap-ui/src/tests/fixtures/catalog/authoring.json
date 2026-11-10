@@ -1309,8 +1309,7 @@
               "algorithm": "xor",
               "startByte": -1,
               "byteLength": 1,
-              "calcStartByte": 0,
-              "bigEndian": false
+              "calcStartByte": 0
             }
           }
         },
@@ -1352,8 +1351,7 @@
             "algorithm": "xor",
             "start_byte": -1,
             "byte_length": 1,
-            "calc_start_byte": 0,
-            "big_endian": false
+            "calc_start_byte": 0
           },
           "modbusDeviceAddress": 1,
           "modbusRegisterBase": 0

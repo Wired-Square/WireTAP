@@ -1148,6 +1148,62 @@ mod tests {
         }
     }
 
+    fn legacy_serial_checksum(big_endian: Option<bool>, byte_length: u32) -> String {
+        let key = big_endian.map_or(String::new(), |b| format!("big_endian = {b}\n"));
+        format!(
+            "[meta]\nname = \"d\"\nversion = 1\n\n[meta.serial]\nencoding = \"slip\"\n\n[meta.serial.checksum]\nalgorithm = \"crc16_modbus\"\nstart_byte = -2\nbyte_length = {byte_length}\n{key}"
+        )
+    }
+
+    #[test]
+    fn a_legacy_serial_checksum_is_served_with_its_byte_order() {
+        for (big_endian, served) in [(Some(true), serde_json::json!("big")), (Some(false), "little".into()), (None, "little".into())] {
+            let parsed = command("catalog.parse", serde_json::json!({ "content": legacy_serial_checksum(big_endian, 2) }));
+            assert_eq!(parsed["serial"]["checksum"]["endianness"], served, "{big_endian:?}");
+        }
+    }
+
+    #[test]
+    fn saving_a_legacy_serial_checksum_writes_endianness_and_keeps_its_parameters() {
+        let edited = command(
+            "catalog.edits",
+            serde_json::json!({
+                "content": legacy_serial_checksum(Some(true), 2),
+                "ops": [{
+                    "op": "SetSerialConfig",
+                    "config": {
+                        "encoding": "slip",
+                        "checksum": {
+                            "name": "Frame CRC", "algorithm": "crc_custom", "start_byte": -2, "byte_length": 2,
+                            "endianness": "big", "polynomial": 4129, "init": 65535, "notes": ["one of two pairs"],
+                        },
+                    },
+                }],
+            }),
+        );
+        let text = edited.as_str().unwrap();
+        assert!(text.contains("endianness = \"big\""), "{text}");
+        assert!(!text.contains("big_endian"), "{text}");
+        let checksum = &command("catalog.parse", serde_json::json!({ "content": text }))["serial"]["checksum"];
+        assert_eq!((&checksum["name"], &checksum["polynomial"], &checksum["notes"]), (&"Frame CRC".into(), &4129.into(), &serde_json::json!(["one of two pairs"])));
+    }
+
+    fn finding_fields(toml: &str) -> Vec<String> {
+        let result = command("catalog.validate", serde_json::json!({ "content": toml }));
+        result["errors"].as_array().unwrap().iter().map(|e| e["field"].as_str().unwrap().to_string()).collect()
+    }
+
+    #[test]
+    fn a_malformed_checksum_is_a_finding_at_its_path() {
+        let frame = legacy_serial_checksum(None, 2)
+            + "\n[frame.serial.0x10]\nlength = 8\n\n[[frame.serial.0x10.checksum]]\nalgorithm = \"xor\"\nstart_byte = 300\ncalc_end_byte = -1\n\n[[frame.serial.0x10.checksum]]\nalgorithm = \"crc_custom\"\nstart_byte = -2\nbyte_length = 2\n";
+        let mut fields = finding_fields(&frame);
+        fields.dedup();
+        assert_eq!(fields, ["frame.serial.0x10.checksum[0].start_byte", "frame.serial.0x10.checksum[1].polynomial"]);
+        let serial = legacy_serial_checksum(None, 2).replace("crc16_modbus", "crc99");
+        assert_eq!(finding_fields(&serial), ["meta.serial.checksum.algorithm"]);
+    }
+
     fn set_meta_version(original: &str) -> serde_json::Value {
         command(
             "catalog.edits",

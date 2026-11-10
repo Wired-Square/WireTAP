@@ -9,5 +9,6 @@ export type { FrameFields } from "../generated/FrameFields";
 export type { MetaFields } from "../generated/MetaFields";
 export type { ModbusConfigFields } from "../generated/ModbusConfigFields";
 export type { MuxFields } from "../generated/MuxFields";
+export type { SerialChecksumFields } from "../generated/SerialChecksumFields";
 export type { SerialConfigFields } from "../generated/SerialConfigFields";
 export type { SignalFields } from "../generated/SignalFields";

@@ -5,8 +5,9 @@ import { tlog } from '../api/settings';
 import { emit } from '@tauri-apps/api/event';
 import { WINDOW_EVENTS } from '../events/registry';
 import type { CatalogSavedPayload } from '../events/registry';
-import type { EditMode, MetaFields, TomlNode, ValidationError, HeaderFieldFormat, SerialChecksumConfig, ProtocolType, SlaveOption } from '../apps/catalog/types';
-import type { Catalog, Endianness } from '../types/catalogModel';
+import type { EditMode, MetaFields, TomlNode, ValidationError, HeaderFieldFormat, ProtocolType, SlaveOption } from '../apps/catalog/types';
+import type { Catalog, Endianness, FrameChecksum } from '../types/catalogModel';
+import type { SerialChecksumFields } from '../types/catalogEdit';
 import type { FramingMode } from '../generated/FramingMode';
 import type { CatalogViewMode } from '../apps/catalog/tree/frameGroups';
 import { openCatalog } from '../api/catalog';
@@ -155,7 +156,7 @@ export interface CatalogEditorState {
     serialByteOrder: Endianness | undefined;
     serialHeaderFields: SerialHeaderFieldEntry[];  // For Serial config - header field masks over header bytes
     serialHeaderLength: number | undefined;  // For Serial config - global header length in bytes
-    serialChecksum: SerialChecksumConfig | null;  // For Serial config - protocol-level checksum defaults
+    serialChecksum: SerialChecksumFields | null;  // For Serial config - protocol-level checksum defaults
     modbusDeviceAddress: number;     // For new catalog dialog - stored in [meta.modbus]
     modbusRegisterBase: 0 | 1;       // For new catalog dialog - stored in [meta.modbus]
     modbusDefaultInterval: number | undefined;  // Default poll interval in ms - stored in [meta.modbus]
@@ -290,7 +291,7 @@ export interface CatalogEditorState {
   setSerialByteOrder: (byteOrder: Endianness | undefined) => void;
   setSerialHeaderFields: (fields: SerialHeaderFieldEntry[]) => void;
   setSerialHeaderLength: (length: number | undefined) => void;
-  setSerialChecksum: (checksum: SerialChecksumConfig | null) => void;
+  setSerialChecksum: (checksum: SerialChecksumFields | null) => void;
   setModbusDeviceAddress: (address: number) => void;
   setModbusRegisterBase: (base: 0 | 1) => void;
   setModbusDefaultInterval: (interval: number | undefined) => void;
@@ -302,6 +303,20 @@ export interface CatalogEditorState {
 }
 
 const hexMask = (mask: number) => `0x${mask.toString(16).toUpperCase()}`;
+
+function serialChecksumFieldsOf(served: FrameChecksum): SerialChecksumFields {
+  const { startByte, byteLength, calcStartByte, calcEndByte, xorOut, reflectIn, reflectOut, ...sameNamed } = served;
+  return {
+    ...sameNamed,
+    start_byte: startByte,
+    byte_length: byteLength,
+    calc_start_byte: calcStartByte,
+    calc_end_byte: calcEndByte,
+    xor_out: xorOut,
+    reflect_in: reflectIn,
+    reflect_out: reflectOut,
+  };
+}
 
 function configForms(catalog: Catalog | null) {
   const can = catalog?.can;
@@ -330,16 +345,7 @@ function configForms(catalog: Catalog | null) {
       format: (f.format ?? 'hex') as HeaderFieldFormat,
     })),
     serialHeaderLength: serial?.headerLength ?? undefined,
-    serialChecksum: serial?.checksum
-      ? {
-          algorithm: serial.checksum.algorithm as SerialChecksumConfig['algorithm'],
-          start_byte: serial.checksum.startByte,
-          byte_length: serial.checksum.byteLength,
-          calc_start_byte: serial.checksum.calcStartByte,
-          calc_end_byte: serial.checksum.calcEndByte ?? undefined,
-          big_endian: serial.checksum.bigEndian,
-        }
-      : null,
+    serialChecksum: serial?.checksum ? serialChecksumFieldsOf(serial.checksum) : null,
     modbusDeviceAddress: modbus?.deviceAddress ?? 1,
     modbusRegisterBase: (modbus?.registerBase ?? 0) as 0 | 1,
     modbusDefaultInterval: modbus?.defaultInterval ?? undefined,

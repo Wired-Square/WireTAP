@@ -679,7 +679,7 @@ pub fn candidate_signals(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use wslib_wiretap_catalogue::model::ChecksumConfig;
+    use wslib_wiretap_catalogue::model::FrameChecksum;
 
     #[test]
     fn a_serial_config_reserves_its_id_source_and_checksum_bytes() {
@@ -688,13 +688,16 @@ mod tests {
             frame_id_bytes: Some(2),
             source_address_start_byte: Some(2),
             source_address_bytes: Some(1),
-            checksum: Some(ChecksumConfig {
+            checksum: Some(FrameChecksum {
+                name: None,
                 algorithm: "sum8".into(),
                 start_byte: -1,
                 byte_length: 1,
+                endianness: None,
                 calc_start_byte: 0,
                 calc_end_byte: None,
-                big_endian: false,
+                parameters: Default::default(),
+                notes: Vec::new(),
             }),
             ..Default::default()
         };

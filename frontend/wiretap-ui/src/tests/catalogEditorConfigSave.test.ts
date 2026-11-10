@@ -71,6 +71,26 @@ describe("saving the catalogue configuration", () => {
     });
   });
 
+  it("saves the served serial checksum's byte order as endianness, with the fields its form does not show", async () => {
+    const checksum = {
+      name: "Frame CRC", algorithm: "crc_custom", startByte: -2, byteLength: 2, calcStartByte: 0, calcEndByte: -2,
+      endianness: "big" as const, polynomial: 0x1021, init: 0xffff, xorOut: 0, reflectIn: true, reflectOut: true, offset: 3, notes: ["one of two pairs"],
+    };
+    const ops = await savedOps({ serial: { encoding: "slip", checksum } });
+    expect(useCatalogEditorStore.getState().forms.serialChecksum?.endianness).toBe("big");
+    const saved = opNamed(ops, "SetSerialConfig") as Extract<EditOp, { op: "SetSerialConfig" }>;
+    expect(JSON.parse(JSON.stringify(saved.config.checksum))).toEqual({
+      name: "Frame CRC", algorithm: "crc_custom", start_byte: -2, byte_length: 2, calc_start_byte: 0, calc_end_byte: -2,
+      endianness: "big", polynomial: 0x1021, init: 0xffff, xor_out: 0, reflect_in: true, reflect_out: true, offset: 3, notes: ["one of two pairs"],
+    });
+  });
+
+  it("seeds a little-endian serial checksum as little-endian", async () => {
+    const checksum = { algorithm: "crc16_modbus", startByte: -2, byteLength: 2, calcStartByte: 0, endianness: "little" as const };
+    await savedOps({ serial: { encoding: "slip", checksum } });
+    expect(useCatalogEditorStore.getState().forms.serialChecksum?.endianness).toBe("little");
+  });
+
   it("deletes a protocol's section when it is turned off", async () => {
     const ops = await savedOps({ can: {} }, { can: false, serial: false, modbus: false });
     expect(ops.slice(1)).toEqual([

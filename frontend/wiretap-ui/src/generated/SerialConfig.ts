@@ -1,6 +1,6 @@
 // Generated from the Rust serde types by `npm run gen:types`. Do not edit.
-import type { ChecksumConfig } from "./ChecksumConfig";
 import type { Endianness } from "./Endianness";
+import type { FrameChecksum } from "./FrameChecksum";
 import type { FramingMode } from "./FramingMode";
 import type { HeaderField } from "./HeaderField";
 import type { HeaderFieldPosition } from "./HeaderFieldPosition";
@@ -13,7 +13,7 @@ export type SerialConfig = {
  * Absent where the catalogue names none or one this library cannot frame,
  * which [`crate::validate`] reports.
  */
-encoding?: FramingMode | null, byteOrder?: Endianness | null, frameIdMask?: number | null, headerLength?: number | null, minFrameLength?: number | null, checksum?: ChecksumConfig | null, fields?: { [key in string]: HeaderField }, 
+encoding?: FramingMode | null, byteOrder?: Endianness | null, frameIdMask?: number | null, headerLength?: number | null, minFrameLength?: number | null, checksum?: FrameChecksum | null, fields?: { [key in string]: HeaderField }, 
 /**
  * Byte position of the `id` field, when present; end-relative when negative.
  */

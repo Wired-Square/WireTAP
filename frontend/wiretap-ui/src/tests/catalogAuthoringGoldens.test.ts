@@ -289,7 +289,7 @@ const handlerCases: Case[] = [
     name: "Configuration draft seeded from the model: unset byte orders stay unset",
     input: [
       { meta: { name: "d", version: 1 }, frames: [], can: { defaultExtended: true, frameIdMask: 0x1fffff00, fields: { src: { mask: 255 } } } },
-      { meta: { name: "d", version: 1 }, frames: [], serial: { checksum: { algorithm: "xor", startByte: -1, byteLength: 1, calcStartByte: 0, bigEndian: false } } },
+      { meta: { name: "d", version: 1 }, frames: [], serial: { checksum: { algorithm: "xor", startByte: -1, byteLength: 1, calcStartByte: 0 } } },
       { meta: { name: "d", version: 1 }, frames: [], modbus: { defaultInterval: 500, deviceAddress: 7 } },
     ],
     run: (catalogs: Catalog[]) =>

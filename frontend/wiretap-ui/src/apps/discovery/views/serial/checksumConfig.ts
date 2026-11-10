@@ -2,7 +2,7 @@
 //
 // One owner for converting between the three shapes a serial checksum takes:
 // the detector's `ChecksumCandidate`, the UI's `ChecksumConfig`, and the
-// catalogue's `SerialChecksumConfig`.
+// catalogue's `FrameChecksum`.
 //
 // These conversions used to be written by hand at six sites, and `endianness`
 // was silently dropped at three of them — a little-endian CRC-16 chosen in the
@@ -10,7 +10,7 @@
 // shapes goes through here so the next field cannot go missing the same way.
 
 import type { ChecksumCandidate } from '../../../../api/checksums';
-import type { SerialChecksumConfig } from '../../../../utils/frameExport';
+import type { FrameChecksum } from '../../../../types/catalogModel';
 import type { ChecksumConfig, DiscoveryChecksumAlgorithm } from './serialTypes';
 
 /** A detected candidate, as the dialog's editable configuration. */
@@ -43,32 +43,32 @@ export function matchesCandidate(config: ChecksumConfig, candidate: ChecksumCand
  * Returns `null` for `'unknown'` — a UI-only placeholder that must never reach a
  * catalogue, since nothing can decode it.
  */
-export function serialChecksumFromConfig(config: ChecksumConfig): SerialChecksumConfig | null {
+export function serialChecksumFromConfig(config: ChecksumConfig): FrameChecksum | null {
   if (config.algorithm === 'unknown') return null;
   return {
     algorithm: config.algorithm,
-    start_byte: config.startByte,
-    byte_length: config.numBytes,
-    calc_start_byte: config.calcStartByte,
-    calc_end_byte: config.calcEndByte,
-    big_endian: config.endianness === 'big',
+    startByte: config.startByte,
+    byteLength: config.numBytes,
+    calcStartByte: config.calcStartByte,
+    calcEndByte: config.calcEndByte,
+    endianness: config.numBytes > 1 ? config.endianness : undefined,
   };
 }
 
 /**
  * Back from the catalogue/export shape.
  *
- * `big_endian` absent means little-endian, matching `frameExport`'s own doc and
- * the catalogue parser's `unwrap_or(false)`. The reverse mapper used to default
- * the other way, which is how a stored little-endian config came back big.
+ * No byte order is little-endian, as the catalogue reads a legacy file. The
+ * reverse mapper used to default the other way, which is how a stored
+ * little-endian config came back big.
  */
-export function configFromSerialChecksum(checksum: SerialChecksumConfig): ChecksumConfig {
+export function configFromSerialChecksum(checksum: FrameChecksum): ChecksumConfig {
   return {
     algorithm: checksum.algorithm as DiscoveryChecksumAlgorithm,
-    numBytes: checksum.byte_length,
-    startByte: checksum.start_byte,
-    endianness: checksum.big_endian === true ? 'big' : 'little',
-    calcStartByte: checksum.calc_start_byte,
-    calcEndByte: checksum.calc_end_byte,
+    numBytes: checksum.byteLength,
+    startByte: checksum.startByte,
+    endianness: checksum.endianness ?? 'little',
+    calcStartByte: checksum.calcStartByte,
+    calcEndByte: checksum.calcEndByte ?? -1,
   };
 }

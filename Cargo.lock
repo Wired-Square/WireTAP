@@ -9680,9 +9680,9 @@ dependencies = [
 
 [[package]]
 name = "wslib-wiretap-catalogue"
-version = "0.2.0"
+version = "0.3.0"
 source = "sparse+https://forge.wiredsquare.com/api/packages/wired-square/cargo/"
-checksum = "e4d75d2cca060c3de894f834dc8943e96d381cc04e927afc0b35ea896da99fbe"
+checksum = "c68caff1b58d1ce4b87fc2c7cdf32e8876e17629295038c68f4101741f7d2dca"
 dependencies = [
  "can-dbc",
  "rust_decimal",
