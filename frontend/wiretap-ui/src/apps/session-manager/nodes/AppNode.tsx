@@ -1,6 +1,7 @@
 // src/apps/session-manager/nodes/AppNode.tsx
 
 import { memo } from "react";
+import { useTranslation } from "react-i18next";
 import { Port } from "./Port";
 import { APP_INPUT_PORT } from "../utils/layoutUtils";
 import { iconSm } from "../../../styles/spacing";
@@ -22,6 +23,7 @@ interface AppNodeProps {
 }
 
 function AppNode({ data, selected }: AppNodeProps) {
+  const { t } = useTranslation("sessionManager");
   const { appId, appName, isActive } = data;
 
   const borderColour = selected
@@ -33,7 +35,7 @@ function AppNode({ data, selected }: AppNodeProps) {
   const bgColour = "bg-surface";
 
   // Show the cosmetic per-instance id (e.g. "decoder_a3f9").
-  const displayName = appId;
+  const displayName = appName === "mcp" ? t("node.app.mcpAgent") : appId;
 
   return (
     <div

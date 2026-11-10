@@ -53,6 +53,8 @@ function QueryInner() {
   // Query store selectors
   const ioProfile = useQueryStore((s) => s.ioProfile);
   const setIoProfile = useQueryStore((s) => s.setIoProfile);
+  const captureSourceId = useQueryStore((s) => s.captureSourceId);
+  const setCaptureSourceId = useQueryStore((s) => s.setCaptureSourceId);
   const error = useQueryStore((s) => s.error);
   const setError = useQueryStore((s) => s.setError);
   const queue = useQueryStore((s) => s.queue);
@@ -145,6 +147,7 @@ function QueryInner() {
     appName: "query",
     ioProfiles: backendProfiles,
     store: { ioProfile, setIoProfile },
+    reopenCaptureId: captureSourceId,
     onFrames: handleFrames,
     onError: handleError,
     onTimeUpdate: handleTimeUpdate,
@@ -177,6 +180,11 @@ function QueryInner() {
   const openedOnCapture = useSessionStore((s) => isCaptureSession(s, session.sessionId));
   const captureId = isCaptureMode && openedOnCapture ? sourceProfileId : null;
   const profileId = captureId ? null : sourceProfileId;
+
+  const sessionKnown = useSessionStore((s) => !!session.sessionId && !!s.sessions[session.sessionId]);
+  useEffect(() => {
+    if (sessionKnown) setCaptureSourceId(captureId);
+  }, [sessionKnown, captureId, setCaptureSourceId]);
 
   // Subscribe to session's catalogPath. Returns undefined when session doesn't exist
   // in the store yet, null when it exists with no decoder, or a string path.

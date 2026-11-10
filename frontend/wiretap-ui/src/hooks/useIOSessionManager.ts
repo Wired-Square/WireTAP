@@ -149,6 +149,8 @@ export interface UseIOSessionManagerOptions {
   /** Called when session is destroyed externally (e.g., from Sessions app).
    *  Receives orphaned capture IDs so apps can switch to capture mode. */
   onSessionDestroyed?: (orphanedCaptureIds: string[]) => void;
+  /** A capture to reopen when the app mounts on a session that no longer exists */
+  reopenCaptureId?: string | null;
 }
 
 /** Result of the IO session manager hook */
@@ -298,6 +300,7 @@ export function useIOSessionManager(
     streamCompletedRef: streamCompletedRefProp,
     onSessionReconfigured,
     onSessionDestroyed,
+    reopenCaptureId,
   } = options;
 
   // ---- Profile State ----
@@ -488,6 +491,15 @@ export function useIOSessionManager(
     }
   }, [appName, onBeforeWatch, setMultiBusProfiles, setIoProfile, streamCompletedRef, onSessionDestroyed]);
 
+  // A capture deleted while the app was closed leaves it with no source, not an error.
+  const handleSessionNotFound = useCallback(async () => {
+    if (!reopenCaptureId) return;
+    const { getCaptureMetadataById } = await import("../api/capture");
+    const capture = await getCaptureMetadataById(reopenCaptureId).catch(() => null);
+    if (capture) await selectProfileRef.current(reopenCaptureId);
+    else setIoProfile(null);
+  }, [reopenCaptureId, setIoProfile]);
+
   const sessionOptions: UseIOSessionOptions = {
     appName,
     sessionId: effectiveSessionId,
@@ -512,6 +524,7 @@ export function useIOSessionManager(
     onReconfigure: clearForFreshStream,
     onResuming: clearForFreshStream,
     onDestroyed: handleSessionDestroyed,
+    onSessionNotFound: handleSessionNotFound,
   };
 
   const session = useIOSession(sessionOptions);

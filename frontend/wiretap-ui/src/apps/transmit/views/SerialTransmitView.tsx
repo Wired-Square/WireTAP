@@ -40,14 +40,7 @@ export default function SerialTransmitView() {
   const canTransmit = isConnected && activeSession?.capabilities?.traits.tx_bytes === true;
 
   // Parse hex input for preview
-  const parsedBytes = useMemo(() => {
-    const hex = serialEditor.hexInput.replace(/\s/g, "");
-    try {
-      return hexToBytes(hex);
-    } catch {
-      return [];
-    }
-  }, [serialEditor.hexInput]);
+  const parsedBytes = useMemo(() => hexToBytes(serialEditor.hexInput), [serialEditor.hexInput]);
 
   // Build preview
   const preview = useMemo(() => {
@@ -64,9 +57,7 @@ export default function SerialTransmitView() {
   // Handle hex input change
   const handleHexInputChange = useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-      // Allow hex chars and spaces
-      const value = e.target.value.replace(/[^0-9a-fA-F\s]/g, "").toUpperCase();
-      updateSerialEditor({ hexInput: value });
+      updateSerialEditor({ hexInput: e.target.value.replace(/[^0-9a-fx\s]/gi, "") });
     },
     [updateSerialEditor]
   );
@@ -79,16 +70,11 @@ export default function SerialTransmitView() {
     [updateSerialEditor]
   );
 
-  // Handle delimiter change
+  const [delimiterDraft, setDelimiterDraft] = useState<string | null>(null);
   const handleDelimiterChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
-      const hex = e.target.value.replace(/[^0-9a-fA-F\s]/g, "").toUpperCase();
-      try {
-        const bytes = hexToBytes(hex.replace(/\s/g, ""));
-        updateSerialEditor({ delimiter: bytes });
-      } catch {
-        // Invalid input, ignore
-      }
+      setDelimiterDraft(e.target.value);
+      updateSerialEditor({ delimiter: hexToBytes(e.target.value) });
     },
     [updateSerialEditor]
   );
@@ -169,7 +155,6 @@ export default function SerialTransmitView() {
               rows={4}
               size="lg"
               mono
-              className="uppercase"
             />
           </div>
 
@@ -215,11 +200,12 @@ export default function SerialTransmitView() {
               </label>
               <Input
                 type="text"
-                value={serialEditor.delimiter.map(byteToHex).join(" ")}
+                value={delimiterDraft ?? serialEditor.delimiter.map(byteToHex).join(" ")}
                 onChange={handleDelimiterChange}
+                onBlur={() => setDelimiterDraft(null)}
                 placeholder={t("serialView.delimiterPlaceholder")}
                 mono
-                className="w-32 uppercase"
+                className="w-32"
               />
               <p className={`${textSecondary} text-xs mt-1`}>
                 {t("serialView.delimiterDefault")}
