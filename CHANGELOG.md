@@ -22,6 +22,10 @@ All notable changes to WireTAP will be documented in this file.
 - **A stopped capture offers Play.** On a session opened on a capture or an imported file, the session menu used to offer "Resume IO stream" while stopped, although there is no device to resume; it now reads "Play", as it does while paused.
 - **The Sessions detail panel names an MCP agent as one.** Selecting an MCP agent's node used to show its internal `mcp_` id; the panel now reads "MCP agent", as the node does.
 - **The Decoder's times follow your language.** Signal update times and the Unmatched and Filtered frame times used to be formatted in US English whatever language you chose; they now follow it.
+- **The Decoder checks a serial custom CRC.** A serial catalogue whose checksum is a custom CRC or a negated sum showed no checksum badge on its frames; it is now checked, as a named algorithm is.
+- **The Sessions detail panel names an MCP agent's connection as one.** Selecting the link to an MCP agent used to show its internal `mcp_` id with "mcp" beneath; it now reads "MCP agent", as the node does.
+- **Discovery's serial times follow your language.** Frame times in Discovery's serial view used to be formatted in US English whatever language you chose; they now follow it.
+- **A refused edit no longer marks a valid catalogue invalid.** When the Catalogue Editor turned down an edit (a frame with no identifier, a mux case that already exists, a failed delete), the toolbar badge read Invalid although the file had not changed; it now keeps the catalogue's last verdict.
 
 ## [0.16.1] - 2026-11-04
 

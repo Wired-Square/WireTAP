@@ -229,6 +229,7 @@ export interface CatalogEditorState {
   setDiff: (diff: CatalogDiff | null) => void;
 
   // Actions - Validation
+  /** Without `isValid`, the errors refuse a draft that never reached the catalogue, so its verdict stands. */
   setValidation: (errors: ValidationError[], isValid?: boolean | null) => void;
   clearValidation: () => void;
 
@@ -563,12 +564,9 @@ export const useCatalogEditorStore = create<CatalogEditorState>((set, get) => ({
     set((state) => ({ content: { ...state.content, diff } })),
 
   // Validation actions
-  setValidation: (errors, isValid) => set({
-    validation: {
-      errors,
-      isValid: isValid !== undefined ? isValid : errors.length === 0
-    }
-  }),
+  setValidation: (errors, isValid) => set((state) => ({
+    validation: { errors, isValid: isValid === undefined ? state.validation.isValid : isValid },
+  })),
 
   clearValidation: () => set({ validation: { errors: [], isValid: null } }),
 
