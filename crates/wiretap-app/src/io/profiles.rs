@@ -255,7 +255,8 @@ mod tests {
     }
 
     /// The retired TypeScript create path's output, taken before it was deleted.
-    /// The only deliberate difference is the id's number.
+    /// The deliberate differences are the id's number and a virtual device's
+    /// buses, now listed as `interfaces`.
     #[test]
     fn the_retired_typescript_create_path_agrees() {
         let golden: Value =
@@ -273,7 +274,15 @@ mod tests {
             let mut written = serde_json::to_value(&profile).unwrap();
             written.as_object_mut().unwrap().remove("id");
             written.as_object_mut().unwrap().remove("preferred_catalog");
-            assert_eq!(written, case["profile"], "{name} (persist {persist})");
+            let mut retired = IOProfile {
+                kind: profile.kind.clone(),
+                connection: serde_json::from_value(case["profile"]["connection"].clone()).unwrap(),
+                ..IOProfile::default()
+            };
+            crate::io::profile::list_legacy_virtual_buses(&mut retired);
+            let mut expected = case["profile"].clone();
+            expected["connection"] = serde_json::to_value(retired.connection).unwrap();
+            assert_eq!(written, expected, "{name} (persist {persist})");
 
             let want: Vec<(String, String)> = case["keychain"]
                 .as_array()

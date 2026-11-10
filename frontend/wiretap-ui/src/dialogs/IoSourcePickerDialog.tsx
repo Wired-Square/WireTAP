@@ -239,6 +239,7 @@ export default function IoSourcePickerDialog({
   // Get session helpers from session store
   const isProfileInUse = useSessionStore((s) => s.isProfileInUse);
   const getSessionForProfile = useSessionStore((s) => s.getSessionForProfile);
+  const getProfileIoState = useSessionStore((s) => s.getProfileIoState);
   const startSession = useSessionStore((s) => s.startSession);
   const selectedIsCapture = useSessionStore((s) => isCaptureSession(s, selectedId));
   const selectedSessionCaptureId = useSessionStore((s) => (selectedId ? s.sessions[selectedId]?.capture.id : null));
@@ -1309,7 +1310,7 @@ export default function IoSourcePickerDialog({
           }}
           onToggleSource={handleToggleReader}
           isProfileLive={isProfileInUse}
-          getSessionForProfile={getSessionForProfile}
+          profileIoState={getProfileIoState}
           validationError={validationError}
           allowMultiSelect={allowMultiSelect}
           renderProfileExtra={(profileId) => {

@@ -6,18 +6,16 @@
 //! [`apply_defaults`] is the exception: the write path stores a profile with its
 //! defaults, because the frontend reads the map directly.
 //!
-//! Outside the table: the Modbus MITM server's listen `host`/`port`, and the
-//! nested `interfaces[]` entries, whose per-item values are the `VIRTUAL_*`
-//! constants.
+//! Outside the table: the Modbus MITM server's listen `host`/`port`.
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use serde::Serialize;
 use wslib_wiretap_catalogue::serial_framing::degenerate_framing_field;
 use wslib_wiretap_catalogue::FramingMode;
 
 use super::{ConnValue, IOProfile};
-use DefaultValue::{Bool, Float, Int, Str};
+use DefaultValue::{Bool, Float, Int, List, Map, Str};
 
 /// A default connection value, as a `const` can hold one.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -26,15 +24,27 @@ pub enum DefaultValue {
     Int(i64),
     Float(f64),
     Bool(bool),
+    List(&'static [DefaultValue]),
+    Map(&'static [(&'static str, DefaultValue)]),
 }
 
 impl From<DefaultValue> for ConnValue {
     fn from(value: DefaultValue) -> Self {
         match value {
-            DefaultValue::Str(s) => s.into(),
-            DefaultValue::Int(n) => n.into(),
-            DefaultValue::Float(f) => f.into(),
-            DefaultValue::Bool(b) => b.into(),
+            Str(s) => s.into(),
+            Int(n) => n.into(),
+            Float(f) => f.into(),
+            Bool(b) => b.into(),
+            List(items) => items
+                .iter()
+                .map(|v| (*v).into())
+                .collect::<Vec<ConnValue>>()
+                .into(),
+            Map(fields) => fields
+                .iter()
+                .map(|(k, v)| ((*k).to_string(), (*v).into()))
+                .collect::<BTreeMap<String, ConnValue>>()
+                .into(),
         }
     }
 }
@@ -171,9 +181,14 @@ static KINDS: &[(&str, KindSpec)] = &[
             defaults: &[
                 ("traffic_type", Str("can")),
                 ("loopback", Bool(true)),
-                ("signal_generator", Bool(VIRTUAL_SIGNAL_GENERATOR)),
-                ("frame_rate_hz", Float(VIRTUAL_FRAME_RATE_HZ)),
-                ("bus_count", Int(1)),
+                (
+                    "interfaces",
+                    List(&[Map(&[
+                        ("bus", Int(0)),
+                        ("signal_generator", Bool(VIRTUAL_SIGNAL_GENERATOR)),
+                        ("frame_rate_hz", Float(VIRTUAL_FRAME_RATE_HZ)),
+                    ])]),
+                ),
             ],
             required: &[],
         },
@@ -228,6 +243,7 @@ pub fn apply_defaults(profile: &mut IOProfile) {
     let Some(spec) = spec(&profile.kind) else {
         return;
     };
+    list_legacy_virtual_buses(profile);
     for (key, val) in spec.defaults {
         let blank = match profile.connection.get(*key) {
             None | Some(ConnValue::Null) => true,
@@ -243,6 +259,36 @@ pub fn apply_defaults(profile: &mut IOProfile) {
             profile.connection.insert((*key).to_string(), form_value);
         }
     }
+}
+
+/// Rewrites a virtual device's top-level `bus_count`, `signal_generator` and
+/// `frame_rate_hz` into the `interfaces` list they read as.
+pub fn list_legacy_virtual_buses(profile: &mut IOProfile) {
+    let listed = profile
+        .connection
+        .get("interfaces")
+        .and_then(ConnValue::as_list);
+    if canonical_kind(&profile.kind) != "virtual" || listed.is_some_and(|l| !l.is_empty()) {
+        return;
+    }
+    let interfaces: Vec<ConnValue> = profile
+        .virtual_interfaces()
+        .into_iter()
+        .map(|i| {
+            BTreeMap::from([
+                ("bus".to_string(), i64::from(i.bus).into()),
+                ("signal_generator".to_string(), i.signal_generator.into()),
+                ("frame_rate_hz".to_string(), i.frame_rate_hz.into()),
+            ])
+            .into()
+        })
+        .collect();
+    for key in ["bus_count", "signal_generator", "frame_rate_hz"] {
+        profile.connection.remove(key);
+    }
+    profile
+        .connection
+        .insert("interfaces".into(), interfaces.into());
 }
 
 /// What a serial source will run with: the framing, and whether raw bytes go

@@ -592,7 +592,7 @@ fn migrate(settings: &mut AppSettings, documents: Option<&Path>) -> bool {
     }
     merge_framelink_interfaces(settings);
     canonicalise_kinds(&mut settings.io_profiles);
-    list_legacy_virtual_buses(&mut settings.io_profiles);
+    settings.io_profiles.iter_mut().for_each(crate::io::profile::list_legacy_virtual_buses);
     clamp_settings(settings);
 
     serde_json::to_value(&*settings).expect("settings serialise") != before
@@ -860,33 +860,6 @@ fn canonicalise_kinds(profiles: &mut [IOProfile]) {
         if canonical != p.kind {
             p.kind = canonical.to_string();
         }
-    }
-}
-
-/// Rewrites a virtual device's top-level `bus_count`, `signal_generator` and
-/// `frame_rate_hz` into the `interfaces` list they read as.
-fn list_legacy_virtual_buses(profiles: &mut [IOProfile]) {
-    use crate::io::profile::ConnValue;
-    for p in profiles.iter_mut().filter(|p| p.kind == "virtual") {
-        if p.connection.get("interfaces").and_then(ConnValue::as_list).is_some_and(|l| !l.is_empty()) {
-            continue;
-        }
-        let interfaces: Vec<ConnValue> = p
-            .virtual_interfaces()
-            .into_iter()
-            .map(|i| {
-                std::collections::BTreeMap::from([
-                    ("bus".to_string(), i64::from(i.bus).into()),
-                    ("signal_generator".to_string(), i.signal_generator.into()),
-                    ("frame_rate_hz".to_string(), i.frame_rate_hz.into()),
-                ])
-                .into()
-            })
-            .collect();
-        for key in ["bus_count", "signal_generator", "frame_rate_hz"] {
-            p.connection.remove(key);
-        }
-        p.connection.insert("interfaces".into(), interfaces.into());
     }
 }
 

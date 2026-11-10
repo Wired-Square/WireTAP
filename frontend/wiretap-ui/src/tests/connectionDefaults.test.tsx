@@ -14,6 +14,7 @@ import type { ConnectionDefaults } from "../api/deviceKinds";
 const served: Record<string, ConnectionDefaults> = {
   slcan: { baud_rate: 230400, bitrate: 250000, silent_mode: true, data_bits: 8, stop_bits: 1, parity: "none" },
   modbus_tcp: { host: "192.168.1.100", port: 502, unit_id: 1 },
+  virtual: { traffic_type: "can", loopback: true, interfaces: [{ bus: 0, signal_generator: true, frame_rate_hz: 25 }] },
 };
 const invoke = vi.fn(async (cmd: string, args?: Record<string, unknown>) =>
   cmd === "default_connection_for_kind" ? served[args?.kind as string] ?? {} : [],
@@ -42,12 +43,12 @@ describe("connection defaults from Rust", () => {
     expect(modbusConnectionOf({ connection: { host: "10.0.0.7", unit_id: "3" } }, served.modbus_tcp).host).toBe("10.0.0.7");
   });
 
-  it("show a blank field at the served default", async () => {
+  async function renderFields(profile: IOProfile) {
     const root = createRoot(document.body.appendChild(document.createElement("div")));
     await act(async () =>
       root.render(
         <IOConnectionFields
-          profile={slcan({ port: "" })}
+          profile={profile}
           onUpdateConnectionField={() => {}}
           probe={{} as ConnectionProbe}
           platform={{ isWindows: false, isLinux: false, isMacos: true }}
@@ -55,8 +56,20 @@ describe("connection defaults from Rust", () => {
         />,
       ),
     );
+    return root;
+  }
+
+  it("show a blank field at the served default", async () => {
+    const root = await renderFields(slcan({ port: "" }));
     const values = [...document.querySelectorAll("select")].map((s) => s.value);
     expect(values).toContain("250000");
+    act(() => root.unmount());
+  });
+
+  it("seed a new virtual device's bus from the served interface default", async () => {
+    const root = await renderFields({ id: "", name: "Virtual", kind: "virtual", connection: {} } as IOProfile);
+    const values = [...document.querySelectorAll("input")].map((i) => i.value);
+    expect(values).toContain("25");
     act(() => root.unmount());
   });
 });

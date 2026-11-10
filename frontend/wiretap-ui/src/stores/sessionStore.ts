@@ -364,6 +364,8 @@ export interface SessionStore {
   isProfileInUse: (profileId: string) => boolean;
   /** Get session for a profile (if one exists) */
   getSessionForProfile: (profileId: string) => Session | undefined;
+  /** Running while any session holding the profile runs; stopped only when all have stopped. */
+  getProfileIoState: (profileId: string) => IOStateType | undefined;
 
   // ---- Global App Error Dialog ----
   /** Global app error dialog state (shown for errors across the app) */
@@ -1143,6 +1145,13 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     Object.values(get().sessions).find(
       (s) => s && s.profileId === profileId && s.lifecycleState === "connected"
     ),
+
+  getProfileIoState: (profileId) => {
+    const states = Object.values(get().sessions)
+      .filter((s) => s && s.profileId === profileId && s.lifecycleState === "connected")
+      .map((s) => s.ioState);
+    return states.find((s) => s === "running") ?? states.find((s) => s !== "stopped") ?? states[0];
+  },
 
   // ---- Global App Error Dialog ----
   showAppError: (title, message, details, fingerprint, sessionId) => {
