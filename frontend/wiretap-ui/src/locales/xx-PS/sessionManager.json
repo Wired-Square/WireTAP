@@ -109,6 +109,9 @@
       "appsCount_one": "⟦{{count}} app⟧",
       "appsCount_other": "⟦{{count}} apps⟧",
       "framesBuffered": "⟦{{count}} frames buffered⟧"
+    },
+    "app": {
+      "mcpAgent": "⟦MCP agent⟧"
     }
   },
   "log": {

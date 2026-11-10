@@ -12,6 +12,7 @@ All notable changes to WireTAP will be documented in this file.
 - **The Catalogue Editor shows a CAN frame's name.** A frame's `name` now appears beside its ID in the tree and on its own line in the frame's details. It can still be set only in Text Mode.
 - **Serial Transmit takes a 0x prefix.** Its bytes and delimiter fields used to read `0x0d` as the bytes 00 0D; they now read it as 0D, and the delimiter field no longer reformats under you while you type.
 - **Dashboard histograms follow a theme change.** A histogram left open while you switched theme kept the old theme's grid and axis colours until its tab was reopened; it now redraws in the new theme straight away, as the line and flow charts do.
+- **The Sessions graph names an MCP agent as one.** A session opened over MCP added an app node labelled with an internal `mcp_` id; the node now reads "MCP agent".
 
 ## [0.16.1] - 2026-11-04
 
