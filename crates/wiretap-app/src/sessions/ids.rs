@@ -105,9 +105,10 @@ pub(crate) fn session_id_prefix<'a>(
     let mut emits_bytes = false;
     for p in profiles {
         let spec = device_kinds::traits(&p.kind);
-        let virtual_serial = p.kind == "virtual"
-            && super::source_config::profile_bus_mappings(p).iter().any(|m| m.protocol == Protocol::Serial);
-        let proto = spec.filter(|s| s.realtime).map(|s| if virtual_serial { Protocol::Serial } else { s.protocol });
+        let virtual_traffic = (p.kind == "virtual")
+            .then(|| super::source_config::profile_bus_mappings(p).first().map(|m| m.protocol))
+            .flatten();
+        let proto = spec.filter(|s| s.realtime).map(|s| virtual_traffic.unwrap_or(s.protocol));
         if proto == Some(Protocol::Serial) {
             emits_bytes |= crate::io::profile::resolve_serial_framing(p, None, emit_raw_bytes).1;
         }
@@ -119,7 +120,7 @@ pub(crate) fn session_id_prefix<'a>(
     match first {
         Some((true, _)) => "t",
         Some((_, Some(Protocol::Serial))) if emits_bytes => "b",
-        Some((_, Some(Protocol::Can | Protocol::Serial))) => "f",
+        Some((_, Some(Protocol::Can | Protocol::CanFd | Protocol::Serial))) => "f",
         _ => "s",
     }
 }
@@ -146,6 +147,13 @@ mod tests {
         let serial = profile("virtual", json!({ "traffic_type": "serial" }));
         assert_eq!(session_id_prefix([&serial], None), "b");
         assert_eq!(session_id_prefix([&profile("virtual", json!({ "traffic_type": "can" }))], None), "f");
+    }
+
+    #[test]
+    fn a_virtual_device_generating_modbus_traffic_gets_a_modbus_id() {
+        let modbus = profile("virtual", json!({ "traffic_type": "modbus" }));
+        assert_eq!(session_id_prefix([&modbus], None), "m");
+        assert_eq!(session_id_prefix([&profile("virtual", json!({ "traffic_type": "canfd" }))], None), "f");
     }
 
     /// The spellings the retired frontend mints used, and where one changed:

@@ -14,6 +14,7 @@ All notable changes to WireTAP will be documented in this file.
 - **Dashboard histograms follow a theme change.** A histogram left open while you switched theme kept the old theme's grid and axis colours until its tab was reopened; it now redraws in the new theme straight away, as the line and flow charts do.
 - **Query reopens on the capture it was showing.** Closing and reopening the Query tab on a capture used to leave it on a session that had closed with the tab, its button showing an internal id; it now opens the capture again under its name, or shows no source if the capture was deleted meanwhile.
 - **The Sessions graph names an MCP agent as one.** A session opened over MCP added an app node labelled with an internal `mcp_` id; the node now reads "MCP agent".
+- **A Virtual Device generating Modbus traffic opens a Modbus session.** Its session used to get a frames id, as a CAN source does; it now gets a Modbus one, as a Modbus device does.
 
 ## [0.16.1] - 2026-11-04
 
