@@ -414,7 +414,7 @@ export default function IoSourcePickerDialog({
 
   // Get the session for the checked profile (if any) to check its state
   const checkedProfileSession = checkedSourceId ? getSessionForProfile(checkedSourceId) : undefined;
-  const isCheckedProfileStopped = checkedProfileSession?.ioState === "stopped";
+  const isCheckedProfileStopped = checkedSourceId ? getProfileIoState(checkedSourceId) === "stopped" : false;
   const isCheckedProfileCapture = checkedProfileSession?.capabilities?.traits?.temporal_mode === "capture";
 
   // Find if there's a live multi-source session for the selected profiles (multi-bus mode)
@@ -730,8 +730,7 @@ export default function IoSourcePickerDialog({
       // Check if this profile has an active session
       // Access store functions via getState() to avoid dependency issues
       const isLive = isProfileInUse(profileId);
-      const session = getSessionForProfile(profileId);
-      const isStopped = session?.ioState === "stopped";
+      const isStopped = getProfileIoState(profileId) === "stopped";
       const profile = readProfiles.find((p) => p.id === profileId);
       const isMultiBus = profile ? isMultiBusProfile(profile) : false;
 
@@ -780,7 +779,7 @@ export default function IoSourcePickerDialog({
           });
         });
     });
-    // Note: isProfileInUse and getSessionForProfile are stable store functions,
+    // Note: isProfileInUse and getProfileIoState are stable store functions,
     // intentionally excluded from deps to prevent infinite loops
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, checkedSourceIds, readProfiles, profileBusesLoaded]);
