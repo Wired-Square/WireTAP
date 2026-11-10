@@ -11,6 +11,7 @@ All notable changes to WireTAP will be documented in this file.
 - **Opening an invalid dashboard file says why.** A file that failed to load used to do nothing; an error dialog now says the dashboard was not opened and why, and the current dashboard is left as it was.
 - **The Catalogue Editor shows a CAN frame's name.** A frame's `name` now appears beside its ID in the tree and on its own line in the frame's details. It can still be set only in Text Mode.
 - **Serial Transmit takes a 0x prefix.** Its bytes and delimiter fields used to read `0x0d` as the bytes 00 0D; they now read it as 0D, and the delimiter field no longer reformats under you while you type.
+- **Dashboard histograms follow a theme change.** A histogram left open while you switched theme kept the old theme's grid and axis colours until its tab was reopened; it now redraws in the new theme straight away, as the line and flow charts do.
 
 ## [0.16.1] - 2026-11-04
 

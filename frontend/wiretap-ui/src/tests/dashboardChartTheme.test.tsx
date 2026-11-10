@@ -17,10 +17,12 @@ vi.mock("uplot", () => ({
     }
     destroy() {}
     setData() {}
+    static paths = { bars: () => () => null };
   },
 }));
 
 import LineChartPanel from "../apps/dashboard/views/panels/line-chart/LineChartPanel";
+import HistogramPanel from "../apps/dashboard/views/panels/histogram/HistogramPanel";
 import type { DashboardPanel } from "../stores/dashboardStore";
 
 const lastXAxis = () => built[built.length - 1]?.axes?.[0];
@@ -52,6 +54,33 @@ describe("a dashboard line chart", () => {
 
     await act(async () => {
       html.classList.remove("dark");
+      html.style.setProperty("--text-primary", "#111111");
+      html.style.setProperty("--border-default", "#cccccc");
+    });
+
+    const axis = lastXAxis();
+    expect(axis?.stroke).toBe("#111111");
+    expect(axis?.grid?.stroke).toBe("#cccccc");
+  });
+});
+
+describe("a dashboard histogram", () => {
+  let root: Root;
+  afterEach(() => act(() => root.unmount()));
+
+  it("takes the new theme's axis and grid colours when the theme changes", async () => {
+    const html = document.documentElement;
+    html.style.setProperty("--text-primary", "#eeeeee");
+    html.style.setProperty("--border-default", "#333333");
+    const panel = {
+      id: "h", type: "histogram", title: "", minValue: 0, maxValue: 100,
+      signals: [{ frameId: 0x100, signalName: "Speed", colour: "#ff0000" }],
+    } as DashboardPanel;
+    root = createRoot(document.createElement("div"));
+    await act(async () => root.render(<HistogramPanel panel={panel} />));
+    expect(lastXAxis()?.stroke).toBe("#eeeeee");
+
+    await act(async () => {
       html.style.setProperty("--text-primary", "#111111");
       html.style.setProperty("--border-default", "#cccccc");
     });

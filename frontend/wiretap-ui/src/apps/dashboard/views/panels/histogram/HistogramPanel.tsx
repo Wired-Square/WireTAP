@@ -8,7 +8,7 @@ import { getSignalLabel, type DashboardPanel } from "../../../../../stores/dashb
 import { emptyStateText } from "../../../../../styles/typography";
 import { readHistograms, type HistogramBin } from "../../../../../api/dashboardHistory";
 import { useHistoryQuery } from "../../../widgets/useHistoryQuery";
-import { getCssVar } from "../useUPlotPanel";
+import { getCssVar, useThemeVersion } from "../useUPlotPanel";
 
 interface Props {
   panel: DashboardPanel;
@@ -44,6 +44,7 @@ export default function HistogramPanel({ panel, canvasRef }: Props) {
   const data = useMemo(() => histogramData(histograms ?? []), [histograms]);
   const dataRef = useRef(data);
   dataRef.current = data;
+  const themeVersion = useThemeVersion();
 
   // Expose canvas for PNG export
   useEffect(() => {
@@ -130,7 +131,7 @@ export default function HistogramPanel({ panel, canvasRef }: Props) {
     const chart = new uPlot(opts, dataRef.current, el);
     chartRef.current = chart;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [panel.signals.length, sigKey, panel.histogramBins]);
+  }, [panel.signals.length, sigKey, panel.histogramBins, themeVersion]);
 
   useEffect(() => {
     chartRef.current?.setData(data);

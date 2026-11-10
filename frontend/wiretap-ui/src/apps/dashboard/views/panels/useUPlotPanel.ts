@@ -17,7 +17,7 @@ export function getCssVar(name: string): string {
 const COMPACT_WIDTH = 350;
 const COMPACT_HEIGHT = 180;
 
-function useThemeVersion(): number {
+export function useThemeVersion(): number {
   const [version, setVersion] = useState(0);
   useEffect(() => {
     const observer = new MutationObserver(() => setVersion((v) => v + 1));
