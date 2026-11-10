@@ -10,6 +10,7 @@ All notable changes to WireTAP will be documented in this file.
 
 ### Fixed
 
+- **An older Virtual Device keeps its buses in Settings.** A Virtual Device saved by an older version with a bus count, rather than a list of interfaces, opened with all its buses but showed "buses: 1" in Data I/O and one interface in its editor. WireTAP now rewrites it into the interface list on first load, so the summary and the editor show every bus; nothing needs doing.
 - **Dashboard charts follow a theme change.** A line or flow chart left open while you switched theme kept the old theme's grid and axis colours until its tab was reopened; it now redraws in the new theme straight away.
 - **A Dashboard that gets its first panel after opening fills its tab.** Its grid used to stay about 800 pixels wide, leaving the rest of the tab empty until it was reopened; it now follows the tab's width.
 - **Opening an invalid dashboard file says why.** A file that failed to load used to do nothing; an error dialog now says the dashboard was not opened and why, and the current dashboard is left as it was.

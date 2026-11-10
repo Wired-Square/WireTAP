@@ -592,6 +592,7 @@ fn migrate(settings: &mut AppSettings, documents: Option<&Path>) -> bool {
     }
     merge_framelink_interfaces(settings);
     canonicalise_kinds(&mut settings.io_profiles);
+    list_legacy_virtual_buses(&mut settings.io_profiles);
     clamp_settings(settings);
 
     serde_json::to_value(&*settings).expect("settings serialise") != before
@@ -859,6 +860,33 @@ fn canonicalise_kinds(profiles: &mut [IOProfile]) {
         if canonical != p.kind {
             p.kind = canonical.to_string();
         }
+    }
+}
+
+/// Rewrites a virtual device's top-level `bus_count`, `signal_generator` and
+/// `frame_rate_hz` into the `interfaces` list they read as.
+fn list_legacy_virtual_buses(profiles: &mut [IOProfile]) {
+    use crate::io::profile::ConnValue;
+    for p in profiles.iter_mut().filter(|p| p.kind == "virtual") {
+        if p.connection.get("interfaces").and_then(ConnValue::as_list).is_some_and(|l| !l.is_empty()) {
+            continue;
+        }
+        let interfaces: Vec<ConnValue> = p
+            .virtual_interfaces()
+            .into_iter()
+            .map(|i| {
+                std::collections::BTreeMap::from([
+                    ("bus".to_string(), i64::from(i.bus).into()),
+                    ("signal_generator".to_string(), i.signal_generator.into()),
+                    ("frame_rate_hz".to_string(), i.frame_rate_hz.into()),
+                ])
+                .into()
+            })
+            .collect();
+        for key in ["bus_count", "signal_generator", "frame_rate_hz"] {
+            p.connection.remove(key);
+        }
+        p.connection.insert("interfaces".into(), interfaces.into());
     }
 }
 
@@ -1527,6 +1555,45 @@ mod tests {
         assert_eq!(settings.io_profiles.len(), 1);
         assert_eq!(settings.default_read_profile.as_deref(), Some("p1"));
         assert_eq!(settings.default_write_profiles, ["p1", "other"]);
+    }
+
+    fn virtual_device(id: &str, connection: serde_json::Value) -> IOProfile {
+        IOProfile {
+            id: id.into(),
+            name: id.into(),
+            kind: "virtual".into(),
+            connection: serde_json::from_value(connection).unwrap(),
+            preferred_catalog: None,
+            ephemeral: false,
+        }
+    }
+
+    #[test]
+    fn a_legacy_virtual_device_is_rewritten_into_the_interfaces_it_already_read_as() {
+        let legacy = virtual_device("v_legacy", serde_json::json!({
+            "traffic_type": "can", "bus_count": "3", "signal_generator": false, "frame_rate_hz": "25",
+        }));
+        let listed = virtual_device("v_listed", serde_json::json!({
+            "interfaces": [{ "bus": 2, "signal_generator": true, "frame_rate_hz": 5 }], "bus_count": "4",
+        }));
+        let mut settings = AppSettings { io_profiles: vec![legacy.clone(), listed.clone()], ..AppSettings::default() };
+        migrate(&mut settings, None);
+
+        let rewritten = &settings.io_profiles[0];
+        assert_eq!(
+            serde_json::to_value(&rewritten.connection).unwrap(),
+            serde_json::json!({
+                "traffic_type": "can",
+                "interfaces": [
+                    { "bus": 0, "signal_generator": false, "frame_rate_hz": 25.0 },
+                    { "bus": 1, "signal_generator": false, "frame_rate_hz": 25.0 },
+                    { "bus": 2, "signal_generator": false, "frame_rate_hz": 25.0 },
+                ],
+            })
+        );
+        assert_eq!(rewritten.virtual_interfaces(), legacy.virtual_interfaces());
+        assert_eq!(settings.io_profiles[1], listed);
+        assert!(!migrate(&mut settings, None), "a second pass changes nothing");
     }
 
     struct Scratch(PathBuf);
