@@ -10,6 +10,7 @@ import { caption, emptyStateContainer, emptyStateText, bgSurface, bgDataView, te
 import type { PlaybackState, PlaybackSpeed } from "../../../components/TimeController";
 import type { IOCapabilities } from '../../../api/io';
 import { formatFrameId, formatProtocolFrameId, parseFrameId } from "../../../utils/frameIds";
+import { formatClockTime } from "../../../utils/timeFormat";
 import { protocolLabel, MODBUS_REGISTER_TONES } from "../../../utils/profileTraits";
 import MessageBytes from "../../../components/MessageBytes";
 import { CanFlagBadges, RemoteRequest } from "../../../components/CanFlagMarks";
@@ -187,59 +188,12 @@ function formatSignalTimestamp(
   startTimeSeconds?: number
 ): string {
   if (timestamp === undefined) return "";
-
-  switch (format) {
-    case "human": {
-      // Short time only: HH:MM:SS
-      const date = new Date(timestamp * 1000);
-      return date.toLocaleTimeString('en-US', {
-        hour12: false,
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit'
-      });
-    }
-    case "timestamp":
-      // Unix timestamp (seconds) - show with 3 decimal places
-      return timestamp.toFixed(3);
-    case "delta-start": {
-      // Delta from start time in seconds
-      if (startTimeSeconds !== undefined) {
-        const deltaSeconds = timestamp - startTimeSeconds;
-        return `+${deltaSeconds.toFixed(1)}s`;
-      }
-      // Fallback to human time if no start time available
-      const date = new Date(timestamp * 1000);
-      return date.toLocaleTimeString('en-US', {
-        hour12: false,
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit'
-      });
-    }
-    case "delta-last":
-      // For delta-last, we'd need per-signal tracking which is complex
-      // Show human time as fallback - delta-last doesn't make sense for signal view
-      // since we show "last update time" not a stream of updates
-      {
-        const date = new Date(timestamp * 1000);
-        return date.toLocaleTimeString('en-US', {
-          hour12: false,
-          hour: '2-digit',
-          minute: '2-digit',
-          second: '2-digit'
-        });
-      }
-    default: {
-      const date = new Date(timestamp * 1000);
-      return date.toLocaleTimeString('en-US', {
-        hour12: false,
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit'
-      });
-    }
+  if (format === "timestamp") return timestamp.toFixed(3);
+  if (format === "delta-start" && startTimeSeconds !== undefined) {
+    return `+${(timestamp - startTimeSeconds).toFixed(1)}s`;
   }
+  // delta-last has no meaning for a signal's last-update time, so it reads as a clock time too.
+  return formatClockTime(new Date(timestamp * 1000));
 }
 
 function emphasisedColour(colour: string): string {
@@ -333,12 +287,7 @@ export function RawFrameRow({
 }) {
   const { t } = useTranslation("decoder");
   const date = new Date(frame.timestamp * 1000);
-  const timeStr = date.toLocaleTimeString('en-US', {
-    hour12: false,
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  }) + '.' + String(date.getMilliseconds()).padStart(3, '0');
+  const timeStr = formatClockTime(date) + '.' + String(date.getMilliseconds()).padStart(3, '0');
   return (
     <div
       className={`flex items-center gap-3 px-3 py-1.5 ${bgDataView} rounded text-sm font-mono`}

@@ -103,6 +103,11 @@ export function formatDeltaUs(deltaUs: number): string {
 // Display & Form Utilities (extracted from Discovery/Decoder components)
 // ============================================================================
 
+/** A 24-hour HH:MM:SS clock time in the chosen language. */
+export function formatClockTime(date: Date): string {
+  return date.toLocaleTimeString(i18n.language, { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" });
+}
+
 /**
  * Format epoch seconds to a locale string for display (e.g., clock display).
  * @param epochSeconds - Unix timestamp in seconds

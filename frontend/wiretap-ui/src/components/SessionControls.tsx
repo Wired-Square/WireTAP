@@ -577,7 +577,7 @@ export function IOSessionControls({
           {/* Playback / capture actions */}
           {showPlay && (
             <MenuItem onClick={onPlay} icon={<Play />}>
-              {isStopped ? t("session.resumeIo") : t("playback.play")}
+              {isStopped && !openedOnCapture ? t("session.resumeIo") : t("playback.play")}
             </MenuItem>
           )}
           {showPause && (

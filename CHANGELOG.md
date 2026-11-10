@@ -14,6 +14,10 @@ All notable changes to WireTAP will be documented in this file.
 - **Dashboard histograms follow a theme change.** A histogram left open while you switched theme kept the old theme's grid and axis colours until its tab was reopened; it now redraws in the new theme straight away, as the line and flow charts do.
 - **Query reopens on the capture it was showing.** Closing and reopening the Query tab on a capture used to leave it on a session that had closed with the tab, its button showing an internal id; it now opens the capture again under its name, or shows no source if the capture was deleted meanwhile.
 - **The Sessions graph names an MCP agent as one.** A session opened over MCP added an app node labelled with an internal `mcp_` id; the node now reads "MCP agent".
+- **A Virtual Device generating Modbus traffic opens a Modbus session.** Its session used to get a frames id, as a CAN source does; it now gets a Modbus one, as a Modbus device does.
+- **A stopped capture offers Play.** On a session opened on a capture or an imported file, the session menu used to offer "Resume IO stream" while stopped, although there is no device to resume; it now reads "Play", as it does while paused.
+- **The Sessions detail panel names an MCP agent as one.** Selecting an MCP agent's node used to show its internal `mcp_` id; the panel now reads "MCP agent", as the node does.
+- **The Decoder's times follow your language.** Signal update times and the Unmatched and Filtered frame times used to be formatted in US English whatever language you chose; they now follow it.
 
 ## [0.16.1] - 2026-11-04
 

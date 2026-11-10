@@ -18,6 +18,7 @@ import { Badge } from "../../../components/Badge";
 import { protocolLabel, protocolTone } from "../../../utils/profileTraits";
 import { appTitle } from "../../registry";
 import { ioStateLabel } from "../stores/sessionLogStore";
+import { appNodeLabel } from "../utils/appNodeLabel";
 import { Checkbox, Input, Select } from "../../../components/forms";
 
 interface SessionDetailPanelProps {
@@ -1061,7 +1062,7 @@ function AppDetails({ nodeId, sessions, openApps, onEvict }: { nodeId: string; s
           {t("detail.labels.appId")}
         </label>
         <p className="text-sm text-primary font-mono">
-          {instance?.display_id ?? listener.subscriber_id}
+          {appNodeLabel(t, listener.app_name, instance?.display_id ?? listener.subscriber_id)}
         </p>
       </div>
 
