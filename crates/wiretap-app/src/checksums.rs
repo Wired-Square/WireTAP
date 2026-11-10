@@ -11,9 +11,9 @@ use serde::Serialize;
 use std::str::FromStr;
 
 use wslib_checksum::{
-    calculate_checksum, detect_checksum, resolve_byte_index, sweep_specs, validate_checksum,
-    ChecksumAlgorithm, ChecksumDetectionOptions, ChecksumDetectionResult, ChecksumSpec,
-    ChecksumSpecResult, ChecksumValidationResult,
+    calculate_checksum, calculated_range, detect_checksum, extract_checksum, resolve_byte_index,
+    sweep_specs, validate_checksum, ChecksumAlgorithm, ChecksumDetectionOptions,
+    ChecksumDetectionResult, ChecksumSpec, ChecksumSpecResult, ChecksumValidationResult,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -63,22 +63,29 @@ pub fn validate_checksum_cmd(
 }
 
 /// Check a frame against its serial catalogue's `[meta.serial.checksum]`.
-/// `None` when the catalogue names an algorithm this build does not know.
+/// `None` when the declaration is not coherent enough to evaluate.
 pub fn validate_serial_checksum(
     config: &wslib_wiretap_catalogue::model::FrameChecksum,
     data: &[u8],
 ) -> Option<ChecksumValidationResult> {
-    let algo = ChecksumAlgorithm::from_str(&config.algorithm).ok()?;
-    Some(validate_checksum(
-        algo,
-        data,
+    let specification = config.specification()?;
+    let byte_length = config.byte_length as usize;
+    let big_endian = config.endianness == Some(wslib_wiretap_catalogue::Endianness::Big);
+    let range = calculated_range(
+        data.len(),
         config.start_byte,
-        config.byte_length as usize,
-        config.endianness == Some(wslib_wiretap_catalogue::Endianness::Big),
+        byte_length,
         config.calc_start_byte,
         // Absent stops short of the last byte, as the Decoder has always read it.
         config.calc_end_byte.unwrap_or(-1),
-    ))
+    );
+    let extracted = extract_checksum(data, config.start_byte, byte_length, big_endian).unwrap_or(0);
+    let calculated = range.clone().map_or(0, |r| specification.calculate(&data[r]));
+    Some(ChecksumValidationResult {
+        extracted,
+        calculated,
+        valid: range.is_some() && extracted == calculated,
+    })
 }
 
 /// Each index resolved against each frame length, one row per length; a
@@ -233,5 +240,82 @@ mod tests {
             calculate_checksum_cmd("sum8".into(), vec![1, 2, 0], 0, -1),
             Ok(0x03)
         );
+    }
+
+    mod serial_level_checksum {
+        use super::*;
+        use wslib_wiretap_catalogue::model::{ChecksumParameters, FrameChecksum};
+        use wslib_wiretap_catalogue::Endianness;
+
+        fn declared(algorithm: &str, start_byte: i32, byte_length: u32) -> FrameChecksum {
+            FrameChecksum {
+                name: None,
+                algorithm: algorithm.into(),
+                start_byte,
+                byte_length,
+                endianness: None,
+                calc_start_byte: 0,
+                calc_end_byte: None,
+                parameters: ChecksumParameters::default(),
+                notes: Vec::new(),
+            }
+        }
+
+        fn verdicts(config: &FrameChecksum, good: &[u8]) -> (Option<bool>, Option<bool>) {
+            let mut corrupted = good.to_vec();
+            corrupted[0] ^= 0x01;
+            (
+                validate_serial_checksum(config, good).map(|r| r.valid),
+                validate_serial_checksum(config, &corrupted).map(|r| r.valid),
+            )
+        }
+
+        #[test]
+        fn a_custom_crc_is_verified_with_its_parameters() {
+            let config = FrameChecksum {
+                endianness: Some(Endianness::Big),
+                calc_end_byte: Some(-2),
+                parameters: ChecksumParameters {
+                    polynomial: Some(0x1021),
+                    init: Some(0x1D0F),
+                    xor_out: Some(0),
+                    reflect_in: Some(false),
+                    reflect_out: Some(false),
+                    offset: None,
+                },
+                ..declared(wslib_checksum::CRC_CUSTOM, -2, 2)
+            };
+            let frame = [b"123456789".as_slice(), &[0xE5, 0xCC]].concat();
+            assert_eq!(verdicts(&config, &frame), (Some(true), Some(false)));
+        }
+
+        #[test]
+        fn a_negated_sum_is_verified() {
+            let config = declared(wslib_checksum::SUM8_NEGATED, -1, 1);
+            assert_eq!(verdicts(&config, &[1, 2, 3, 250]), (Some(true), Some(false)));
+        }
+
+        #[test]
+        fn an_absent_calc_end_stops_short_of_the_last_byte() {
+            assert_eq!(verdicts(&declared("xor", -1, 1), &[1, 2, 4, 7]), (Some(true), Some(false)));
+        }
+
+        #[test]
+        fn a_named_two_byte_checksum_without_endianness_reads_little_endian() {
+            let config = FrameChecksum {
+                calc_end_byte: Some(-2),
+                ..declared("crc16_modbus", -2, 2)
+            };
+            let mut frame = vec![1, 2, 3];
+            let crc =
+                wslib_checksum::calculate_checksum_simple(ChecksumAlgorithm::Crc16Modbus, &frame);
+            frame.extend_from_slice(&crc.to_le_bytes());
+            assert_eq!(verdicts(&config, &frame), (Some(true), Some(false)));
+        }
+
+        #[test]
+        fn an_unknown_algorithm_gets_no_verdict() {
+            assert_eq!(verdicts(&declared("crc99", -1, 1), &[1, 2, 3]), (None, None));
+        }
     }
 }
