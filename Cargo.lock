@@ -9167,6 +9167,7 @@ dependencies = [
  "wslib-bits",
  "wslib-checksum",
  "wslib-modbus",
+ "wslib-quantity",
  "wslib-wiretap-catalogue",
  "wslib-wiretap-gateway",
  "wslib-wiretap-protocol",

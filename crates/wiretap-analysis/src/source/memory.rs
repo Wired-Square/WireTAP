@@ -43,6 +43,12 @@ impl MemorySource {
         });
     }
 
+    fn on_bus(&self, bus: Option<u8>) -> impl Iterator<Item = &SourceFrame> {
+        self.frames
+            .iter()
+            .filter(move |f| bus.is_none_or(|b| b == f.frame.bus))
+    }
+
     /// Each payload query so far, as (frame id, `is_extended`, sampling).
     pub fn asked(&self) -> Vec<(u32, Option<bool>, Sampling)> {
         self.asked.lock().unwrap().clone()
@@ -58,9 +64,10 @@ impl PayloadSource for MemorySource {
         &self,
         _: Option<i64>,
         _: Option<i64>,
+        bus: Option<u8>,
     ) -> Result<Vec<InventoryRow>, Infallible> {
         let mut rows: Vec<InventoryRow> = Vec::new();
-        for SourceFrame { protocol, frame } in &self.frames {
+        for SourceFrame { protocol, frame } in self.on_bus(bus) {
             let t = frame.timestamp_us as i64;
             let FrameKey {
                 frame_id,
@@ -87,14 +94,17 @@ impl PayloadSource for MemorySource {
         Ok(rows)
     }
 
-    async fn payloads(&self, q: PayloadQuery<'_>) -> Result<Vec<Vec<u8>>, Infallible> {
+    async fn payloads(
+        &self,
+        q: PayloadQuery<'_>,
+        bus: Option<u8>,
+    ) -> Result<Vec<Vec<u8>>, Infallible> {
         self.asked
             .lock()
             .unwrap()
             .push((q.frame_id, q.is_extended, q.sampling));
         let matching: Vec<Vec<u8>> = self
-            .frames
-            .iter()
+            .on_bus(bus)
             .filter(|f| {
                 f.frame.key.frame_id == q.frame_id
                     && q.protocol.is_none_or(|p| p == f.protocol)

@@ -7,9 +7,11 @@ All notable changes to WireTAP will be documented in this file.
 ### Changed
 
 - **Validate checks checksums.** The Catalogue Editor's Validate now reports a frame checksum or serial checksum it cannot use (an unknown algorithm, a position past the longest frame, a custom CRC with no polynomial), which used to be skipped without a word. Saving the serial configuration writes the checksum's byte order as `endianness` in place of `big_endian`, and keeps its name, CRC parameters and notes. Older catalogues open with the same byte order as before; no change is needed to them.
+- **Catalogue coverage can be limited to one bus.** The MCP `catalog_coverage` tool takes an optional `bus`, so a catalogue written for one link is diffed against that bus alone on a multi-bus capture: another bus's frames are no longer reported as uncatalogued or folded under the catalogue's id mask. A WireTAP backend profile refuses a bus for now, as its archive cannot be split by bus yet; leave it out there.
 
 ### Fixed
 
+- **An older Virtual Device keeps its buses in Settings.** A Virtual Device saved by an older version with a bus count, rather than a list of interfaces, opened with all its buses but showed "buses: 1" in Data I/O and one interface in its editor. WireTAP now rewrites it into the interface list on first load, so the summary and the editor show every bus; nothing needs doing.
 - **Dashboard charts follow a theme change.** A line or flow chart left open while you switched theme kept the old theme's grid and axis colours until its tab was reopened; it now redraws in the new theme straight away.
 - **A Dashboard that gets its first panel after opening fills its tab.** Its grid used to stay about 800 pixels wide, leaving the rest of the tab empty until it was reopened; it now follows the tab's width.
 - **Opening an invalid dashboard file says why.** A file that failed to load used to do nothing; an error dialog now says the dashboard was not opened and why, and the current dashboard is left as it was.
@@ -26,6 +28,7 @@ All notable changes to WireTAP will be documented in this file.
 - **The Sessions detail panel names an MCP agent's connection as one.** Selecting the link to an MCP agent used to show its internal `mcp_` id with "mcp" beneath; it now reads "MCP agent", as the node does.
 - **Discovery's serial times follow your language.** Frame times in Discovery's serial view used to be formatted in US English whatever language you chose; they now follow it.
 - **A refused edit no longer marks a valid catalogue invalid.** When the Catalogue Editor turned down an edit (a frame with no identifier, a mux case that already exists, a failed delete), the toolbar badge read Invalid although the file had not changed; it now keeps the catalogue's last verdict.
+- **Dashboard statistics and cursors read like the signal.** The min/mean/max overlay and the line chart's cursor and measurement values padded a signal with no precision to three decimals, "89.000" beside a readout of "89". They now read as the signal's own value does, and a mean shows one decimal place more than the signal's readings carry.
 
 ## [0.16.1] - 2026-11-04
 

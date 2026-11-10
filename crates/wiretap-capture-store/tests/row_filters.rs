@@ -68,6 +68,7 @@ async fn every_row_filter_selects_exactly_its_rows() {
                             .map_or_else(Vec::new, |p| CaptureProtocol::of(p).to_vec()),
                         start_us,
                         end_us,
+                        bus: None,
                     };
                     let condition = filter.sql_where(CAPTURE);
                     let statement = Sql {

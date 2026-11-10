@@ -20,16 +20,19 @@ pub fn inventory_row(row: &SqliteRow) -> sqlx::Result<InventoryRow> {
 }
 
 impl Store {
-    /// Every identity in a capture within `start_us..end_us`, with its rollup.
+    /// Every identity in a capture within `start_us..end_us`, on `bus` when
+    /// given, with its rollup.
     pub async fn frame_inventory(
         &self,
         capture_id: &str,
         start_us: Option<i64>,
         end_us: Option<i64>,
+        bus: Option<u8>,
     ) -> Result<Vec<InventoryRow>> {
         let filter = FrameRowFilter {
             start_us,
             end_us,
+            bus,
             ..Default::default()
         };
         self.rows(
@@ -51,7 +54,7 @@ mod tests {
     async fn inventory_reports_one_row_per_protocol() {
         let store = multi_protocol_capture().await;
 
-        let rows = store.frame_inventory("c1", None, None).await.unwrap();
+        let rows = store.frame_inventory("c1", None, None, None).await.unwrap();
 
         let for_256: Vec<(&str, i64)> = rows
             .iter()
@@ -67,7 +70,7 @@ mod tests {
         let store = multi_protocol_capture().await;
 
         let rows = store
-            .frame_inventory("c1", Some(20), Some(40))
+            .frame_inventory("c1", Some(20), Some(40), None)
             .await
             .unwrap();
 
@@ -77,6 +80,31 @@ mod tests {
                 .collect::<Vec<_>>(),
             [("modbus", 20, 20), ("serial", 30, 30)]
         );
+    }
+
+    #[tokio::test]
+    async fn a_bus_reads_only_its_own_frames() {
+        let store = store().await;
+        sqlx::query(
+            "INSERT INTO frames (capture_id, protocol, timestamp_us, frame_id, bus, dlc, payload)
+             VALUES ('c1', 'can', 1, 256, 0, 1, x'00'), ('c1', 'can', 2, 256, 1, 2, x'0101'),
+                    ('c1', 'can', 3, 257, 1, 1, x'02')",
+        )
+        .execute(store.database().pool())
+        .await
+        .unwrap();
+        let query = wslib_wiretap_protocol::PayloadQuery {
+            protocol: None,
+            frame_id: 256,
+            is_extended: None,
+            limit: 10,
+            sampling: wslib_wiretap_protocol::Sampling::Recent,
+        };
+
+        let rows = store.frame_inventory("c1", None, None, Some(0)).await.unwrap();
+        assert_eq!(rows.iter().map(|r| (r.frame_id, r.count)).collect::<Vec<_>>(), [(256, 1)]);
+        assert_eq!(store.payloads("c1", &query, Some(1)).await.unwrap(), [vec![1, 1]]);
+        assert_eq!(store.payloads("c1", &query, None).await.unwrap().len(), 2);
     }
 
     #[tokio::test]
@@ -91,7 +119,7 @@ mod tests {
         .await
         .unwrap();
 
-        let rows = store.frame_inventory("c1", None, None).await.unwrap();
+        let rows = store.frame_inventory("c1", None, None, None).await.unwrap();
 
         assert_eq!(rows.iter().map(|r| r.max_dlc).collect::<Vec<_>>(), [64, 6]);
     }

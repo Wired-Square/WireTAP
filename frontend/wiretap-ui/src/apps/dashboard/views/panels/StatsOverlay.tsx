@@ -1,16 +1,15 @@
 // ui/src/apps/dashboard/views/panels/StatsOverlay.tsx
 
 import { useTranslation } from "react-i18next";
-import type { SignalRef } from "../../../../stores/dashboardStore";
+import { signalKey, type SignalRef } from "../../../../stores/dashboardStore";
 import type { WindowStats } from "../../../../api/dashboardHistory";
 import { textMuted } from "../../../../styles";
-import { formatValue } from "../../utils/dashboardFormat";
-import { useSignalPrecisions } from "../../widgets/useSignalValues";
+import { useComputedValueText } from "../../widgets/useSignalValues";
 
 /** min / avg / max of each signal over the samples the chart holds. */
 export default function StatsOverlay({ signals, stats }: { signals: SignalRef[]; stats: (WindowStats | null)[] }) {
   const { t } = useTranslation("dashboard");
-  const precisions = useSignalPrecisions(signals);
+  const textOf = useComputedValueText();
   return (
     <div
       className="absolute top-1 right-1 pointer-events-none"
@@ -27,16 +26,16 @@ export default function StatsOverlay({ signals, stats }: { signals: SignalRef[];
     >
       {signals.map((sig, i) => {
         const s = stats[i];
-        const precision = precisions[i];
+        const key = signalKey(sig.frameId, sig.signalName);
         return (
           <div key={`${i}:${sig.frameId}:${sig.signalName}`} style={{ display: "flex", alignItems: "center", gap: 4 }}>
             <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: sig.colour, flexShrink: 0 }} />
             <span className={textMuted} style={{ fontFamily: "ui-monospace, monospace", whiteSpace: "nowrap" }}>
-              {formatValue(s?.min, precision)}
+              {textOf(key, s?.min, "sample")}
               {" / "}
-              {formatValue(s?.mean, precision)}
+              {textOf(key, s?.mean, "mean")}
               {" / "}
-              {formatValue(s?.max, precision)}
+              {textOf(key, s?.max, "sample")}
             </span>
           </div>
         );

@@ -809,6 +809,10 @@ pub struct CatalogCoverageParams {
     pub start_time: Option<String>,
     #[serde(default)]
     pub end_time: Option<String>,
+    /// Diff only this bus's frames, as a catalogue written for one link needs on
+    /// a multi-bus capture. Captures only: a backend profile refuses it.
+    #[serde(default)]
+    pub bus: Option<u8>,
 }
 
 // ── Exposed analytical engines (capture OR WireTAP backend) ─────────────────────────

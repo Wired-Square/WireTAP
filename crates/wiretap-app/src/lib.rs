@@ -141,6 +141,7 @@ pub fn run() {
             dashboard::list_dashboards,
             dashboard::open_dashboard,
             dashboard::save_dashboard,
+            dashboard::signal_value_formats,
             settings::load_settings,
             settings::save_settings,
             settings::validate_directory,

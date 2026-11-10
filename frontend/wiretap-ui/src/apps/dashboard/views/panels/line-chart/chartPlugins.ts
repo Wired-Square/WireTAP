@@ -6,8 +6,9 @@
 import i18n from "i18next";
 import type uPlot from "uplot";
 import type { SignalRef } from "../../../../../stores/dashboardStore";
-import { getSignalLabel, signalKey, useDashboardStore } from "../../../../../stores/dashboardStore";
-import { formatValue, formatTimestamp, formatTimeDelta } from "../../../utils/dashboardFormat";
+import { getSignalLabel, signalKey } from "../../../../../stores/dashboardStore";
+import { formatTimestamp, formatTimeDelta } from "../../../utils/dashboardFormat";
+import { computedValueText } from "../../../widgets/useSignalValues";
 
 // ─────────────────────────────────────────
 // Shared tooltip DOM styling (CSS variables)
@@ -60,8 +61,8 @@ function createEl(tag: string, css: string, text?: string): HTMLElement {
   return node;
 }
 
-const precisionOf = (sig: SignalRef) =>
-  useDashboardStore.getState().signalPrecisions.get(signalKey(sig.frameId, sig.signalName));
+const sampleText = (sig: SignalRef, value: number | null | undefined) =>
+  computedValueText(signalKey(sig.frameId, sig.signalName), value, "sample");
 
 /** Build one signal's value row for the cursor tooltip. */
 function signalRowNode(
@@ -85,7 +86,7 @@ function signalRowNode(
     row.appendChild(confDot);
   }
 
-  row.appendChild(createEl("span", "margin-left: auto; font-family: ui-monospace, monospace; font-weight: 500;", formatValue(value, precisionOf(sig))));
+  row.appendChild(createEl("span", "margin-left: auto; font-family: ui-monospace, monospace; font-weight: 500;", sampleText(sig, value)));
 
   if (sig.unit) {
     row.appendChild(createEl("span", "color: var(--text-muted); font-size: 10px;", sig.unit));
@@ -394,7 +395,6 @@ export function measurementPlugin(
       const v1 = u.data[i + 1]?.[idx1] as number | null | undefined;
       const v2 = u.data[i + 1]?.[idx2] as number | null | undefined;
       const delta = (v1 != null && v2 != null) ? v2 - v1 : null;
-      const precision = precisionOf(sig);
 
       const labelCell = createEl("div", "display: flex; align-items: center; gap: 4px;");
       const dot = createEl("span", "display: inline-block; width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;");
@@ -409,9 +409,9 @@ export function measurementPlugin(
       }
       grid.appendChild(labelCell);
 
-      grid.appendChild(createEl("span", monoStyle, formatValue(v1, precision)));
-      grid.appendChild(createEl("span", monoStyle, formatValue(v2, precision)));
-      grid.appendChild(createEl("span", `${monoStyle} color: var(--text-primary); font-weight: 600;`, formatValue(delta, precision)));
+      grid.appendChild(createEl("span", monoStyle, sampleText(sig, v1)));
+      grid.appendChild(createEl("span", monoStyle, sampleText(sig, v2)));
+      grid.appendChild(createEl("span", `${monoStyle} color: var(--text-primary); font-weight: 600;`, sampleText(sig, delta)));
     }
 
     overlay.replaceChildren(head, grid);

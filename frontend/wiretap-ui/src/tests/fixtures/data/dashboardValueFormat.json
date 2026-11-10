@@ -1,0 +1,484 @@
+{
+  "cases": [
+    {
+      "format": {
+        "padded": false,
+        "places": 0
+      },
+      "text": "89",
+      "value": 89.0
+    },
+    {
+      "format": {
+        "padded": false,
+        "places": 1
+      },
+      "text": "89",
+      "value": 89.0
+    },
+    {
+      "format": {
+        "padded": false,
+        "places": 2
+      },
+      "text": "89",
+      "value": 89.0
+    },
+    {
+      "format": {
+        "padded": true,
+        "places": 2
+      },
+      "text": "89.00",
+      "value": 89.0
+    },
+    {
+      "format": {
+        "padded": true,
+        "places": 3
+      },
+      "text": "89.000",
+      "value": 89.0
+    },
+    {
+      "format": {
+        "padded": false,
+        "places": 0
+      },
+      "text": "89",
+      "value": 89.25
+    },
+    {
+      "format": {
+        "padded": false,
+        "places": 1
+      },
+      "text": "89.3",
+      "value": 89.25
+    },
+    {
+      "format": {
+        "padded": false,
+        "places": 2
+      },
+      "text": "89.25",
+      "value": 89.25
+    },
+    {
+      "format": {
+        "padded": true,
+        "places": 2
+      },
+      "text": "89.25",
+      "value": 89.25
+    },
+    {
+      "format": {
+        "padded": true,
+        "places": 3
+      },
+      "text": "89.250",
+      "value": 89.25
+    },
+    {
+      "format": {
+        "padded": false,
+        "places": 0
+      },
+      "text": "-89",
+      "value": -89.25
+    },
+    {
+      "format": {
+        "padded": false,
+        "places": 1
+      },
+      "text": "-89.3",
+      "value": -89.25
+    },
+    {
+      "format": {
+        "padded": false,
+        "places": 2
+      },
+      "text": "-89.25",
+      "value": -89.25
+    },
+    {
+      "format": {
+        "padded": true,
+        "places": 2
+      },
+      "text": "-89.25",
+      "value": -89.25
+    },
+    {
+      "format": {
+        "padded": true,
+        "places": 3
+      },
+      "text": "-89.250",
+      "value": -89.25
+    },
+    {
+      "format": {
+        "padded": false,
+        "places": 0
+      },
+      "text": "0",
+      "value": 0.30000000000000004
+    },
+    {
+      "format": {
+        "padded": false,
+        "places": 1
+      },
+      "text": "0.3",
+      "value": 0.30000000000000004
+    },
+    {
+      "format": {
+        "padded": false,
+        "places": 2
+      },
+      "text": "0.3",
+      "value": 0.30000000000000004
+    },
+    {
+      "format": {
+        "padded": true,
+        "places": 2
+      },
+      "text": "0.30",
+      "value": 0.30000000000000004
+    },
+    {
+      "format": {
+        "padded": true,
+        "places": 3
+      },
+      "text": "0.300",
+      "value": 0.30000000000000004
+    },
+    {
+      "format": {
+        "padded": false,
+        "places": 0
+      },
+      "text": "1",
+      "value": 1.0005
+    },
+    {
+      "format": {
+        "padded": false,
+        "places": 1
+      },
+      "text": "1",
+      "value": 1.0005
+    },
+    {
+      "format": {
+        "padded": false,
+        "places": 2
+      },
+      "text": "1",
+      "value": 1.0005
+    },
+    {
+      "format": {
+        "padded": true,
+        "places": 2
+      },
+      "text": "1.00",
+      "value": 1.0005
+    },
+    {
+      "format": {
+        "padded": true,
+        "places": 3
+      },
+      "text": "1.001",
+      "value": 1.0005
+    },
+    {
+      "format": {
+        "padded": false,
+        "places": 0
+      },
+      "text": "10",
+      "value": 9.995
+    },
+    {
+      "format": {
+        "padded": false,
+        "places": 1
+      },
+      "text": "10",
+      "value": 9.995
+    },
+    {
+      "format": {
+        "padded": false,
+        "places": 2
+      },
+      "text": "10",
+      "value": 9.995
+    },
+    {
+      "format": {
+        "padded": true,
+        "places": 2
+      },
+      "text": "10.00",
+      "value": 9.995
+    },
+    {
+      "format": {
+        "padded": true,
+        "places": 3
+      },
+      "text": "9.995",
+      "value": 9.995
+    },
+    {
+      "format": {
+        "padded": false,
+        "places": 0
+      },
+      "text": "100",
+      "value": 99.95
+    },
+    {
+      "format": {
+        "padded": false,
+        "places": 1
+      },
+      "text": "100",
+      "value": 99.95
+    },
+    {
+      "format": {
+        "padded": false,
+        "places": 2
+      },
+      "text": "99.95",
+      "value": 99.95
+    },
+    {
+      "format": {
+        "padded": true,
+        "places": 2
+      },
+      "text": "99.95",
+      "value": 99.95
+    },
+    {
+      "format": {
+        "padded": true,
+        "places": 3
+      },
+      "text": "99.950",
+      "value": 99.95
+    },
+    {
+      "format": {
+        "padded": false,
+        "places": 0
+      },
+      "text": "0",
+      "value": -0.004
+    },
+    {
+      "format": {
+        "padded": false,
+        "places": 1
+      },
+      "text": "0",
+      "value": -0.004
+    },
+    {
+      "format": {
+        "padded": false,
+        "places": 2
+      },
+      "text": "0",
+      "value": -0.004
+    },
+    {
+      "format": {
+        "padded": true,
+        "places": 2
+      },
+      "text": "0.00",
+      "value": -0.004
+    },
+    {
+      "format": {
+        "padded": true,
+        "places": 3
+      },
+      "text": "-0.004",
+      "value": -0.004
+    },
+    {
+      "format": {
+        "padded": false,
+        "places": 0
+      },
+      "text": "0",
+      "value": 0.0
+    },
+    {
+      "format": {
+        "padded": false,
+        "places": 1
+      },
+      "text": "0",
+      "value": 0.0
+    },
+    {
+      "format": {
+        "padded": false,
+        "places": 2
+      },
+      "text": "0",
+      "value": 0.0
+    },
+    {
+      "format": {
+        "padded": true,
+        "places": 2
+      },
+      "text": "0.00",
+      "value": 0.0
+    },
+    {
+      "format": {
+        "padded": true,
+        "places": 3
+      },
+      "text": "0.000",
+      "value": 0.0
+    },
+    {
+      "format": {
+        "padded": false,
+        "places": 0
+      },
+      "text": "12346",
+      "value": 12345.678
+    },
+    {
+      "format": {
+        "padded": false,
+        "places": 1
+      },
+      "text": "12345.7",
+      "value": 12345.678
+    },
+    {
+      "format": {
+        "padded": false,
+        "places": 2
+      },
+      "text": "12345.68",
+      "value": 12345.678
+    },
+    {
+      "format": {
+        "padded": true,
+        "places": 2
+      },
+      "text": "12345.68",
+      "value": 12345.678
+    },
+    {
+      "format": {
+        "padded": true,
+        "places": 3
+      },
+      "text": "12345.678",
+      "value": 12345.678
+    },
+    {
+      "format": {
+        "padded": false,
+        "places": 0
+      },
+      "text": "0",
+      "value": 1e-7
+    },
+    {
+      "format": {
+        "padded": false,
+        "places": 1
+      },
+      "text": "0",
+      "value": 1e-7
+    },
+    {
+      "format": {
+        "padded": false,
+        "places": 2
+      },
+      "text": "0",
+      "value": 1e-7
+    },
+    {
+      "format": {
+        "padded": true,
+        "places": 2
+      },
+      "text": "0.00",
+      "value": 1e-7
+    },
+    {
+      "format": {
+        "padded": true,
+        "places": 3
+      },
+      "text": "0.000",
+      "value": 1e-7
+    },
+    {
+      "format": {
+        "padded": false,
+        "places": 0
+      },
+      "text": "1000000000000000000000",
+      "value": 1e+21
+    },
+    {
+      "format": {
+        "padded": false,
+        "places": 1
+      },
+      "text": "1000000000000000000000",
+      "value": 1e+21
+    },
+    {
+      "format": {
+        "padded": false,
+        "places": 2
+      },
+      "text": "1000000000000000000000",
+      "value": 1e+21
+    },
+    {
+      "format": {
+        "padded": true,
+        "places": 2
+      },
+      "text": "1000000000000000000000.00",
+      "value": 1e+21
+    },
+    {
+      "format": {
+        "padded": true,
+        "places": 3
+      },
+      "text": "1000000000000000000000.000",
+      "value": 1e+21
+    }
+  ]
+}

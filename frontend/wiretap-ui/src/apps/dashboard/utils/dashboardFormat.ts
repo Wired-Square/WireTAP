@@ -2,6 +2,8 @@
 //
 // Shared formatting helpers for dashboard panels, tooltips and measurement overlays.
 
+import type { ValueFormat } from "../../../generated/ValueFormat";
+
 /** Format a numeric value to the signal's `precision`, else to places chosen by its
  *  size. A missing or non-finite value reads "—". */
 export function formatValue(v: number | null | undefined, precision?: number): string {
@@ -9,6 +11,13 @@ export function formatValue(v: number | null | undefined, precision?: number): s
   const abs = Math.abs(v);
   const places = precision ?? (abs >= 10_000 ? 0 : abs >= 1_000 ? 1 : abs >= 100 ? 2 : 3);
   return toFixedHalfAwayFromZero(v, places);
+}
+
+/** Format a value as Rust's `ValueFormat` for its signal says. A missing or non-finite value reads "—". */
+export function formatAs(v: number | null | undefined, { places, padded }: ValueFormat): string {
+  if (v == null || !Number.isFinite(v)) return "—";
+  const text = toFixedHalfAwayFromZero(v, places);
+  return padded || places === 0 ? text : text.replace(/\.?0+$/, "");
 }
 
 // Rounds the shortest decimal form of `v`, as wslib-quantity's `format_decimal` does,

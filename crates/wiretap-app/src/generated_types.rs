@@ -113,6 +113,7 @@ fn render() -> BTreeMap<PathBuf, String> {
     r.visit::<crate::dashboard_history::SeriesWindow>();
     r.visit::<crate::dashboard_history::AlignedSeries>();
     r.visit::<wiretap_analysis::dashboard::HistogramBin>();
+    r.visit::<wiretap_analysis::dashboard::SignalValueFormat>();
     r.visit::<crate::io::modbus_tcp::scanner::ModbusScanState>();
     r.visit::<crate::ws::dispatch::AttachToPanelMsg<'static>>();
     r.visit::<crate::settings::DirectoryValidation>();
