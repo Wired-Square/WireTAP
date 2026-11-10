@@ -97,14 +97,13 @@ where
     let frame_count = frames.len();
     let timed = timed_by_protocol(frames);
 
-    let bursts: HashSet<(&str, FrameKey)> = timed
+    let bursts: HashSet<(&str, u8, FrameKey)> = timed
         .iter()
         .flat_map(|(protocol, frames)| {
             analyse_order(frames, None)
                 .buses
                 .into_iter()
-                .flat_map(|bus| bus.bursts)
-                .map(move |b| (protocol.as_str(), b.key))
+                .flat_map(move |bus| bus.bursts.into_iter().map(move |b| (protocol.as_str(), bus.bus, b.key)))
         })
         .collect();
     let mirrors = timed
@@ -137,7 +136,8 @@ where
         .into_iter()
         .map(|profile| {
             let key = FrameKey::new(profile.frame_id, profile.is_extended);
-            let burst = bursts.contains(&(profile.protocol.as_deref().unwrap_or_default(), key));
+            let protocol = profile.protocol.as_deref().unwrap_or_default();
+            let burst = profile.bus.is_some_and(|bus| bursts.contains(&(protocol, bus, key)));
             ChangesFrame { notes: byte_notes(&profile.profile, burst), burst, profile }
         })
         .collect();

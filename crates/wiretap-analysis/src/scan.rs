@@ -158,6 +158,9 @@ impl DiscoveredChecksum {
 pub struct FrameChecksumFinding {
     #[serde(flatten)]
     pub key: FrameKey,
+    #[cfg_attr(feature = "ts", ts(optional))]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bus: Option<u8>,
     /// Frames seen for this id.
     pub frame_count: usize,
     /// Distinct payloads among them. A checksum cannot be recovered from
@@ -251,6 +254,7 @@ pub fn analyse_group(
 
     FrameChecksumFinding {
         key,
+        bus: None,
         frame_count: frames.len(),
         distinct_payloads,
         candidates,
@@ -297,22 +301,27 @@ fn solved_candidates(
         .collect()
 }
 
+/// One frame id's payloads, on one bus when the source groups by bus.
+#[derive(Debug, Clone)]
+pub struct ScanGroup {
+    pub key: FrameKey,
+    pub bus: Option<u8>,
+    pub payloads: Vec<Vec<u8>>,
+}
+
 /// Scan payloads already grouped by frame id.
 ///
 /// The shape a database-backed caller wants: it queried per id, so it should not
 /// have to flatten only for the grouping to be redone.
-pub fn scan_groups(
-    groups: &[(FrameKey, Vec<Vec<u8>>)],
-    options: &ChecksumScanOptions,
-) -> ChecksumScanResult {
+pub fn scan_groups(groups: &[ScanGroup], options: &ChecksumScanOptions) -> ChecksumScanResult {
     let findings: Vec<FrameChecksumFinding> = groups
         .par_iter()
-        .filter(|(_, payloads)| payloads.len() >= options.min_samples)
-        .map(|(key, payloads)| analyse_group(*key, payloads, options))
+        .filter(|g| g.payloads.len() >= options.min_samples)
+        .map(|g| FrameChecksumFinding { bus: g.bus, ..analyse_group(g.key, &g.payloads, options) })
         .collect();
 
     ChecksumScanResult {
-        frame_count: groups.iter().map(|(_, p)| p.len()).sum(),
+        frame_count: groups.iter().map(|g| g.payloads.len()).sum(),
         unique_frame_ids: groups.len(),
         skipped_frame_ids: groups.len() - findings.len(),
         findings,
@@ -326,7 +335,7 @@ pub fn scan_frames(
 ) -> ChecksumScanResult {
     // Groups in arrival order, so the results read the way the capture does;
     // the map holds indices into them rather than a second copy.
-    let mut groups: Vec<(FrameKey, Vec<Vec<u8>>)> = Vec::new();
+    let mut groups: Vec<ScanGroup> = Vec::new();
     let mut index: HashMap<FrameKey, usize> = HashMap::new();
 
     for (key, bytes) in frames {
@@ -334,10 +343,10 @@ pub fn scan_frames(
             continue;
         }
         let slot = *index.entry(key).or_insert_with(|| {
-            groups.push((key, Vec::new()));
+            groups.push(ScanGroup { key, bus: None, payloads: Vec::new() });
             groups.len() - 1
         });
-        groups[slot].1.push(bytes);
+        groups[slot].payloads.push(bytes);
     }
 
     scan_groups(&groups, options)

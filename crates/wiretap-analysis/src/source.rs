@@ -14,7 +14,7 @@ use wslib_wiretap_protocol::format_frame_id;
 
 use crate::order::{analyse_order, OrderAnalysis, TimedFrame};
 use crate::roles::{profile_bytes, ByteProfile};
-use crate::scan::{scan_groups, ChecksumScanOptions, ChecksumScanResult, FrameKey};
+use crate::scan::{scan_groups, ChecksumScanOptions, ChecksumScanResult, FrameKey, ScanGroup};
 
 mod coverage;
 #[cfg(feature = "testing")]
@@ -82,6 +82,9 @@ pub struct FrameByteProfile {
     pub frame_id: u32,
     pub is_extended: bool,
     pub frame_id_hex: String,
+    #[cfg_attr(feature = "ts", ts(optional))]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bus: Option<u8>,
     #[serde(flatten)]
     pub profile: ByteProfile,
 }
@@ -98,18 +101,21 @@ impl FrameByteProfile {
             frame_id,
             is_extended,
             frame_id_hex: format_frame_id(frame_id, is_extended),
+            bus: None,
             profile: profile_bytes(payloads),
         }
     }
 }
 
-/// One frame's profile over its most recent `sample_limit` payloads.
+/// One frame's profile over its most recent `sample_limit` payloads, on `bus`
+/// when given.
 pub async fn byte_profile<S: PayloadSource>(
     source: &S,
     protocol: Option<&str>,
     frame_id: u32,
     is_extended: Option<bool>,
     sample_limit: u32,
+    bus: Option<u8>,
 ) -> Result<FrameByteProfile, S::Error> {
     let payloads = source
         .payloads(PayloadQuery {
@@ -118,14 +124,12 @@ pub async fn byte_profile<S: PayloadSource>(
             is_extended,
             limit: sample_limit,
             sampling: Sampling::Recent,
-        }, None)
+        }, bus)
         .await?;
-    Ok(FrameByteProfile::new(
-        protocol,
-        frame_id,
-        is_extended.unwrap_or(false),
-        &payloads,
-    ))
+    Ok(FrameByteProfile {
+        bus,
+        ..FrameByteProfile::new(protocol, frame_id, is_extended.unwrap_or(false), &payloads)
+    })
 }
 
 /// Which frames a scan covers. Both read empty as "everything", as
@@ -152,22 +156,22 @@ impl ScanFilter {
 ///
 /// A frame id is almost never both standard and extended, and filtering on
 /// `is_extended` takes the payload query off its covering index. Pay for it only
-/// where the inventory says the pair is genuinely ambiguous.
+/// where the inventory says the pair is genuinely ambiguous on one bus.
 fn selected_rows<'a>(
     inventory: &'a [InventoryRow],
     filter: &ScanFilter,
 ) -> Vec<(&'a InventoryRow, Option<bool>)> {
-    let mut seen: HashMap<(&str, u32), usize> = HashMap::new();
+    let mut seen: HashMap<(&str, u32, Option<u8>), usize> = HashMap::new();
     for row in inventory {
         *seen
-            .entry((row.protocol.as_str(), row.frame_id))
+            .entry((row.protocol.as_str(), row.frame_id, row.bus))
             .or_default() += 1;
     }
     inventory
         .iter()
         .filter(|row| filter.matches(&row.protocol, row.frame_id))
         .map(|row| {
-            let ambiguous = seen[&(row.protocol.as_str(), row.frame_id)] > 1;
+            let ambiguous = seen[&(row.protocol.as_str(), row.frame_id, row.bus)] > 1;
             (row, ambiguous.then_some(row.is_extended))
         })
         .collect()
@@ -193,8 +197,8 @@ pub async fn checksum_scan<S: PayloadSource>(
         unique_frame_ids: 0,
         skipped_frame_ids: 0,
     };
-    let mut chunk: Vec<(FrameKey, Vec<Vec<u8>>)> = Vec::new();
-    let mut accumulate = |chunk: &[(FrameKey, Vec<Vec<u8>>)]| {
+    let mut chunk: Vec<ScanGroup> = Vec::new();
+    let mut accumulate = |chunk: &[ScanGroup]| {
         let part = scan_groups(chunk, &options);
         result.findings.extend(part.findings);
         result.frame_count += part.frame_count;
@@ -210,9 +214,13 @@ pub async fn checksum_scan<S: PayloadSource>(
                 is_extended,
                 limit: sample_limit,
                 sampling: Sampling::Spread,
-            }, None)
+            }, row.bus)
             .await?;
-        chunk.push((FrameKey::new(row.frame_id, row.is_extended), payloads));
+        chunk.push(ScanGroup {
+            key: FrameKey::new(row.frame_id, row.is_extended),
+            bus: row.bus,
+            payloads,
+        });
         if chunk.len() == SCAN_CHUNK_IDS {
             accumulate(&chunk);
             chunk.clear();
@@ -251,14 +259,12 @@ pub async fn byte_profiles<S: PayloadSource>(
                 is_extended,
                 limit: sample_limit,
                 sampling: Sampling::Recent,
-            }, None)
+            }, row.bus)
             .await?;
-        frames.push(FrameByteProfile::new(
-            Some(&row.protocol),
-            row.frame_id,
-            row.is_extended,
-            &payloads,
-        ));
+        frames.push(FrameByteProfile {
+            bus: row.bus,
+            ..FrameByteProfile::new(Some(&row.protocol), row.frame_id, row.is_extended, &payloads)
+        });
     }
     Ok(ByteProfiles {
         skipped_frames: rows.len().saturating_sub(max_frames),

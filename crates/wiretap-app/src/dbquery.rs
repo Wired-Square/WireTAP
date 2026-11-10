@@ -38,9 +38,10 @@ pub async fn db_frame_inventory(
     profile_id: &str,
     start_us: Option<i64>,
     end_us: Option<i64>,
+    bus: Option<u8>,
 ) -> Result<Vec<InventoryRow>, String> {
     let profile = backend_profile(settings, profile_id).await?;
-    crate::apiclient::frame_inventory(&profile, start_us, end_us).await
+    crate::apiclient::frame_inventory(&profile, start_us, end_us, bus).await
 }
 
 pub async fn db_fetch_frame_payloads(
@@ -49,9 +50,10 @@ pub async fn db_fetch_frame_payloads(
     frame_id: u32,
     is_extended: Option<bool>,
     limit: u32,
+    bus: Option<u8>,
 ) -> Result<Vec<Vec<u8>>, String> {
     let profile = backend_profile(settings, profile_id).await?;
-    crate::apiclient::fetch_frame_payloads(&profile, frame_id, is_extended, limit).await
+    crate::apiclient::fetch_frame_payloads(&profile, frame_id, is_extended, limit, bus).await
 }
 
 #[tauri::command]

@@ -53,6 +53,7 @@ pub fn stats(rows_scanned: usize, results_count: usize, started: Instant) -> Que
         rows_scanned: rows_scanned as u64,
         results_count: results_count as u64,
         execution_time_ms: started.elapsed().as_millis() as u64,
+        bus: None,
     }
 }
 

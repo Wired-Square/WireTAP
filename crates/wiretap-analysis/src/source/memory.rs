@@ -19,8 +19,13 @@ pub struct MemorySource {
 impl MemorySource {
     /// A bus-0 frame stamped with its arrival index.
     pub fn push(&mut self, protocol: &str, frame_id: u32, is_extended: bool, bytes: Vec<u8>) {
+        self.push_on(0, protocol, frame_id, is_extended, bytes);
+    }
+
+    /// A frame on `bus` stamped with its arrival index.
+    pub fn push_on(&mut self, bus: u8, protocol: &str, frame_id: u32, is_extended: bool, bytes: Vec<u8>) {
         let timestamp_us = self.frames.len() as u64;
-        self.push_at(protocol, 0, frame_id, is_extended, timestamp_us, bytes);
+        self.push_at(protocol, bus, frame_id, is_extended, timestamp_us, bytes);
     }
 
     pub fn push_at(
@@ -74,7 +79,10 @@ impl PayloadSource for MemorySource {
                 is_extended,
             } = frame.key;
             match rows.iter_mut().find(|r| {
-                r.protocol == *protocol && r.frame_id == frame_id && r.is_extended == is_extended
+                r.protocol == *protocol
+                    && r.frame_id == frame_id
+                    && r.is_extended == is_extended
+                    && r.bus == Some(frame.bus)
             }) {
                 Some(row) => {
                     row.count += 1;
@@ -88,7 +96,8 @@ impl PayloadSource for MemorySource {
                     t,
                     t,
                     frame.payload.len() as u16,
-                )),
+                )
+                .on_bus(frame.bus)),
             }
         }
         Ok(rows)

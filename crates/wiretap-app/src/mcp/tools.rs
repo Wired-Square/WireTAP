@@ -95,7 +95,7 @@ fn bound(s: &Option<String>) -> Result<Option<i64>, McpError> {
 }
 
 fn window(start_time: &Option<String>, end_time: &Option<String>) -> Result<RowWindow, McpError> {
-    Ok(RowWindow { protocol: None, start_us: bound(start_time)?, end_us: bound(end_time)? })
+    Ok(RowWindow { protocol: None, start_us: bound(start_time)?, end_us: bound(end_time)?, bus: None })
 }
 
 /// Resolve a catalog filename to an absolute path under the decoder directory.
@@ -852,7 +852,7 @@ impl WireTapTools {
 
     // ── Headless analysis levers (capture OR WireTAP backend) ───────────────────────
 
-    #[tool(description = "Per-frame-id rollup (count, first/last timestamp, max dlc, extended) for a capture (capture_id) or WireTAP backend profile (profile_id), lowest frame id first, up to limit ids; truncated says the limit cut it. Headless — no view needed. Use to see which frame ids exist and how often.")]
+    #[tool(description = "Per-frame-id rollup (count, first/last timestamp, max dlc, extended, bus) for a capture (capture_id) or WireTAP backend profile (profile_id), one row per bus the id was seen on (bus null where the source groups every bus together), lowest frame id first, up to limit rows; truncated says the limit cut it. Headless — no view needed. Use to see which frame ids exist and how often.")]
     async fn frame_inventory(
         &self,
         Parameters(p): Parameters<FrameInventoryParams>,
@@ -874,6 +874,7 @@ impl WireTapTools {
             p.frame_id,
             p.is_extended,
             p.sample_limit,
+            None,
         )
         .await
         .map_err(err)?;

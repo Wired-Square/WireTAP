@@ -9,7 +9,7 @@ import type { NoteEndianness } from "./NoteEndianness";
  * One frame as Payload Changes reports it: its byte profile, what the profile
  * says, and whether message order finds it sent in bursts.
  */
-export type ChangesFrame = { notes: ByteNotes, burst: boolean, protocol?: string, frameId: number, isExtended: boolean, frameIdHex: string, sampleCount: number, minLen: number, maxLen: number, 
+export type ChangesFrame = { notes: ByteNotes, burst: boolean, protocol?: string, frameId: number, isExtended: boolean, frameIdHex: string, bus?: number, sampleCount: number, minLen: number, maxLen: number, 
 /**
  * The payload, when there is more than one sample and every one is equal.
  */

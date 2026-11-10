@@ -6,13 +6,12 @@
 
 use std::collections::BTreeSet;
 
-use serde::de::DeserializeOwned;
-use serde_json::Value;
 use crate::settings::SettingsSource;
+use wslib_wiretap_gateway::client::Db;
 use wslib_wiretap_gateway::{
     ByteChangeQueryResult, DistributionQueryResult, FirstLastQueryResult, FrameChangeQueryResult,
     FrequencyQueryResult, GapAnalysisQueryResult, GatewayRequest, MirrorValidationQueryResult,
-    MuxStatisticsQueryResult, PatternSearchQueryResult, Protocol, QuerySpec,
+    MuxStatisticsQueryResult, PatternSearchQueryResult, Protocol, QueryBody, QuerySpec,
 };
 
 use super::{QueryOutcome, QueryResults};
@@ -43,27 +42,36 @@ pub(super) fn request(
         .map_err(|e| e.to_string())
 }
 
-fn parse<T: DeserializeOwned>(body: Value) -> Result<T, String> {
-    serde_json::from_value(body).map_err(|e| format!("API response decode failed: {e}"))
-}
-
-fn decode(spec: &QuerySpec, body: Value, compare: Option<&BTreeSet<usize>>) -> Result<QueryOutcome, String> {
+/// The gateway's answer to `body`, refused where it ignored the bus asked for.
+async fn answer(
+    db: &Db<'_>,
+    spec: &QuerySpec,
+    path: &str,
+    body: &QueryBody,
+    query_id: &str,
+    compare: Option<&BTreeSet<usize>>,
+) -> Result<QueryOutcome, String> {
+    macro_rules! ask {
+        ($result:ty) => {
+            db.answer::<$result>(path, body, query_id).await.map_err(apiclient::text)?
+        };
+    }
     Ok(match spec {
-        QuerySpec::ByteChanges { .. } => parse::<ByteChangeQueryResult>(body)?.into(),
-        QuerySpec::FrameChanges { .. } => parse::<FrameChangeQueryResult>(body)?.into(),
+        QuerySpec::ByteChanges { .. } => ask!(ByteChangeQueryResult).into(),
+        QuerySpec::FrameChanges { .. } => ask!(FrameChangeQueryResult).into(),
         QuerySpec::MirrorValidation { limit, .. } => {
-            let mut answer: MirrorValidationQueryResult = parse(body)?;
+            let mut answer = ask!(MirrorValidationQueryResult);
             if let Some(compare) = compare {
                 narrow(&mut answer, compare, *limit);
             }
             answer.into()
         }
-        QuerySpec::MuxStatistics { .. } => parse::<MuxStatisticsQueryResult>(body)?.into(),
-        QuerySpec::FirstLast { .. } => parse::<FirstLastQueryResult>(body)?.into(),
-        QuerySpec::Frequency { .. } => parse::<FrequencyQueryResult>(body)?.into(),
-        QuerySpec::Distribution { .. } => parse::<DistributionQueryResult>(body)?.into(),
-        QuerySpec::GapAnalysis { .. } => parse::<GapAnalysisQueryResult>(body)?.into(),
-        QuerySpec::PatternSearch { .. } => parse::<PatternSearchQueryResult>(body)?.into(),
+        QuerySpec::MuxStatistics { .. } => ask!(MuxStatisticsQueryResult).into(),
+        QuerySpec::FirstLast { .. } => ask!(FirstLastQueryResult).into(),
+        QuerySpec::Frequency { .. } => ask!(FrequencyQueryResult).into(),
+        QuerySpec::Distribution { .. } => ask!(DistributionQueryResult).into(),
+        QuerySpec::GapAnalysis { .. } => ask!(GapAnalysisQueryResult).into(),
+        QuerySpec::PatternSearch { .. } => ask!(PatternSearchQueryResult).into(),
         QuerySpec::FrameInventory { .. } => return Err("an inventory is not a POST".into()),
     })
 }
@@ -98,14 +106,7 @@ pub async fn run(
             let (rows, truncated) = apiclient::read_inventory(&api, query.clone()).await?;
             QueryOutcome { results: QueryResults::FrameInventory(rows), stats: None, sql: Vec::new(), truncated }
         }
-        GatewayRequest::Post(path, body) => {
-            let answer = api
-                .db()
-                .query::<Value>(path, body, query_id)
-                .await
-                .map_err(apiclient::text)?;
-            decode(spec, answer, compare)?
-        }
+        GatewayRequest::Post(path, body) => answer(&api.db(), spec, path, body, query_id, compare).await?,
     };
     outcome.sql = vec![text(&request)];
     Ok(outcome)
@@ -128,12 +129,53 @@ pub async fn preview(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use wslib_wiretap_gateway::{MirrorValidationResult, QueryStats};
+    use crate::apiclient::tests::{backend_at, buses_asked, recording_gateway};
+    use crate::settings::{AppSettings, IOProfile};
+    use wslib_wiretap_gateway::{MirrorValidationResult, QueryStats, RowWindow};
+
+    struct Backend(IOProfile);
+
+    impl SettingsSource for Backend {
+        fn load(&self) -> Result<AppSettings, String> {
+            Ok(AppSettings { io_profiles: vec![self.0.clone()], ..Default::default() })
+        }
+        fn saved_profiles(&self) -> crate::io::ProfileLoader {
+            unreachable!()
+        }
+    }
+
+    fn frequency(bus: Option<u8>) -> QuerySpec {
+        QuerySpec::Frequency {
+            frame_id: 0x100,
+            is_extended: None,
+            bucket_size_ms: 1000,
+            limit: None,
+            window: RowWindow { bus, ..Default::default() },
+        }
+    }
+
+    #[tokio::test]
+    async fn a_query_asks_for_its_bus_only_when_given_and_refuses_an_unechoed_one() {
+        let (ignoring, asked) =
+            recording_gateway(|_| r#"{"results":[],"stats":{"rows_scanned":0,"results_count":0,"execution_time_ms":0}}"#)
+                .await;
+        let settings = Backend(backend_at(&ignoring));
+        assert!(run(&settings, "backend", &frequency(None), "q", None).await.is_ok());
+        let refused = run(&settings, "backend", &frequency(Some(3)), "q", None).await;
+        assert_eq!(refused.err(), Some(wslib_wiretap_gateway::client::ClientError::BusIgnored(3).to_string()));
+        assert_eq!(buses_asked(&asked), [None, Some(3)]);
+
+        let (echoing, _) = recording_gateway(|_| {
+            r#"{"results":[],"stats":{"rows_scanned":0,"results_count":0,"execution_time_ms":0,"bus":3}}"#
+        })
+        .await;
+        assert!(run(&Backend(backend_at(&echoing)), "backend", &frequency(Some(3)), "q", None).await.is_ok());
+    }
 
     #[test]
     fn a_backend_profile_refuses_another_protocols_window() {
         let spec = |protocol| QuerySpec::FrameInventory {
-            window: wslib_wiretap_gateway::RowWindow { protocol, start_us: None, end_us: None },
+            window: wslib_wiretap_gateway::RowWindow { protocol, start_us: None, end_us: None, bus: None },
             limit: Some(5),
         };
         assert!(request(Protocol::ModbusRtu, &spec(Some(Protocol::Can)), None, false).is_err());
@@ -156,7 +198,7 @@ mod tests {
         };
         let mut answer = MirrorValidationQueryResult {
             results: vec![mismatch(1, vec![1, 2, 9]), mismatch(2, vec![9, 2, 3]), mismatch(3, vec![9, 9, 3])],
-            stats: QueryStats { rows_scanned: 6, results_count: 3, execution_time_ms: 0 },
+            stats: QueryStats { rows_scanned: 6, results_count: 3, execution_time_ms: 0, bus: None },
         };
         narrow(&mut answer, &BTreeSet::from([0]), Some(1));
         assert_eq!(answer.results.iter().map(|r| r.mirror_timestamp_us).collect::<Vec<_>>(), [2]);

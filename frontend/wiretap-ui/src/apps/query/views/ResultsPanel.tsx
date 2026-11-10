@@ -137,6 +137,10 @@ function ResultsBody({
       pageStart: start,
     };
   }, [results, resultCount, currentPage, pageSize]);
+  const showBus =
+    queryType === "frame_inventory" &&
+    Array.isArray(results) &&
+    new Set((results as InventoryRow[]).map((r) => r.bus)).size > 1;
 
   // Reset page when query changes
   const queryId = selectedQuery?.id;
@@ -427,6 +431,7 @@ function ResultsBody({
               <ResultRow
                 result={result}
                 queryType={queryType}
+                showBus={showBus}
                 formatTimestamp={formatTimestamp}
                 formatTimestampFull={formatTimestampFull}
                 formatByte={formatByte}
@@ -446,6 +451,7 @@ type AnyRowResult = ByteChangeResult | FrameChangeResult | MirrorValidationResul
 interface ResultRowProps {
   result: AnyRowResult;
   queryType: string;
+  showBus: boolean;
   formatTimestamp: (us: number) => string;
   formatTimestampFull: (us: number) => string;
   formatByte: (value: number) => string;
@@ -455,6 +461,7 @@ interface ResultRowProps {
 function ResultRow({
   result,
   queryType,
+  showBus,
   formatTimestamp,
   formatTimestampFull,
   formatByte,
@@ -653,6 +660,11 @@ function ResultRow({
         <span className={`${monoBody} text-xs ${textDataPurple} w-24 flex-shrink-0`}>
           {formatId(inv.protocol, inv.frame_id, inv.is_extended)}
         </span>
+        {showBus && (
+          <span className={`${monoBody} text-xs ${textSecondary} w-12 flex-shrink-0`}>
+            {inv.bus !== null && t("results.inventoryBus", { bus: inv.bus })}
+          </span>
+        )}
         <span className={`${monoBody} text-xs ${textDataGreen} w-24 flex-shrink-0 text-right`}>
           {inv.count.toLocaleString()}
         </span>

@@ -9,7 +9,7 @@ import type { DiscoveredChecksum } from "./DiscoveredChecksum";
  * What the scan found for one frame id — including when it found nothing, so
  * the reason is visible rather than the id simply vanishing from the results.
  */
-export type FrameChecksumFinding = { 
+export type FrameChecksumFinding = { bus?: number, 
 /**
  * Frames seen for this id.
  */

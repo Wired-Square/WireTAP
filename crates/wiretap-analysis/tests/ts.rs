@@ -104,7 +104,7 @@ fn a_field_serde_skips_when_absent_is_optional() {
     assert_eq!(
         decl::<FrameByteProfile>(),
         "type FrameByteProfile = { protocol?: string, frameId: number, isExtended: boolean, \
-         frameIdHex: string, sampleCount: number, minLen: number, maxLen: number, \
+         frameIdHex: string, bus?: number, sampleCount: number, minLen: number, maxLen: number, \
          identical: Array<number> | null, analysedFrom: number, columns: Array<ByteColumn>, \
          patterns: Array<MultiBytePattern>, endianness: NoteEndianness | null, \
          mux: MuxAnalysis | null, };"
@@ -119,7 +119,7 @@ fn a_field_serde_skips_when_absent_is_optional() {
         decl::<UncataloguedFrame>(),
         "type UncataloguedFrame = { frame_id: number, frame_id_hex: string, \
          is_extended: boolean, count: number, seen_as_hex?: string, unit?: number, \
-         register_type?: RegisterType, };"
+         register_type?: RegisterType, bus?: number, };"
     );
 }
 

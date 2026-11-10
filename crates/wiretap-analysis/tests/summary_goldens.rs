@@ -5,7 +5,7 @@
 //! profiles, ids renumbered from 0x100 as the desktop's fixture does, and Frame
 //! Order over `frameOrder.input.json`. The rows and wording are the desktop's.
 
-use std::collections::{BTreeMap, HashSet};
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use serde_json::{json, Value};
@@ -153,11 +153,6 @@ fn payload_changes_counts_are_the_reports_summary() {
             )
         })
         .collect();
-    let bursts: HashSet<(&str, FrameKey)> = inputs
-        .iter()
-        .filter(|i| i.3)
-        .map(|(p, k, ..)| (p.as_str(), *k))
-        .collect();
     let can = [group(
         [FrameKey::new(0x100, false), FrameKey::new(0x18FF0010, true)],
         45,
@@ -172,10 +167,7 @@ fn payload_changes_counts_are_the_reports_summary() {
     )];
 
     let counts = changes_counts(
-        inputs
-            .iter()
-            .map(|(p, k, profile, _)| (p.as_str(), *k, profile)),
-        &bursts,
+        inputs.iter().map(|(.., profile, burst)| (profile, *burst)),
         [&can[..], &modbus[..]],
     );
     let lib = serde_json::to_value(counts).unwrap();

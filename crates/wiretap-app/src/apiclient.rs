@@ -181,6 +181,7 @@ pub(crate) async fn read_inventory(
                 e.last_us,
                 max_len,
             )
+            .on_bus(e.bus)
         })
         .collect();
     Ok((rows, truncated))
@@ -190,6 +191,7 @@ pub async fn frame_inventory(
     profile: &IOProfile,
     start_us: Option<i64>,
     end_us: Option<i64>,
+    bus: Option<u8>,
 ) -> Result<Vec<InventoryRow>, String> {
     let api = resolve(profile)?;
     let bound = |us: Option<i64>| {
@@ -202,6 +204,7 @@ pub async fn frame_inventory(
         end: bound(end_us)?,
         protocol: None,
         limit: None,
+        bus,
     };
     Ok(read_inventory(&api, query).await?.0)
 }
@@ -211,6 +214,7 @@ pub async fn fetch_frame_payloads(
     frame_id: u32,
     is_extended: Option<bool>,
     limit: u32,
+    bus: Option<u8>,
 ) -> Result<Vec<Vec<u8>>, String> {
     let filter = FrameFilter {
         frame_id,
@@ -218,6 +222,7 @@ pub async fn fetch_frame_payloads(
         start_time: None,
         end_time: None,
         protocol: None,
+        bus,
     };
     resolve(profile)?
         .db()
@@ -611,7 +616,7 @@ pub async fn api_database_protocols(
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use serde_json::{json, Value};
 
@@ -619,17 +624,48 @@ mod tests {
         pairs.iter().map(|(k, v)| (k.to_string(), serde_json::from_value(v.clone()).unwrap())).collect()
     }
 
-    #[test]
-    fn can_is_the_unsaid_default_modbus_is_named_and_serial_is_refused() {
-        assert_eq!(archive_protocol(&conn(&[])).unwrap(), Protocol::Can);
-        assert_eq!(archive_protocol(&conn(&[("protocol", json!("can"))])).unwrap(), Protocol::Can);
-        assert_eq!(archive_protocol(&conn(&[("protocol", json!("modbus"))])).unwrap(), Protocol::ModbusRtu);
-        assert!(archive_protocol(&conn(&[("protocol", json!("modbsu"))])).is_err());
-        let serial = archive_protocol(&conn(&[("protocol", json!("serial"))])).unwrap_err();
-        assert!(serial.contains("serial"), "{serial}");
+    /// A backend profile on the gateway at `base_url`, its key inline.
+    pub(crate) fn backend_at(base_url: &str) -> IOProfile {
+        IOProfile {
+            id: "backend".into(),
+            kind: "wiretap".into(),
+            connection: conn(&[("url", json!(base_url)), ("api_key", json!("inline"))]),
+            ..Default::default()
+        }
+    }
 
-        assert_eq!(frame_tag(Protocol::Can), "can");
-        assert_eq!(frame_tag(Protocol::ModbusRtu), "modbus_rtu");
+    #[tokio::test]
+    async fn an_inventory_asks_for_its_bus_only_when_given_and_takes_the_echoed_rows() {
+        let (echoing, asked) = recording_gateway(|_| {
+            r#"{"entries":[{"frame_id":256,"is_extended":false,"count":3,"first_us":1,"last_us":2,"max_dlc":8,"bus":1}],"bus":1}"#
+        })
+        .await;
+        let rows = frame_inventory(&backend_at(&echoing), None, None, Some(1)).await.unwrap();
+        assert_eq!(rows.iter().map(|r| (r.frame_id, r.bus)).collect::<Vec<_>>(), [(256, Some(1))]);
+        assert_eq!(lines(&asked), ["GET /v1/db/wiretap/inventory?bus=1"]);
+
+        let (ignoring, asked) = recording_gateway(|_| {
+            r#"{"entries":[{"frame_id":256,"is_extended":false,"count":3,"first_us":1,"last_us":2,"max_dlc":8}]}"#
+        })
+        .await;
+        let refused = frame_inventory(&backend_at(&ignoring), None, None, Some(1)).await;
+        assert_eq!(refused, Err(ClientError::BusIgnored(1).to_string()));
+        let rows = frame_inventory(&backend_at(&ignoring), None, None, None).await.unwrap();
+        assert_eq!(rows[0].bus, None);
+        assert_eq!(lines(&asked)[1], "GET /v1/db/wiretap/inventory");
+    }
+
+    #[tokio::test]
+    async fn payloads_ask_for_their_bus_only_when_given_and_refuse_an_unechoed_one() {
+        let (ignoring, asked) = recording_gateway(|_| r#"{"payloads":[[1,2]]}"#).await;
+        let profile = backend_at(&ignoring);
+        assert_eq!(fetch_frame_payloads(&profile, 256, None, 5, None).await, Ok(vec![vec![1, 2]]));
+        let refused = fetch_frame_payloads(&profile, 256, None, 5, Some(2)).await;
+        assert_eq!(refused, Err(ClientError::BusIgnored(2).to_string()));
+        assert_eq!(buses_asked(&asked), [None, Some(2)]);
+
+        let (echoing, _) = recording_gateway(|_| r#"{"payloads":[],"bus":2}"#).await;
+        assert_eq!(fetch_frame_payloads(&backend_at(&echoing), 256, None, 5, Some(2)).await, Ok(vec![]));
     }
 
     fn uploaded(body: &[u8]) -> Vec<(i64, bool, CanFrame)> {
@@ -721,14 +757,25 @@ mod tests {
         assert!(ensure_only_can(&create_standalone_capture(CaptureKind::Bytes, "bytes".into())).await.is_err());
     }
 
-    /// A gateway on 127.0.0.1 that answers every request with success and records its request line.
-    async fn recording_gateway(
-        reply: fn(&str) -> &'static str,
-    ) -> (String, std::sync::Arc<std::sync::Mutex<Vec<String>>>) {
+    /// Each request a recording gateway took: its request line and its body.
+    pub(crate) type Requests = std::sync::Arc<std::sync::Mutex<Vec<(String, String)>>>;
+
+    pub(crate) fn lines(requests: &Requests) -> Vec<String> {
+        requests.lock().unwrap().iter().map(|(line, _)| line.clone()).collect()
+    }
+
+    /// The `bus` each JSON body asked for.
+    pub(crate) fn buses_asked(requests: &Requests) -> Vec<Option<u64>> {
+        let bus = |body: &str| serde_json::from_str::<Value>(body).unwrap()["bus"].as_u64();
+        requests.lock().unwrap().iter().map(|(_, body)| bus(body)).collect()
+    }
+
+    /// A gateway on 127.0.0.1 that answers every request with success and records it.
+    pub(crate) async fn recording_gateway(reply: fn(&str) -> &'static str) -> (String, Requests) {
         use tokio::io::{AsyncReadExt, AsyncWriteExt};
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let base_url = format!("http://{}", listener.local_addr().unwrap());
-        let requests = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let requests = Requests::default();
         let seen = requests.clone();
         tokio::spawn(async move {
             while let Ok((mut sock, _)) = listener.accept().await {
@@ -754,7 +801,8 @@ mod tests {
                 let line = head.lines().next().unwrap();
                 let request = line.rsplit_once(' ').unwrap().0.to_string();
                 let body = reply(&request);
-                seen.lock().unwrap().push(request);
+                let sent = String::from_utf8_lossy(&buf[head_end..head_end + length]).to_string();
+                seen.lock().unwrap().push((request, sent));
                 let reply = format!(
                     "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}",
                     body.len()
@@ -794,10 +842,7 @@ mod tests {
                 .collect::<Vec<_>>(),
             [("site", 5)]
         );
-        assert_eq!(
-            *requests.lock().unwrap(),
-            ["GET /v1/health", "GET /v1/databases"]
-        );
+        assert_eq!(lines(&requests), ["GET /v1/health", "GET /v1/databases"]);
     }
 
     #[tokio::test]
@@ -817,7 +862,7 @@ mod tests {
         assert!(requests.lock().unwrap().is_empty(), "{:?}", requests.lock().unwrap());
 
         import_capture(&gateway, &capture_of("can"), "fresh", true, |_| {}).await.unwrap();
-        assert_eq!(*requests.lock().unwrap(), ["POST /v1/databases", "POST /v1/db/fresh/import?create=true"]);
+        assert_eq!(lines(&requests), ["POST /v1/databases", "POST /v1/db/fresh/import?create=true"]);
     }
 
     #[tokio::test]
@@ -844,7 +889,7 @@ mod tests {
 
         let imported = import_capture_to(&profile("wiretap"), &capture_id, "archive", false, progress).await;
         assert_eq!(imported, Ok(1));
-        assert_eq!(*requests.lock().unwrap(), ["POST /v1/db/archive/import"]);
+        assert_eq!(lines(&requests), ["POST /v1/db/archive/import"]);
         assert_eq!(*finished.lock().unwrap(), [(1, 1, false), (1, 1, true)]);
     }
 }

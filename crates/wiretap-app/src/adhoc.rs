@@ -345,6 +345,7 @@ pub async fn rank_hypotheses(
             row.frame_id,
             None,
             crate::checksum_discovery::DEFAULT_SAMPLE_LIMIT,
+            row.bus,
         )
         .await?
         .profile;

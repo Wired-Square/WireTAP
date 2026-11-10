@@ -181,6 +181,7 @@
     "samplePrefix": "Sample:",
     "mirrorDescription": "These frame IDs transmit identical payloads that change together",
     "samples": "{{count}} samples",
+    "onBus": "bus {{bus}}",
     "burstBadge": "Burst",
     "muxBadge": "Mux",
     "lengthRangeBadge": "{{min}}–{{max}} bytes",
@@ -283,6 +284,7 @@
     "noneFound": "nothing explains this byte",
     "noneFoundCount_one": "{{count}} frame ID with no checksum found",
     "noneFoundCount_other": "{{count}} frame IDs with no checksum found",
+    "onBus": "bus {{bus}}",
     "panelDescription": "Works out what explains each frame ID's checksum byte: the built-in algorithms, sums with a constant offset, or a recovered CRC polynomial.",
     "rejected": {
       "constant": "never changes — padding",

@@ -15,8 +15,8 @@ wslib-checksum = { version = "0.1", registry = "wired-square" }
 wslib-modbus = { version = "0.2.1", registry = "wired-square" }
 wslib-quantity = { version = "0.1", registry = "wired-square" }
 wslib-wiretap-catalogue = { version = "0.3", registry = "wired-square" }
-wslib-wiretap-gateway = { version = "0.2.0", registry = "wired-square" }
-wslib-wiretap-protocol = { version = "0.2.1", registry = "wired-square" }
+wslib-wiretap-gateway = { version = "0.2.3", registry = "wired-square" }
+wslib-wiretap-protocol = { version = "0.2.3", registry = "wired-square" }
 
 [features]
 ts = [

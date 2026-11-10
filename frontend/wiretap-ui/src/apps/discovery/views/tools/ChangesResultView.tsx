@@ -73,17 +73,18 @@ export default function ChangesResultView({ embedded = false, onClose }: Props) 
     setShowExportDialog(false);
   };
 
-  const { sortedFrames, summary, mirrors } = useMemo(() => {
+  const { sortedFrames, summary, mirrors, showBus } = useMemo(() => {
     if (!results) {
-      return { sortedFrames: [], summary: null, mirrors: [] };
+      return { sortedFrames: [], summary: null, mirrors: [], showBus: false };
     }
 
-    const sorted = [...results.frames].sort((a, b) => a.frameId - b.frameId);
+    const sorted = [...results.frames].sort((a, b) => a.frameId - b.frameId || (a.bus ?? -1) - (b.bus ?? -1));
     const mirrors = results.mirrors.flatMap(({ protocol, groups }) => groups.map((group) => ({ protocol, group })));
 
     return {
       sortedFrames: sorted,
       mirrors,
+      showBus: new Set(sorted.map((f) => f.bus)).size > 1,
       summary: {
         identicalCount: sorted.filter(f => f.identical !== null).length,
         varyingLengthCount: sorted.filter(f => f.minLen !== f.maxLen).length,
@@ -183,7 +184,11 @@ export default function ChangesResultView({ embedded = false, onClose }: Props) 
 
         {/* Individual Frame Cards */}
         {sortedFrames.map((frame) => (
-          <FrameAnalysisCard key={`${frame.protocol}:${frame.frameId}:${frame.isExtended}`} frame={frame} />
+          <FrameAnalysisCard
+            key={`${frame.protocol}:${frame.frameId}:${frame.isExtended}:${frame.bus}`}
+            frame={frame}
+            showBus={showBus}
+          />
         ))}
       </div>
 
@@ -314,9 +319,10 @@ function MirrorGroupCard({ protocol, group }: MirrorGroupCardProps) {
 
 type FrameAnalysisCardProps = {
   frame: ChangesFrame;
+  showBus: boolean;
 };
 
-function FrameAnalysisCard({ frame }: FrameAnalysisCardProps) {
+function FrameAnalysisCard({ frame, showBus }: FrameAnalysisCardProps) {
   const { t } = useTranslation("discovery");
   const counts = countByteRoles(frame.columns, frame.patterns);
   const selector = frame.mux?.detection.selector;
@@ -331,6 +337,9 @@ function FrameAnalysisCard({ frame }: FrameAnalysisCardProps) {
           <span className="font-mono font-semibold text-sm text-primary">
             {formatFrameKey(frame.protocol ?? "can", frame)}
           </span>
+          {showBus && frame.bus !== undefined && (
+            <span className={captionMuted}>{t("changes.onBus", { bus: frame.bus })}</span>
+          )}
           <span className={captionMuted}>
             {t("changes.samples", { count: frame.sampleCount })}
           </span>
