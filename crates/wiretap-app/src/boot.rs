@@ -95,8 +95,7 @@ pub(crate) fn boot_core(paths: &Paths) -> Result<(AppSettings, bool), String> {
         dashboard_history::set_capacity(s.graph_buffer_size);
         logging::set_log_level(&s.log_level);
         if s.log_level != "off" {
-            if let Some(doc_dir) = &paths.documents {
-                let reports_dir = doc_dir.join("WireTAP").join("Reports");
+            if let Some(reports_dir) = logging::log_dir(&s.report_dir, paths.documents.as_deref()) {
                 if let Err(e) = logging::init_file_logging(&reports_dir) {
                     tlog!("[setup] Failed to init file logging: {}", e);
                 }

@@ -35,6 +35,14 @@ pub(crate) fn get_log_level() -> u8 {
     LOG_LEVEL.load(Ordering::Relaxed)
 }
 
+pub(crate) fn log_dir(report_dir: &str, documents: Option<&Path>) -> Option<PathBuf> {
+    if report_dir.is_empty() {
+        documents.map(|d| d.join("WireTAP").join("Reports"))
+    } else {
+        Some(PathBuf::from(report_dir))
+    }
+}
+
 /// Initialise file logging to the given reports directory.
 /// Creates a timestamped log file and a `WireTAP.log` symlink (Unix only).
 pub(crate) fn init_file_logging(reports_dir: &Path) -> Result<(), String> {
@@ -136,16 +144,36 @@ pub(crate) mod commands {
     pub async fn set_log_level(app: AppHandle, level: String) -> Result<(), String> {
         super::set_log_level(&level);
         if level != "off" {
-            let reports_dir = app
-                .path()
-                .document_dir()
-                .map_err(|e| format!("Failed to get documents dir: {}", e))?
-                .join("WireTAP")
-                .join("Reports");
+            let settings = crate::settings::load_settings_sync(&app)?;
+            let documents = app.path().document_dir().ok();
+            let reports_dir = super::log_dir(&settings.report_dir, documents.as_deref())
+                .ok_or("Failed to get documents dir")?;
             super::init_file_logging(&reports_dir)?;
         } else {
             super::stop_file_logging();
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_log_goes_to_the_report_dir_and_to_documents_only_when_it_is_empty() {
+        let temp = std::env::temp_dir().join(format!("wiretap-logging-{}", std::process::id()));
+        let report_dir = temp.join("walk").join("Reports");
+        let documents = temp.join("Documents");
+
+        assert_eq!(
+            log_dir(&report_dir.to_string_lossy(), Some(&documents)),
+            Some(report_dir)
+        );
+        assert_eq!(
+            log_dir("", Some(&documents)),
+            Some(documents.join("WireTAP").join("Reports"))
+        );
+        assert_eq!(log_dir("", None), None);
     }
 }
