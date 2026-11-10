@@ -37,6 +37,7 @@ All notable changes to WireTAP will be documented in this file.
 - **Discovery's serial times follow your language.** Frame times in Discovery's serial view used to be formatted in US English whatever language you chose; they now follow it.
 - **A refused edit no longer marks a valid catalogue invalid.** When the Catalogue Editor turned down an edit (a frame with no identifier, a mux case that already exists, a failed delete), the toolbar badge read Invalid although the file had not changed; it now keeps the catalogue's last verdict.
 - **Dashboard statistics and cursors read like the signal.** The min/mean/max overlay and the line chart's cursor and measurement values padded a signal with no precision to three decimals, "89.000" beside a readout of "89". They now read as the signal's own value does, and a mean shows one decimal place more than the signal's readings carry.
+- **An edited event keeps its fraction of a second.** Changing an event's time in the event dialog used to drop the milliseconds and microseconds it opened with, moving it off the frame it marked; the new time now keeps them.
 
 ## [0.16.1] - 2026-11-04
 
