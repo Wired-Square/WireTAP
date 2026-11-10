@@ -26,6 +26,6 @@ fn an_inventory_row_is_snake_case() {
         decl::<InventoryRow>(),
         "type InventoryRow = { protocol: string, frame_id: number, frame_id_hex: string, \
          is_extended: boolean, count: number, first_us: number, last_us: number, \
-         max_dlc: number, };"
+         max_dlc: number, bus: number | null, };"
     );
 }

@@ -98,9 +98,12 @@ pub fn render(results: &QueryResults) -> String {
                 .collect(),
         ),
         QueryResults::FrameInventory(r) => (
-            &["protocol", "frame_id", "frame_id_hex", "is_extended", "count", "first_us", "last_us", "max_dlc"],
+            &["protocol", "frame_id", "frame_id_hex", "is_extended", "count", "first_us", "last_us", "max_dlc", "bus"],
             r.iter()
-                .map(|r| row![r.protocol, r.frame_id, r.frame_id_hex, r.is_extended, r.count, r.first_us, r.last_us, r.max_dlc])
+                .map(|r| {
+                    let bus = r.bus.map(|b| b.to_string()).unwrap_or_default();
+                    row![r.protocol, r.frame_id, r.frame_id_hex, r.is_extended, r.count, r.first_us, r.last_us, r.max_dlc, bus]
+                })
                 .collect(),
         ),
     };

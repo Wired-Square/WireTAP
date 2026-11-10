@@ -51,6 +51,7 @@
     "ingestAroundGap": "⟦Ingest frames around this gap⟧",
     "ingestAroundMatch": "⟦Ingest frames around this match⟧",
     "ingestAroundFirst": "⟦Ingest frames around the first sighting⟧",
+    "inventoryBus": "⟦bus {{bus}}⟧",
     "inventoryLen": "⟦≤{{len}} B⟧",
     "inventoryTo": "⟦ → ⟧",
     "addEventTooltip": "⟦Add event for this range⟧",

@@ -96,7 +96,8 @@ export default function ChecksumDiscoveryResultView({ embedded = false, onClose 
     );
   }
 
-  const findings = [...results.findings].sort((a, b) => a.frameId - b.frameId);
+  const findings = [...results.findings].sort((a, b) => a.frameId - b.frameId || (a.bus ?? -1) - (b.bus ?? -1));
+  const showBus = new Set(findings.map((f) => f.bus)).size > 1;
   const explained = findings.filter((f) => f.candidates.length > 0);
   const unexplained = findings.filter((f) => f.candidates.length === 0);
 
@@ -129,7 +130,7 @@ export default function ChecksumDiscoveryResultView({ embedded = false, onClose 
 
       <div className="flex-1 p-4 overflow-auto space-y-3">
         {explained.map((finding) => (
-          <FrameCard key={`${finding.frameId}-${finding.isExtended}`} finding={finding} />
+          <FrameCard key={findingKey(finding)} finding={finding} showBus={showBus} />
         ))}
 
         {explained.length === 0 && (
@@ -142,14 +143,16 @@ export default function ChecksumDiscoveryResultView({ embedded = false, onClose 
         {/* Why an id came back empty is worth keeping, but 62 rows of it buries
             the answer on a bus that has no checksums at all. */}
         {unexplained.length > 0 && (
-          <UnexplainedSection findings={unexplained} />
+          <UnexplainedSection findings={unexplained} showBus={showBus} />
         )}
       </div>
     </div>
   );
 }
 
-function UnexplainedSection({ findings }: { findings: FrameChecksumFinding[] }) {
+const findingKey = (f: FrameChecksumFinding) => `${f.frameId}-${f.isExtended}-${f.bus}`;
+
+function UnexplainedSection({ findings, showBus }: { findings: FrameChecksumFinding[]; showBus: boolean }) {
   const { t } = useTranslation("discovery");
   const [expanded, setExpanded] = useState(false);
 
@@ -169,7 +172,7 @@ function UnexplainedSection({ findings }: { findings: FrameChecksumFinding[] }) 
       {expanded && (
         <div className="px-3 pb-3 space-y-2">
           {findings.map((finding) => (
-            <FrameCard key={`${finding.frameId}-${finding.isExtended}`} finding={finding} />
+            <FrameCard key={findingKey(finding)} finding={finding} showBus={showBus} />
           ))}
         </div>
       )}
@@ -207,10 +210,12 @@ function Header({ onClose }: { onClose?: () => void }) {
   );
 }
 
-function FrameCard({ finding }: { finding: FrameChecksumFinding }) {
+function FrameCard({ finding, showBus }: { finding: FrameChecksumFinding; showBus: boolean }) {
   const { t } = useTranslation("discovery");
   const { effective: frameIdFormat } = useFrameIdFormat();
   const best = finding.candidates[0];
+  const frameId = formatFrameId(finding.frameId, frameIdFormat, finding.isExtended);
+  const bus = showBus && finding.bus !== undefined ? t("checksumDiscovery.onBus", { bus: finding.bus }) : null;
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -223,7 +228,7 @@ function FrameCard({ finding }: { finding: FrameChecksumFinding }) {
         t("checksumDiscovery.copyConfidence", { confidence: c.confidence }),
     );
     void navigator.clipboard.writeText(
-      `${formatFrameId(finding.frameId, frameIdFormat, finding.isExtended)}\n${lines.join("\n")}`,
+      `${bus ? `${frameId} ${bus}` : frameId}\n${lines.join("\n")}`,
     );
     setCopied(true);
     setTimeout(() => setCopied(false), COPY_FEEDBACK_TIMEOUT_MS);
@@ -238,9 +243,8 @@ function FrameCard({ finding }: { finding: FrameChecksumFinding }) {
           className="flex items-center gap-2 flex-1 min-w-0 text-left"
         >
           {expanded ? <ChevronDown className={iconSm} /> : <ChevronRight className={iconSm} />}
-          <span className={`font-mono font-medium ${textPrimary}`}>
-            {formatFrameId(finding.frameId, frameIdFormat, finding.isExtended)}
-          </span>
+          <span className={`font-mono font-medium ${textPrimary}`}>{frameId}</span>
+          {bus && <span className={`text-xs ${textMuted}`}>{bus}</span>}
           {best ? (
             <>
               <span className={`text-sm ${textSecondary} font-mono truncate`}>

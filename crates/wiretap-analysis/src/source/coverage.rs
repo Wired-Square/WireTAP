@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::hash::Hash;
 
 use serde::Serialize;
@@ -106,6 +106,9 @@ pub struct UncataloguedFrame {
     #[cfg_attr(feature = "ts", ts(optional))]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub register_type: Option<RegisterType>,
+    #[cfg_attr(feature = "ts", ts(optional))]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bus: Option<u8>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -159,6 +162,7 @@ impl Seen {
 
 /// The data side of one catalogue frame: every inventory row whose id maps onto
 /// it, rolled up.
+#[derive(Clone, Copy)]
 struct DataFrame<'a> {
     /// The most-seen contributing row. Decides how the id renders, and is the
     /// raw id payloads are sampled by: a masked catalogue id never appears in
@@ -187,14 +191,27 @@ impl<'a> DataFrame<'a> {
         }
     }
 
-    fn merge(&mut self, row: &'a InventoryRow) {
-        self.count += row.count;
-        self.first_us = self.first_us.min(row.first_us);
-        self.last_us = self.last_us.max(row.last_us);
-        if row.count > self.top.count {
-            self.top = row;
+    fn merge(&mut self, other: DataFrame<'a>) {
+        self.count += other.count;
+        self.first_us = self.first_us.min(other.first_us);
+        self.last_us = self.last_us.max(other.last_us);
+        if other.top.count > self.top.count {
+            self.top = other.top;
         }
     }
+}
+
+type RolledUp<'a> = BTreeMap<(u32, Option<u8>), DataFrame<'a>>;
+
+/// A catalogue frame's data summed over every bus it was seen on.
+fn on_any_bus<'a>(rolled: &RolledUp<'a>, id: u32) -> Option<DataFrame<'a>> {
+    rolled
+        .range((id, None)..=(id, Some(u8::MAX)))
+        .map(|(_, d)| *d)
+        .reduce(|mut a, b| {
+            a.merge(b);
+            a
+        })
 }
 
 const STANDARD_CAN_ID: u32 = 0x7FF;
@@ -210,18 +227,15 @@ fn catalogue_id(row: &InventoryRow, mask: u32) -> u32 {
     }
 }
 
-/// The inventory rolled up onto the ids the catalogue is keyed by. `mask` is the
-/// catalogue's `frame_id_mask`, or `u32::MAX` for none, when the only merge is a
-/// std/extended pair.
-fn roll_up<'a>(
-    inventory: impl IntoIterator<Item = &'a InventoryRow>,
-    mask: u32,
-) -> HashMap<u32, DataFrame<'a>> {
-    let mut by_id: HashMap<u32, DataFrame> = HashMap::new();
+/// The inventory rolled up onto the ids the catalogue is keyed by, bus by bus.
+/// `mask` is the catalogue's `frame_id_mask`, or `u32::MAX` for none, when the
+/// only merge is a std/extended pair.
+fn roll_up<'a>(inventory: impl IntoIterator<Item = &'a InventoryRow>, mask: u32) -> RolledUp<'a> {
+    let mut by_id = RolledUp::new();
     for row in inventory {
         by_id
-            .entry(catalogue_id(row, mask))
-            .and_modify(|d| d.merge(row))
+            .entry((catalogue_id(row, mask), row.bus))
+            .and_modify(|d| d.merge(DataFrame::new(row)))
             .or_insert_with(|| DataFrame::new(row));
     }
     by_id
@@ -231,9 +245,9 @@ fn roll_up<'a>(
 struct RtuReads<'c> {
     /// By frame key, with the newest register bytes of the reads carrying it.
     present: HashMap<&'c str, (Seen, VecDeque<Vec<u8>>)>,
-    uncatalogued: HashMap<(u8, RegisterType, u16), Seen>,
-    /// Messages addressing no register bank, by unit and function code.
-    unbanked: HashMap<(u8, u8), Seen>,
+    uncatalogued: HashMap<(Option<u8>, u8, RegisterType, u16), Seen>,
+    /// Messages addressing no register bank, by bus, unit and function code.
+    unbanked: HashMap<(Option<u8>, u8, u8), Seen>,
 }
 
 fn tally<K: Eq + Hash>(seen_by: &mut HashMap<K, Seen>, key: K, seen: Seen) {
@@ -271,7 +285,7 @@ async fn rtu_reads<'c, S: PayloadSource>(
                 is_extended: None,
                 limit: u32::MAX,
                 sampling: Sampling::Recent,
-            }, bus)
+            }, row.bus.or(bus))
             .await?;
         let mut stream = options.stream();
         for msg in payloads.iter().filter_map(|raw| stream.interpret(raw)) {
@@ -281,7 +295,7 @@ async fn rtu_reads<'c, S: PayloadSource>(
             let Some(bank) = RegisterType::from_function_code(msg.function) else {
                 tally(
                     &mut reads.unbanked,
-                    (msg.device_address, msg.function),
+                    (row.bus, msg.device_address, msg.function),
                     seen,
                 );
                 continue;
@@ -295,7 +309,7 @@ async fn rtu_reads<'c, S: PayloadSource>(
             let unit = msg.device_address;
             let frames = catalog.modbus_register_frames_within(start, quantity, bank, unit);
             if frames.is_empty() {
-                tally(&mut reads.uncatalogued, (unit, bank, start), seen);
+                tally(&mut reads.uncatalogued, (row.bus, unit, bank, start), seen);
             }
             let bytes = if bank.is_register_bank() && sample_limit > 0 {
                 msg.register_bytes()
@@ -329,11 +343,12 @@ async fn rtu_reads<'c, S: PayloadSource>(
 /// match each other.
 ///
 /// With a `bus`, only that bus's frames are diffed: a mask describes the frames
-/// the catalogue is about, not another link's.
+/// the catalogue is about, not another link's. Without one, each bus is rolled
+/// up apart; a catalogue frame counts every bus it was seen on, and its byte
+/// roles sample the bus that carried it most.
 ///
-/// A frame whose byte-role payloads fail to read is profiled over none, so one
-/// unreadable frame costs its byte roles and not the report. A `modbus_rtu` row
-/// is counted from its payloads, so its read error is returned.
+/// A payload read error is returned, from byte roles too: a profile over no
+/// samples would read as an answer.
 pub async fn catalog_coverage<S: PayloadSource>(
     source: &S,
     catalog_name: &str,
@@ -361,8 +376,23 @@ pub async fn catalog_coverage<S: PayloadSource>(
         0
     };
     let mut rtu = rtu_reads(source, &inventory, catalog, profile_limit, bus).await?;
-    let data_frames = by_register.len()
-        + by_id.len()
+    let catalog_ids: HashSet<(bool, u32)> = catalog
+        .frames
+        .iter()
+        .map(|f| (f.protocol == Protocol::Modbus, f.frame_id))
+        .collect();
+    let catalogued = |registers: bool, id: u32| catalog_ids.contains(&(registers, id));
+    // A catalogued id is one frame of data whatever the buses; an uncatalogued
+    // one is a frame per bus, as it is reported.
+    let rolled_frames: HashSet<(bool, u32, Option<u8>)> = [(true, &by_register), (false, &by_id)]
+        .into_iter()
+        .flat_map(|(registers, by)| {
+            by.keys().map(move |&(id, bus)| {
+                (registers, id, bus.filter(|_| !catalogued(registers, id)))
+            })
+        })
+        .collect();
+    let data_frames = rolled_frames.len()
         + rtu.present.len()
         + rtu.uncatalogued.len()
         + rtu.unbanked.len();
@@ -372,11 +402,6 @@ pub async fn catalog_coverage<S: PayloadSource>(
     let mut confidence = ConfidenceTally::default();
     let mut present = Vec::new();
     let mut missing = Vec::new();
-    let catalog_ids: HashSet<(bool, u32)> = catalog
-        .frames
-        .iter()
-        .map(|f| (f.protocol == Protocol::Modbus, f.frame_id))
-        .collect();
 
     for frame in &catalog.frames {
         let sigs = frame.own_signals();
@@ -385,7 +410,7 @@ pub async fn catalog_coverage<S: PayloadSource>(
         }
 
         let is_modbus = frame.protocol == Protocol::Modbus;
-        let rolled = if is_modbus { &by_register } else { &by_id }.get(&frame.frame_id);
+        let rolled = on_any_bus(if is_modbus { &by_register } else { &by_id }, frame.frame_id);
         let read = is_modbus
             .then(|| rtu.present.remove(frame.key.as_str()))
             .flatten();
@@ -393,6 +418,7 @@ pub async fn catalog_coverage<S: PayloadSource>(
             polled_and_read.insert(frame.frame_id);
         }
         let seen = rolled
+            .as_ref()
             .map(DataFrame::seen)
             .into_iter()
             .chain(read.as_ref().map(|r| r.0));
@@ -419,9 +445,8 @@ pub async fn catalog_coverage<S: PayloadSource>(
                         is_extended: Some(data.top.is_extended),
                         limit: sample_limit,
                         sampling: Sampling::Recent,
-                    }, bus)
-                    .await
-                    .unwrap_or_default();
+                    }, data.top.bus.or(bus))
+                    .await?;
                 Some(profile_bytes(&payloads))
             }
             (true, None, None) => None,
@@ -450,8 +475,8 @@ pub async fn catalog_coverage<S: PayloadSource>(
     // message from five nodes is one frame; the raw id rides along.
     let rolled_up_unknown = [(true, &by_register), (false, &by_id)]
         .into_iter()
-        .flat_map(|(registers, by)| by.iter().map(move |(id, d)| (registers, *id, d)))
-        .filter(|&(registers, id, _)| !catalog_ids.contains(&(registers, id)))
+        .flat_map(|(registers, by)| by.iter().map(move |(&(id, _), d)| (registers, id, d)))
+        .filter(|&(registers, id, _)| !catalogued(registers, id))
         .map(|(_, id, d)| UncataloguedFrame {
             frame_id: id,
             frame_id_hex: format_frame_id(id, d.top.is_extended),
@@ -461,11 +486,12 @@ pub async fn catalog_coverage<S: PayloadSource>(
                 .then(|| format_frame_id(d.top.frame_id, d.top.is_extended)),
             unit: None,
             register_type: None,
+            bus: d.top.bus,
         });
     let unknown_reads = rtu
         .uncatalogued
         .into_iter()
-        .map(|((unit, bank, start), seen)| UncataloguedFrame {
+        .map(|((bus, unit, bank, start), seen)| UncataloguedFrame {
             frame_id: start.into(),
             frame_id_hex: register_label(Some(unit), bank, start.into()),
             is_extended: false,
@@ -473,11 +499,12 @@ pub async fn catalog_coverage<S: PayloadSource>(
             seen_as_hex: None,
             unit: Some(unit),
             register_type: Some(bank),
+            bus,
         });
     let unknown_functions =
         rtu.unbanked
             .into_iter()
-            .map(|((unit, function), seen)| UncataloguedFrame {
+            .map(|((bus, unit, function), seen)| UncataloguedFrame {
                 frame_id: u32::from(unit) << 8 | u32::from(function),
                 frame_id_hex: format!("unit {unit} fn 0x{function:02X}"),
                 is_extended: false,
@@ -485,12 +512,15 @@ pub async fn catalog_coverage<S: PayloadSource>(
                 seen_as_hex: None,
                 unit: Some(unit),
                 register_type: None,
+                bus,
             });
     let mut uncatalogued: Vec<UncataloguedFrame> = rolled_up_unknown
         .chain(unknown_reads)
         .chain(unknown_functions)
         .collect();
-    uncatalogued.sort_by(|a, b| (a.frame_id, &a.frame_id_hex).cmp(&(b.frame_id, &b.frame_id_hex)));
+    uncatalogued.sort_by(|a, b| {
+        (a.frame_id, &a.frame_id_hex, a.bus).cmp(&(b.frame_id, &b.frame_id_hex, b.bus))
+    });
 
     Ok(CoverageReport {
         catalog: catalog_name.to_owned(),
@@ -528,7 +558,7 @@ mod tests {
             1,
             "three source addresses, one catalogue frame"
         );
-        let data = &rolled[&0x1802_FF00];
+        let data = &rolled[&(0x1802_FF00, None)];
         assert_eq!(data.count, 45, "counts sum across contributing ids");
         assert_eq!(data.first_us, 100, "the window starts at the earliest");
         assert_eq!(data.last_us, 3000, "and ends at the latest");
@@ -550,8 +580,7 @@ mod tests {
             InventoryRow::new("can", 0x73F, false, 1, 0, 1, 8),
         ];
         let rolled = roll_up(&inventory, 0x1FFF_FF00);
-        let mut ids: Vec<u32> = rolled.keys().copied().collect();
-        ids.sort_unstable();
+        let ids: Vec<u32> = rolled.keys().map(|&(id, _)| id).collect();
         assert_eq!(ids, [0x700, 0x701, 0x73F, 0x1802_FF00]);
 
         let serial = [
@@ -591,7 +620,7 @@ mod tests {
             InventoryRow::new("can", 0x100, true, 90, 5, 50, 8),
         ];
         let rolled = roll_up(&inventory, u32::MAX);
-        let data = &rolled[&0x100];
+        let data = &rolled[&(0x100, None)];
 
         assert!(
             data.top.is_extended,

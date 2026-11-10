@@ -2,8 +2,6 @@
 //
 // The Payload Changes report, over `wiretap_analysis::summary::changes_counts`.
 
-use std::collections::HashSet;
-
 use wiretap_analysis::roles::{Endianness, Trend};
 use wiretap_analysis::{changes_counts, ByteColumn, ByteRole, FrameKey, MultiBytePattern, MuxSelector, PatternKind};
 
@@ -25,15 +23,12 @@ fn labels(l: &ReportLocale, keys: &[&str]) -> Vec<String> {
 
 pub fn report(changes: &PayloadChanges, l: &ReportLocale) -> Doc {
     let mut frames: Vec<&ChangesFrame> = changes.frames.iter().collect();
-    frames.sort_by_key(|f| (protocol_rank(protocol(f)), protocol(f), key(f)));
-
-    let bursts: HashSet<(&str, FrameKey)> =
-        frames.iter().filter(|f| f.burst).map(|f| (protocol(f), key(f))).collect();
+    frames.sort_by_key(|f| (protocol_rank(protocol(f)), protocol(f), key(f), f.profile.bus));
     let counts = changes_counts(
-        frames.iter().map(|f| (protocol(f), key(f), &f.profile.profile)),
-        &bursts,
+        frames.iter().map(|f| (&f.profile.profile, f.burst)),
         changes.mirrors.iter().map(|m| m.groups.as_slice()),
     );
+    let multi_bus = frames.iter().map(|f| f.profile.bus).collect::<std::collections::BTreeSet<_>>().len() > 1;
 
     let mut protocols: Vec<&str> = frames.iter().map(|f| protocol(f)).collect();
     protocols.dedup();
@@ -85,7 +80,10 @@ pub fn report(changes: &PayloadChanges, l: &ReportLocale) -> Doc {
         );
         blocks.push(Block::Section(l.label("reports:changes.mirrorGroups"), vec![Block::Table(header, mirror_rows)]));
     }
-    blocks.push(Block::Section(l.label("reports:changes.frames"), frames.into_iter().map(|f| frame(f, l)).collect()));
+    blocks.push(Block::Section(
+        l.label("reports:changes.frames"),
+        frames.into_iter().map(|f| frame(f, multi_bus, l)).collect(),
+    ));
     Doc::new(l, l.label("reports:changes.title"), blocks)
 }
 
@@ -93,7 +91,7 @@ fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{b:02X}")).collect::<Vec<_>>().join(" ")
 }
 
-fn frame(f: &ChangesFrame, l: &ReportLocale) -> Block {
+fn frame(f: &ChangesFrame, multi_bus: bool, l: &ReportLocale) -> Block {
     let p = &f.profile.profile;
     let length = if p.min_len == p.max_len {
         l.count("reports:count.byte", p.max_len)
@@ -157,7 +155,10 @@ fn frame(f: &ChangesFrame, l: &ReportLocale) -> Block {
             blocks.push(Block::Section(title, inner));
         }
     }
-    let title = format!("{} {}", l.protocol_label(protocol(f)), frame_label(protocol(f), key(f)));
+    let mut title = format!("{} {}", l.protocol_label(protocol(f)), frame_label(protocol(f), key(f)));
+    if let Some(bus) = f.profile.bus.filter(|_| multi_bus) {
+        title = l.t("reports:changes.onBus", &[("frame", &title), ("bus", &bus.to_string())]);
+    }
     Block::Section(title, blocks)
 }
 

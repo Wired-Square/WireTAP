@@ -810,7 +810,7 @@ pub struct CatalogCoverageParams {
     #[serde(default)]
     pub end_time: Option<String>,
     /// Diff only this bus's frames, as a catalogue written for one link needs on
-    /// a multi-bus capture. Captures only: a backend profile refuses it.
+    /// a multi-bus capture. A backend whose gateway ignores it answers an error.
     #[serde(default)]
     pub bus: Option<u8>,
 }

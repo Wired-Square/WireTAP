@@ -57,21 +57,9 @@ impl Source for Gateway<'_> {
     type Error = String;
 }
 
-/// The gateway's archive groups frames without their bus, so a bus is refused
-/// rather than ignored.
-fn refuse_bus(bus: Option<u8>) -> Result<(), String> {
-    match bus {
-        Some(bus) => Err(format!(
-            "a WireTAP backend's archive cannot be filtered by bus yet (asked for bus {bus}); use a capture, or leave the bus out"
-        )),
-        None => Ok(()),
-    }
-}
-
 impl PayloadSource for Gateway<'_> {
     async fn inventory(&self, start_us: Option<i64>, end_us: Option<i64>, bus: Option<u8>) -> Result<Vec<InventoryRow>, String> {
-        refuse_bus(bus)?;
-        crate::dbquery::db_frame_inventory(self.settings, self.profile_id, start_us, end_us).await
+        crate::dbquery::db_frame_inventory(self.settings, self.profile_id, start_us, end_us, bus).await
     }
 
     // No protocol and no stride: a backend profile reads one protocol, and a
@@ -79,13 +67,13 @@ impl PayloadSource for Gateway<'_> {
     // query is an index seek. A capture is bounded and local, which is what
     // makes striding it affordable.
     async fn payloads(&self, q: PayloadQuery<'_>, bus: Option<u8>) -> Result<Vec<Vec<u8>>, String> {
-        refuse_bus(bus)?;
         crate::dbquery::db_fetch_frame_payloads(
             self.settings,
             self.profile_id,
             q.frame_id,
             q.is_extended,
             q.limit,
+            bus,
         )
         .await
     }
@@ -140,33 +128,6 @@ impl PayloadSource for AppSource<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    struct Unread;
-
-    impl SettingsSource for Unread {
-        fn load(&self) -> Result<crate::settings::AppSettings, String> {
-            panic!("a refused bus reads no settings")
-        }
-        fn saved_profiles(&self) -> crate::io::ProfileLoader {
-            unreachable!()
-        }
-    }
-
-    #[tokio::test]
-    async fn a_backend_refuses_a_bus_rather_than_ignoring_it() {
-        let source = QuerySource::Backend("p".into());
-        let gateway = source.reader(&Unread);
-        let query = PayloadQuery {
-            protocol: None,
-            frame_id: 1,
-            is_extended: None,
-            limit: 1,
-            sampling: wiretap_analysis::source::Sampling::Recent,
-        };
-        for refused in [gateway.inventory(None, None, Some(0)).await.err(), gateway.payloads(query, Some(1)).await.err()] {
-            assert!(refused.is_some_and(|e| e.contains("cannot be filtered by bus")));
-        }
-    }
 
     /// The `rust` column of the bounds table: what the MCP makes of each input.
     #[test]

@@ -18,7 +18,7 @@ wslib-can-gsusb = { version = "0.1.0", registry = "wired-square", features = ["t
 wslib-can-pcan = { version = "0.1.0", registry = "wired-square", features = ["transport"] }
 wslib-can-socketcan = { version = "0.1", registry = "wired-square", features = ["transport"] }
 wslib-serial = { version = "0.1.1", registry = "wired-square", features = ["ports"] }
-wslib-wiretap-protocol = { version = "0.2.1", registry = "wired-square" }
+wslib-wiretap-protocol = { version = "0.2.3", registry = "wired-square" }
 
 [target.'cfg(any(target_os = "macos", target_os = "windows"))'.dependencies]
 nusb = { version = "0.2", features = ["tokio"] }

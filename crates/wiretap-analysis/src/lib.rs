@@ -71,7 +71,7 @@ pub use roles::{
 };
 pub use scan::{
     analyse_group, scan_frames, scan_groups, ChecksumScanOptions, ChecksumScanResult,
-    DiscoveredChecksum, FrameChecksumFinding, FrameKey, DEFAULT_MIN_LIKENESS,
+    DiscoveredChecksum, FrameChecksumFinding, FrameKey, ScanGroup, DEFAULT_MIN_LIKENESS,
 };
 pub use structure::{serial_structure, CandidateReason, FieldCandidate, SerialStructure};
 pub use summary::{

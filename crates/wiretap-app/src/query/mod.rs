@@ -302,6 +302,7 @@ pub(crate) mod tests {
                             n("last_us"),
                             n("max_dlc") as u16,
                         )
+                        .on_bus(r["bus"].as_u64().map(|b| b as u8))
                     })
                     .collect(),
             ),
@@ -360,10 +361,49 @@ pub(crate) mod tests {
     }
 
     #[test]
+    fn a_windows_bus_limits_every_row_set_a_capture_query_reads() {
+        let on = |bus, id, at, bytes: &[u8]| FrameMessage { bus, ..frame(id, at, bytes) };
+        capture_of("a5-buses", &[
+            on(0, 0x300, 1000, &[0xAA, 1]),
+            on(0, 0x301, 1000, &[0xAA, 1]),
+            on(1, 0x300, 2000, &[0xAA, 2]),
+            on(1, 0x301, 2000, &[0xAA, 9]),
+            on(1, 0x300, 3000, &[0xAA, 3]),
+        ]);
+        let window = |bus| RowWindow { bus, ..Default::default() };
+        let run = |spec| run_capture("a5-buses", spec).unwrap().results;
+
+        let QueryResults::FirstLast(fl) = run(QuerySpec::FirstLast { frame_id: 0x300, is_extended: None, window: window(Some(1)) })
+        else {
+            panic!()
+        };
+        assert_eq!((fl.first_timestamp_us, fl.total_count), (2000, 2));
+
+        let mirror = |bus| QuerySpec::MirrorValidation {
+            mirror_frame_id: 0x301,
+            source_frame_id: 0x300,
+            is_extended: None,
+            window: window(bus),
+            tolerance_ms: 1,
+            limit: None,
+        };
+        assert_eq!(run(mirror(Some(0))).len(), 0, "bus 0's pair matches");
+        assert_eq!(run(mirror(Some(1))).len(), 1, "bus 1's pair differs");
+
+        let pattern = QuerySpec::PatternSearch { window: window(Some(0)), pattern: vec![0xAA], pattern_mask: vec![0xFF], limit: None };
+        assert_eq!(run(pattern).len(), 2);
+
+        let QueryResults::FrameInventory(rows) = run(QuerySpec::FrameInventory { window: window(Some(1)), limit: None }) else {
+            panic!()
+        };
+        assert_eq!(rows.iter().map(|r| (r.frame_id, r.bus, r.count)).collect::<Vec<_>>(), [(0x300, Some(1), 2), (0x301, Some(1), 1)]);
+    }
+
+    #[test]
     fn first_last_counts_the_window_and_inventory_rolls_it_up() {
         let frames: Vec<_> = (0..5u64).map(|i| frame(0x300, i * 1000, &[i as u8])).collect();
         capture_of("d5-first-last", &frames);
-        let window = RowWindow { protocol: None, start_us: Some(1000), end_us: Some(4000) };
+        let window = RowWindow { protocol: None, start_us: Some(1000), end_us: Some(4000), bus: None };
         let inventory = QuerySpec::FrameInventory { window: window.clone(), limit: None };
         let spec = QuerySpec::FirstLast { frame_id: 0x300, is_extended: None, window: window.clone() };
         let QueryResults::FirstLast(fl) = run_capture("d5-first-last", spec).unwrap().results else { panic!() };

@@ -81,6 +81,7 @@
     "mirrorGroups": "⟦Mirror groups⟧",
     "lengthRange": "⟦{{min}}–{{max}} bytes⟧",
     "case": "⟦Case {{value}} ({{samples}})⟧",
+    "onBus": "⟦{{frame}} · bus {{bus}}⟧",
     "loopingCounter": "⟦looping {{min}}–{{max}} (mod {{modulo}}), step {{step}}⟧",
     "step": "⟦step {{step}}⟧",
     "stepRollover": "⟦step {{step}}, rollover⟧",

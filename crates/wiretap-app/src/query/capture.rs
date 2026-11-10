@@ -52,7 +52,7 @@ fn row_filters(spec: &QuerySpec) -> Vec<FrameRowFilter> {
         protocols: window.protocol.map(CaptureProtocol::of).unwrap_or_default().to_vec(),
         start_us: window.start_us,
         end_us: window.end_us,
-        bus: None,
+        bus: window.bus,
     };
     match spec {
         QuerySpec::ByteChanges { frame_id, is_extended, .. }

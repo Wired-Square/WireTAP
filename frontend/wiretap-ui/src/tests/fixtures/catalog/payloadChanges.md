@@ -3,9 +3,10 @@
 ## Summary
 
 - **Frames read:** 364
-- **Frames profiled:** 6
+- **Frames profiled:** 7
 - **Protocols:** CAN, Modbus, Serial
 - **Mirror groups:** 1
+- **Identical:** 1
 - **Varying length:** 1
 - **Multiplexed:** 1
 - **Burst:** 1
@@ -18,7 +19,7 @@
 
 ## Frames
 
-### CAN 0x100
+### CAN 0x100 · bus 0
 
 - **Samples:** 40
 - **Length:** 4 bytes
@@ -39,7 +40,7 @@
 - Counter at byte[0]: incrementing, step=1
 - 16-bit counter at byte[2:3], little endian
 
-### CAN 0x200
+### CAN 0x200 · bus 0
 
 - **Samples:** 40
 - **Length:** 4 bytes
@@ -60,9 +61,23 @@
 - Counter at byte[0]: incrementing, step=1
 - 16-bit counter at byte[2:3], little endian
 
-### CAN 0x300
+### CAN 0x300 · bus 0
 
-- **Samples:** 84
+- **Samples:** 4
+- **Length:** 2 bytes
+- **Flags:** identical
+
+| Byte | Role | Details |
+|---|---|---|
+| 0 | static | 0x80 |
+| 1 | static | 0x11 |
+
+- Identical payload across all 4 samples: 80 11
+- Static bytes: byte[0]=0x80, byte[1]=0x11
+
+### CAN 0x300 · bus 1
+
+- **Samples:** 80
 - **Length:** 2–3 bytes
 - **Flags:** burst
 
@@ -75,9 +90,9 @@
 - Varying length: 2–3 bytes
 - Burst frame: analysing stable payload portion only
 - Static bytes: byte[2]=0x33
-- Sensor at byte[0]: ↑ range 128–131 (73% trend)
+- Sensor at byte[0]: ↑ range 128–131 (77% trend)
 
-### CAN 0x18FF0001
+### CAN 0x18FF0001 · bus 0
 
 - **Samples:** 120
 - **Length:** 4 bytes
@@ -110,7 +125,7 @@
 - Static: byte[1]=0x30, byte[3]=0x00
 - Counter byte[2]: inc, step=1
 
-### Modbus 40001
+### Modbus 40001 · bus 0
 
 - **Samples:** 40
 - **Length:** 2 bytes
@@ -123,7 +138,7 @@
 - Static bytes: byte[0]=0x00
 - Counter at byte[1]: incrementing, step=1
 
-### Serial 0x10
+### Serial 0x10 · bus 0
 
 - **Samples:** 40
 - **Length:** 3 bytes

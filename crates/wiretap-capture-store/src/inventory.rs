@@ -7,9 +7,9 @@ pub fn inventory_statement(capture_id: &str, filter: &FrameRowFilter, limit: Opt
     let filter = filter.sql_where(capture_id);
     let mut statement = Sql {
         sql: format!(
-            "SELECT protocol, frame_id, is_extended, COUNT(*), MIN(timestamp_us), MAX(timestamp_us), MAX({STORED_LENGTH}) \
+            "SELECT protocol, frame_id, is_extended, COUNT(*), MIN(timestamp_us), MAX(timestamp_us), MAX({STORED_LENGTH}), bus \
              FROM frames WHERE {} \
-             GROUP BY protocol, frame_id, is_extended ORDER BY frame_id, protocol, is_extended{}",
+             GROUP BY protocol, frame_id, is_extended, bus ORDER BY frame_id, protocol, is_extended, bus{}",
             filter.sql,
             if limit.is_some() { " LIMIT ?" } else { "" }
         ),
@@ -35,8 +35,8 @@ mod tests {
         assert_eq!(
             inventory_statement("c'1", &filter, None).inlined(),
             "SELECT protocol, frame_id, is_extended, COUNT(*), MIN(timestamp_us), MAX(timestamp_us), \
-             MAX(MAX(dlc, length(payload))) FROM frames WHERE capture_id = 'c''1' AND timestamp_us >= 1 \
-             AND timestamp_us < 2 GROUP BY protocol, frame_id, is_extended ORDER BY frame_id, protocol, is_extended"
+             MAX(MAX(dlc, length(payload))), bus FROM frames WHERE capture_id = 'c''1' AND timestamp_us >= 1 \
+             AND timestamp_us < 2 GROUP BY protocol, frame_id, is_extended, bus ORDER BY frame_id, protocol, is_extended, bus"
         );
     }
 }

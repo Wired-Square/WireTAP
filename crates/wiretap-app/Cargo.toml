@@ -91,9 +91,9 @@ wslib-bits = { version = "0.1", registry = "wired-square" }
 # with no checksums costs milliseconds instead of a full sweep per frame id.
 wiretap-analysis = { path = "../wiretap-analysis" }
 # The capture vocabulary, the ingest protocol and Test Pattern.
-wslib-wiretap-protocol = { version = "0.2.1", registry = "wired-square" }
+wslib-wiretap-protocol = { version = "0.2.3", registry = "wired-square" }
 # The gateway's HTTP API: its serde types and, behind `client`, the client.
-wslib-wiretap-gateway = { version = "0.2.0", registry = "wired-square", features = ["client"] }
+wslib-wiretap-gateway = { version = "0.2.3", registry = "wired-square", features = ["client"] }
 # The capture store: schema and migrations, frame and byte reads and writes, metadata and events.
 wiretap-capture-store = { path = "../wiretap-capture-store" }
 # The transports: Modbus TCP, the serial port and the CAN adapters.

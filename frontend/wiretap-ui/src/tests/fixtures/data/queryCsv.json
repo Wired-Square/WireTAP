@@ -218,13 +218,14 @@
     },
     {
       "expected": [
-        "protocol,frame_id,frame_id_hex,is_extended,count,first_us,last_us,max_dlc",
-        "can,256,0x100,false,10,1,2,8",
-        "modbus_rtu,259,0x103,false,1,3,3,7",
+        "protocol,frame_id,frame_id_hex,is_extended,count,first_us,last_us,max_dlc,bus",
+        "can,256,0x100,false,10,1,2,8,1",
+        "modbus_rtu,259,0x103,false,1,3,3,7,",
         ""
       ],
       "input": [
         {
+          "bus": 1,
           "count": 10,
           "first_us": 1,
           "frame_id": 256,

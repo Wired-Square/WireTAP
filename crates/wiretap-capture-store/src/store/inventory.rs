@@ -16,7 +16,8 @@ pub fn inventory_row(row: &SqliteRow) -> sqlx::Result<InventoryRow> {
         row.try_get(4)?,
         row.try_get(5)?,
         row.try_get::<i64, _>(6)? as u16,
-    ))
+    )
+    .on_bus(row.try_get::<i64, _>(7)? as u8))
 }
 
 impl Store {
@@ -105,6 +106,28 @@ mod tests {
         assert_eq!(rows.iter().map(|r| (r.frame_id, r.count)).collect::<Vec<_>>(), [(256, 1)]);
         assert_eq!(store.payloads("c1", &query, Some(1)).await.unwrap(), [vec![1, 1]]);
         assert_eq!(store.payloads("c1", &query, None).await.unwrap().len(), 2);
+    }
+
+    #[tokio::test]
+    async fn an_identity_on_two_buses_is_a_row_per_bus() {
+        let store = store().await;
+        sqlx::query(
+            "INSERT INTO frames (capture_id, protocol, timestamp_us, frame_id, bus, dlc, payload)
+             VALUES ('c1', 'can', 1, 256, 1, 1, x'00'), ('c1', 'can', 2, 256, 0, 2, x'0101'),
+                    ('c1', 'can', 3, 256, 1, 1, x'02')",
+        )
+        .execute(store.database().pool())
+        .await
+        .unwrap();
+
+        let rows = store.frame_inventory("c1", None, None, None).await.unwrap();
+
+        assert_eq!(
+            rows.iter()
+                .map(|r| (r.bus, r.count, r.first_us, r.last_us, r.max_dlc))
+                .collect::<Vec<_>>(),
+            [(Some(0), 1, 2, 2, 2), (Some(1), 2, 1, 3, 1)]
+        );
     }
 
     #[tokio::test]

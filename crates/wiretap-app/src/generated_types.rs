@@ -920,7 +920,7 @@ fn query_shapes_serialise_as_declared() {
     for (_, spec) in form_specs() {
         assert_declared::<QuerySpec>(&serde_json::to_value(&spec).unwrap());
     }
-    let stats = QueryStats { rows_scanned: 1, results_count: 1, execution_time_ms: 0 };
+    let stats = QueryStats { rows_scanned: 1, results_count: 1, execution_time_ms: 0, bus: None };
     assert_declared::<QueryStats>(&serde_json::to_value(&stats).unwrap());
     for case in fixture("queryCsv.json")["cases"].as_array().unwrap() {
         let name = case["name"].as_str().unwrap();

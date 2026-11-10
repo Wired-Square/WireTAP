@@ -119,6 +119,48 @@ fn only_an_id_seen_both_standard_and_extended_is_fetched_by_its_width() {
     );
 }
 
+/// 0x100 on bus 0 counts up in byte 0; on bus 1 it is a constant.
+fn one_id_on_two_buses() -> MemorySource {
+    let mut source = MemorySource::default();
+    for i in 0..20u8 {
+        source.push_on(0, "can", 0x100, false, vec![i, i ^ 0x5A]);
+        source.push_on(1, "can", 0x100, false, vec![7, 7, 7]);
+    }
+    source
+}
+
+#[test]
+fn an_id_on_two_buses_is_profiled_once_per_bus_from_that_bus_alone() {
+    let source = one_id_on_two_buses();
+
+    let profiles = block_on(byte_profiles(&source, &ScanFilter::Ids(vec![]), 10, usize::MAX)).unwrap();
+
+    let per_bus: Vec<_> = profiles
+        .frames
+        .iter()
+        .map(|f| (f.bus, f.profile.sample_count, f.profile.max_len))
+        .collect();
+    assert_eq!(per_bus, [(Some(0), 10, 2), (Some(1), 10, 3)]);
+    assert!(
+        source.asked().iter().all(|a| a.1.is_none()),
+        "one width on each bus is not ambiguous"
+    );
+
+    let bus_1 = block_on(byte_profile(&source, Some("can"), 0x100, None, 10, Some(1))).unwrap();
+    assert_eq!((bus_1.bus, bus_1.profile.max_len), (Some(1), 3));
+}
+
+#[test]
+fn a_checksum_scan_finds_an_id_on_two_buses_twice_naming_each_bus() {
+    let source = one_id_on_two_buses();
+
+    let result = block_on(checksum_scan(&source, &ScanFilter::Ids(vec![]), 20, Default::default())).unwrap();
+
+    let found: Vec<_> = result.findings.iter().map(|f| (f.key.frame_id, f.bus, f.frame_count)).collect();
+    assert_eq!(found, [(0x100, Some(0), 20), (0x100, Some(1), 20)]);
+    assert_eq!(serde_json::to_value(&result.findings[1]).unwrap()["bus"], 1);
+}
+
 #[test]
 fn frames_past_max_frames_are_counted_not_profiled() {
     let mut source = MemorySource::default();
@@ -381,6 +423,7 @@ fn coverage_is_snake_case_and_says_unset_for_none_and_absent_alike() {
                 "frame_id_hex": "0x300",
                 "is_extended": false,
                 "count": 1,
+                "bus": 0,
             }],
             "confidence": { "high": 1, "medium": 0, "low": 0, "unset": 2 },
         })
@@ -388,25 +431,17 @@ fn coverage_is_snake_case_and_says_unset_for_none_and_absent_alike() {
 }
 
 #[test]
-fn a_payload_read_failure_costs_coverage_its_byte_roles_not_the_report() {
+fn a_byte_roles_payload_read_failure_fails_the_report_rather_than_profiling_no_samples() {
     let catalog = Catalogue::parse(COVERED).unwrap();
     let mut memory = MemorySource::default();
     memory.push("can", 0x100, false, vec![1, 2]);
+    let source = UnreadablePayloads(memory);
+    let coverage = |byte_roles| {
+        block_on(catalog_coverage(&source, "covered", &catalog, byte_roles, 10, None, None, None))
+    };
 
-    let report = block_on(catalog_coverage(
-        &UnreadablePayloads(memory),
-        "covered",
-        &catalog,
-        true,
-        10,
-        None,
-        None,
-        None,
-    ))
-    .unwrap();
-
-    let roles = report.present[0].byte_roles.as_ref().unwrap();
-    assert_eq!(roles.sample_count, 0);
+    assert_eq!(coverage(true).unwrap_err(), "unreadable");
+    assert!(coverage(false).is_ok());
 }
 
 const INTER_TOWER: &str = r#"
@@ -442,11 +477,13 @@ fn two_bus_capture() -> MemorySource {
     source
 }
 
-fn uncatalogued(report: &wiretap_analysis::source::CoverageReport) -> Vec<(String, i64, Option<String>)> {
+fn uncatalogued(
+    report: &wiretap_analysis::source::CoverageReport,
+) -> Vec<(String, Option<u8>, i64, Option<String>)> {
     let mut rows: Vec<_> = report
         .uncatalogued
         .iter()
-        .map(|u| (u.frame_id_hex.clone(), u.count, u.seen_as_hex.clone()))
+        .map(|u| (u.frame_id_hex.clone(), u.bus, u.count, u.seen_as_hex.clone()))
         .collect();
     rows.sort();
     rows
@@ -457,21 +494,29 @@ fn coverage_on_one_bus_diffs_the_catalogue_against_that_bus_alone() {
     let catalog = Catalogue::parse(INTER_TOWER).unwrap();
     let source = two_bus_capture();
 
-    let mixed = block_on(catalog_coverage(&source, "inter_tower", &catalog, true, 10, None, None, None)).unwrap();
-    assert_eq!(mixed.present[0].count, 5);
+    let every_bus = block_on(catalog_coverage(&source, "inter_tower", &catalog, true, 10, None, None, None)).unwrap();
+    assert_eq!(every_bus.present[0].count, 5, "a catalogue frame sums the buses it was seen on");
     assert_eq!(
-        uncatalogued(&mixed),
+        uncatalogued(&every_bus),
         [
-            ("0x18AA0000".into(), 6, Some("0x18AA0005".into())),
-            ("0x70F".into(), 1, None),
-            ("0x72F".into(), 1, None),
+            ("0x18AA0000".into(), Some(0), 1, Some("0x18AA0001".into())),
+            ("0x18AA0000".into(), Some(1), 5, Some("0x18AA0005".into())),
+            ("0x70F".into(), Some(1), 1, None),
+            ("0x72F".into(), Some(1), 1, None),
         ],
-        "with no bus, bus 1's traffic is uncatalogued and folded under bus 0's mask"
+        "with no bus, the mask rolls each bus up apart and never merges across them"
+    );
+    assert_eq!(every_bus.data_frames, 5, "one catalogue frame and four uncatalogued rows");
+    let roles = every_bus.present[0].byte_roles.as_ref().unwrap();
+    assert_eq!(
+        (roles.sample_count, roles.max_len),
+        (3, 2),
+        "byte roles sample the most-seen row on its own bus"
     );
 
     let bus_0 = block_on(catalog_coverage(&source, "inter_tower", &catalog, true, 10, None, None, Some(0))).unwrap();
     assert_eq!(bus_0.present[0].count, 4);
-    assert_eq!(uncatalogued(&bus_0), [("0x18AA0000".into(), 1, Some("0x18AA0001".into()))]);
+    assert_eq!(uncatalogued(&bus_0), [("0x18AA0000".into(), Some(0), 1, Some("0x18AA0001".into()))]);
     let roles = bus_0.present[0].byte_roles.as_ref().unwrap();
     assert_eq!((roles.sample_count, roles.max_len), (3, 2), "byte roles sample bus 0's payloads only");
 }
@@ -504,7 +549,7 @@ fn the_mcp_shapes_keep_their_casing() {
     source.push("can", 0x100, false, vec![1]);
 
     let profile = serde_json::to_value(
-        block_on(byte_profile(&source, Some("can"), 0x100, None, 10)).unwrap(),
+        block_on(byte_profile(&source, Some("can"), 0x100, None, 10, None)).unwrap(),
     )
     .unwrap();
     assert_eq!(profile["frameId"], 0x100);
@@ -544,6 +589,7 @@ fn the_mcp_shapes_keep_their_casing() {
             "first_us": 0,
             "last_us": 0,
             "max_dlc": 1,
+            "bus": 0,
         })
     );
 }
@@ -581,6 +627,10 @@ fn with_crc(body: &[u8]) -> Vec<u8> {
 /// A read request and its response, as a `modbus_rtu` archive keys them: both
 /// under `unit << 8 | function`, each one whole message.
 fn exchange(source: &mut MemorySource, unit: u8, function: u8, start: u16, values: &[u16]) {
+    exchange_on(source, 0, unit, function, start, values);
+}
+
+fn exchange_on(source: &mut MemorySource, bus: u8, unit: u8, function: u8, start: u16, values: &[u16]) {
     let id = u32::from(unit) << 8 | u32::from(function);
     let quantity = values.len() as u16;
     let request = [
@@ -591,8 +641,8 @@ fn exchange(source: &mut MemorySource, unit: u8, function: u8, start: u16, value
     .concat();
     let data: Vec<u8> = values.iter().flat_map(|v| v.to_be_bytes()).collect();
     let response = [&[unit, function, data.len() as u8][..], &data].concat();
-    source.push("modbus_rtu", id, false, with_crc(&request));
-    source.push("modbus_rtu", id, false, with_crc(&response));
+    source.push_on(bus, "modbus_rtu", id, false, with_crc(&request));
+    source.push_on(bus, "modbus_rtu", id, false, with_crc(&response));
 }
 
 /// Unit 1 FC04 is row `0x104`, which is the `voltage` register's number.
@@ -676,8 +726,9 @@ fn an_rtu_read_holding_no_catalogue_frame_is_uncatalogued_by_unit_bank_and_regis
                 "count": 1,
                 "unit": 2,
                 "register_type": "holding",
+                "bus": 0,
             },
-            { "frame_id": 0x104, "frame_id_hex": "0x104", "is_extended": false, "count": 1 },
+            { "frame_id": 0x104, "frame_id_hex": "0x104", "is_extended": false, "count": 1, "bus": 0 },
             {
                 "frame_id": 700,
                 "frame_id_hex": "unit 1 input 700",
@@ -685,6 +736,7 @@ fn an_rtu_read_holding_no_catalogue_frame_is_uncatalogued_by_unit_bank_and_regis
                 "count": 1,
                 "unit": 1,
                 "register_type": "input",
+                "bus": 0,
             },
         ])
     );
@@ -708,9 +760,29 @@ fn a_register_less_rtu_message_is_uncatalogued_by_unit_and_function() {
             "is_extended": false,
             "count": 2,
             "unit": 1,
+            "bus": 0,
         }]),
         "a vendor code counts per message; an exception is skipped"
     );
+}
+
+#[test]
+fn an_rtu_read_on_two_buses_counts_both_and_stays_uncatalogued_per_bus() {
+    let mut source = metered_line();
+    exchange_on(&mut source, 1, 1, 0x04, 500, &[1, 2, 3, 4]);
+    exchange_on(&mut source, 1, 2, 0x03, 40, &[1, 2]);
+    let report = metered_coverage(&source);
+
+    let power = report.present.iter().find(|f| f.name.as_deref() == Some("power")).unwrap();
+    assert_eq!(power.count, 3, "two reads on bus 0 and one on bus 1");
+    assert_eq!(power.byte_roles.as_ref().unwrap().sample_count, 3);
+    let unit_2: Vec<Option<u8>> = report
+        .uncatalogued
+        .iter()
+        .filter(|u| u.frame_id_hex == "unit 2 holding 40")
+        .map(|u| u.bus)
+        .collect();
+    assert_eq!(unit_2, [Some(0), Some(1)]);
 }
 
 #[test]
