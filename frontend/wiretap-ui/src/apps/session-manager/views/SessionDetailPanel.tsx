@@ -881,6 +881,7 @@ function EdgeDetails({
     const [, sessionId, subscriberId] = match;
     const session = sessions.find((s) => s.session_id === sessionId);
     const listener = session?.subscribers.find((l) => l.subscriber_id === subscriberId);
+    const label = appNodeLabel(t, listener?.app_name ?? "", subscriberId);
 
     return (
       <div className="space-y-4">
@@ -907,9 +908,9 @@ function EdgeDetails({
             {t("detail.labels.app")}
           </label>
           <p className="text-sm text-primary font-mono">
-            {subscriberId}
+            {label}
           </p>
-          {listener && (
+          {listener && label === subscriberId && (
             <p className="text-xs text-muted">
               {appTitle(t, listener.app_name || subscriberId)}
             </p>

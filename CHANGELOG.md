@@ -23,6 +23,7 @@ All notable changes to WireTAP will be documented in this file.
 - **The Sessions detail panel names an MCP agent as one.** Selecting an MCP agent's node used to show its internal `mcp_` id; the panel now reads "MCP agent", as the node does.
 - **The Decoder's times follow your language.** Signal update times and the Unmatched and Filtered frame times used to be formatted in US English whatever language you chose; they now follow it.
 - **The Decoder checks a serial custom CRC.** A serial catalogue whose checksum is a custom CRC or a negated sum showed no checksum badge on its frames; it is now checked, as a named algorithm is.
+- **The Sessions detail panel names an MCP agent's connection as one.** Selecting the link to an MCP agent used to show its internal `mcp_` id with "mcp" beneath; it now reads "MCP agent", as the node does.
 
 ## [0.16.1] - 2026-11-04
 
