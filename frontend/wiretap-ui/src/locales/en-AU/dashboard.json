@@ -32,6 +32,7 @@
       "saveFile": "File",
       "saveFileHint": "Save as a shareable .dashboard.json file",
       "dashboardFiles": "Dashboard files",
+      "dashboardNotOpened": "The dashboard file was not opened",
       "namePlaceholder": "Layout name",
       "noLayouts": "No saved layouts"
     },
