@@ -2,7 +2,7 @@
 
 import { describe, it, expect, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-import type { ActiveSessionInfo } from "../api/io";
+import type { ActiveSessionInfo, AppInstanceInfo } from "../api/io";
 
 vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn(async () => () => {}), emit: vi.fn(async () => {}) }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn(async () => null) }));
@@ -17,14 +17,14 @@ const session = (subscriberId: string, appName: string) =>
     subscribers: [{ subscriber_id: subscriberId, app_name: appName, registered_seconds_ago: 5, is_active: true }],
   }) as unknown as ActiveSessionInfo;
 
-const edgeDetailsOf = (subscriberId: string, appName: string) => {
+const edgeDetailsOf = (subscriberId: string, appName: string, openApps: AppInstanceInfo[] = []) => {
   useSessionManagerStore.getState().setSelectedNode({ id: `edge-c_1::${subscriberId}`, type: "edge" });
   const noop = () => {};
   return renderToStaticMarkup(
     <SessionDetailPanel
       sessions={[session(subscriberId, appName)]}
       profiles={[]}
-      openApps={[]}
+      openApps={openApps}
       onStartSession={noop}
       onStopSession={noop}
       onPauseSession={noop}
@@ -50,5 +50,12 @@ describe("the session detail panel for an edge to an app", () => {
     const markup = edgeDetailsOf("decoder_a3f9", "decoder");
     expect(markup).toContain("decoder_a3f9");
     expect(markup).toContain("Decoder");
+  });
+
+  it("names an open panel by its display id, as the graph node does", () => {
+    const panel = { instance_id: "decoder_a3f9", display_id: "decoder_2", app_name: "decoder" } as AppInstanceInfo;
+    const markup = edgeDetailsOf("decoder_a3f9", "decoder", [panel]);
+    expect(markup).toContain("decoder_2");
+    expect(markup).not.toContain("decoder_a3f9");
   });
 });

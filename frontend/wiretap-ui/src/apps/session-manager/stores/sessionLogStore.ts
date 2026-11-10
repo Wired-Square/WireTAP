@@ -12,6 +12,7 @@ import type { SessionMode } from "../../../generated/SessionMode";
 import type { IOProfile } from "../../../hooks/useSettings";
 import { SESSION_LOG_CAPACITY } from "../../../generated/wireConstants";
 import { getStateType } from "../../../api/io";
+import { appNodeLabel } from "../utils/appNodeLabel";
 
 export type { SessionLogEntry };
 export type SessionLogKind = SessionLogEvent["kind"];
@@ -157,7 +158,8 @@ export function describeEvent(event: SessionLogEvent, who: string | null): strin
 }
 
 export function describeEntry(entry: SessionLogEntry): string {
-  return describeEvent(entry.event, entry.app_name ?? entry.subscriber_id);
+  const subject = entry.app_name ?? entry.subscriber_id;
+  return describeEvent(entry.event, subject && appNodeLabel(i18n.getFixedT(null, "sessionManager"), subject, subject));
 }
 
 export function profileNames(entry: SessionLogEntry, profiles: Pick<IOProfile, "id" | "name">[]): string | null {

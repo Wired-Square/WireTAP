@@ -95,7 +95,7 @@ export default function SessionDetailPanel({
     }
 
     if (selectedNode.type === "edge") {
-      return <EdgeDetails edgeId={selectedNode.id} sessions={sessions} profiles={profiles} onDisableBusMapping={onDisableBusMapping} onEvictSubscriber={onEvictSubscriber} />;
+      return <EdgeDetails edgeId={selectedNode.id} sessions={sessions} profiles={profiles} openApps={openApps} onDisableBusMapping={onDisableBusMapping} onEvictSubscriber={onEvictSubscriber} />;
     }
 
     return null;
@@ -860,12 +860,14 @@ function EdgeDetails({
   edgeId,
   sessions,
   profiles,
+  openApps,
   onDisableBusMapping,
   onEvictSubscriber,
 }: {
   edgeId: string;
   sessions: ActiveSessionInfo[];
   profiles: IOProfile[];
+  openApps?: AppInstanceInfo[];
   onDisableBusMapping: (sessionId: string, profileId: string, deviceBus: number) => void;
   onEvictSubscriber: (sessionId: string, subscriberId: string) => void;
 }) {
@@ -881,7 +883,8 @@ function EdgeDetails({
     const [, sessionId, subscriberId] = match;
     const session = sessions.find((s) => s.session_id === sessionId);
     const listener = session?.subscribers.find((l) => l.subscriber_id === subscriberId);
-    const label = appNodeLabel(t, listener?.app_name ?? "", subscriberId);
+    const displayId = openApps?.find((a) => a.instance_id === subscriberId)?.display_id ?? subscriberId;
+    const label = appNodeLabel(t, listener?.app_name ?? "", displayId);
 
     return (
       <div className="space-y-4">
@@ -910,7 +913,7 @@ function EdgeDetails({
           <p className="text-sm text-primary font-mono">
             {label}
           </p>
-          {listener && label === subscriberId && (
+          {listener && label === displayId && (
             <p className="text-xs text-muted">
               {appTitle(t, listener.app_name || subscriberId)}
             </p>
