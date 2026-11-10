@@ -258,5 +258,12 @@
     "rawCanvas": "Custom Canvas",
     "customSvg": "Custom SVG",
     "panel": "Panel"
+  },
+  "fileErrors": {
+    "notJson": "Dashboard is not valid JSON: {{error}}",
+    "notObject": "Dashboard must be an object",
+    "unsupportedSchema": "Unsupported dashboard schema: {{schema}}",
+    "missingPanelsOrLayout": "Dashboard must have panels[] and layout[]",
+    "unknownWidgetType": "Dashboard panel has unknown widget type: {{type}}"
   }
 }

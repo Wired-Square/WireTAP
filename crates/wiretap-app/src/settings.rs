@@ -1565,8 +1565,26 @@ mod tests {
             })
         );
         assert_eq!(rewritten.virtual_interfaces(), legacy.virtual_interfaces());
-        assert_eq!(settings.io_profiles[1], listed);
+        assert_eq!(settings.io_profiles[1].virtual_interfaces(), listed.virtual_interfaces());
         assert!(!migrate(&mut settings, None), "a second pass changes nothing");
+    }
+
+    #[test]
+    fn a_virtual_profile_with_interfaces_loses_its_legacy_bus_keys() {
+        let listed = virtual_device("v_listed", serde_json::json!({
+            "traffic_type": "can",
+            "interfaces": [{ "bus": 2, "signal_generator": true, "frame_rate_hz": 5 }],
+            "bus_count": "4", "signal_generator": false, "frame_rate_hz": "25",
+        }));
+        let mut settings = AppSettings { io_profiles: vec![listed], ..AppSettings::default() };
+        assert!(migrate(&mut settings, None));
+        assert_eq!(
+            serde_json::to_value(&settings.io_profiles[0].connection).unwrap(),
+            serde_json::json!({
+                "traffic_type": "can",
+                "interfaces": [{ "bus": 2, "signal_generator": true, "frame_rate_hz": 5 }],
+            })
+        );
     }
 
     struct Scratch(PathBuf);

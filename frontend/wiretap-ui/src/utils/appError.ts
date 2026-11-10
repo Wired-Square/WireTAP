@@ -1,4 +1,6 @@
+import i18n from "i18next";
 import { useSessionStore } from "../stores/sessionStore";
+import { KeyedError } from "./keyedError";
 
 /**
  * Wraps an async operation with standardised error handling.
@@ -14,7 +16,7 @@ export async function withAppError(
     await fn();
     return true;
   } catch (e) {
-    const detail = e instanceof Error ? e.message : String(e);
+    const detail = e instanceof KeyedError ? i18n.t(e.key, e.params) : e instanceof Error ? e.message : String(e);
     console.error(`[${title}] ${message}:`, e);
     useSessionStore.getState().showAppError(title, message, detail);
     return false;

@@ -1,7 +1,7 @@
 // src/dialogs/EventDialog.tsx
 //
-// Add or edit one event. The field shows seconds, but an untouched time keeps
-// the microseconds it opened with — a frame's timestamp survives a note edit.
+// Add or edit one event. The field shows whole seconds; the time keeps the
+// sub-second part it opened with, so a frame's timestamp survives an edit.
 
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -41,7 +41,7 @@ export default function EventDialog({ isOpen, initial, onClose, onSave }: Props)
   const handleTimeChange = (text: string) => {
     setTimeText(text);
     const ms = new Date(text).getTime();
-    if (!Number.isNaN(ms)) setTimestampUs(ms * 1000);
+    if (!Number.isNaN(ms)) setTimestampUs(Math.floor(ms / 1000) * 1_000_000 + ((initial?.timestampUs ?? 0) % 1_000_000));
   };
 
   const handleSave = () => {

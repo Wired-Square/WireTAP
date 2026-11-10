@@ -13,6 +13,7 @@ All notable changes to WireTAP will be documented in this file.
 
 ### Fixed
 
+- **The log file goes to your Reports directory.** With logging on, the log was written to WireTAP/Reports in Documents whatever Reports directory Settings named; it now goes to the one in Settings, and to Documents only when none is set.
 - **An older Virtual Device keeps its buses in Settings.** A Virtual Device saved by an older version with a bus count, rather than a list of interfaces, opened with all its buses but showed "buses: 1" in Data I/O and one interface in its editor. WireTAP now rewrites it into the interface list on first load, so the summary and the editor show every bus; nothing needs doing.
 - **A Virtual Device made over MCP or for one run keeps its buses.** One created with a bus count rather than a list of interfaces showed one bus in Data I/O and its editor until the next restart, or for the whole run if it was not saved; it is now stored with an interface per bus straight away.
 - **Dashboard charts follow a theme change.** A line or flow chart left open while you switched theme kept the old theme's grid and axis colours until its tab was reopened; it now redraws in the new theme straight away.
@@ -20,6 +21,7 @@ All notable changes to WireTAP will be documented in this file.
 - **Opening an invalid dashboard file says why.** A file that failed to load used to do nothing; an error dialog now says the dashboard was not opened and why, and the current dashboard is left as it was.
 - **The Catalogue Editor shows a CAN frame's name.** A frame's `name` now appears beside its ID in the tree and on its own line in the frame's details. It can still be set only in Text Mode.
 - **Serial Transmit takes a 0x prefix.** Its bytes and delimiter fields used to read `0x0d` as the bytes 00 0D; they now read it as 0D, and the delimiter field no longer reformats under you while you type.
+- **A dashboard file's errors follow your language.** The reason an invalid dashboard file was not opened used to be shown in English whatever language you chose; it now follows it.
 - **Dashboard histograms follow a theme change.** A histogram left open while you switched theme kept the old theme's grid and axis colours until its tab was reopened; it now redraws in the new theme straight away, as the line and flow charts do.
 - **Query reopens on the capture it was showing.** Closing and reopening the Query tab on a capture used to leave it on a session that had closed with the tab, its button showing an internal id; it now opens the capture again under its name, or shows no source if the capture was deleted meanwhile.
 - **The source picker reads Live while any session runs a device.** A device held by running sessions and a stopped one could show Stopped on the Devices tab; it now shows Live, and Stopped only once every session holding it has stopped.
@@ -27,6 +29,7 @@ All notable changes to WireTAP will be documented in this file.
 - **A Virtual Device generating Modbus traffic opens a Modbus session.** Its session used to get a frames id, as a CAN source does; it now gets a Modbus one, as a Modbus device does.
 - **A stopped capture offers Play.** On a session opened on a capture or an imported file, the session menu used to offer "Resume IO stream" while stopped, although there is no device to resume; it now reads "Play", as it does while paused.
 - **The Sessions detail panel names an MCP agent as one.** Selecting an MCP agent's node used to show its internal `mcp_` id; the panel now reads "MCP agent", as the node does.
+- **The source picker offers Resume only when a device has stopped.** A device held by a running session and a stopped one could offer Resume and Join, and be probed, as if it had stopped; it now does so only once every session holding it has stopped.
 - **The Decoder's times follow your language.** Signal update times and the Unmatched and Filtered frame times used to be formatted in US English whatever language you chose; they now follow it.
 - **The Decoder checks a serial custom CRC.** A serial catalogue whose checksum is a custom CRC or a negated sum showed no checksum badge on its frames; it is now checked, as a named algorithm is.
 - **The Sessions detail panel names an MCP agent's connection as one.** Selecting the link to an MCP agent used to show its internal `mcp_` id with "mcp" beneath; it now reads "MCP agent", as the node does.
@@ -34,6 +37,7 @@ All notable changes to WireTAP will be documented in this file.
 - **Discovery's serial times follow your language.** Frame times in Discovery's serial view used to be formatted in US English whatever language you chose; they now follow it.
 - **A refused edit no longer marks a valid catalogue invalid.** When the Catalogue Editor turned down an edit (a frame with no identifier, a mux case that already exists, a failed delete), the toolbar badge read Invalid although the file had not changed; it now keeps the catalogue's last verdict.
 - **Dashboard statistics and cursors read like the signal.** The min/mean/max overlay and the line chart's cursor and measurement values padded a signal with no precision to three decimals, "89.000" beside a readout of "89". They now read as the signal's own value does, and a mean shows one decimal place more than the signal's readings carry.
+- **An edited event keeps its fraction of a second.** Changing an event's time in the event dialog used to drop the milliseconds and microseconds it opened with, moving it off the frame it marked; the new time now keeps them.
 
 ## [0.16.1] - 2026-11-04
 
