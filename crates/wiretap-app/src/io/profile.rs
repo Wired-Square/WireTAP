@@ -16,8 +16,9 @@ use wslib_wiretap_catalogue::FramingMode;
 
 pub use kinds::{
     apply_defaults, canonical_kind, default_connection, default_value, kinds,
-    resolve_serial_framing, spec, validate_profile, DefaultValue, KindSpec, ProfileValidationError,
-    ValidationCode, VIRTUAL_FRAME_RATE_HZ, VIRTUAL_SIGNAL_GENERATOR,
+    list_legacy_virtual_buses, resolve_serial_framing, spec, validate_profile, DefaultValue,
+    KindSpec, ProfileValidationError, ValidationCode, VIRTUAL_FRAME_RATE_HZ,
+    VIRTUAL_SIGNAL_GENERATOR,
 };
 pub use serial::{SerialOverrides, SerialSourceConfig, SerialSourceError};
 pub use value::ConnValue;

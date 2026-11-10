@@ -547,10 +547,10 @@ export default function IOConnectionFields({
 
   // ── Virtual adapter ────────────────────────────────────────────────────────
   if (isProfileKind(profile, "virtual")) {
-    const defaultIface: VirtualInterfaceConfig = {
+    const defaultIface: VirtualInterfaceConfig = (defaults.interfaces as VirtualInterfaceConfig[] | undefined)?.[0] ?? {
       bus: 0,
-      signal_generator: defaults.signal_generator !== false,
-      frame_rate_hz: Number(defaults.frame_rate_hz),
+      signal_generator: true,
+      frame_rate_hz: "",
     };
     const interfaces = profile.connection.interfaces || [defaultIface];
     const updateIface = (idx: number, patch: Partial<VirtualInterfaceConfig>) => {
@@ -624,7 +624,7 @@ export default function IOConnectionFields({
               min="1"
               max="1000"
               step="1"
-              value={iface.frame_rate_hz || String(defaults.frame_rate_hz ?? "")}
+              value={iface.frame_rate_hz || String(defaultIface.frame_rate_hz)}
               onChange={(e) => updateIface(idx, { frame_rate_hz: parseFloat(e.target.value) || 0 })}
               placeholder="10"
               className="w-20"

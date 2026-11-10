@@ -181,6 +181,8 @@ fn every_default_reads_back() {
                 DefaultValue::Int(_) => p.conn_i64(key).is_some(),
                 DefaultValue::Float(_) => p.conn_f64(key).is_some(),
                 DefaultValue::Bool(_) => p.conn_bool(key).is_some(),
+                DefaultValue::List(_) => p.conn(key, |v| v.as_list().map(drop)).is_some(),
+                DefaultValue::Map(_) => p.conn(key, |v| v.as_map().map(drop)).is_some(),
             };
             assert!(
                 found,
@@ -213,6 +215,28 @@ fn apply_defaults_is_idempotent_and_never_overwrites() {
     assert_eq!(once, p.connection);
     assert_eq!(p.connection["bitrate"], "250000".into());
     assert_eq!(p.connection["baud_rate"], "115200".into());
+}
+
+#[test]
+fn a_virtual_draft_with_a_legacy_bus_count_is_saved_with_that_many_interfaces() {
+    let mut legacy = profile("virtual");
+    set(&mut legacy, "bus_count", 3i64);
+    let mut blank = profile("virtual");
+    for p in [&mut legacy, &mut blank] {
+        apply_defaults(p);
+        for key in ["bus_count", "signal_generator", "frame_rate_hz"] {
+            assert!(!p.connection.contains_key(key), "{key} was written");
+        }
+    }
+    let iface = |bus| json!({ "bus": bus, "signal_generator": true, "frame_rate_hz": 10.0 });
+    assert_eq!(
+        serde_json::to_value(&legacy.connection["interfaces"]).unwrap(),
+        json!([iface(0), iface(1), iface(2)])
+    );
+    assert_eq!(
+        serde_json::to_value(&blank.connection["interfaces"]).unwrap(),
+        json!([iface(0)])
+    );
 }
 
 #[test]

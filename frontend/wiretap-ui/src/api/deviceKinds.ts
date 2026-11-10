@@ -13,7 +13,7 @@ import type { KindTraits } from "../generated/KindTraits";
 
 export type { ProfileValidationError, ValidationCode, ProfileTraitsTable, ProfileTraits, KindTraits };
 
-export type ConnectionDefaults = Record<string, string | number | boolean>;
+export type ConnectionDefaults = Record<string, string | number | boolean | object[]>;
 
 const defaultsByKind = new Map<string, Promise<ConnectionDefaults>>();
 
