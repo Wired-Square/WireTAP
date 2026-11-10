@@ -8,6 +8,7 @@ import {
   calculateChecksum as calculateChecksumAsync,
   getAlgorithmOutputBytes,
 } from '../../../../utils/analysis/checksums';
+import { formatClockTime } from '../../../../utils/timeFormat';
 import type { TFunction } from 'i18next';
 
 // ============================================================================
@@ -70,12 +71,7 @@ export function getChecksumByteCount(algorithm: DiscoveryChecksumAlgorithm): num
 /** Format timestamp with microsecond precision */
 export function formatTimestampUs(timestampUs: number): string {
   const date = new Date(timestampUs / 1000);
-  const time = date.toLocaleTimeString('en-US', {
-    hour12: false,
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  });
+  const time = formatClockTime(date);
   const ms = String(date.getMilliseconds()).padStart(3, '0');
   const us = String(Math.floor(timestampUs % 1000)).padStart(3, '0');
   return `${time}.${ms}.${us}`;
