@@ -24,6 +24,9 @@ const { candidateReasonNote } = await import("../utils/analysis/serialFrameAnaly
 const { fileFilter } = await import("../api/dialogs");
 const { ioStateLabel, describeEvent } = await import("../apps/session-manager/stores/sessionLogStore");
 const { default: SourceNode } = await import("../apps/session-manager/nodes/SourceNode");
+const { parseDashboard } = await import("../utils/dashboards");
+const { withAppError } = await import("../utils/appError");
+const { useSessionStore } = await import("../stores/sessionStore");
 
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 
@@ -123,5 +126,12 @@ describe("store, dialog and shared labels", () => {
     expect(text).toContain("3 ⟦bytes⟧");
     expect(text).toContain("⟦Virtual");
     expect(text).not.toMatch(/sqlite|virtual/);
+  });
+
+  it("words a dashboard file's validation error in the current language", async () => {
+    await withAppError("title", "message", async () => {
+      parseDashboard(JSON.stringify({ schema: 99, panels: [], layout: [] }));
+    });
+    expect(useSessionStore.getState().appErrorDialog.details).toBe("⟦Unsupported dashboard schema: 99⟧");
   });
 });

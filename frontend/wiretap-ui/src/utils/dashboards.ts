@@ -6,6 +6,7 @@
 
 import type { DashboardPanel, LayoutItem, HypothesisParams } from "../stores/dashboardStore";
 import { getWidgetMeta } from "../apps/dashboard/widgets/widgetMeta";
+import { KeyedError } from "./keyedError";
 
 export const DASHBOARD_SCHEMA = "wiretap.dashboard/1";
 
@@ -48,15 +49,15 @@ export function parseDashboard(json: string): DashboardFileContent {
   try {
     data = JSON.parse(json);
   } catch (e) {
-    throw new Error(`Dashboard is not valid JSON: ${e}`);
+    throw new KeyedError("dashboard:fileErrors.notJson", { error: String(e) });
   }
   const d = data as Partial<DashboardFileContent>;
-  if (!d || typeof d !== "object") throw new Error("Dashboard must be an object");
-  if (d.schema !== DASHBOARD_SCHEMA) throw new Error(`Unsupported dashboard schema: ${d.schema}`);
-  if (!Array.isArray(d.panels) || !Array.isArray(d.layout)) throw new Error("Dashboard must have panels[] and layout[]");
+  if (!d || typeof d !== "object") throw new KeyedError("dashboard:fileErrors.notObject");
+  if (d.schema !== DASHBOARD_SCHEMA) throw new KeyedError("dashboard:fileErrors.unsupportedSchema", { schema: String(d.schema) });
+  if (!Array.isArray(d.panels) || !Array.isArray(d.layout)) throw new KeyedError("dashboard:fileErrors.missingPanelsOrLayout");
   for (const p of d.panels) {
     if (!p || typeof p.type !== "string" || !getWidgetMeta(p.type)) {
-      throw new Error(`Dashboard panel has unknown widget type: ${(p as DashboardPanel)?.type}`);
+      throw new KeyedError("dashboard:fileErrors.unknownWidgetType", { type: String((p as DashboardPanel)?.type) });
     }
   }
   return d as DashboardFileContent;

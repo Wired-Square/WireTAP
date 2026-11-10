@@ -15,6 +15,7 @@ vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn(async () => () => {}) })
 vi.mock("uplot", () => ({ default: class {} }));
 vi.mock("../components/AppTopBar", () => ({ default: ({ children }: { children: ReactNode }) => <>{children}</> }));
 
+await import("../i18n");
 const { default: DashboardTopBar } = await import("../apps/dashboard/views/DashboardTopBar");
 const { useSessionStore } = await import("../stores/sessionStore");
 const { useDashboardStore } = await import("../stores/dashboardStore");
@@ -44,7 +45,7 @@ describe("opening a dashboard file", () => {
     );
     const panelsBefore = useDashboardStore.getState().panels;
 
-    await act(async () => document.querySelector<HTMLElement>('[title="topBar.manageLayouts"]')!.click());
+    await act(async () => document.querySelector<HTMLElement>('[title="Manage layouts"]')!.click());
     const file = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find((el) => el.textContent === "Broken");
     await act(async () => file!.click());
 
