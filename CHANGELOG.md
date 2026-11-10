@@ -2,6 +2,12 @@
 
 All notable changes to WireTAP will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+
+- **Dashboard charts follow a theme change.** A line or flow chart left open while you switched theme kept the old theme's grid and axis colours until its tab was reopened; it now redraws in the new theme straight away.
+
 ## [0.16.1] - 2026-11-04
 
 ### Changed
