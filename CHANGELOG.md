@@ -9,6 +9,7 @@ All notable changes to WireTAP will be documented in this file.
 - **Dashboard charts follow a theme change.** A line or flow chart left open while you switched theme kept the old theme's grid and axis colours until its tab was reopened; it now redraws in the new theme straight away.
 - **A Dashboard that gets its first panel after opening fills its tab.** Its grid used to stay about 800 pixels wide, leaving the rest of the tab empty until it was reopened; it now follows the tab's width.
 - **Opening an invalid dashboard file says why.** A file that failed to load used to do nothing; an error dialog now says the dashboard was not opened and why, and the current dashboard is left as it was.
+- **The Catalogue Editor shows a CAN frame's name.** A frame's `name` now appears beside its ID in the tree and on its own line in the frame's details. It can still be set only in Text Mode.
 
 ## [0.16.1] - 2026-11-04
 

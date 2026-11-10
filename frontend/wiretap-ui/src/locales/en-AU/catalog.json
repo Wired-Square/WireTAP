@@ -164,6 +164,7 @@
   },
   "canFrameView": {
     "id": "ID",
+    "name": "Name",
     "lengthDlc": "Length (DLC)",
     "required": "*",
     "inheritedTooltip": "Inherited from copied ID",

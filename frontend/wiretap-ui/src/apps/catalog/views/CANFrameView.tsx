@@ -90,6 +90,13 @@ export default function CANFrameView({
           </div>
 
           <div className={`p-4 ${bgSurface} rounded-lg`}>
+            <div className={labelSmallMuted}>{t("canFrameView.name")}</div>
+            <div className={monoBody}>
+              {frame.name || <span className="text-muted">{t("canFrameView.none")}</span>}
+            </div>
+          </div>
+
+          <div className={`p-4 ${bgSurface} rounded-lg`}>
             <div className={labelSmallMuted}>
               {t("canFrameView.lengthDlc")} <span className="text-danger">{t("canFrameView.required")}</span>
               {inherited.has("length") && (

@@ -119,7 +119,7 @@ export function createRenderTreeNode({
               const truncatedNote = note(40);
               return (
                 <span className="flex flex-col">
-                  <span>{id}</span>
+                  <span>{frame.name ? `${id} — ${frame.name}` : id}</span>
                   {truncatedNote && (
                     <span className={`${textSecondary} text-xs italic`}>
                       {truncatedNote}
