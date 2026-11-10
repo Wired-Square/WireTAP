@@ -85,3 +85,9 @@ pub async fn save_dashboard(app: AppHandle, filename: String, content: String) -
     let settings = crate::settings::load_settings(app).await?;
     write_dashboard(&settings.decoder_dir, &filename, &content)
 }
+
+/// How each signal's computed values read, in the order given.
+#[tauri::command]
+pub fn signal_value_formats(signals: Vec<wslib_wiretap_catalogue::Signal>) -> Vec<wiretap_analysis::dashboard::SignalValueFormat> {
+    signals.iter().map(wiretap_analysis::dashboard::SignalValueFormat::of).collect()
+}

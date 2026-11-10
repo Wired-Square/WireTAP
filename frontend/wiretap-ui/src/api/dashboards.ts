@@ -2,6 +2,8 @@
 // Dashboard artifact (*.dashboard.json) Tauri commands.
 
 import { invoke } from "@tauri-apps/api/core";
+import type { SignalValueFormat } from "../generated/SignalValueFormat";
+import type { Signal } from "../types/catalogModel";
 
 export interface DashboardFile {
   name: string;
@@ -22,4 +24,9 @@ export async function openDashboard(path: string): Promise<string> {
 /** Save a dashboard by filename into the dashboards dir. Returns the full path. */
 export async function saveDashboard(filename: string, content: string): Promise<string> {
   return await invoke<string>("save_dashboard", { filename, content });
+}
+
+/** How each signal's computed values (a min, a mean, a cursor reading) read, in order. */
+export async function signalValueFormats(signals: Signal[]): Promise<SignalValueFormat[]> {
+  return await invoke<SignalValueFormat[]>("signal_value_formats", { signals });
 }

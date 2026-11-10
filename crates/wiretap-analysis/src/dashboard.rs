@@ -2,6 +2,7 @@
 //! each payload bit toggles.
 
 use serde::Serialize;
+use wslib_quantity::{Precision, Quantity};
 
 /// Values in `[min, max)`; the last bin also holds `max`.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
@@ -43,6 +44,52 @@ pub fn histogram(values: &[f64], bin_count: usize) -> Vec<HistogramBin> {
         bins[(((v - min) / step).floor() as usize).min(bin_count - 1)].count += 1;
     }
     bins
+}
+
+/// `places` decimals, padded with zeros or with trailing zeros dropped.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct ValueFormat {
+    pub places: u8,
+    pub padded: bool,
+}
+
+/// How a value computed from a signal's samples reads beside its decoded readout:
+/// a `sample` (a min, a max, a cursor reading, a difference of two) and a `mean`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct SignalValueFormat {
+    pub sample: ValueFormat,
+    pub mean: ValueFormat,
+}
+
+impl SignalValueFormat {
+    /// Fixed to the signal's `precision`; without one, a sample has the places its
+    /// factor and offset put a reading on, as the readout's exact text does, and a
+    /// mean, which is off that grid, one place more.
+    pub fn of(sig: &wslib_wiretap_catalogue::Signal) -> Self {
+        if let Some(places) = sig.precision {
+            let fixed = ValueFormat { places, padded: true };
+            return Self { sample: fixed, mean: fixed };
+        }
+        let places = decimal_places(sig.factor.unwrap_or(1.0)).max(decimal_places(sig.offset.unwrap_or(0.0)));
+        Self {
+            sample: ValueFormat { places, padded: false },
+            mean: ValueFormat { places: places.saturating_add(1), padded: false },
+        }
+    }
+}
+
+fn decimal_places(v: f64) -> u8 {
+    let text = v.to_string();
+    text.split_once('.').map_or(0, |(_, fraction)| u8::try_from(fraction.len()).unwrap_or(u8::MAX))
+}
+
+/// `value` as `wslib-quantity` words it in `format`; "—" when it is not finite
+/// or out of a `Decimal`'s range.
+pub fn format_value(value: f64, format: ValueFormat) -> String {
+    let precision = if format.padded { Precision::Fixed(format.places) } else { Precision::AtMost(format.places) };
+    Quantity::parse(&value.to_string(), None).map_or_else(|| "—".to_string(), |q| q.format(precision))
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Serialize)]

@@ -3,8 +3,10 @@
 import { create } from '@wired-square/store/react';
 import { tlog } from '../api/settings';
 import type { Confidence } from '../types/catalog';
-import type { Catalog, Frame } from '../types/catalogModel';
+import type { Catalog, Frame, Signal } from '../types/catalogModel';
 import { attachCatalog, openCatalog, parseCatalogAtPath } from '../api/catalog';
+import { signalValueFormats } from '../api/dashboards';
+import type { SignalValueFormat } from '../generated/SignalValueFormat';
 import { allFrameSignals, framesById } from '../utils/catalogFrames';
 import { subscriberIdFor } from '../utils/subscriberId';
 
@@ -63,16 +65,20 @@ export function signalKey(frameId: number, signalName: string): string {
   return `${frameId}:${signalName}`;
 }
 
-function precisionsBySignalKey(frames: Map<number, Frame>): Map<string, number> {
-  const precisions = new Map<string, number>();
+function signalsBySignalKey(frames: Map<number, Frame>): Map<string, Signal> {
+  const signals = new Map<string, Signal>();
   for (const [frameId, frame] of frames) {
-    for (const { name, precision } of allFrameSignals(frame)) {
-      if (!name || precision == null) continue;
-      const key = signalKey(frameId, name);
-      if (!precisions.has(key)) precisions.set(key, precision);
+    for (const signal of allFrameSignals(frame)) {
+      if (!signal.name) continue;
+      const key = signalKey(frameId, signal.name);
+      if (!signals.has(key)) signals.set(key, signal);
     }
   }
-  return precisions;
+  return signals;
+}
+
+function precisionsOf(signals: Map<string, Signal>): Map<string, number> {
+  return new Map([...signals].flatMap(([key, { precision }]) => (precision == null ? [] : [[key, precision]])));
 }
 
 /** A flow panel's byte columns on its target frame. */
@@ -179,11 +185,13 @@ function scheduleAutoSave() {
 // Store
 // ─────────────────────────────────────────
 
-interface DashboardState {
+export interface DashboardState {
   // ── Catalog ──
   catalogPath: string | null;
   frames: Map<number, Frame>;
   signalPrecisions: Map<string, number>;
+  /** How each signal's computed values read, from Rust. */
+  signalFormats: Map<string, SignalValueFormat>;
   protocol: 'can' | 'serial' | 'modbus';
   serialConfig: SerialFrameConfig | null;
 
@@ -280,6 +288,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   catalogPath: null,
   frames: new Map(),
   signalPrecisions: new Map(),
+  signalFormats: new Map(),
   protocol: 'can',
   serialConfig: null,
 
@@ -322,12 +331,19 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   // this must NOT write `catalogPath`, or it races the mirror into a reload loop.
   applyCatalog: (catalog: Catalog) => {
     const frames = framesById(catalog);
+    const signals = signalsBySignalKey(frames);
     set({
       frames,
-      signalPrecisions: precisionsBySignalKey(frames),
+      signalPrecisions: precisionsOf(signals),
       protocol: catalog.protocol,
       serialConfig: catalog.serial ? serialFrameConfigOf(catalog.serial) : null,
     });
+    signalValueFormats([...signals.values()])
+      .then((formats) => {
+        if (get().frames !== frames) return;
+        set({ signalFormats: new Map([...signals.keys()].map((key, i) => [key, formats[i]])) });
+      })
+      .catch((e) => tlog.info(`[dashboardStore] signal value formats failed: ${e}`));
   },
 
   initFromSettings: async (_decoderDir) => {

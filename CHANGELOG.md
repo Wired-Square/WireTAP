@@ -27,6 +27,7 @@ All notable changes to WireTAP will be documented in this file.
 - **The Sessions detail panel names an MCP agent's connection as one.** Selecting the link to an MCP agent used to show its internal `mcp_` id with "mcp" beneath; it now reads "MCP agent", as the node does.
 - **Discovery's serial times follow your language.** Frame times in Discovery's serial view used to be formatted in US English whatever language you chose; they now follow it.
 - **A refused edit no longer marks a valid catalogue invalid.** When the Catalogue Editor turned down an edit (a frame with no identifier, a mux case that already exists, a failed delete), the toolbar badge read Invalid although the file had not changed; it now keeps the catalogue's last verdict.
+- **Dashboard statistics and cursors read like the signal.** The min/mean/max overlay and the line chart's cursor and measurement values padded a signal with no precision to three decimals, "89.000" beside a readout of "89". They now read as the signal's own value does, and a mean shows one decimal place more than the signal's readings carry.
 
 ## [0.16.1] - 2026-11-04
 
