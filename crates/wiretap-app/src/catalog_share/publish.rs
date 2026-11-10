@@ -1302,9 +1302,7 @@ mod tests {
         branch: &str,
         validation_errors: Vec<String>,
     ) -> (Result<PublishResult, ShareError>, Steps, Vec<String>) {
-        let root = std::env::temp_dir().join(root_name);
-        let _ = std::fs::remove_dir_all(&root);
-        std::fs::create_dir_all(&root).expect("root");
+        let root = git::tests::scratch_root(root_name);
         let clone_dir = root.join("clone");
         git2::Repository::clone(&git::tests::seed_remote(&root), &clone_dir).expect("clone");
 
@@ -1362,7 +1360,7 @@ mod tests {
     #[tokio::test]
     async fn a_direct_push_reports_each_step_and_records_the_blob() {
         let (result, steps, persisted) =
-            publish_to_seeded_remote("wiretap-publish-direct", "main", Vec::new()).await;
+            publish_to_seeded_remote("publish-direct", "main", Vec::new()).await;
         let result = result.expect("publish");
 
         assert_eq!(
@@ -1381,7 +1379,7 @@ mod tests {
     #[tokio::test]
     async fn a_named_branch_adds_the_branch_step() {
         let (result, steps, _) =
-            publish_to_seeded_remote("wiretap-publish-branch", "catalog/x", Vec::new()).await;
+            publish_to_seeded_remote("publish-branch", "catalog/x", Vec::new()).await;
         result.expect("publish");
 
         assert_eq!(
@@ -1399,8 +1397,7 @@ mod tests {
     #[tokio::test]
     async fn an_invalid_catalogue_stops_after_validate() {
         let (result, steps, persisted) =
-            publish_to_seeded_remote("wiretap-publish-invalid", "main", vec!["bad".to_string()])
-                .await;
+            publish_to_seeded_remote("publish-invalid", "main", vec!["bad".to_string()]).await;
 
         assert_eq!(result.unwrap_err().kind, ShareErrorKind::Invalid);
         assert_eq!(steps, [("validate", None)]);

@@ -1267,6 +1267,13 @@ pub(super) mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
+    pub(in crate::catalog_share) fn scratch_root(tag: &str) -> PathBuf {
+        let root = std::env::temp_dir().join(format!("wiretap-{tag}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).expect("root");
+        root
+    }
+
     /// Make a bare repository with one commit on `main`, to act as a remote.
     ///
     /// A `file://` remote exercises the real clone, commit and push paths with no
@@ -1315,9 +1322,7 @@ pub(super) mod tests {
     /// assertion worth making.
     #[test]
     fn commits_and_pushes_to_the_tracked_branch() {
-        let root = std::env::temp_dir().join("wiretap-git-push");
-        let _ = std::fs::remove_dir_all(&root);
-        std::fs::create_dir_all(&root).expect("root");
+        let root = scratch_root("git-push");
         let url = seed_remote(&root);
 
         let spec = RepoSpec {
@@ -1368,9 +1373,7 @@ pub(super) mod tests {
 
     #[test]
     fn transfer_progress_names_the_repository_and_the_phase() {
-        let root = std::env::temp_dir().join("wiretap-git-progress");
-        let _ = std::fs::remove_dir_all(&root);
-        std::fs::create_dir_all(&root).expect("root");
+        let root = scratch_root("git-progress");
         let spec = RepoSpec {
             repo_id: "gh:test/progress".into(),
             clone_url: seed_remote(&root),
@@ -1394,9 +1397,7 @@ pub(super) mod tests {
     /// the opt-in half of "branches are optional".
     #[test]
     fn a_named_branch_is_created_off_the_base() {
-        let root = std::env::temp_dir().join("wiretap-git-branch");
-        let _ = std::fs::remove_dir_all(&root);
-        std::fs::create_dir_all(&root).expect("root");
+        let root = scratch_root("git-branch");
         let url = seed_remote(&root);
 
         let dir = root.join("clone");
@@ -1455,9 +1456,7 @@ pub(super) mod tests {
     /// which folds tags in — a catalogue pinned to a tag was accepted as a push target.
     #[test]
     fn branches_lists_branches_and_not_tags() {
-        let root = std::env::temp_dir().join("wiretap-git-branches");
-        let _ = std::fs::remove_dir_all(&root);
-        std::fs::create_dir_all(&root).expect("root");
+        let root = scratch_root("git-branches");
         let url = seed_remote(&root);
 
         // Tag the seed commit on the remote, then clone: the initial clone takes every
@@ -1500,9 +1499,7 @@ pub(super) mod tests {
     /// covers the same ground only runs by hand.
     #[test]
     fn a_seeded_blob_hashes_to_its_tree_entry_id() {
-        let root = std::env::temp_dir().join("wiretap-git-blobsha");
-        let _ = std::fs::remove_dir_all(&root);
-        std::fs::create_dir_all(&root).expect("root");
+        let root = scratch_root("git-blobsha");
         let url = seed_remote(&root);
 
         let dir = root.join("clone");
@@ -1529,9 +1526,7 @@ pub(super) mod tests {
     /// happens to be at HEAD.
     #[test]
     fn last_commit_for_path_finds_the_change_not_the_head() {
-        let root = std::env::temp_dir().join("wiretap-git-lastchange");
-        let _ = std::fs::remove_dir_all(&root);
-        std::fs::create_dir_all(&root).expect("root");
+        let root = scratch_root("git-lastchange");
         let url = seed_remote(&root);
 
         let dir = root.join("clone");
@@ -1622,9 +1617,7 @@ pub(super) mod tests {
     /// branches it has diffed against — the invariant belongs here.
     #[test]
     fn an_unchanged_file_is_refused_rather_than_committed() {
-        let root = std::env::temp_dir().join("wiretap-git-empty");
-        let _ = std::fs::remove_dir_all(&root);
-        std::fs::create_dir_all(&root).expect("root");
+        let root = scratch_root("git-empty");
         let url = seed_remote(&root);
 
         let dir = root.join("clone");
