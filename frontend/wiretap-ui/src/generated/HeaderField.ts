@@ -11,6 +11,6 @@ export type HeaderField = { mask?: number | null, shift?: number | null,
  */
 format?: string | null, endianness?: Endianness | null, 
 /**
- * End-relative when negative, as [`ChecksumConfig::start_byte`].
+ * End-relative when negative, as [`FrameChecksum::start_byte`].
  */
 startByte?: number | null, bytes?: number | null, };

@@ -61,22 +61,6 @@ export interface ModbusConfig {
 /** Header field format for display */
 export type HeaderFieldFormat = "hex" | "decimal";
 
-/** Serial checksum config - protocol-level defaults stored in [meta.serial.checksum] */
-export interface SerialChecksumConfig {
-  /** Checksum algorithm (e.g., "sum8", "crc8_sae_j1850", "xor") */
-  algorithm: ChecksumAlgorithm;
-  /** Byte position where checksum is stored (supports negative indexing: -1 = last byte) */
-  start_byte: number;
-  /** Number of bytes for the checksum value (1 or 2) */
-  byte_length: number;
-  /** Start of calculation range (0-indexed) */
-  calc_start_byte: number;
-  /** End of calculation range (exclusive, supports negative indexing); absent is the frame's end */
-  calc_end_byte?: number;
-  /** Whether checksum value is big-endian (default: false = little-endian) */
-  big_endian?: boolean;
-}
-
 /** Serial/RS-485 frame configuration - per-frame settings only */
 export interface SerialConfig {
   protocol: "serial";

@@ -24,7 +24,7 @@ describe("serialConfigOf", () => {
         frame_id_byte_order: "little",
         min_frame_length: 4,
         header_length: 3,
-        checksum: { algorithm: "xor", start_byte: -1, byte_length: 1, calc_start_byte: 0, calc_end_byte: -1 },
+        checksum: { algorithm: "crc16_modbus", startByte: -2, byteLength: 2, calcStartByte: 0, calcEndByte: -2, endianness: "little" },
       }),
     ).toEqual({
       encoding: "slip",
@@ -34,7 +34,7 @@ describe("serialConfigOf", () => {
       frameIdByteOrder: "little",
       minFrameLength: 4,
       headerLength: 3,
-      checksum: { algorithm: "xor", startByte: -1, byteLength: 1, calcStartByte: 0, calcEndByte: -1, bigEndian: false },
+      checksum: { algorithm: "crc16_modbus", startByte: -2, byteLength: 2, calcStartByte: 0, calcEndByte: -2, endianness: "little" },
     });
   });
 });

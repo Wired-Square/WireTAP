@@ -144,12 +144,20 @@ fn serial_config_fields(
         header_length: config.header_length,
         min_frame_length: config.min_frame_length,
         checksum: config.checksum.as_ref().map(|c| SerialChecksumFields {
+            name: c.name.clone(),
             algorithm: c.algorithm.clone(),
             start_byte: c.start_byte,
             byte_length: c.byte_length,
             calc_start_byte: c.calc_start_byte,
             calc_end_byte: Some(c.calc_end_byte.unwrap_or(-1)),
-            big_endian: c.big_endian,
+            endianness: c.endianness,
+            polynomial: c.parameters.polynomial,
+            init: c.parameters.init,
+            xor_out: c.parameters.xor_out,
+            reflect_in: c.parameters.reflect_in,
+            reflect_out: c.parameters.reflect_out,
+            offset: c.parameters.offset,
+            notes: c.notes.clone(),
         }),
         fields,
     };
@@ -269,7 +277,7 @@ pub fn modbus_ops(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use wslib_wiretap_catalogue::model::ChecksumConfig;
+    use wslib_wiretap_catalogue::model::FrameChecksum;
     use wslib_wiretap_catalogue::FramingMode;
 
     fn meta(version: i64, default_interval: f64) -> ExportMeta {
@@ -357,13 +365,16 @@ mod tests {
             frame_id_byte_order: Some(Endianness::Little),
             source_address_start_byte: Some(3),
             source_address_bytes: Some(1),
-            checksum: Some(ChecksumConfig {
+            checksum: Some(FrameChecksum {
+                name: None,
                 algorithm: "sum8".into(),
                 start_byte: -1,
                 byte_length: 1,
+                endianness: None,
                 calc_start_byte: 0,
                 calc_end_byte: None,
-                big_endian: false,
+                parameters: Default::default(),
+                notes: Vec::new(),
             }),
             ..Default::default()
         };

@@ -2,9 +2,8 @@
 import type { Endianness } from "./Endianness";
 
 /**
- * A per-frame checksum definition, one of a frame's `checksum` tables.
- * Distinct from [`ChecksumConfig`] (the serial-level default); a frame may
- * declare several.
+ * A checksum definition: one of a frame's `checksum` tables, or the serial-level
+ * default. A frame may declare several.
  */
 export type FrameChecksum = { name?: string | null, 
 /**

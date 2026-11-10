@@ -8,7 +8,8 @@ import { Cable, Plus, Trash2, ChevronDown, ChevronRight } from "lucide-react";
 import { iconMd, flexRowGap2 } from "../../../../styles/spacing";
 import { caption, textMedium } from "../../../../styles";
 import type { SerialHeaderFieldEntry } from "../../../../stores/catalogEditorStore";
-import type { HeaderFieldFormat, SerialChecksumConfig, ChecksumAlgorithm } from "../../types";
+import type { HeaderFieldFormat, ChecksumAlgorithm } from "../../types";
+import type { SerialChecksumFields } from "../../../../types/catalogEdit";
 import type { FramingMode } from "../../../../generated/FramingMode";
 import MaskBitPicker from "../../../../components/MaskBitPicker";
 import { CHECKSUM_ALGORITHMS } from "../../../../utils/analysis/checksums";
@@ -66,8 +67,8 @@ export type SerialConfigSectionProps = {
   setHeaderFields: (fields: SerialHeaderFieldEntry[]) => void;
   headerLength: number | undefined;
   setHeaderLength: (length: number | undefined) => void;
-  checksum: SerialChecksumConfig | null;
-  setChecksum: (checksum: SerialChecksumConfig | null) => void;
+  checksum: SerialChecksumFields | null;
+  setChecksum: (checksum: SerialChecksumFields | null) => void;
 };
 
 export default function SerialConfigSection({
@@ -189,7 +190,7 @@ export default function SerialConfigSection({
     setChecksum(null);
   };
 
-  const handleUpdateChecksum = (updates: Partial<SerialChecksumConfig>) => {
+  const handleUpdateChecksum = (updates: Partial<SerialChecksumFields>) => {
     if (checksum) {
       setChecksum({ ...checksum, ...updates });
     }
@@ -560,7 +561,7 @@ export default function SerialConfigSection({
                     </label>
                     <Input
                       type="number"
-                      value={checksum.calc_end_byte}
+                      value={checksum.calc_end_byte ?? ""}
                       onChange={(e) => handleUpdateChecksum({ calc_end_byte: parseInt(e.target.value) || 0 })}
                       title={t("configSections.serial.calcEndTooltip")}
                     />
@@ -574,8 +575,8 @@ export default function SerialConfigSection({
                   <div className={flexRowGap2}>
                     <Checkbox
                       id="checksum-big-endian"
-                      checked={checksum.big_endian ?? false}
-                      onChange={(e) => handleUpdateChecksum({ big_endian: e.target.checked })}
+                      checked={checksum.endianness === "big"}
+                      onChange={(e) => handleUpdateChecksum({ endianness: e.target.checked ? "big" : "little" })}
                     />
                     <label htmlFor="checksum-big-endian" className="text-sm text-secondary">
                       {t("configSections.serial.checksumBigEndian")}

@@ -1,25 +1,7 @@
 // ui/src/utils/frameExport.ts
 
-import type { SerialConfig } from '../types/catalogModel';
+import type { FrameChecksum, SerialConfig } from '../types/catalogModel';
 import type { FramingMode } from '../generated/FramingMode';
-
-/**
- * Checksum configuration for serial frames
- */
-export type SerialChecksumConfig = {
-  /** Checksum algorithm (e.g., "sum8", "crc16_modbus", "xor") */
-  algorithm: string;
-  /** Byte position where checksum is stored (supports negative indexing) */
-  start_byte: number;
-  /** Number of bytes for the checksum value (1 or 2) */
-  byte_length: number;
-  /** Start of calculation range */
-  calc_start_byte: number;
-  /** End of calculation range (exclusive, supports negative indexing) */
-  calc_end_byte: number;
-  /** Whether checksum value is big-endian (default: false = little-endian) */
-  big_endian?: boolean;
-};
 
 /**
  * Serial frame configuration - stored in [frame.serial.config]
@@ -46,7 +28,7 @@ export type SerialFrameConfig = {
   /** Minimum frame length to accept (frames shorter are dropped) */
   min_frame_length?: number;
   /** Checksum configuration detected from analysis */
-  checksum?: SerialChecksumConfig;
+  checksum?: FrameChecksum;
   /** Global header length in bytes (for protocols with fixed header size) */
   header_length?: number;
 };
@@ -65,14 +47,7 @@ export function serialFrameConfigOf(c: SerialConfig): SerialFrameConfig {
     source_address_byte_order: c.sourceAddressByteOrder ?? undefined,
     min_frame_length: c.minFrameLength ?? undefined,
     header_length: c.headerLength ?? undefined,
-    checksum: c.checksum ? {
-      algorithm: c.checksum.algorithm,
-      start_byte: c.checksum.startByte,
-      byte_length: c.checksum.byteLength,
-      calc_start_byte: c.checksum.calcStartByte,
-      calc_end_byte: c.checksum.calcEndByte ?? -1,
-      big_endian: c.checksum.bigEndian,
-    } : undefined,
+    checksum: c.checksum ?? undefined,
   };
 }
 
@@ -84,14 +59,7 @@ export function serialConfigOf(c: SerialFrameConfig): SerialConfig {
     frameIdMask: c.frame_id_mask,
     headerLength: c.header_length,
     minFrameLength: c.min_frame_length,
-    checksum: c.checksum && {
-      algorithm: c.checksum.algorithm,
-      startByte: c.checksum.start_byte,
-      byteLength: c.checksum.byte_length,
-      calcStartByte: c.checksum.calc_start_byte,
-      calcEndByte: c.checksum.calc_end_byte,
-      bigEndian: c.checksum.big_endian ?? false,
-    },
+    checksum: c.checksum,
     frameIdStartByte: c.frame_id_start_byte,
     frameIdBytes: c.frame_id_bytes,
     frameIdByteOrder: c.frame_id_byte_order,

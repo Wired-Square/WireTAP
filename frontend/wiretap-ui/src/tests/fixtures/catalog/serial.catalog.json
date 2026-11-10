@@ -114,10 +114,10 @@
     "byteOrder": "little",
     "checksum": {
       "algorithm": "crc16_modbus",
-      "bigEndian": false,
       "byteLength": 2,
       "calcEndByte": -2,
       "calcStartByte": 0,
+      "endianness": "little",
       "startByte": -2
     },
     "encoding": "slip",

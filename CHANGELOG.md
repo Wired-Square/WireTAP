@@ -4,6 +4,10 @@ All notable changes to WireTAP will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- **Validate checks checksums.** The Catalogue Editor's Validate now reports a frame checksum or serial checksum it cannot use (an unknown algorithm, a position past the longest frame, a custom CRC with no polynomial), which used to be skipped without a word. Saving the serial configuration writes the checksum's byte order as `endianness` in place of `big_endian`, and keeps its name, CRC parameters and notes. Older catalogues open with the same byte order as before; no change is needed to them.
+
 ### Fixed
 
 - **Dashboard charts follow a theme change.** A line or flow chart left open while you switched theme kept the old theme's grid and axis colours until its tab was reopened; it now redraws in the new theme straight away.

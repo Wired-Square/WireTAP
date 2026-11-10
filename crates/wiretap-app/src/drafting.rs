@@ -404,7 +404,7 @@ mod tests {
             "frameIdStartByte": 0,
             "frameIdBytes": 1,
             "checksum": {
-                "algorithm": "xor", "startByte": -1, "byteLength": 1, "calcStartByte": 0, "calcEndByte": -1, "bigEndian": false,
+                "algorithm": "xor", "startByte": -1, "byteLength": 1, "calcStartByte": 0, "calcEndByte": -1,
             },
         });
         let exported = build_framed(None, write(vec![frame("serial", 0x10, false, 4)], false), serial);
@@ -492,15 +492,28 @@ mod tests {
         }
         let mut config = walk(input);
         if let Some(checksum) = config.get_mut("checksum") {
-            checksum["bigEndian"] = checksum.get("bigEndian").cloned().unwrap_or(false.into());
+            legacy_byte_order(checksum);
         }
         from(&config)
+    }
+
+    /// The golden predates `endianness`; its `bigEndian` reads as the catalogue reads a legacy `big_endian`.
+    fn legacy_byte_order(checksum: &mut serde_json::Value) {
+        let Some(big) = checksum.as_object_mut().and_then(|c| c.remove("bigEndian")) else { return };
+        if big == true {
+            checksum["endianness"] = "big".into();
+        } else if checksum["byteLength"].as_u64() > Some(1) {
+            checksum["endianness"] = "little".into();
+        }
     }
 
     fn check_head(name: &str, input: &serde_json::Value, expected: &serde_json::Value) {
         let serial = input.get("serialConfig").map(serial_of).unwrap_or_default();
         let (ops, findings) = head_ops(from(&input["protocol"]), &from(&input["meta"]), &serial);
         let mut expected = expected.clone();
+        if let Some(checksum) = expected.pointer_mut("/1/config/checksum") {
+            legacy_byte_order(checksum);
+        }
         let config = name.strip_prefix("headOps serial ").and_then(|c| c.split_once(" interval ").or(c.split_once("plain ")));
         for (field, lib) in config.map_or(vec![], |(_, config)| lib_fields(config)) {
             let fields = expected[1]["config"]["fields"].as_object_mut().unwrap();
