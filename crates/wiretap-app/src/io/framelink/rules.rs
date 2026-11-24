@@ -3,6 +3,7 @@
 // FrameLink rule operations dispatched via WS commands.
 // All operations route through the shared connection pool (one TCP connection per device).
 
+use crate::causes::with_causes;
 use std::collections::{BTreeMap, HashMap};
 
 use serde::{Deserialize, Serialize};
@@ -599,7 +600,7 @@ async fn cmd_probe(params: Value) -> Result<Value, String> {
         .ok_or("Missing 'port' parameter")? as u16;
     let timeout = get_timeout(&params);
     let result = super::probe_framelink(host, port, timeout).await?;
-    serde_json::to_value(&result).map_err(|e| e.to_string())
+    serde_json::to_value(&result).map_err(with_causes)
 }
 
 // ============================================================================
@@ -622,7 +623,7 @@ async fn cmd_frame_def_list(params: Value) -> Result<Value, String> {
         .map(|info| frame_def_to_descriptor(&info, board_def.as_ref(), editable.as_ref()))
         .collect();
 
-    serde_json::to_value(&descriptors).map_err(|e| e.to_string())
+    serde_json::to_value(&descriptors).map_err(with_causes)
 }
 
 fn signal_names(frame_def: &Value) -> HashMap<u16, String> {
@@ -688,7 +689,7 @@ async fn cmd_bridge_list(params: Value) -> Result<Value, String> {
         .map(|info| bridge_to_descriptor(&info, board_def.as_ref()))
         .collect();
 
-    serde_json::to_value(&descriptors).map_err(|e| e.to_string())
+    serde_json::to_value(&descriptors).map_err(with_causes)
 }
 
 async fn cmd_bridge_add(params: Value) -> Result<Value, String> {
@@ -749,7 +750,7 @@ async fn cmd_xform_list(params: Value) -> Result<Value, String> {
         .map(|info| xform_to_descriptor(&info, board_def.as_ref(), editable.as_ref()))
         .collect();
 
-    serde_json::to_value(&descriptors).map_err(|e| e.to_string())
+    serde_json::to_value(&descriptors).map_err(with_causes)
 }
 
 async fn cmd_xform_add(params: Value) -> Result<Value, String> {
@@ -816,7 +817,7 @@ async fn cmd_gen_list(params: Value) -> Result<Value, String> {
         .map(|info| gen_to_descriptor(&info, board_def.as_ref(), editable.as_ref()))
         .collect();
 
-    serde_json::to_value(&descriptors).map_err(|e| e.to_string())
+    serde_json::to_value(&descriptors).map_err(with_causes)
 }
 
 async fn cmd_gen_add(params: Value) -> Result<Value, String> {
@@ -918,7 +919,7 @@ async fn cmd_persist_save(params: Value) -> Result<Value, String> {
         let conn = shared::get_connection(&device_id, timeout).await?;
         wslib_framelink::board::upload_board_def(&conn.session, toml_str)
             .await
-            .map_err(|e| e.to_string())?;
+            .map_err(with_causes)?;
     }
 
     // Step 5: Merge pending on the real EditableBoardDef (clearing pending state)
@@ -1061,7 +1062,7 @@ async fn cmd_dsig_list(params: Value) -> Result<Value, String> {
             flags: s.flags,
         })
         .collect();
-    serde_json::to_value(&descriptors).map_err(|e| e.to_string())
+    serde_json::to_value(&descriptors).map_err(with_causes)
 }
 
 async fn cmd_dsig_read(params: Value) -> Result<Value, String> {
@@ -1155,7 +1156,7 @@ async fn cmd_indicators_list(params: Value) -> Result<Value, String> {
 
     // Filter out Status LED (index 0) before returning
     indicators.retain(|led| led.index != 0);
-    serde_json::to_value(&indicators).map_err(|e| e.to_string())
+    serde_json::to_value(&indicators).map_err(with_causes)
 }
 
 // ============================================================================
@@ -1169,7 +1170,7 @@ async fn cmd_palettes_list(params: Value) -> Result<Value, String> {
         .await
         .ok_or("No board definition available")?;
 
-    serde_json::to_value(&board_def.palettes).map_err(|e| e.to_string())
+    serde_json::to_value(&board_def.palettes).map_err(with_causes)
 }
 
 // ============================================================================
@@ -1393,8 +1394,8 @@ async fn cmd_signals_selectable(params: Value) -> Result<Value, String> {
     let signals =
         wslib_framelink::board::list_selectable_signals(&conn.session, board_def.as_ref())
             .await
-            .map_err(|e| format!("Failed to list selectable signals: {e}"))?;
-    serde_json::to_value(&signals).map_err(|e| e.to_string())
+            .map_err(|e| format!("Failed to list selectable signals: {}", with_causes(&e)))?;
+    serde_json::to_value(&signals).map_err(with_causes)
 }
 
 // ============================================================================

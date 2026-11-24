@@ -6,6 +6,7 @@
 //
 // Data is cached in memory and persisted to disk with debounced writes.
 
+use crate::causes::with_causes;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -129,7 +130,7 @@ fn save_to_disk_internal() -> Result<(), String> {
     drop(manager); // Release read lock before file operations
 
     wslib_file_atomic::replace_readable(&path, json.as_bytes())
-        .map_err(|e| format!("Failed to write store file: {}", e))?;
+        .map_err(|e| format!("Failed to write store file: {}", with_causes(&e)))?;
 
     // Clear dirty flag
     if let Ok(mut manager) = STORE_MANAGER.write() {

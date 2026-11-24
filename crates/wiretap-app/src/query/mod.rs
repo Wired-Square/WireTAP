@@ -22,6 +22,7 @@ use wslib_wiretap_gateway::{
 
 use wiretap_analysis::source::InventoryRow;
 use wiretap_capture_store::Cancel;
+use crate::causes::with_causes;
 use crate::payload_source::QuerySource;
 use crate::settings::SettingsSource;
 
@@ -134,7 +135,7 @@ fn mirror_compare(spec: &QuerySpec, catalog_path: Option<&str>) -> Result<Option
         return Ok(None);
     };
     let text = std::fs::read_to_string(path).map_err(|e| format!("Failed to read catalog file: {e}"))?;
-    let catalog = wslib_wiretap_catalogue::Catalogue::parse(&text).map_err(|e| e.to_string())?;
+    let catalog = wslib_wiretap_catalogue::Catalogue::parse(&text).map_err(with_causes)?;
     Ok(wiretap_analysis::query::mirror_compare_set(&catalog, *mirror_frame_id))
 }
 

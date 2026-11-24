@@ -9,6 +9,7 @@
 // produced, so it flows through `open_session`'s existing
 // `modbus_polls` parameter with no new plumbing.
 
+use crate::causes::with_causes;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use wslib_modbus::{chunk_ranges, RangeSpec, RegisterRange};
@@ -120,7 +121,7 @@ pub fn build_polls_from_ranges(spec: &ModbusRangeSpec) -> Result<Vec<PollGroup>,
         block_size: spec.block_size,
         max_registers: spec.max_registers,
     };
-    let items = chunk_ranges(&catalogue_spec, ()).map_err(|e| e.to_string())?;
+    let items = chunk_ranges(&catalogue_spec, ()).map_err(with_causes)?;
 
     if items.len() > spec.max_groups as usize {
         return Err(format!(

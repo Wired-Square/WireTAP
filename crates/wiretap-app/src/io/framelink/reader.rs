@@ -12,6 +12,7 @@ use super::convert_stream_frame;
 use super::shared;
 use wslib_framelink_protocol::types::{IFACE_CAN, IFACE_CANFD, IFACE_RS232, IFACE_RS485};
 
+use crate::causes::with_causes;
 use crate::io::error::IoError;
 use crate::io::bus_mapping::{reconcile_with_device, BusMapping};
 use crate::io::types::{transmit_channel, EndReason, SourceMessage};
@@ -164,7 +165,7 @@ pub async fn run_source(
                         .session
                         .transmit(&req.data)
                         .await
-                        .map_err(|e| e.to_string());
+                        .map_err(with_causes);
                     let _ = req.result_tx.send(result);
                 }
             }

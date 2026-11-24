@@ -9,6 +9,7 @@
 #![cfg(not(target_os = "ios"))]
 
 use std::sync::Mutex;
+use crate::causes::with_causes;
 
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
@@ -87,6 +88,7 @@ impl EspFlashOptions {
             flash_mode: esp::parse_flash_mode(self.flash_mode.as_deref())?,
             flash_freq: esp::parse_flash_freq(self.flash_freq.as_deref())?,
             flash_size: esp::parse_flash_size(self.flash_size.as_deref())?,
+            expected_mac: None,
         })
     }
 }
@@ -266,7 +268,7 @@ where
     tauri::async_runtime::spawn_blocking(f)
         .await
         .map_err(|e| format!("Flasher task panicked: {e}"))?
-        .map_err(|e| e.to_string())
+        .map_err(with_causes)
 }
 
 /// Runs `op` on the blocking pool under a fresh flash id, reporting through
@@ -508,7 +510,7 @@ mod tests {
         let detected = DetectedChip::from(Detected::Esp(EspChipInfo {
             chip: "esp32s3".into(),
             features: vec!["WiFi".into()],
-            mac: "aa:bb".into(),
+            mac: Some("aa:bb:cc:dd:ee:ff".parse().unwrap()),
             flash_size_bytes: Some(8 * 1024 * 1024),
         }));
         assert_eq!(
@@ -521,7 +523,7 @@ mod tests {
                 "extra": {
                     "chip": "esp32s3",
                     "features": ["WiFi"],
-                    "mac": "aa:bb",
+                    "mac": "aa:bb:cc:dd:ee:ff",
                     "flash_size_bytes": 8388608u64,
                 },
             })
@@ -533,7 +535,7 @@ mod tests {
         let detected = DetectedChip::from(Detected::Esp(EspChipInfo {
             chip: "esp8266".into(),
             features: vec![],
-            mac: "aa".into(),
+            mac: None,
             flash_size_bytes: None,
         }));
         assert_eq!(detected.manufacturer, "ESP8266");

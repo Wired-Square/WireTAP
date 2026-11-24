@@ -1,3 +1,4 @@
+use crate::causes::with_causes;
 use std::{fmt, str::FromStr, time::Duration};
 
 use clap::Args;
@@ -400,7 +401,7 @@ pub async fn open(
             dbitrate,
         } => {
             use wslib_can_socketcan as socketcan;
-            let set = socketcan::bitrates(&name).map_err(|e| format!("{name}: {e}"))?;
+            let set = socketcan::bitrates(&name).map_err(|e| format!("{name}: {}", with_causes(&e)))?;
             for (flag, wanted, actual) in [
                 ("--bitrate", bitrate, set.nominal),
                 ("--dbitrate", dbitrate, set.data),
@@ -421,7 +422,7 @@ pub async fn open(
         }
         Plan::Gvret(link) => gvret::open(link, gvret::GvretOptions::default(), options).await,
     };
-    opened.map_err(|e| format!("{interface}: {e}"))
+    opened.map_err(|e| format!("{interface}: {}", with_causes(&e)))
 }
 
 /// Answered once the device has taken the frame, or with the library's reason
@@ -429,7 +430,7 @@ pub async fn open(
 pub async fn send(writer: &CanWriter, frame: CanFrame) -> Result<(), String> {
     match writer.send(frame).await {
         Ok(Ok(())) => Ok(()),
-        Ok(Err(e)) => Err(format!("write failed: {e}")),
+        Ok(Err(e)) => Err(with_causes(&e)),
         Err(refused) => Err(format!("refused: {refused}")),
     }
 }
@@ -461,12 +462,12 @@ pub async fn probe(interface: &Interface) -> Result<Probed, String> {
         Interface::SocketCan { name } => {
             return wslib_can_socketcan::bitrates(name)
                 .map(Probed::Rates)
-                .map_err(|e| format!("{name}: {e}"));
+                .map_err(|e| format!("{name}: {}", with_causes(&e)));
         }
         #[allow(unreachable_patterns)]
         _ => unreachable!("plan refuses it on this OS"),
     };
-    info.map(Probed::Device).map_err(|e| e.to_string())
+    info.map(Probed::Device).map_err(with_causes)
 }
 
 #[cfg(test)]

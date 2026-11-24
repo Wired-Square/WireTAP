@@ -15,6 +15,7 @@ use wslib_wiretap_gateway::{
     UnassignParams,
 };
 
+use crate::causes::with_causes;
 use crate::apiclient::{resolve_by_id, text};
 use crate::catalog_share::registry::{
     git_blob_sha, git_blob_sha_of_file, CatalogEntry, CatalogSourceRegistry, LocalState,
@@ -229,7 +230,7 @@ async fn read_library(app: &AppHandle) -> Library {
 
 fn library_file(app: &AppHandle, filename: &str) -> Result<(String, Vec<u8>), String> {
     let filename = wslib_wiretap_catalogue::text::reject_unsafe_filename(filename)
-        .map_err(|e| e.to_string())?
+        .map_err(with_causes)?
         .to_string();
     let dir = crate::catalog::decoder_dir(app).ok_or("No decoder directory is set")?;
     let bytes = std::fs::read(dir.join(&filename))

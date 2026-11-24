@@ -13,6 +13,7 @@ use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use wiretap_analysis::dashboard::{histogram, BitToggles, HistogramBin};
 
+use crate::causes::with_causes;
 use crate::io::FrameMessage;
 use crate::ws::decoded::DecodedFrameMsg;
 
@@ -347,7 +348,7 @@ pub fn get(session_id: &str) -> Option<Shared> {
 /// A session nobody watches reads as empty.
 fn read<R>(session_id: &str, f: impl FnOnce(&mut History) -> R) -> Result<R, String> {
     match get(session_id) {
-        Some(shared) => Ok(f(&mut *shared.lock().map_err(|e| e.to_string())?)),
+        Some(shared) => Ok(f(&mut *shared.lock().map_err(with_causes)?)),
         None => Ok(f(&mut History::default())),
     }
 }
@@ -372,7 +373,7 @@ pub fn dispatch(op_name: &str, params: serde_json::Value) -> Result<serde_json::
         headers: Vec<String>,
         frame_id: Option<u32>,
     }
-    let p: Params = serde_json::from_value(params).map_err(|e| e.to_string())?;
+    let p: Params = serde_json::from_value(params).map_err(with_causes)?;
     read(&p.session_id, |h| {
         let value = match op_name {
             "dashboard.series" => serde_json::to_value(p.signals.iter().map(|r| h.series(r, p.last)).collect::<Vec<_>>()),
@@ -390,7 +391,7 @@ pub fn dispatch(op_name: &str, params: serde_json::Value) -> Result<serde_json::
             }
             _ => return Err(format!("Unknown command: {op_name}")),
         };
-        value.map_err(|e| e.to_string())
+        value.map_err(with_causes)
     })?
 }
 

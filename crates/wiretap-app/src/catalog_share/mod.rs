@@ -22,6 +22,7 @@ pub mod secrets;
 pub mod url;
 
 use futures::stream::{self, StreamExt};
+use crate::causes::with_causes;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager};
 
@@ -457,7 +458,7 @@ fn write_import(
     })?;
 
     let desired = wslib_wiretap_catalogue::text::sanitise_filename(basename(&blob.path)).map_err(|e| {
-        ImportResult::refused(&blob.path, ImportOutcome::Failed, None, e.to_string())
+        ImportResult::refused(&blob.path, ImportOutcome::Failed, None, with_causes(&e))
     })?;
     let taken = decoder_dir.join(&desired).exists();
 

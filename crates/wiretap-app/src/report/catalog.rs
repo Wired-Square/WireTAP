@@ -3,6 +3,7 @@
 // The catalogue report: every protocol's frames as the catalogue authors them,
 // over `wslib_wiretap_catalogue::summary`.
 
+use crate::causes::with_causes;
 use wslib_wiretap_catalogue::model::{Confidence, Endianness, Protocol, Signal};
 use wslib_wiretap_catalogue::summary::{CatalogueSummary, FrameRow, MuxRow, SignalRow};
 
@@ -10,7 +11,7 @@ use super::{Block, Cell, Doc, ReportFormat, ReportLocale};
 
 /// The report on a catalogue's text, a legacy `[id]` table read as CAN.
 pub fn render(text: &str, format: ReportFormat, l: &ReportLocale) -> Result<String, String> {
-    let summary = CatalogueSummary::from_text(text).map_err(|e| e.to_string())?;
+    let summary = CatalogueSummary::from_text(text).map_err(with_causes)?;
     Ok(report(&summary, l).render(format))
 }
 

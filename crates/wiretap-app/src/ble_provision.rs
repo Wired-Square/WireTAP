@@ -8,6 +8,7 @@
 // Tear-down is the unified `release_device(device_id)` command in
 // `device_scan` — there is no per-protocol `disconnect` here.
 
+use crate::causes::with_causes;
 use crate::device_scan::{canonical_device_id, device_scan_start, device_scan_stop, discovery_handle};
 use wslib_framelink::Discovery;
 use wslib_framelink::ble::wifi_prov::{
@@ -99,7 +100,7 @@ async fn session_for(device_id: &str) -> Result<(Discovery, Arc<WifiProvSession>
     let session = discovery
         .open_wifi_prov(&id)
         .await
-        .map_err(|e| format!("Failed to open WiFi-prov session for {id}: {e}"))?;
+        .map_err(|e| format!("Failed to open WiFi-prov session for {id}: {}", with_causes(&e)))?;
     Ok((discovery, session))
 }
 
@@ -135,7 +136,7 @@ pub async fn ble_connect(device_id: String) -> Result<(), String> {
     discovery
         .open_wifi_prov(&id)
         .await
-        .map_err(|e| format!("Failed to open WiFi-prov session for {id}: {e}"))?;
+        .map_err(|e| format!("Failed to open WiFi-prov session for {id}: {}", with_causes(&e)))?;
     tlog!("[ble_provision] WiFi-prov session ready for {}", id);
     Ok(())
 }
@@ -150,7 +151,7 @@ pub async fn ble_delete_all_credentials(device_id: String) -> Result<(), String>
     session
         .forget()
         .await
-        .map_err(|e| format!("Failed to wipe credentials: {e}"))
+        .map_err(|e| format!("Failed to wipe credentials: {}", with_causes(&e)))
 }
 
 #[tauri::command]
@@ -159,7 +160,7 @@ pub async fn ble_wifi_disconnect(device_id: String) -> Result<(), String> {
     session
         .disconnect()
         .await
-        .map_err(|e| format!("Failed to disconnect WiFi on device: {e}"))
+        .map_err(|e| format!("Failed to disconnect WiFi on device: {}", with_causes(&e)))
 }
 
 #[tauri::command]
@@ -168,7 +169,7 @@ pub async fn ble_read_device_state(device_id: String) -> Result<DeviceWifiState,
     let s = session
         .status()
         .await
-        .map_err(|e| format!("Failed to read device state: {e}"))?;
+        .map_err(|e| format!("Failed to read device state: {}", with_causes(&e)))?;
     Ok(DeviceWifiState {
         ssid: s.ssid,
         security: s.security.map(|sec| sec.byte()),
@@ -205,7 +206,7 @@ pub async fn ble_provision_wifi(
             }
             Ok(_) => {}
             Err(e) => {
-                return Err(format!("Provisioning failed: {e}"));
+                return Err(format!("Provisioning failed: {}", with_causes(&e)));
             }
         }
     }
@@ -239,7 +240,7 @@ pub async fn ble_subscribe_status(app: AppHandle, device_id: String) -> Result<(
                 }
                 Ok(_) => {}
                 Err(e) => {
-                    tlog!("[ble_provision] watch stream ended: {e}");
+                    tlog!("[ble_provision] watch stream ended: {}", with_causes(&e));
                     break;
                 }
             }

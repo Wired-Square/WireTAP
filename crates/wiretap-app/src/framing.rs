@@ -116,7 +116,7 @@ mod desktop {
             FramingMode::Delimiter => {
                 let delimiter = match cfg.delimiter.as_deref() {
                     Some(hex) => {
-                        wslib_bits::hex::parse_bytes(hex).map_err(|e| e.to_string())?
+                        wslib_bits::hex::parse_bytes(hex).map_err(crate::causes::with_causes)?
                     }
                     None => vec![0x0A], // Default LF
                 };
@@ -242,7 +242,7 @@ mod desktop {
     impl Framing {
         fn new(config: BackendFramingConfig, catalog: Option<Arc<Catalogue>>) -> Result<Self, String> {
             let checked = |cfg: &InterfaceFramingConfig| {
-                build_encoding(cfg)?.checked().map_err(|e| e.to_string())
+                build_encoding(cfg)?.checked().map_err(crate::causes::with_causes)
             };
             let default_encoding = checked(&config.framing)?;
             let overrides = config

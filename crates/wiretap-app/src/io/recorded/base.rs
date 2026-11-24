@@ -3,6 +3,7 @@
 // Shared control state for recorded sources (Capture, the WireTAP backend):
 // their start/stop state machine and where their playback position goes.
 
+use crate::causes::with_causes;
 use crate::io::replay::{PlaybackControl, Timestamped};
 
 use crate::io::{
@@ -99,7 +100,7 @@ impl RecordedSourceState {
                 device_name, self.session_id, speed
             );
         }
-        self.control.set_speed(speed).map_err(|e| e.to_string())
+        self.control.set_speed(speed).map_err(with_causes)
     }
 
     /// Get current state.

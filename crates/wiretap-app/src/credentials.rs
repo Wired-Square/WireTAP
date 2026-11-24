@@ -17,6 +17,7 @@
 
 use wslib_secret::{OsStore, Secret, SecretStore};
 
+use crate::causes::with_causes;
 use crate::settings::IOProfile;
 
 /// IO-profile secrets.
@@ -158,20 +159,20 @@ impl Credentials<'_> {
     fn set(&self, service: &str, account: &str, value: &str) -> Result<(), String> {
         self.0
             .save(service, account, &Secret::new(value))
-            .map_err(|e| format!("Failed to store credential: {e}"))
+            .map_err(|e| format!("Failed to store credential: {}", with_causes(&e)))
     }
 
     fn get(&self, service: &str, account: &str) -> Result<Option<String>, String> {
         self.0
             .load(service, account)
             .map(|secret| secret.map(|s| s.expose().to_owned()))
-            .map_err(|e| format!("Failed to retrieve credential: {e}"))
+            .map_err(|e| format!("Failed to retrieve credential: {}", with_causes(&e)))
     }
 
     fn delete(&self, service: &str, account: &str) -> Result<(), String> {
         self.0
             .delete(service, account)
-            .map_err(|e| format!("Failed to delete credential: {e}"))
+            .map_err(|e| format!("Failed to delete credential: {}", with_causes(&e)))
     }
 
     fn holds(&self, service: &str, account: &str) -> bool {

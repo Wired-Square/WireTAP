@@ -19,6 +19,7 @@ use crate::io::replay::{Pacer, PlaybackControl, Playout, Unlimited};
 
 use super::base::{publish_position, RecordedSourceState};
 use crate::apiclient::{frame_tag, gateway};
+use crate::causes::with_causes;
 use crate::capture_store::{self, CaptureKind, SessionAppender};
 use crate::io::{
     emit_capture_changed, emit_session_error, emit_stream_ended, signal_frames_ready,
@@ -202,9 +203,9 @@ impl Pages {
 
 fn fetch_error(e: ClientError) -> String {
     match e {
-        ClientError::Transport(cause) => format!("frame fetch failed: {cause}"),
-        ClientError::BadHex(_) => e.to_string(),
-        e => format!("frame fetch failed: {e}"),
+        ClientError::Transport(cause) => format!("frame fetch failed: {}", with_causes(cause)),
+        ClientError::BadHex { .. } => with_causes(e),
+        e => format!("frame fetch failed: {}", with_causes(e)),
     }
 }
 

@@ -152,7 +152,7 @@ async fn run_gvret_usb_reader(
 ) -> Result<(), String> {
     let port = profile.req_str("port")?;
 
-    run_gvret_usb_source(source_idx, port, profile.line_settings()?, bus_mappings, stop, tx)
+    run_gvret_usb_source(source_idx, port, profile.line_settings().map_err(crate::causes::with_causes)?, bus_mappings, stop, tx)
         .await;
     Ok(())
 }
@@ -172,7 +172,7 @@ async fn run_slcan_reader(
     run_slcan_source(
         source_idx,
         port,
-        profile.line_settings()?,
+        profile.line_settings().map_err(crate::causes::with_causes)?,
         bitrate,
         silent_mode,
         data_bitrate,

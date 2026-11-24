@@ -19,6 +19,7 @@ use wslib_wiretap_gateway::client::{ClientError, ClientOptions, Db, GatewayClien
 use wslib_wiretap_gateway::{
     DatabaseActivityResult, EventPatch, FrameFilter, NewEvent, Protocol, TimeRangeQuery,
 };
+use crate::causes::with_causes;
 use crate::io::profile::ConnValue;
 
 use crate::capture_events::CaptureEvent;
@@ -137,7 +138,7 @@ fn resolve_api_key(profile: &IOProfile) -> Result<String, String> {
 }
 
 pub(crate) fn text(e: ClientError) -> String {
-    e.to_string()
+    with_causes(e)
 }
 
 pub async fn activity(profile: &IOProfile) -> Result<DatabaseActivityResult, String> {
@@ -197,7 +198,7 @@ pub async fn frame_inventory(
     let bound = |us: Option<i64>| {
         us.map(wslib_wiretap_gateway::rfc3339)
             .transpose()
-            .map_err(|e| e.to_string())
+            .map_err(with_causes)
     };
     let query = TimeRangeQuery {
         start: bound(start_us)?,
@@ -432,8 +433,8 @@ async fn import_capture(
             .import(import_body(&frames), first && create)
             .await
             .map_err(|e| match e {
-                ClientError::Transport(cause) => format!("import request failed: {cause}"),
-                e => e.to_string(),
+                ClientError::Transport(cause) => format!("import request failed: {}", with_causes(cause)),
+                e => with_causes(e),
             })?;
         imported_total += imported.imported;
 
@@ -507,7 +508,7 @@ pub async fn api_test_connection(
     {
         Ok(_) | Err(ClientError::Decode(_)) => Ok(true),
         Err(ClientError::Status { .. }) => Ok(false),
-        Err(e) => Err(e.to_string()),
+        Err(e) => Err(with_causes(e)),
     }
 }
 

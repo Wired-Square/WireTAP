@@ -8,6 +8,7 @@ use rmcp::schemars::{self, JsonSchema};
 use serde::Deserialize;
 use wslib_mcp::rmcp;
 
+use crate::causes::with_causes;
 use crate::io::CanTransmitFrame;
 
 fn default_count() -> usize {
@@ -427,7 +428,7 @@ impl ModbusRangeSpecParam {
                 register_type: r
                     .register_type
                     .parse::<crate::io::RegisterType>()
-                    .map_err(|e| e.to_string())?,
+                    .map_err(with_causes)?,
                 start: r.start,
                 end: r.end,
                 interval_ms: r.interval_ms,

@@ -6,6 +6,7 @@
 
 use std::collections::BTreeSet;
 
+use crate::causes::with_causes;
 use crate::settings::SettingsSource;
 use wslib_wiretap_gateway::client::Db;
 use wslib_wiretap_gateway::{
@@ -39,7 +40,7 @@ pub(super) fn request(
     narrowed: bool,
 ) -> Result<GatewayRequest, String> {
     spec.request(protocol, query_id, narrowed)
-        .map_err(|e| e.to_string())
+        .map_err(with_causes)
 }
 
 /// The gateway's answer to `body`, refused where it ignored the bus asked for.

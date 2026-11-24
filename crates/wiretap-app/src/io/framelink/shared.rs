@@ -13,6 +13,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
+use crate::causes::with_causes;
 use crate::io::error::{IoError, IoFailure};
 use wslib_framelink_protocol::capabilities::decode_capabilities;
 use wslib_framelink_protocol::types::{FLAG_ACK_REQ, MSG_CAPABILITIES_REQ};
@@ -27,14 +28,14 @@ use super::{FrameLinkProbeResult, ProbeInterface};
 // WS command param helpers — shared by every framelink command module
 // ============================================================================
 
-/// Convert any `Display` error into a `String`, for WS command results.
+/// An error and its causes as a `String`, for WS command results.
 pub(super) trait IntoStringErr<T> {
     fn str_err(self) -> Result<T, String>;
 }
 
-impl<T, E: std::fmt::Display> IntoStringErr<T> for Result<T, E> {
+impl<T, E: std::error::Error> IntoStringErr<T> for Result<T, E> {
     fn str_err(self) -> Result<T, String> {
-        self.map_err(|e| e.to_string())
+        self.map_err(with_causes)
     }
 }
 
@@ -280,7 +281,7 @@ pub(crate) async fn connect_to_addr(
     )
     .await
     .map_err(|_| IoError::timeout(display_key, "connect").for_user())?
-    .map_err(|e| IoError::connection(display_key, e.to_string()).for_user())?;
+    .map_err(|e| IoError::connection(display_key, with_causes(&e)).for_user())?;
 
     let (iface_types, probe_cache, editable_board_def) =
         match fetch_capabilities(&session, display_key, timeout_sec).await {
@@ -493,13 +494,13 @@ async fn fetch_capabilities(
         IoError::timeout(key, "capabilities request")
     })?
     .map_err(|e| {
-        tlog!("[framelink:{}] Capabilities request failed: {}", key, e);
-        IoError::protocol(key, format!("capabilities request failed: {e}"))
+        tlog!("[framelink:{}] Capabilities request failed: {}", key, with_causes(&e));
+        IoError::protocol(key, format!("capabilities request failed: {}", with_causes(&e)))
     })?;
 
     let caps = decode_capabilities(&frame.payload).map_err(|e| {
-        tlog!("[framelink:{}] Failed to decode capabilities: {}", key, e);
-        IoError::protocol(key, format!("could not decode capabilities: {e}"))
+        tlog!("[framelink:{}] Failed to decode capabilities: {}", key, with_causes(&e));
+        IoError::protocol(key, format!("could not decode capabilities: {}", with_causes(&e)))
     })?;
 
     let iface_types: HashMap<u8, u8> = caps

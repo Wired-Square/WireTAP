@@ -15,6 +15,7 @@ use wiretap_capture_store::{
 };
 
 use super::{QueryOutcome, QueryResults};
+use crate::causes::with_causes;
 use crate::capture_db;
 
 const ROW: &str = "timestamp_us, frame_id, is_extended, payload";
@@ -154,7 +155,7 @@ async fn run_paged(
     page: usize,
 ) -> Result<QueryOutcome, String> {
     if let QuerySpec::PatternSearch { pattern, pattern_mask, .. } = spec {
-        kernel::pattern_search(&[], pattern, pattern_mask, None).map_err(|e| e.to_string())?;
+        kernel::pattern_search(&[], pattern, pattern_mask, None).map_err(with_causes)?;
     }
     let started = Instant::now();
     let statements = statements_paged(capture_id, spec, page);
@@ -200,7 +201,7 @@ async fn run_paged(
         }
         QuerySpec::PatternSearch { pattern, pattern_mask, limit, .. } => {
             let (found, read) = paged(capture_id, filter, page, *limit, false, cancel, |rows, limit| {
-                kernel::pattern_search(rows, pattern, pattern_mask, limit).map(|r| r.results).map_err(|e| e.to_string())
+                kernel::pattern_search(rows, pattern, pattern_mask, limit).map(|r| r.results).map_err(with_causes)
             })
             .await?;
             counted(QueryResults::PatternSearch(found), read)

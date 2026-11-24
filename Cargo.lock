@@ -262,7 +262,7 @@ version = "1.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "40c48f72fd53cd289104fc64099abca73db4166ad86ea0b4341abe65af83dadc"
 dependencies = [
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -273,7 +273,7 @@ checksum = "291e6a250ff86cd4a820112fb8898808a366d8f9f58ce16d1f538353ad55747d"
 dependencies = [
  "anstyle",
  "once_cell_polyfill",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -1761,7 +1761,7 @@ dependencies = [
  "libc",
  "option-ext",
  "redox_users 0.5.2",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -1986,7 +1986,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -3019,7 +3019,7 @@ dependencies = [
  "js-sys",
  "log",
  "wasm-bindgen",
- "windows-core 0.62.2",
+ "windows-core 0.61.2",
 ]
 
 [[package]]
@@ -3891,7 +3891,7 @@ dependencies = [
  "png 0.18.1",
  "serde",
  "thiserror 2.0.21",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -4063,7 +4063,7 @@ version = "0.50.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7957b9740744892f114936ab4a57b3f487491bbeafaf8083688b16841a4240e5"
 dependencies = [
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -4222,7 +4222,7 @@ dependencies = [
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -5577,7 +5577,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.12.1",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -6347,7 +6347,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "52d1cfed4120b4d927bf7c0f86d2087a4a7d6027c906d9f9d525a80573b9be51"
 dependencies = [
  "libc",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -7278,10 +7278,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.4.2",
+ "getrandom 0.3.4",
  "once_cell",
  "rustix 1.1.4",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -7803,7 +7803,7 @@ dependencies = [
  "png 0.18.1",
  "serde",
  "thiserror 2.0.21",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -7894,7 +7894,7 @@ checksum = "f2f6fb2847f6742cd76af783a2a2c49e9375d0a111c7bef6f71cd9e738c72d6e"
 dependencies = [
  "memoffset",
  "tempfile",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -8511,7 +8511,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -9388,21 +9388,28 @@ dependencies = [
 
 [[package]]
 name = "wslib-can"
-version = "0.1.1"
+version = "0.2.0"
 source = "sparse+https://forge.wiredsquare.com/api/packages/wired-square/cargo/"
-checksum = "087323f5c5d4508ba1d1a75bd323c421135c0f8cdb0f594fd368ad0beac1caec"
+checksum = "e90f1c75688deb861e6855808708a373f83962ff9bd1569027706578b97c166a"
 dependencies = [
  "thiserror 2.0.21",
  "tokio",
  "wslib-backoff",
+ "wslib-serial",
  "wslib-tcp",
 ]
 
 [[package]]
-name = "wslib-can-gsusb"
-version = "0.1.0"
+name = "wslib-can-bus"
+version = "0.3.0"
 source = "sparse+https://forge.wiredsquare.com/api/packages/wired-square/cargo/"
-checksum = "0bbbe15233ed761b1055eda53a32a665b1be00a1c3d8e7bb5267026fa20b4cc5"
+checksum = "b4f68b24ceff5a4cf95cd74becec4e7e76a5968f39870ce1e7abafa41e0cfe93"
+
+[[package]]
+name = "wslib-can-gsusb"
+version = "0.2.0"
+source = "sparse+https://forge.wiredsquare.com/api/packages/wired-square/cargo/"
+checksum = "0af69da06fbdf9cc4539c6c2f0ab4b246c8b5f0514cbb9ad4d1c92df66cffd43"
 dependencies = [
  "nusb 0.2.7",
  "tokio",
@@ -9411,9 +9418,9 @@ dependencies = [
 
 [[package]]
 name = "wslib-can-gvret"
-version = "0.1.0"
+version = "0.2.0"
 source = "sparse+https://forge.wiredsquare.com/api/packages/wired-square/cargo/"
-checksum = "f7231c8db8fa342083ec0b7ec2984206a5d9f9787c63b8f3abb4b2d23d2df9ea"
+checksum = "51cc84ad9a480489506341af85baf0d6e27b2c750d18f36bfc2adf0a1235e05a"
 dependencies = [
  "tokio",
  "wslib-can",
@@ -9423,9 +9430,9 @@ dependencies = [
 
 [[package]]
 name = "wslib-can-pcan"
-version = "0.1.0"
+version = "0.2.0"
 source = "sparse+https://forge.wiredsquare.com/api/packages/wired-square/cargo/"
-checksum = "0fbe6e021f1b6ce6cf4a1e12d7df7e325283a2b19f08d893faa385484e5afccd"
+checksum = "023d804c6c43dab17f6ba7cd590bbe43592191b8c0a7f15c9ac73dbe33cca376"
 dependencies = [
  "libloading 0.8.9",
  "nusb 0.2.7",
@@ -9435,9 +9442,9 @@ dependencies = [
 
 [[package]]
 name = "wslib-can-slcan"
-version = "0.1.0"
+version = "0.2.0"
 source = "sparse+https://forge.wiredsquare.com/api/packages/wired-square/cargo/"
-checksum = "94c1a421c4346a0fe2fe292efca3891c983c1f5b4fca095fb9c9935ac9c16137"
+checksum = "6d578a35d0b5915a4c121d1f1ce898c7cbeddc127da7b68dccc8ef751308187d"
 dependencies = [
  "tokio",
  "wslib-can",
@@ -9446,9 +9453,9 @@ dependencies = [
 
 [[package]]
 name = "wslib-can-socketcan"
-version = "0.1.0"
+version = "0.2.0"
 source = "sparse+https://forge.wiredsquare.com/api/packages/wired-square/cargo/"
-checksum = "51a9e47627441b30e27d102e23bc4d84817b543d8e5a2c01ba13ea6d97f62dd2"
+checksum = "d2d84312e8824257cfd71c0db58cbe11401146b583de01d0496eb7692b46e1c6"
 dependencies = [
  "libc",
  "socketcan",
@@ -9458,9 +9465,9 @@ dependencies = [
 
 [[package]]
 name = "wslib-checksum"
-version = "0.1.0"
+version = "0.1.1"
 source = "sparse+https://forge.wiredsquare.com/api/packages/wired-square/cargo/"
-checksum = "460a0d9e5ec8ac6bf7681a7c3d8435c36e911329158cbb4165a7efcc998a24cd"
+checksum = "a6545c9cacdf4fe0cd04e8221268990b3faba4988522ce84b9980593ccc6090c"
 dependencies = [
  "serde",
  "ts-rs",
@@ -9469,9 +9476,9 @@ dependencies = [
 
 [[package]]
 name = "wslib-db-sqlite"
-version = "0.2.4"
+version = "0.3.0"
 source = "sparse+https://forge.wiredsquare.com/api/packages/wired-square/cargo/"
-checksum = "58bba5658346cfaf54911c72ec4c56a719dea578bec4229e5384b1de32d004da"
+checksum = "fb1b49c6a12e24ec36b7bf5835e31dd6e3208d5d4a66ffd4bfe5ae81cb0202be"
 dependencies = [
  "chrono",
  "serde",
@@ -9486,9 +9493,9 @@ dependencies = [
 
 [[package]]
 name = "wslib-file-atomic"
-version = "0.1.8"
+version = "0.2.0"
 source = "sparse+https://forge.wiredsquare.com/api/packages/wired-square/cargo/"
-checksum = "df7cfd680bf02c921f8738a2b302e5d01f4a048563f00cc3527844aa3f9a5a55"
+checksum = "4124db76eed30ad7769eabeec647d3a1d96f01930c81aeb7ba9a746824046306"
 dependencies = [
  "libc",
  "windows-sys 0.61.2",
@@ -9496,9 +9503,9 @@ dependencies = [
 
 [[package]]
 name = "wslib-framelink"
-version = "0.3.0"
+version = "0.6.0"
 source = "sparse+https://forge.wiredsquare.com/api/packages/wired-square/cargo/"
-checksum = "3ae65dbebea7f3b4e026057d09f19ecdb398cfa5eb088fd89ff4926061ad146e"
+checksum = "41ce72fcaaef56ab90934f61f5f4b59cd4ad125d18caaef0900ea769019c8fc3"
 dependencies = [
  "btleplug",
  "futures-util",
@@ -9508,6 +9515,7 @@ dependencies = [
  "tokio",
  "tracing",
  "uuid",
+ "wslib-can-bus",
  "wslib-file-atomic",
  "wslib-framelink-board",
  "wslib-framelink-protocol",
@@ -9518,9 +9526,9 @@ dependencies = [
 
 [[package]]
 name = "wslib-framelink-board"
-version = "0.3.2"
+version = "0.3.4"
 source = "sparse+https://forge.wiredsquare.com/api/packages/wired-square/cargo/"
-checksum = "ddc9f2c6d97ca86a9c1dd75748a154857def409b5eaccc34371598f4864fb5d5"
+checksum = "093c4d2b7b8a081a11c68cc048549a2ab7f940e2175e8b119835655627e0b982"
 dependencies = [
  "flate2",
  "serde",
@@ -9531,9 +9539,9 @@ dependencies = [
 
 [[package]]
 name = "wslib-framelink-protocol"
-version = "0.2.0"
+version = "0.2.1"
 source = "sparse+https://forge.wiredsquare.com/api/packages/wired-square/cargo/"
-checksum = "15cbe50c3797f009def742b43811237cb52a427e72c586bdedab450dad93ab0e"
+checksum = "50c459351981b21d34f612362712b023676965d6909ed91464a0078e6cbc5bd6"
 dependencies = [
  "serde",
  "thiserror 2.0.21",
@@ -9553,9 +9561,9 @@ dependencies = [
 
 [[package]]
 name = "wslib-mcp"
-version = "0.2.1"
+version = "0.3.0"
 source = "sparse+https://forge.wiredsquare.com/api/packages/wired-square/cargo/"
-checksum = "469dfd38568b34dfb48a8ac4b1b60474fd0f3de422b900190f1c437bae73b592"
+checksum = "9f88e0a4d7deac0061628d235f4bca53d9a7efc53b4a3bb3ee9157f4d961fb38"
 dependencies = [
  "axum",
  "ipnet",
@@ -9570,9 +9578,9 @@ dependencies = [
 
 [[package]]
 name = "wslib-mcu-flash"
-version = "0.1.2"
+version = "0.4.0"
 source = "sparse+https://forge.wiredsquare.com/api/packages/wired-square/cargo/"
-checksum = "14ff693f24a6afcbef0843ca089a6a751c972184ea7763af12475968ac915319"
+checksum = "afa7fb07124627eae22bdcbf8935c3bc6639780ec1bad16800d91197098368da"
 dependencies = [
  "dfu-nusb",
  "espflash",
@@ -9586,9 +9594,9 @@ dependencies = [
 
 [[package]]
 name = "wslib-mcumgr"
-version = "0.1.0"
+version = "0.2.0"
 source = "sparse+https://forge.wiredsquare.com/api/packages/wired-square/cargo/"
-checksum = "7692024571791211086acd9672e1b618c08f052bcf2d965ef57b5f4d4ee93cc0"
+checksum = "ac844deacd6ff525677e0d8863af2cb2b4e9bbf7d62adad6e69b8e57bbf6094f"
 dependencies = [
  "btleplug",
  "ciborium",
@@ -9604,9 +9612,9 @@ dependencies = [
 
 [[package]]
 name = "wslib-mdns"
-version = "0.1.0"
+version = "0.2.0"
 source = "sparse+https://forge.wiredsquare.com/api/packages/wired-square/cargo/"
-checksum = "138c7230a9ae112cef9d6d993f22c036634ad929af1a18077d5fcd446089b37b"
+checksum = "18b51b27cb1f5aa647592a8491202afaf421bf3f9189f9e14e1caf896914afdc"
 dependencies = [
  "libc",
  "mdns-sd",
@@ -9615,9 +9623,9 @@ dependencies = [
 
 [[package]]
 name = "wslib-modbus"
-version = "0.2.1"
+version = "0.3.0"
 source = "sparse+https://forge.wiredsquare.com/api/packages/wired-square/cargo/"
-checksum = "13057fe86d0ef9aea798f66573d908d178cc83b7a7394d6b157c3bf2167062e5"
+checksum = "98ea7a3f21d93cf163857966e08bd19013d87cdd32a8b53284a8b36fa594eca2"
 dependencies = [
  "rust_decimal",
  "serde",
@@ -9636,18 +9644,18 @@ dependencies = [
 
 [[package]]
 name = "wslib-quantity"
-version = "0.1.0"
+version = "0.2.1"
 source = "sparse+https://forge.wiredsquare.com/api/packages/wired-square/cargo/"
-checksum = "d11568f220b9ae6a11cac1b4e45ea02fcb5699e9abc8dfa893a2dad3464bcad7"
+checksum = "45f249d922e2043448e938c0c3354012aa59880d6ff6e0b48d46e55b3c14603b"
 dependencies = [
  "rust_decimal",
 ]
 
 [[package]]
 name = "wslib-secret"
-version = "0.1.5"
+version = "0.1.7"
 source = "sparse+https://forge.wiredsquare.com/api/packages/wired-square/cargo/"
-checksum = "bd23976e6554d11308774e880dd881f7dcb8318f6509ba1123752e512467aeac"
+checksum = "8523072909024b3576a69631d2059f49e655575733d4c387f9d49ff1892f2304"
 dependencies = [
  "secret-service",
  "security-framework 3.7.0",
@@ -9658,9 +9666,9 @@ dependencies = [
 
 [[package]]
 name = "wslib-serial"
-version = "0.1.3"
+version = "0.2.0"
 source = "sparse+https://forge.wiredsquare.com/api/packages/wired-square/cargo/"
-checksum = "652093d74aae4fe6d9ec4d4a9fc949931cb5f3f23533aba511fbee480c158bbf"
+checksum = "a4c7be42e7e1ff519649efdbe39cd2c3a81f0e924349615e2740e8039db56707"
 dependencies = [
  "libc",
  "serialport",
@@ -9671,9 +9679,9 @@ dependencies = [
 
 [[package]]
 name = "wslib-tcp"
-version = "0.1.0"
+version = "0.1.2"
 source = "sparse+https://forge.wiredsquare.com/api/packages/wired-square/cargo/"
-checksum = "a49cdc6e61f2a87c565c2e93181e32e83135634ba2ab7bcfbad4da0c11fa8226"
+checksum = "9769d5cc14d79b9393b1af9a7707e9e7d3bd475f743708fd973061e5a28c7655"
 dependencies = [
  "thiserror 2.0.21",
  "tokio",
@@ -9681,9 +9689,9 @@ dependencies = [
 
 [[package]]
 name = "wslib-wiretap-catalogue"
-version = "0.3.0"
+version = "0.4.0"
 source = "sparse+https://forge.wiredsquare.com/api/packages/wired-square/cargo/"
-checksum = "c68caff1b58d1ce4b87fc2c7cdf32e8876e17629295038c68f4101741f7d2dca"
+checksum = "868bd5f654d4c63374b111f406625caef03ed55978f7ca4d7cde1c3172e5ee02"
 dependencies = [
  "can-dbc",
  "rust_decimal",
@@ -9703,9 +9711,9 @@ dependencies = [
 
 [[package]]
 name = "wslib-wiretap-gateway"
-version = "0.2.3"
+version = "0.3.0"
 source = "sparse+https://forge.wiredsquare.com/api/packages/wired-square/cargo/"
-checksum = "bc331fa1615b28dd392efecbc13c7f80236a74e96fbe07db1322abfc55ba6ebc"
+checksum = "ebe9402b60f40201bceb9e28c6615e0a89c19c265138a9906936af1801302833"
 dependencies = [
  "reqwest 0.12.28",
  "serde",
@@ -9718,9 +9726,9 @@ dependencies = [
 
 [[package]]
 name = "wslib-wiretap-protocol"
-version = "0.2.3"
+version = "0.3.0"
 source = "sparse+https://forge.wiredsquare.com/api/packages/wired-square/cargo/"
-checksum = "0ff7c6405c69f632f30764a790267fb800b87e688bcceb23216019e26c7e41d3"
+checksum = "1c59d97acf1ad41086fdb2179337f39797f0f679a78e0bb24511ba6b4a6a5fb6"
 dependencies = [
  "serde",
  "ts-rs",

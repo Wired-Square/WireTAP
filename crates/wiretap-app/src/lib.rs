@@ -13,6 +13,7 @@ mod capture_inventory;
 mod capture_store;
 mod captures;
 mod catalog;
+mod causes;
 mod catalog_share;
 mod apiclient;
 mod gateway_admin;
