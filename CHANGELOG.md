@@ -4,6 +4,10 @@ All notable changes to WireTAP will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **UDS conversations can be read out of a capture.** The new MCP tool `get_uds_conversations` finds UDS (ISO 14229) diagnostic traffic in a session's CAN capture and lists each request in order: which IDs are the tester and the ECU, what was asked for, its safety class and how it was answered. It only reads; nothing is sent to the bus. A pair of IDs is reported as a conversation after two answered requests; anything less certain is listed separately as unsettled, with its candidate partners.
+
 ### Changed
 
 - **Device and catalogue libraries updated.** The CAN, serial, Modbus, FrameLink, flashing and catalogue libraries move to their current releases. A serial or USB adapter whose driver crashes mid-read is now reported as a disconnect and its port reopened, and a serial write that fails is never sent late. Error messages keep the underlying cause after the summary, as before.

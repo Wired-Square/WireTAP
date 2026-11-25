@@ -369,6 +369,8 @@ fn frame_key_groups(keys: Option<Vec<String>>) -> Result<Vec<ProtocolFrames>, St
 }
 
 /// The session's frame capture, which the live tools read.
+const DEFAULT_UDS_EXCHANGES: usize = 200;
+
 fn session_frame_capture(session_id: &str) -> Result<String, McpError> {
     crate::capture_store::get_session_frame_capture_id(session_id).ok_or_else(|| {
         err(format!(
@@ -789,6 +791,36 @@ impl WireTapTools {
         .map_err(err)?
         .map_err(|e| err(source_error(e)))?;
         ok_json(json!({ "captureId": capture_id, "protocols": orders }))
+    }
+
+    #[tool(description = "UDS (ISO 14229) diagnostic conversations found in a session's CAN frame capture, bus by bus. Nothing is sent. Each conversation gives its parties (the tester and ECU ids and the evidence for them: exchanges, negative and pending answers, flow-controlled messages) and a transcript of its requests in order: the request bytes, what it asks for (service, data identifier, routine), its safety class (readOnly, stateChanging, destructive) and how it ended (answered with the response bytes and latency, suppressed, timed out, superseded, unfinished). A pair is called a conversation only on at least two answered requests or one paced by flow control; unsettled lists the ids that exchanged UDS without that, each with its candidate partners, which are possibilities and not findings. A conversation of only vendor-specific services is not found. Headless. newest sets how many of the capture's newest frames are read (default 100000); limit how many of each conversation's newest requests are returned (default 200), with exchangeCount the number found.")]
+    async fn get_uds_conversations(
+        &self,
+        Parameters(p): Parameters<UdsConversationsParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let capture_id = session_frame_capture(&p.session_id)?;
+        let newest = Some(analysis_window(p.newest));
+        let traffic = capture_db::analyse(&capture_id, async move |c| {
+            wiretap_analysis::diagnostics::uds_traffic(c, newest).await
+        })
+        .await
+        .map_err(err)?
+        .map_err(|e| err(source_error(e)))?;
+        let limit = p.limit.unwrap_or(DEFAULT_UDS_EXCHANGES);
+        let conversations: Vec<_> = traffic
+            .conversations
+            .into_iter()
+            .map(|mut conversation| {
+                let found = conversation.transcript.exchanges.len();
+                conversation.transcript.exchanges.drain(..found.saturating_sub(limit));
+                json!({ "exchangeCount": found, "conversation": conversation })
+            })
+            .collect();
+        ok_json(json!({
+            "captureId": capture_id,
+            "conversations": conversations,
+            "unsettled": traffic.unsettled,
+        }))
     }
 
     #[tool(

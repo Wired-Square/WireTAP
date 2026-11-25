@@ -65,7 +65,7 @@ Backend time bounds are RFC3339 strings (`start_time` / `end_time`); for capture
 they are converted to the capture's microsecond timeline automatically.
 
 The live tools (`get_discovery_analysis`, `get_frame_order`, `get_decoded_signals`,
-`get_live_frame_map`) take a `session_id` instead and read that session's frame
+`get_live_frame_map`, `get_uds_conversations`) take a `session_id` instead and read that session's frame
 capture. Every read tool but `get_signal_history` is **headless**: it reads the
 data store directly, so no window need be open. Only `open_app` and the DOM tools drive the window.
 
@@ -179,6 +179,28 @@ extended id are different frames. It reads the capture's newest `newest` frames,
 more of a long capture. Optional `frame_ids`, and
 `start_frame_id` (with `start_is_extended`, and `start_protocol` to name one
 protocol) to walk cycles from one id instead of the likeliest.
+
+### `get_uds_conversations`
+UDS (ISO 14229) diagnostic conversations in a session's CAN capture, read without
+sending anything: `{ captureId, conversations: [{ exchangeCount, conversation }],
+unsettled }`. A `conversation` has its `bus`, its `parties` (`tester` and `ecu`,
+each an `id` and an `addressByte` where the frames lead with one, `extended`, and
+the evidence: `exchanges`, `negative`, `pending`, `flowControlledRequests`,
+`flowControlledResponses`) and a `transcript`: `exchanges` in the order asked, each
+with a `name` (the service and its data identifier or routine), a `safety` class
+(`readOnly`, `stateChanging`, `destructive`) and the `transaction` (request bytes,
+`requestedAtUs`, `pendingResponses`, and an `outcome` of `answered`, `malformed`,
+`suppressed`, `superseded`, `timedOut` or `unfinished`); `unsolicited` ECU messages;
+and the ISO-TP `notices` (sequence breaks, timeouts).
+
+Two ids are a conversation on at least two answered requests, or one paced by flow
+control. `unsettled` lists every other id that exchanged UDS, with its `side` and
+its `candidates`, most exchanges first: possibilities, not findings. One request
+sent by hand and answered once is unsettled. Only services the standard defines
+count, so a conversation of vendor services alone is not found. It reads the
+capture's newest `newest` frames (100000 by default) and returns each
+conversation's newest `limit` requests (200 by default); `exchangeCount` is how
+many were found.
 
 ### `describe_capture_analysis` and `describe_catalog`
 The export reports as Markdown text. `describe_capture_analysis` takes the

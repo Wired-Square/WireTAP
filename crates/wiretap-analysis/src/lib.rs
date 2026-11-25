@@ -45,6 +45,7 @@
 
 pub mod checksum;
 pub mod dashboard;
+pub mod diagnostics;
 pub mod draft;
 pub mod hypothesis;
 pub mod mirror;

@@ -12,8 +12,10 @@ serde = { version = "1", features = ["derive"] }
 ts-rs = { version = "12", optional = true, features = ["no-serde-warnings"] }
 wslib-bits = { version = "0.1.2", registry = "wired-square" }
 wslib-checksum = { version = "0.1.1", registry = "wired-square" }
+wslib-isotp = { version = "0.3", registry = "wired-square", features = ["serde"] }
 wslib-modbus = { version = "0.3", registry = "wired-square" }
 wslib-quantity = { version = "0.2", registry = "wired-square" }
+wslib-uds = { version = "0.1.2", registry = "wired-square", features = ["isotp"] }
 wslib-wiretap-catalogue = { version = "0.4", registry = "wired-square" }
 wslib-wiretap-gateway = { version = "0.3", registry = "wired-square" }
 wslib-wiretap-protocol = { version = "0.3", registry = "wired-square" }
@@ -23,6 +25,8 @@ ts = [
     "dep:ts-rs",
     "wslib-bits/ts",
     "wslib-checksum/ts",
+    "wslib-isotp/ts",
+    "wslib-uds/ts",
     "wslib-wiretap-catalogue/ts",
     "wslib-wiretap-gateway/ts",
     "wslib-wiretap-protocol/ts",
@@ -33,3 +37,5 @@ testing = []
 # So the workspace's `cargo test`, which names no features, has the fixture.
 wiretap-analysis = { path = ".", features = ["testing"] }
 serde_json = "1"
+wslib-isotp = { version = "0.3", registry = "wired-square", features = ["testing"] }
+wslib-uds = { version = "0.1.2", registry = "wired-square", features = ["testing"] }
