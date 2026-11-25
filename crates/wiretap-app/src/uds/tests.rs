@@ -2,6 +2,7 @@
 //! tester sends back into the session, and puts the simulated ECU on the far
 //! end: it hears the echo and answers into the session's capture.
 
+use std::ops::RangeInclusive;
 use std::time::Duration;
 
 use wslib_isotp::testing::Responder;
@@ -376,6 +377,6 @@ fn a_range_that_runs_backwards_is_refused() {
         tester: TESTER,
         ecu: ECU,
     };
-    assert!(Plan::dids(parties, 5..=1).is_err());
-    assert!(Plan::addresses("uds_none".into(), 0, false, 0x7E7..=0x7E0).is_err());
+    assert!(Plan::dids(parties, RangeInclusive::new(5, 1)).is_err());
+    assert!(Plan::addresses("uds_none".into(), 0, false, RangeInclusive::new(0x7E7, 0x7E0)).is_err());
 }
