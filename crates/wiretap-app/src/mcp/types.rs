@@ -390,6 +390,114 @@ pub struct TestIdParams {
     pub test_id: String,
 }
 
+// ── UDS ──────────────────────────────────────────────────────────────────────
+
+/// A tester and one ECU on a session's bus. Ids are decimal: 0x7E0 is 2016.
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct UdsPartiesParams {
+    /// Session to send through (must be transmit-capable).
+    pub session_id: String,
+    /// The bus as the session numbers it; default 0.
+    #[serde(default)]
+    pub bus: u8,
+    /// The id the tester sends requests on.
+    pub tester_id: u32,
+    /// The id the ECU answers on.
+    pub ecu_id: u32,
+    /// 29-bit ids; default 11-bit.
+    #[serde(default)]
+    pub extended: bool,
+}
+
+impl UdsPartiesParams {
+    pub fn parties(self) -> crate::uds::Parties {
+        crate::uds::Parties {
+            session_id: self.session_id,
+            bus: self.bus,
+            extended: self.extended,
+            tester: self.tester_id,
+            ecu: self.ecu_id,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct UdsReadDidsParams {
+    #[serde(flatten)]
+    pub parties: UdsPartiesParams,
+    /// The data identifiers, decimal (0xF190 is 61840); several go in one request.
+    pub dids: Vec<u16>,
+}
+
+#[derive(Debug, Default, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum DtcReport {
+    NumberByStatusMask,
+    #[default]
+    ByStatusMask,
+    SupportedDtcs,
+}
+
+fn every_status() -> u8 {
+    0xFF
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct UdsReadDtcsParams {
+    #[serde(flatten)]
+    pub parties: UdsPartiesParams,
+    /// `number_by_status_mask`, `by_status_mask` (default) or `supported_dtcs`.
+    #[serde(default)]
+    pub report: DtcReport,
+    /// The status bits a DTC must have one of; default 255, any.
+    #[serde(default = "every_status")]
+    pub status_mask: u8,
+}
+
+impl UdsReadDtcsParams {
+    pub fn request(&self) -> wslib_uds::DtcRequest {
+        use wslib_uds::DtcRequest;
+        let status_mask = self.status_mask;
+        match self.report {
+            DtcReport::NumberByStatusMask => DtcRequest::NumberByStatusMask { status_mask },
+            DtcReport::ByStatusMask => DtcRequest::ByStatusMask { status_mask },
+            DtcReport::SupportedDtcs => DtcRequest::SupportedDtcs,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct UdsDidScanParams {
+    #[serde(flatten)]
+    pub parties: UdsPartiesParams,
+    /// The first DID read, decimal.
+    pub first: u16,
+    /// The last DID read, decimal.
+    pub last: u16,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct UdsAddressScanParams {
+    /// Session to send through (must be transmit-capable).
+    pub session_id: String,
+    /// The bus as the session numbers it; default 0.
+    #[serde(default)]
+    pub bus: u8,
+    /// 29-bit ids; default 11-bit.
+    #[serde(default)]
+    pub extended: bool,
+    /// The first request id probed, decimal (0x700 is 1792).
+    pub first: u32,
+    /// The last request id probed, decimal (0x7FF is 2047).
+    pub last: u32,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct UdsScanIdParams {
+    /// Scan ID (returned by a `uds_scan_*` tool).
+    pub scan_id: String,
+}
+
 /// One contiguous span of Modbus registers to poll.
 ///
 /// Mirrors `crate::io::ModbusRange`. Kept separate so the IO layer doesn't grow

@@ -823,6 +823,15 @@ impl WireTapTools {
         }))
     }
 
+    #[tool(description = "A UDS scan's state: { scanId, status (scanning, complete, stopped, failed), progress { done, total, found, stoppedEarly }, findings { kind, found }, error }. A DID scan's findings leave out the DIDs refused as out of range; each other DID has its verdict (present with its length, locked, notInSession, busy, inconclusive). A service scan gives each service probed and its verdict; an address scan each { requestId, responseId } that answered. Nothing is sent.")]
+    async fn get_uds_scan_progress(
+        &self,
+        Parameters(p): Parameters<UdsScanIdParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let report = crate::uds::scan_report(&p.scan_id);
+        ok_json(report.ok_or_else(|| err(format!("Scan '{}' not found", p.scan_id)))?)
+    }
+
     #[tool(
         description = "Decode the latest frames of a session's capture against its attached catalogue. Returns one entry per masked frame id with the newest reading of every signal (each mux case keeps its last value), the mux selectors, header fields and source address. Headless — no view needed. The session must have a catalogue: open_session binds the profile's preferred catalogue, set_profile_catalog chooses one. frame_id restricts it to one frame."
     )]
@@ -1226,6 +1235,90 @@ impl WireTapTools {
     ) -> Result<CallToolResult, McpError> {
         crate::io_test::io_test_stop(p.test_id.clone()).await.map_err(err)?;
         ok_json(json!({ "stopped": p.test_id }))
+    }
+
+    #[tool(
+        description = "Send a UDS (ISO 14229) TesterPresent from tester_id to ecu_id on a session's bus, over ISO-TP (normal addressing, classic frames padded to 8 bytes), and wait for its final answer. Only read-only requests can be sent. Returns { outcome, response?, service?, code?, meaning?, bytes }: outcome positive (with the decoded response), negative (with the code and its meaning), malformed or timeout; bytes is the final message. What is sent and received lands in the session's capture, where get_uds_conversations reads it back.",
+        annotations(read_only_hint = false, destructive_hint = false, idempotent_hint = true)
+    )]
+    async fn uds_tester_present(
+        &self,
+        Parameters(p): Parameters<UdsPartiesParams>,
+    ) -> Result<CallToolResult, McpError> {
+        ok_json(crate::uds::tester_present(&p.parties()).await.map_err(err)?)
+    }
+
+    #[tool(
+        description = "Read one or several data identifiers (UDS ReadDataByIdentifier, 0x22) from an ECU, as uds_tester_present does. A positive response carries the first DID and its data; with several DIDs, data runs on into the later records. A DID the ECU does not have is a negative answer, requestOutOfRange.",
+        annotations(read_only_hint = false, destructive_hint = false, idempotent_hint = true)
+    )]
+    async fn uds_read_data_by_identifier(
+        &self,
+        Parameters(p): Parameters<UdsReadDidsParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let reply = crate::uds::read_data_by_identifier(&p.parties.parties(), p.dids).await;
+        ok_json(reply.map_err(err)?)
+    }
+
+    #[tool(
+        description = "Read an ECU's diagnostic trouble codes (UDS ReadDTCInformation, 0x19), as uds_tester_present does: report number_by_status_mask (a count), by_status_mask (default) or supported_dtcs, filtered by status_mask (default 255).",
+        annotations(read_only_hint = false, destructive_hint = false, idempotent_hint = true)
+    )]
+    async fn uds_read_dtc_information(
+        &self,
+        Parameters(p): Parameters<UdsReadDtcsParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let report = p.request();
+        let reply = crate::uds::read_dtc_information(&p.parties.parties(), report).await;
+        ok_json(reply.map_err(err)?)
+    }
+
+    #[tool(
+        description = "Scan an ECU for the data identifiers it reads, first to last, one ReadDataByIdentifier each, in the background. Returns { scan_id }; poll get_uds_scan_progress, stop with uds_scan_stop. Each DID that does not time out takes one bus round trip; a silent one about 100 ms.",
+        annotations(read_only_hint = false, destructive_hint = false, idempotent_hint = false)
+    )]
+    async fn uds_scan_dids(
+        &self,
+        Parameters(p): Parameters<UdsDidScanParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let plan = crate::uds::Plan::dids(p.parties.parties(), p.first..=p.last).map_err(err)?;
+        ok_json(json!({ "scan_id": crate::uds::start_scan(plan).await.map_err(err)? }))
+    }
+
+    #[tool(
+        description = "Scan an ECU for the UDS services it has, by sending each read-only service id bare (0x19, 0x22, 0x3E) and reading its refusal, in the background. Returns { scan_id }; poll get_uds_scan_progress.",
+        annotations(read_only_hint = false, destructive_hint = false, idempotent_hint = false)
+    )]
+    async fn uds_scan_services(
+        &self,
+        Parameters(p): Parameters<UdsPartiesParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let plan = crate::uds::Plan::services(p.parties());
+        ok_json(json!({ "scan_id": crate::uds::start_scan(plan).await.map_err(err)? }))
+    }
+
+    #[tool(
+        description = "Find the ECUs on a session's bus: send a UDS TesterPresent on every request id from first to last, in the background, and note which id answers each. Every id in the range is sent a frame, and on a bus carrying other traffic some of those ids may mean something else: scan only a bus where that is known to be safe. 11-bit ECUs usually take requests on 0x700 to 0x7FF (1792 to 2047). Returns { scan_id }; poll get_uds_scan_progress, whose findings list each { requestId, responseId }.",
+        annotations(read_only_hint = false, destructive_hint = true, idempotent_hint = false)
+    )]
+    async fn uds_scan_addresses(
+        &self,
+        Parameters(p): Parameters<UdsAddressScanParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let plan = crate::uds::Plan::addresses(p.session_id, p.bus, p.extended, p.first..=p.last).map_err(err)?;
+        ok_json(json!({ "scan_id": crate::uds::start_scan(plan).await.map_err(err)? }))
+    }
+
+    #[tool(
+        description = "Stop a UDS scan by its scan_id once its probe in flight is answered. Its findings so far stay readable through get_uds_scan_progress.",
+        annotations(read_only_hint = false, destructive_hint = false, idempotent_hint = true)
+    )]
+    async fn uds_scan_stop(
+        &self,
+        Parameters(p): Parameters<UdsScanIdParams>,
+    ) -> Result<CallToolResult, McpError> {
+        crate::uds::stop_scan(&p.scan_id).map_err(err)?;
+        ok_json(json!({ "stopped": p.scan_id }))
     }
 
     #[tool(
@@ -1813,6 +1906,17 @@ mod tests {
     #[test]
     fn published_scan_status_wins() {
         assert_eq!(scan_status(Some("error".into()), Some(&IOState::Running)), "error");
+    }
+
+    #[test]
+    fn a_dtc_read_names_only_its_parties_by_default() {
+        let p: crate::mcp::types::UdsReadDtcsParams = serde_json::from_value(serde_json::json!({
+            "session_id": "s", "tester_id": 2016, "ecu_id": 2024,
+        }))
+        .unwrap();
+        assert_eq!(p.request(), wslib_uds::DtcRequest::ByStatusMask { status_mask: 0xFF });
+        let parties = p.parties.parties();
+        assert_eq!((parties.bus, parties.extended, parties.tester, parties.ecu), (0, false, 0x7E0, 0x7E8));
     }
 
     mod test_pattern {

@@ -47,6 +47,7 @@ mod store_manager;
 mod transmit;
 mod transmit_history;
 mod transmit_queue;
+mod uds;
 mod replay;
 mod report;
 #[cfg(test)]

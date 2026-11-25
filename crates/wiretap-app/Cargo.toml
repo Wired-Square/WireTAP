@@ -105,6 +105,9 @@ wslib-can-slcan = { version = "0.2", registry = "wired-square", features = ["tra
 wslib-can-gsusb = { version = "0.2", registry = "wired-square", features = ["transport"] }
 wslib-can-socketcan = { version = "0.2", registry = "wired-square", features = ["transport"] }
 wslib-serial = { version = "0.2", registry = "wired-square", features = ["write"] }
+# UDS over ISO-TP, read-only: no `link` (the session carries the frames), no `write`.
+wslib-isotp = { version = "0.3", registry = "wired-square" }
+wslib-uds = { version = "0.1.2", registry = "wired-square" }
 # Desktop-only dependencies (serial/USB/keepawake not available on iOS)
 [target.'cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))'.dependencies]
 keepawake = "0.6"
