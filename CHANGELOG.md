@@ -7,6 +7,7 @@ All notable changes to WireTAP will be documented in this file.
 ### Added
 
 - **UDS conversations can be read out of a capture.** The new MCP tool `get_uds_conversations` finds UDS (ISO 14229) diagnostic traffic in a session's CAN capture and lists each request in order: which IDs are the tester and the ECU, what was asked for, its safety class and how it was answered. It only reads; nothing is sent to the bus. A pair of IDs is reported as a conversation after two answered requests; anything less certain is listed separately as unsettled, with its candidate partners.
+- **An agent can talk UDS to an ECU.** With MCP control allowed, an agent can send a tester present, read data identifiers and read trouble codes, and scan an ECU for its data identifiers and services, or a bus for its ECUs, through any session that can transmit. Only read-only requests can be sent; nothing that writes, resets or changes session is built in. Everything sent and answered lands in the session's capture, so `get_uds_conversations` reads it back. An address scan sends a frame to every id in its range, so run one only on a bus where that is safe.
 
 ### Changed
 

@@ -1038,6 +1038,7 @@ async fn tear_down(session_id: &str, mut session: SessionGuard, how: Teardown<'_
 /// Clear what a session holds outside its entry, returning the profiles it held.
 fn forget_session(session_id: &str) -> Vec<String> {
     clear_session_closing(session_id);
+    crate::uds::forget_session(session_id);
     sessions::release_session_profiles(session_id)
 }
 

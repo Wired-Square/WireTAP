@@ -196,7 +196,8 @@ and the ISO-TP `notices` (sequence breaks, timeouts).
 Two ids are a conversation on at least two answered requests, or one paced by flow
 control. `unsettled` lists every other id that exchanged UDS, with its `side` and
 its `candidates`, most exchanges first: possibilities, not findings. One request
-sent by hand and answered once is unsettled. Only services the standard defines
+sent by hand and answered once is unsettled. A request nobody answered is not
+listed at all. Only services the standard defines
 count, so a conversation of vendor services alone is not found. It reads the
 capture's newest `newest` frames (100000 by default) and returns each
 conversation's newest `limit` requests (200 by default); `exchangeCount` is how
@@ -345,6 +346,49 @@ server. Thin wrappers over `io_test.rs`; the wire contract is
   is neither `running` nor `listening`; `completed` means it passed.
 - **`test_pattern_stop { test_id }`** — gated by **control**. Idempotent; the
   final state stays readable.
+
+### UDS, active and read-only
+
+A UDS tester on any transmit-capable session, a Virtual Device with `loopback`
+included. Gated by **control**, except `get_uds_scan_progress`. Thin wrappers over
+`crate::uds`; the client and the scans are `wslib-uds`'s, built without its `write`
+feature, so nothing above read-only (0x19, 0x22, 0x3E) can be sent. ISO-TP is
+`wslib-isotp`'s sans-IO codec driven over the session's own transmit path and frame
+stream: normal addressing, classic frames padded to 8 bytes with 0xCC. What the
+tester sends and hears lands in the session's capture, where
+`get_uds_conversations` reads it back.
+
+The parties are `{ session_id, bus?, tester_id, ecu_id, extended? }`, ids in
+decimal (0x7E0 is 2016), bus 0 and 11-bit by default. There is one client for each
+session, bus and pair of ids, and it goes when the session does; a second request to
+the same ECU waits for the first.
+
+- **`uds_tester_present { …parties }`**,
+  **`uds_read_data_by_identifier { …parties, dids }`** and
+  **`uds_read_dtc_information { …parties, report?, status_mask? }`** — one request
+  and its final answer: `{ outcome, response?, service?, code?, meaning?, bytes }`
+  with `outcome` `positive` (and the decoded `response`), `negative` (and the `code`
+  and its `meaning`), `malformed` or `timeout`; `bytes` is the final message.
+  responsePending answers are waited out. `report` is `number_by_status_mask`,
+  `by_status_mask` (default) or `supported_dtcs`; `status_mask` defaults to 255.
+- **`uds_scan_dids { …parties, first, last }`**, **`uds_scan_services { …parties }`**
+  and **`uds_scan_addresses { session_id, bus?, extended?, first, last }`** — run in
+  the background and return `{ scan_id }`. The service scan sends each read-only
+  service id bare and reads its refusal. The address scan sends a tester present to
+  each request id from `first` to `last` and takes an answer from any id, so it
+  finds the response id too; every id in the range is sent a frame, so run it only
+  on a bus where that is safe.
+- **`get_uds_scan_progress { scan_id }`** — read tool. `{ scanId, status, progress
+  { done, total, found, stoppedEarly }, findings { kind, found }, error }`; `status`
+  is `scanning`, `complete`, `stopped` or `failed`. A DID scan's findings leave out
+  the DIDs refused as out of range.
+- **`uds_scan_stop { scan_id }`** — stops once the probe in flight is answered;
+  the findings so far stay readable.
+
+Received frames reach the tester when the session hands them to its capture, which
+batches them up to about 50 ms. P2 (50 ms plus a 50 ms margin) runs from the end of
+the request, and a deadline that falls while a long answer is still arriving waits
+for it.
 
 ## Writing catalogs
 

@@ -739,6 +739,7 @@ pub fn get_session_capture(session_id: &str) -> Option<(String, CaptureKind)> {
 pub async fn append_frames_to_session(session_id: &str, new_frames: Vec<FrameMessage>) {
     if new_frames.is_empty() { return; }
     crate::io_test::tap_test_frames(session_id, &new_frames);
+    crate::uds::tap::hand_over(session_id, &new_frames);
     store_session_frames(session_id, new_frames).await;
 }
 
@@ -804,6 +805,7 @@ impl SessionAppender {
             return;
         }
         crate::io_test::tap_test_frames(&self.session_id, &frames);
+        crate::uds::tap::hand_over(&self.session_id, &frames);
         let _ = self.frames.send(frames);
     }
 
