@@ -5,6 +5,7 @@
 // single-shot transmits so the frontend can display a scrollable, paginated
 // history without unbounded Zustand array growth.
 
+use crate::causes::with_causes;
 use serde::{Deserialize, Serialize};
 use sqlx::{Row, SqlitePool};
 use std::path::Path;
@@ -48,7 +49,7 @@ pub struct TransmitHistoryRow {
 pub fn initialise(data_dir: &Path) -> Result<(), String> {
     std::fs::create_dir_all(data_dir).map_err(|e| format!("Failed to create data dir: {e}"))?;
     let db = crate::blocking::wait(Database::open(data_dir.join("transmit_history.db"), &[chain()]))
-        .map_err(|e| format!("Failed to open transmit history database: {e}"))?;
+        .map_err(|e| format!("Failed to open transmit history database: {}", with_causes(&e)))?;
     DB.set(db).map_err(|_| "Transmit history database already initialised".to_string())
 }
 
@@ -93,7 +94,7 @@ pub async fn write_entry(
     .execute(db.pool())
     .await;
     if let Err(e) = result {
-        tlog!("[transmit_history] INSERT failed: {}", e);
+        tlog!("[transmit_history] INSERT failed: {}", with_causes(&e));
     }
 }
 

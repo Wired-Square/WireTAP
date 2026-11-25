@@ -28,6 +28,7 @@ use wslib_modbus::{
     SweepEnd, SweepLimits, SweepProgress, SweepStep,
 };
 use wslib_modbus::{DeviceIdCode, ModbusTcp, ReadRequest, Reading, RequestError, TcpOptions};
+use crate::causes::with_causes;
 use crate::io::SignalThrottle;
 
 /// Device identification info discovered via FC43 (Read Device Identification)
@@ -582,7 +583,7 @@ pub async fn scan_registers(
             "Range covers {} registers, over the {} limit — narrow the range or raise max_registers",
             total, limit
         ),
-        other => other.to_string(),
+        other => with_causes(&other),
     })?;
     let chunk_size = config
         .chunk_size
@@ -617,7 +618,7 @@ pub async fn scan_registers(
     );
     conn.connect()
         .await
-        .map_err(|e| format!("Failed to connect to Modbus TCP server: {e}"))?;
+        .map_err(|e| format!("Failed to connect to Modbus TCP server: {}", with_causes(&e)))?;
 
     tlog!(
         "[ModbusScan] Connected to {} (unit {})",
@@ -655,7 +656,7 @@ pub async fn scan_registers(
                             span.start + span.count - 1,
                             reason
                         );
-                        last_failure = Some(LastFailure::Transport(reason.to_string()));
+                        last_failure = Some(LastFailure::Transport(with_causes(&reason)));
                         ReadOutcome::Silent
                     }
                 };
@@ -996,7 +997,7 @@ pub async fn probe_function_codes(
         // may drop the socket, and we don't want that to taint the next unit.
         let mut conn = sweep_connection(addr, config.timeout_ms, config.connect_settle_ms, false);
         if let Err(e) = conn.connect().await {
-            tlog!("[ModbusScan] Probe unit {}: connect failed: {}", unit_id, e);
+            tlog!("[ModbusScan] Probe unit {}: connect failed: {}", unit_id, with_causes(&e));
             results.push(FcProbeEntry {
                 unit_id,
                 holding: FcVerdict::Silent,

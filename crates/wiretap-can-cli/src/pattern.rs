@@ -1,3 +1,4 @@
+use crate::causes::with_causes;
 use std::{
     collections::{HashMap, VecDeque},
     future::Future,
@@ -100,9 +101,9 @@ impl Link for TaskLink {
                 Ok(Some(CanEvent::Disconnected {
                     error, retry_in, ..
                 })) => {
-                    eprintln!("disconnected: {error}");
+                    eprintln!("disconnected: {}", with_causes(&error));
                     if retry_in.is_none() {
-                        return Err(error.to_string());
+                        return Err(with_causes(&error));
                     }
                 }
                 Ok(Some(_)) => {}

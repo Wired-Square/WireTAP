@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use std::future::Future;
 use std::sync::Mutex;
 
+use crate::causes::with_causes;
 use crate::capture_store;
 use crate::io::session_log::{self, SessionLogEvent, Subject};
 use crate::io::{probe_gvret_tcp, GvretDeviceInfo};
@@ -164,7 +165,7 @@ pub async fn probe_profile(profile: &IOProfile) -> Result<DeviceProbeResult, Str
         // slcan devices - single-bus (desktop only)
         #[cfg(not(target_os = "ios"))]
         "slcan" => {
-            let result = probe_slcan(&profile.req_str("port")?, profile.line_settings()?).await;
+            let result = probe_slcan(&profile.req_str("port")?, profile.line_settings().map_err(crate::causes::with_causes)?).await;
 
             Ok(DeviceProbeResult {
                 success: result.success,
@@ -298,7 +299,7 @@ pub async fn probe_profile(profile: &IOProfile) -> Result<DeviceProbeResult, Str
                     supports_fd: None,
                     error: None,
                 }),
-                Ok(Err(e)) => Ok(failure(format!("Connection failed: {}", e))),
+                Ok(Err(e)) => Ok(failure(format!("Connection failed: {}", with_causes(&e)))),
                 Err(_) => Ok(failure(format!("Connection timed out after {}s", timeout_sec))),
             }
         }
@@ -407,7 +408,7 @@ async fn probe_gvret(profile: &IOProfile) -> Result<GvretProbe, String> {
         #[cfg(not(target_os = "ios"))]
         "gvret_usb" => {
             let port = profile.req_str("port")?;
-            let info = probe_gvret_usb(&port, profile.line_settings()?).await;
+            let info = probe_gvret_usb(&port, profile.line_settings().map_err(crate::causes::with_causes)?).await;
             Ok(GvretProbe { address: port, info })
         }
         #[cfg(target_os = "ios")]

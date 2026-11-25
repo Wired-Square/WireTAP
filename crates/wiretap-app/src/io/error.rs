@@ -7,6 +7,8 @@ use std::fmt;
 
 use serde::Serialize;
 use wslib_can::CanError;
+
+use crate::causes::with_causes;
 use wslib_tcp::{ResolveError, TransportError};
 #[cfg(not(target_os = "ios"))]
 use wslib_serial::SerialError;
@@ -465,7 +467,7 @@ impl IoError {
             TransportError::ConnectTimeout { .. } | TransportError::Timeout { .. } => {
                 Self::timeout(device, "connect")
             }
-            other => Self::connection(device, other.to_string()),
+            other => Self::connection(device, with_causes(other)),
         }
     }
 }
@@ -480,11 +482,13 @@ impl IoFailure {
             CanError::Connect(e) => return IoError::from_transport(device, e).for_user(),
             CanError::Handshake(_) => IoErrorKind::Protocol,
             CanError::Config(_) => IoErrorKind::Configuration,
+            #[cfg(not(target_os = "ios"))]
+            CanError::Serial(_) => IoErrorKind::Configuration,
             CanError::Closed | CanError::Unresponsive => IoErrorKind::DeviceDisconnected,
-            CanError::Read(_) => IoErrorKind::Read,
+            CanError::Read(_) | CanError::Request { .. } | CanError::Write(_) => IoErrorKind::Read,
             _ => IoErrorKind::Other,
         };
-        Self::new(kind, format!("{device}: {error}"))
+        Self::new(kind, format!("{device}: {}", with_causes(error)))
     }
 
     /// A serial port that would not open.
@@ -495,7 +499,7 @@ impl IoFailure {
                 let reason = source.to_string();
                 (IoError::from_io_error(port, "open", source).kind(), reason)
             }
-            other => (IoErrorKind::Configuration, other.to_string()),
+            other => (IoErrorKind::Configuration, with_causes(other)),
         };
         Self::new(kind, format!("Failed to open {port}: {reason}"))
     }
@@ -515,7 +519,7 @@ impl From<SerialError> for PortLoss {
         match error {
             SerialError::Closed => Self::Closed,
             SerialError::Read(e) => Self::Read(e),
-            other => Self::Other(other.to_string()),
+            other => Self::Other(with_causes(other)),
         }
     }
 }
@@ -526,7 +530,7 @@ impl From<CanError> for PortLoss {
         match error {
             CanError::Closed => Self::Closed,
             CanError::Read(e) => Self::Read(e),
-            other => Self::Other(other.to_string()),
+            other => Self::Other(with_causes(other)),
         }
     }
 }
@@ -729,6 +733,35 @@ mod tests {
         let busy = IoError::busy("COM5");
         assert_eq!(busy.clone().for_user(), IoFailure::new(IoErrorKind::DeviceBusy, busy.user_message()));
         assert_eq!(IoFailure::from("boom".to_string()).kind, IoErrorKind::Other);
+    }
+
+    #[test]
+    fn a_can_failure_keeps_its_kind_and_says_its_cause() {
+        let reset = || std::io::Error::other("connection reset");
+        let failed = |error| IoFailure::from_can("gs_usb(0:5)", error);
+        assert_eq!(
+            failed(CanError::Read(reset())),
+            IoFailure::new(IoErrorKind::Read, "gs_usb(0:5): read failed: connection reset")
+        );
+        let refused = CanError::Request { request: "SET_BITTIMING", source: reset() };
+        assert_eq!(
+            failed(refused),
+            IoFailure::new(IoErrorKind::Read, "gs_usb(0:5): SET_BITTIMING failed: connection reset")
+        );
+        assert_eq!(failed(CanError::Panicked).kind, IoErrorKind::Other);
+    }
+
+    #[cfg(not(target_os = "ios"))]
+    #[test]
+    fn a_serial_refusal_inside_a_can_adapter_is_a_configuration_error() {
+        let refused = IoFailure::from_can("slcan(/dev/x)", CanError::Serial(SerialError::UnsupportedBaud(7)));
+        assert_eq!(
+            refused,
+            IoFailure::new(
+                IoErrorKind::Configuration,
+                "slcan(/dev/x): the serial port failed: 7 baud is not supported"
+            )
+        );
     }
 
     #[cfg(not(target_os = "ios"))]

@@ -15,6 +15,7 @@ use wiretap_analysis::hypothesis::{rank_fields, Candidate, CandidateReason, Swee
 use wslib_bits::{Endianness, PayloadField, ScaledField};
 use wslib_wiretap_catalogue::parse_byte_name;
 
+use crate::causes::with_causes;
 use crate::dashboard_history::{self, HeatmapCounts, History};
 use crate::io::FrameMessage;
 
@@ -215,13 +216,13 @@ pub fn dispatch_adhoc_command(
         #[serde(default)]
         heatmaps: Vec<u32>,
     }
-    let p: Params = serde_json::from_value(params).map_err(|e| e.to_string())?;
-    let mut all = WATCHES.write().map_err(|e| e.to_string())?;
+    let p: Params = serde_json::from_value(params).map_err(with_causes)?;
+    let mut all = WATCHES.write().map_err(with_causes)?;
     match op_name {
         "adhoc.set" => {
             dashboard_history::open(&p.session_id);
             let watch = all.entry(p.session_id).or_default().entry(conn_id).or_default();
-            let registered = watch.lock().map_err(|e| e.to_string())?.set(&p.signals, &p.heatmaps);
+            let registered = watch.lock().map_err(with_causes)?.set(&p.signals, &p.heatmaps);
             Ok(serde_json::json!({ "registered": registered }))
         }
         "adhoc.clear" => {

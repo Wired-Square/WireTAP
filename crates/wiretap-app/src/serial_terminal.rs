@@ -7,7 +7,6 @@
 #![cfg(not(target_os = "ios"))]
 
 use std::collections::HashMap;
-use std::io;
 use std::sync::Mutex;
 use std::time::Duration;
 
@@ -17,9 +16,11 @@ use tauri::{AppHandle, Emitter};
 use tokio_util::sync::CancellationToken;
 
 use wslib_serial::{
-    Access, LineSettings, SerialEvent, SerialOptions, SerialTask, SerialWriter, WriteRefused,
+    Access, LineSettings, SerialError, SerialEvent, SerialOptions, SerialTask, SerialWriter,
+    WriteRefused,
 };
 
+use crate::causes::with_causes;
 use crate::blocking::off_runtime;
 
 const SERIAL_TERMINAL_DATA_EVENT: &str = "serial-terminal-data";
@@ -73,11 +74,12 @@ pub async fn serial_terminal_open(
     stop_bits: Option<u8>,
     parity: Option<String>,
 ) -> Result<String, String> {
-    let line = LineSettings::parse(baud_rate, data_bits, stop_bits, parity.as_deref())?;
+    let line = LineSettings::parse(baud_rate, data_bits, stop_bits, parity.as_deref())
+        .map_err(crate::causes::with_causes)?;
     let path = port.clone();
     let task = off_runtime(move || wslib_serial::open(path, line, terminal_options()))
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(with_causes)?;
 
     let terminal_id = new_terminal_id();
     let stop = CancellationToken::new();
@@ -159,10 +161,11 @@ fn writer(terminal_id: &str) -> Result<SerialWriter, String> {
         .ok_or_else(|| format!("Terminal {} not found", terminal_id))
 }
 
-fn answered(what: &str, answer: Result<io::Result<()>, WriteRefused>) -> Result<(), String> {
+fn answered(what: &str, answer: Result<Result<(), SerialError>, WriteRefused>) -> Result<(), String> {
     match answer {
         Ok(Ok(())) => Ok(()),
-        Ok(Err(e)) => Err(format!("{}: {}", what, e)),
+        Ok(Err(SerialError::Write(e))) => Err(format!("{}: {}", what, e)),
+        Ok(Err(e)) => Err(format!("{}: {}", what, crate::causes::with_causes(e))),
         Err(e) => Err(format!("{}: {}", what, e)),
     }
 }

@@ -16,6 +16,7 @@ use std::time::{Duration, Instant};
 use wiretap_analysis::source::FrameSelection;
 use wiretap_capture_store::{Cancel, CaptureError, Sql, Store};
 
+use crate::causes::with_causes;
 use crate::capture_db::{self, wait};
 use crate::capture_store::{self, CaptureKind, CaptureMetadata};
 use crate::io::FrameMessage;
@@ -1131,8 +1132,8 @@ async fn probe_every_connection(store: &Store) -> Result<(), String> {
     held.push(store.database().writer().acquire().await.map_err(|e| format!("acquire the writer: {e}"))?);
     for (i, conn) in held.iter_mut().enumerate() {
         let c = &mut **conn;
-        let query_only: i64 = sqlx::query_scalar("PRAGMA query_only").fetch_one(&mut *c).await.map_err(|e| e.to_string())?;
-        let foreign_keys: i64 = sqlx::query_scalar("PRAGMA foreign_keys").fetch_one(&mut *c).await.map_err(|e| e.to_string())?;
+        let query_only: i64 = sqlx::query_scalar("PRAGMA query_only").fetch_one(&mut *c).await.map_err(with_causes)?;
+        let foreign_keys: i64 = sqlx::query_scalar("PRAGMA foreign_keys").fetch_one(&mut *c).await.map_err(with_causes)?;
         let long: Result<i64, _> = sqlx::query_scalar("WITH RECURSIVE n(x) AS (SELECT 1 UNION ALL SELECT x + 1 FROM n WHERE x < 50000) SELECT COUNT(*) FROM n")
             .fetch_one(&mut *c)
             .await;
@@ -1269,7 +1270,7 @@ fn cancel_and_drop_hygiene() {
                 let t = Instant::now();
                 let mut results = Vec::new();
                 for _ in 0..POOL {
-                    results.push(format!("{:?}", store.insert_frames("h_after", &batch(0, 1)).await.map_err(|e| e.to_string())));
+                    results.push(format!("{:?}", store.insert_frames("h_after", &batch(0, 1)).await.map_err(with_causes)));
                 }
                 println!("[5c]   {POOL} more inserts: {results:?} in {:.2?}", t.elapsed());
                 let (pool, writer) = (store.database().pool(), store.database().writer());
@@ -1479,7 +1480,7 @@ fn crash_kill_mid_upgrade() {
         );
         *states.entry(state.clone()).or_default() += 1;
         let reopened = rt.block_on(async {
-            let (store, applied) = Store::open(&db).await.map_err(|e| e.to_string())?;
+            let (store, applied) = Store::open(&db).await.map_err(with_causes)?;
             let integrity_result = integrity(&store).await;
             store.close().await;
             Ok::<_, String>((applied.iter().map(|m| m.version).collect::<Vec<_>>(), integrity_result))
@@ -1554,7 +1555,7 @@ fn old_app_compatibility() {
     assert!(err.is_empty());
     println!("[7] after the old app: user_version {}, journal {}, integrity {}", sqlite3(&db, "PRAGMA user_version"), sqlite3(&db, "PRAGMA journal_mode"), sqlite3(&db, "PRAGMA integrity_check"));
     let reopened = rt.block_on(async {
-        let (store, applied) = Store::open(&db).await.map_err(|e| e.to_string())?;
+        let (store, applied) = Store::open(&db).await.map_err(with_causes)?;
         let n = store.get_frame_count("oldapp").await.unwrap();
         let i = integrity(&store).await;
         store.close().await;

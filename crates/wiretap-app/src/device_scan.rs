@@ -265,8 +265,9 @@ pub async fn device_scan_start(app: AppHandle) -> Result<(), String> {
                 DiscoveryEvent::Lost { id } => {
                     let _ = app_for_events.emit("device-disappeared", id.as_str().to_string());
                 }
-                DiscoveryEvent::Error { source, message } => {
-                    tlog!("[device_scan] Discovery error ({:?}): {}", source, message);
+                DiscoveryEvent::Error { source, message, causes, .. } => {
+                    let told = [vec![message], causes].concat().join(": ");
+                    tlog!("[device_scan] Discovery error ({:?}): {}", source, told);
                 }
                 _ => {}
             }

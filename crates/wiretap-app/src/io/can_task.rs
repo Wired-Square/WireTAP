@@ -11,10 +11,12 @@ use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 use wslib_can::{
     BusState, CanError, CanEvent, CanFrame, CanOptions, CanRead, CanTask, CanWriter, DeviceInfo,
+    WriteFailed,
     Direction, SendRefused,
 };
 use wslib_can::dlc_to_len;
 
+use crate::causes::with_causes;
 use crate::io::bus_mapping::{apply_bus_mappings_batch, output_bus, BusMapping};
 use crate::io::bus_status::BusStatus;
 #[cfg(not(target_os = "ios"))]
@@ -99,9 +101,10 @@ pub(crate) fn can_frame(frame: &CanTransmitFrame) -> CanFrame {
     }
 }
 
-fn transmit_result(sent: Result<std::io::Result<()>, SendRefused>) -> Result<(), String> {
+fn transmit_result(sent: Result<Result<(), WriteFailed>, SendRefused>) -> Result<(), String> {
     match sent {
-        Ok(written) => written.map_err(|e| format!("Write error: {e}")),
+        Ok(Err(WriteFailed::Io(e))) => Err(format!("Write error: {e}")),
+        Ok(written) => written.map_err(|e| format!("Write error: {}", with_causes(e))),
         Err(refused) => Err(refusal(refused)),
     }
 }
@@ -277,7 +280,7 @@ pub(crate) async fn serve(
     let _ = tx.send(ended).await;
 }
 
-type Sending = Pin<Box<dyn Future<Output = Result<std::io::Result<()>, SendRefused>> + Send>>;
+type Sending = Pin<Box<dyn Future<Output = Result<Result<(), WriteFailed>, SendRefused>> + Send>>;
 
 pub(crate) trait FrameWriter: Send + 'static {
     fn submit(&self, frame: CanFrame) -> Result<Sending, SendRefused>;
@@ -511,8 +514,15 @@ mod tests {
             refused,
             Err("Transmit refused: 12 bytes is too long".into())
         );
-        let failed = transmit_result(Ok(Err(std::io::Error::other("broken pipe"))));
-        assert_eq!(failed, Err("Write error: broken pipe".into()));
+        let failed = |why| transmit_result(Ok(Err(why)));
+        assert_eq!(
+            failed(WriteFailed::Io(std::io::Error::other("broken pipe"))),
+            Err("Write error: broken pipe".into())
+        );
+        assert_eq!(
+            failed(WriteFailed::Panicked),
+            Err("Write error: the blocking write panicked".into())
+        );
     }
 
     const DEVICE: &str = "gvret_usb(/dev/cu.usbmodem1)";

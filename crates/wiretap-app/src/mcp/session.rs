@@ -5,6 +5,7 @@
 //! reader session) without needing an app window. A keep-alive task touches the
 //! MCP subscriber so the session isn't reaped by the heartbeat watchdog.
 
+use crate::causes::with_causes;
 use std::time::Duration;
 
 use serde_json::{json, Value};
@@ -74,7 +75,7 @@ pub async fn open(
     // every protocol needs it to decode.
     let catalog_toml = match &profile.preferred_catalog {
         Some(name) => {
-            let name = wslib_wiretap_catalogue::text::sanitise_filename(name).map_err(|e| e.to_string())?;
+            let name = wslib_wiretap_catalogue::text::sanitise_filename(name).map_err(with_causes)?;
             let path = std::path::PathBuf::from(&settings.decoder_dir).join(&name);
             let toml = std::fs::read_to_string(&path)
                 .map_err(|e| format!("Failed to read catalog '{name}': {e}"))?;
@@ -108,7 +109,7 @@ pub async fn open(
                 ))
             }
         };
-        Some(serde_json::to_string(&polls).map_err(|e| e.to_string())?)
+        Some(serde_json::to_string(&polls).map_err(with_causes)?)
     } else {
         if modbus_ranges.is_some() {
             return Err("register_ranges only applies to Modbus profiles".to_string());
@@ -151,7 +152,7 @@ pub async fn open(
             }
             // A broken catalogue must not cost you the session — the stream is
             // still useful undecoded, and the path is reported back as absent.
-            Err(e) => tlog!("[mcp] open: catalog '{}' failed to parse: {}", path, e),
+            Err(e) => tlog!("[mcp] open: catalog '{}' failed to parse: {}", path, with_causes(&e)),
         }
     }
 

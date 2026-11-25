@@ -4,6 +4,7 @@
 //! tools are only merged into the router when `mcp_allow_control` is on.
 
 use wiretap_analysis::source::{FrameSelection, ProtocolFrames};
+use crate::causes::with_causes;
 use crate::io::FrameMessage;
 use std::collections::{BTreeMap, HashSet};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -106,7 +107,7 @@ fn resolve_catalog_path(
     filename: &str,
 ) -> Result<(std::path::PathBuf, bool), McpError> {
     let name =
-        wslib_wiretap_catalogue::text::sanitise_filename(filename).map_err(|e| err(e.to_string()))?;
+        wslib_wiretap_catalogue::text::sanitise_filename(filename).map_err(|e| err(with_causes(e)))?;
     let settings = settings.load().map_err(err)?;
     let path = std::path::PathBuf::from(&settings.decoder_dir).join(&name);
     let exists = path.exists();
@@ -127,7 +128,7 @@ fn catalog_text(
                 .map(serde_json::from_value)
                 .collect::<Result<_, _>>()
                 .map_err(|e| format!("invalid edit op: {e}"))?;
-            wslib_wiretap_catalogue::edit::apply_edits(&base()?, &ops)
+            wslib_wiretap_catalogue::edit::apply_edits(&base()?, &ops).map_err(crate::causes::with_causes)
         }
         _ => Err("give either content or ops".to_string()),
     }
@@ -167,7 +168,7 @@ fn modbus_read_json(
             Ok(json!({"ok":true,"register_type":rt,"address":address,"count":count,"values":values}))
         }
         Err(RequestError::Exception { code, .. }) => Ok(modbus_exception_json(rt, address, code)),
-        Err(RequestError::Transport(e)) => Err(format!("Modbus IO error reading {rt} {address}: {e}")),
+        Err(RequestError::Transport(e)) => Err(format!("Modbus IO error reading {rt} {address}: {}", with_causes(&e))),
     }
 }
 
@@ -180,7 +181,7 @@ fn modbus_write_json(
     match r {
         Ok(Ok(_)) => Ok(json!({"ok":true,"register_type":rt,"address":address,"written":written})),
         Ok(Err(RequestError::Exception { code, .. })) => Ok(modbus_exception_json(rt, address, code)),
-        Ok(Err(RequestError::Transport(e))) => Err(format!("Modbus IO error writing {rt} {address}: {e}")),
+        Ok(Err(RequestError::Transport(e))) => Err(format!("Modbus IO error writing {rt} {address}: {}", with_causes(&e))),
         Err(refused) => Ok(json!({"ok":false,"register_type":rt,"address":address,"sent":false,"refused":refused.to_string()})),
     }
 }
@@ -486,7 +487,7 @@ fn latest_by_key(
 
 /// Forward a request to the page over the bridge and wrap the result.
 async fn bridge_call(method: &str, params: impl serde::Serialize) -> Result<CallToolResult, McpError> {
-    let value = serde_json::to_value(params).map_err(|e| err(e.to_string()))?;
+    let value = serde_json::to_value(params).map_err(|e| err(with_causes(e)))?;
     ok_json(super::bridge::request(method, value, BRIDGE_TIMEOUT).await.map_err(err)?)
 }
 
@@ -915,7 +916,7 @@ impl WireTapTools {
         let src = resolve(p.capture_id, p.profile_id).map_err(err)?;
         let entry = self.ctx.find_catalog(&p.catalog).map_err(err)?;
         let toml = crate::catalog::open_catalog(entry.path).await.map_err(err)?;
-        let catalog = wslib_wiretap_catalogue::Catalogue::parse(&toml).map_err(|e| err(e.to_string()))?;
+        let catalog = wslib_wiretap_catalogue::Catalogue::parse(&toml).map_err(|e| err(with_causes(e)))?;
         let report = wiretap_analysis::source::catalog_coverage(
             &src.reader(&self.ctx),
             &entry.name,
@@ -1425,7 +1426,7 @@ impl WireTapTools {
         let register_type = p
             .register_type
             .parse::<crate::io::RegisterType>()
-            .map_err(|e| err(e.to_string()))?;
+            .map_err(|e| err(with_causes(e)))?;
         let max_chunk = register_type.catalog().max_per_read();
 
         let config = crate::io::ModbusScanConfig {
@@ -1474,7 +1475,7 @@ impl WireTapTools {
             register_type: p
                 .register_type
                 .parse::<crate::io::RegisterType>()
-                .map_err(|e| err(e.to_string()))?,
+                .map_err(|e| err(with_causes(e)))?,
             inter_request_delay_ms: p.inter_request_delay_ms.unwrap_or(50),
             timeout_ms: p.timeout_ms.unwrap_or(2000),
             connect_settle_ms: 0,

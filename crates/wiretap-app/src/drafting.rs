@@ -17,6 +17,7 @@ use wslib_wiretap_catalogue::model::{Protocol, SerialConfig};
 use wslib_checksum::columns::ColumnStats;
 use wslib_bits::Endianness;
 
+use crate::causes::with_causes;
 use crate::byte_roles::PayloadChanges;
 
 /// The catalogue protocol a capture's protocol drafts into, if any.
@@ -196,7 +197,7 @@ pub struct ExportedCatalog {
 
 /// A new catalogue from `ops`, refused with its findings unless it validates.
 fn built(ops: &[EditOp]) -> Result<String, String> {
-    let text = wslib_wiretap_catalogue::edit::apply_edits("", ops)?;
+    let text = wslib_wiretap_catalogue::edit::apply_edits("", ops).map_err(crate::causes::with_causes)?;
     crate::catalog::refuse_unless_valid(&text)?;
     Ok(text)
 }
@@ -220,7 +221,7 @@ pub fn draft_catalog_cmd(
             protocol: Some(f.protocol.clone()),
         })
         .collect();
-    let protocol = wiretap_analysis::draft::catalog_protocol(&named).map_err(|e| e.to_string())?;
+    let protocol = wiretap_analysis::draft::catalog_protocol(&named).map_err(with_causes)?;
     let serial = serial.unwrap_or_default();
     let (head, findings) = head_ops(protocol, &meta, &serial);
     let ops: Vec<EditOp> = head.into_iter().chain(catalog_ops(draft, write, ByteSpan::serial(&serial))).collect();
@@ -235,7 +236,7 @@ pub fn export_frames_catalog_cmd(
     meta: ExportMeta,
     decimal_ids: bool,
 ) -> Result<String, String> {
-    let (ops, _) = frames_ops(&frames, &meta, decimal_ids).map_err(|e| e.to_string())?;
+    let (ops, _) = frames_ops(&frames, &meta, decimal_ids).map_err(with_causes)?;
     built(&ops)
 }
 

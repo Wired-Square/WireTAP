@@ -15,9 +15,10 @@ use wslib_modbus::{RtuTap, TappedMessage};
 use wslib_wiretap_catalogue::{Catalogue, RtuSettings};
 use wslib_serial::{
     self as serial, ports, Access, LineSettings, PortInfo, PortKind, SerialEvent,
-    SerialOptions, SerialWriter, WriteRefused,
+    SerialError, SerialOptions, SerialWriter, WriteRefused,
 };
 
+use crate::causes::with_causes;
 use crate::io::bus_mapping::{apply_bus_mapping, BusMapping};
 use crate::io::error::{outage, DevicePresence, IoFailure};
 use crate::io::types::{
@@ -375,9 +376,10 @@ impl LiveLine {
     }
 }
 
-fn transmit_result(written: Result<std::io::Result<()>, WriteRefused>) -> Result<(), String> {
+fn transmit_result(written: Result<Result<(), SerialError>, WriteRefused>) -> Result<(), String> {
     match written {
-        Ok(written) => written.map_err(|e| format!("Write error: {}", e)),
+        Ok(Err(SerialError::Write(e))) => Err(format!("Write error: {e}")),
+        Ok(written) => written.map_err(|e| format!("Write error: {}", with_causes(e))),
         Err(refused) => Err(format!("Write refused: {}", refused)),
     }
 }
@@ -747,8 +749,15 @@ mod tests {
             transmit_result(Err(WriteRefused::Disconnected)),
             Err("Write refused: not connected".to_string())
         );
-        let failed = transmit_result(Ok(Err(std::io::ErrorKind::BrokenPipe.into())));
-        assert!(failed.unwrap_err().starts_with("Write error: "));
+        let failed = |why| transmit_result(Ok(Err(why)));
+        assert_eq!(
+            failed(SerialError::Write(std::io::Error::other("broken pipe"))),
+            Err("Write error: broken pipe".into())
+        );
+        assert_eq!(
+            failed(SerialError::Panicked),
+            Err("Write error: a blocking call on the port panicked".into())
+        );
     }
 
     #[test]

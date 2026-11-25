@@ -21,6 +21,7 @@ use serde::Serialize;
 
 use super::bus_mapping::BusMapping;
 use super::{now_us, FrameMessage};
+use crate::causes::with_causes;
 use crate::io::CanTransmitFrame;
 
 #[derive(Debug, Clone, Serialize)]
@@ -224,7 +225,7 @@ pub async fn framelink_get_interface_signals(
     let all_signals = conn.session
         .list_all_signals()
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(with_causes)?;
 
     // 2. Filter to signals targeting this interface
     let iface_signals = dsig::interface_signals(&all_signals, iface_index);
@@ -317,14 +318,14 @@ pub async fn framelink_write_signal(
     conn.session
         .request(MSG_DSIG_WRITE, FLAG_ACK_REQ, &write_payload)
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(with_causes)?;
 
     if persist {
         let persist_payload = wslib_framelink_protocol::persist::build_persist_save();
         conn.session
             .request(MSG_PERSIST_SAVE, FLAG_ACK_REQ, &persist_payload)
             .await
-            .map_err(|e| e.to_string())?;
+            .map_err(with_causes)?;
     }
 
     Ok(())
@@ -343,7 +344,7 @@ pub async fn framelink_read_signal(
     let frame = conn.session
         .request(MSG_DSIG_READ, FLAG_ACK_REQ, &read_payload)
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(with_causes)?;
     let sv = dsig::parse_read_response(&frame.payload)
         .map_err(|e| format!("Failed to parse signal read: {}", e))?;
     Ok(SignalReadResult {

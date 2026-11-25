@@ -7,6 +7,7 @@
 // is thin glue: it translates WS JSON to/from `wslib_framelink::registry::DeviceRegistry`
 // and never duplicates registry logic.
 
+use crate::causes::with_causes;
 use std::net::IpAddr;
 
 use serde_json::{json, Value};
@@ -40,14 +41,14 @@ pub async fn dispatch_registry_command(
 }
 
 fn cmd_list() -> Result<Value, String> {
-    let registry = DeviceRegistry::open().map_err(|e| format!("open registry: {e}"))?;
+    let registry = DeviceRegistry::open().map_err(|e| format!("open registry: {}", with_causes(&e)))?;
     let rows: Vec<Value> = registry.list().map(record_json).collect();
     Ok(Value::Array(rows))
 }
 
 fn cmd_get(params: Value) -> Result<Value, String> {
     let device_id = get_device_id(&params)?;
-    let registry = DeviceRegistry::open().map_err(|e| format!("open registry: {e}"))?;
+    let registry = DeviceRegistry::open().map_err(|e| format!("open registry: {}", with_causes(&e)))?;
     Ok(registry.get(&device_id).map(record_json).unwrap_or(Value::Null))
 }
 
@@ -80,18 +81,18 @@ fn cmd_upsert(params: Value) -> Result<Value, String> {
         other => return Err(format!("invalid resolution '{other}' (expected 'auto' or 'manual')")),
     };
 
-    let mut registry = DeviceRegistry::open().map_err(|e| format!("open registry: {e}"))?;
+    let mut registry = DeviceRegistry::open().map_err(|e| format!("open registry: {}", with_causes(&e)))?;
     registry.upsert(record);
-    registry.save().map_err(|e| format!("save registry: {e}"))?;
+    registry.save().map_err(|e| format!("save registry: {}", with_causes(&e)))?;
     Ok(json!({ "ok": true }))
 }
 
 fn cmd_remove(params: Value) -> Result<Value, String> {
     let device_id = get_device_id(&params)?;
-    let mut registry = DeviceRegistry::open().map_err(|e| format!("open registry: {e}"))?;
+    let mut registry = DeviceRegistry::open().map_err(|e| format!("open registry: {}", with_causes(&e)))?;
     let removed = registry.remove(&device_id).is_some();
     if removed {
-        registry.save().map_err(|e| format!("save registry: {e}"))?;
+        registry.save().map_err(|e| format!("save registry: {}", with_causes(&e)))?;
     }
     Ok(json!({ "removed": removed }))
 }

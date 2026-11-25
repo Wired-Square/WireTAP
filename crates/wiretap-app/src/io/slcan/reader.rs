@@ -18,6 +18,7 @@ use wslib_can_slcan::{check_rates, open as open_slcan, probe, SlcanOptions};
 use wslib_can::{CanError, CanEvent, DeviceInfo};
 use wslib_serial::LineSettings;
 
+use crate::causes::with_causes;
 use crate::io::bus_mapping::BusMapping;
 use crate::io::can_task::{
     announce_on_event, can_options, link_lost, open_or_report, serve, PortOutage,
@@ -177,7 +178,7 @@ pub fn slcan_rates(profile: &IOProfile) -> Result<(u32, Option<u32>), String> {
     let data_bitrate = profile.req_bool("enable_fd")?
         .then(|| profile.req_i64("data_bitrate").map(|bps| bps as u32))
         .transpose()?;
-    check_rates(bitrate, data_bitrate).map_err(|e| e.to_string())?;
+    check_rates(bitrate, data_bitrate).map_err(with_causes)?;
     Ok((bitrate, data_bitrate))
 }
 

@@ -643,7 +643,7 @@ async fn publish(
         .then(|| match wslib_wiretap_catalogue::edit::bump_meta_version(&content) {
             Ok(bumped) => Some(bumped),
             Err(e) => {
-                tlog!("[catalog_share] no version bump for {}: {}", req.filename, e);
+                tlog!("[catalog_share] no version bump for {}: {}", req.filename, crate::causes::with_causes(e));
                 None
             }
         })

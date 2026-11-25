@@ -5,6 +5,7 @@
 // path/sanitisation helpers are shared with the MCP authoring tools.
 
 use serde::{Deserialize, Serialize};
+use crate::causes::with_causes;
 use std::path::PathBuf;
 use tauri::AppHandle;
 
@@ -42,7 +43,7 @@ pub fn write_dashboard(decoder_dir: &str, filename: &str, content: &str) -> Resu
         .readers(wslib_file_atomic::Readers::Readable)
         .create_parents(true)
         .write(&path, content.as_bytes())
-        .map_err(|e| format!("Failed to write dashboard: {e}"))?;
+        .map_err(|e| format!("Failed to write dashboard: {}", with_causes(&e)))?;
     Ok(path.to_string_lossy().to_string())
 }
 

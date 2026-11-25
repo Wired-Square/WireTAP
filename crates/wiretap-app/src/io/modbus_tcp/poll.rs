@@ -15,6 +15,7 @@ use wslib_modbus::{
 
 use super::reader::{PollEmitMode, PollGroup};
 use wslib_modbus::{coils_to_bytes, registers_to_bytes, FrameBackoff};
+use crate::causes::with_causes;
 use crate::capture_store;
 use crate::io::types::SourceMessage;
 use crate::io::{emit_routine_session_error, emit_session_error, now_us, signal_frames_ready, FrameMessage, SignalThrottle};
@@ -220,7 +221,7 @@ pub async fn start_polling(
     let mut conn = device_connection(host, port, unit_id);
     conn.connect()
         .await
-        .map_err(|e| format!("Failed to connect to Modbus TCP server: {e}"))?;
+        .map_err(|e| format!("Failed to connect to Modbus TCP server: {}", with_causes(&e)))?;
     Ok(spawn_polls(conn, polls, TaskOptions::default()))
 }
 
@@ -420,7 +421,7 @@ impl Drain {
                     consecutive,
                     self.limit_text()
                 );
-                self.sink.routine_error(&register_read_error(&poll, format_args!("IO error: {error}")));
+                self.sink.routine_error(&register_read_error(&poll, format_args!("IO error: {}", with_causes(&error))));
                 if exhausted(consecutive, self.max_register_errors) {
                     task.retire(item);
                     tlog!(
@@ -453,7 +454,7 @@ impl Drain {
                 error
             );
             self.sink.error(format!(
-                "Stopped polling after {consecutive} failed connection attempts: {error}"
+                "Stopped polling after {consecutive} failed connection attempts: {}", with_causes(&error)
             ));
             return true;
         }
@@ -465,7 +466,7 @@ impl Drain {
             self.limit_text(),
             retry_in
         );
-        self.sink.error(format!("Modbus connection lost: {error}"));
+        self.sink.error(format!("Modbus connection lost: {}", with_causes(&error)));
         false
     }
 }

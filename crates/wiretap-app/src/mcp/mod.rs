@@ -23,6 +23,7 @@ use wslib_mcp::http::{self, ConnectionObserver, HttpConfig};
 use wslib_mcp::server::ToolServer;
 
 use tools::WireTapTools;
+use crate::causes::with_causes;
 use crate::boot::Paths;
 use crate::catalog::CatalogFile;
 use crate::io::session_log::{self, SessionLogEvent, Subject};
@@ -164,7 +165,7 @@ pub fn start(
         SocketAddr::from(([127, 0, 0, 1], port)),
         Duration::from_secs(2),
     )
-    .map_err(|e| e.to_string())?;
+    .map_err(with_causes)?;
 
     // Built once and shared: under the stateless 2026-07-28 transport the
     // service factory runs on every request, not once per session.
@@ -185,7 +186,7 @@ pub fn start(
     let serve_cancel = cancel.clone();
     tauri::async_runtime::spawn(async move {
         if let Err(e) = http::serve(listener, factory, http_config, serve_cancel).await {
-            tlog!("[mcp] Server error: {e}");
+            tlog!("[mcp] Server error: {}", with_causes(&e));
         }
         tlog!("[mcp] Server task exited");
     });

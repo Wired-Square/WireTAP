@@ -8,6 +8,7 @@
 //! Single OTA at a time. A second `ota_start` while one is in flight
 //! returns an error.
 
+use crate::causes::with_causes;
 use crate::device_scan::{discovery_handle, resolve_device_id};
 use crate::ws::dispatch::send_ota_event;
 use futures::StreamExt;
@@ -145,11 +146,11 @@ async fn list_images(params: serde_json::Value) -> Result<serde_json::Value, Str
     let session = discovery
         .open_smp_on(&id, p.transport.into())
         .await
-        .map_err(|e| format!("open_smp: {e}"))?;
+        .map_err(|e| format!("open_smp: {}", with_causes(&e)))?;
     let images = session
         .list_images()
         .await
-        .map_err(|e| format!("list_images: {e}"))?;
+        .map_err(|e| format!("list_images: {}", with_causes(&e)))?;
     let mapped: Vec<ImageSlotInfo> = images.into_iter().map(map_image_slot).collect();
     serde_json::to_value(mapped).map_err(|e| format!("serialise: {e}"))
 }
@@ -194,7 +195,7 @@ async fn pump(mut stream: OtaStream) -> serde_json::Value {
     let ended = loop {
         match stream.next().await {
             Some(Ok(ev)) => send_ota_event(&serialise_event(&ev)),
-            Some(Err(e)) => break serde_json::json!({ "type": "Error", "message": e.to_string() }),
+            Some(Err(e)) => break serde_json::json!({ "type": "Error", "message": with_causes(&e) }),
             None => break serde_json::json!({ "type": "Complete" }),
         }
     };

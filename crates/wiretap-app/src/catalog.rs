@@ -47,18 +47,18 @@ pub async fn dispatch_catalog_command(
         // TOML → resolved Catalog model (CAN/Serial/Modbus; shorthands +
         // mirror/copy resolved).
         "catalog.parse" => {
-            let cat = wslib_wiretap_catalogue::Catalogue::parse(&content()?).map_err(|e| e.to_string())?;
-            serde_json::to_value(cat).map_err(|e| e.to_string())
+            let cat = wslib_wiretap_catalogue::Catalogue::parse(&content()?).map_err(with_causes)?;
+            serde_json::to_value(cat).map_err(with_causes)
         }
         // Params: { content, protocol, key, path }; null when there is no such frame or item.
         "catalog.frameLayout" => {
-            let cat = wslib_wiretap_catalogue::Catalogue::parse(&content()?).map_err(|e| e.to_string())?;
+            let cat = wslib_wiretap_catalogue::Catalogue::parse(&content()?).map_err(with_causes)?;
             let protocol = serde_json::from_value(params.get("protocol").cloned().unwrap_or_default())
                 .map_err(|e| format!("invalid protocol: {e}"))?;
             let path: Vec<String> = serde_json::from_value(params.get("path").cloned().unwrap_or_default())
                 .map_err(|e| format!("invalid path: {e}"))?;
             let layout = wslib_wiretap_catalogue::frame_layout(&cat, protocol, &req("key")?, &path);
-            serde_json::to_value(layout).map_err(|e| e.to_string())
+            serde_json::to_value(layout).map_err(with_causes)
         }
         // A frame key → its numeric id, null for a name.
         "catalog.parseId" => Ok(serde_json::json!(wslib_wiretap_catalogue::parse::parse_id(&req("id")?))),
@@ -70,22 +70,22 @@ pub async fn dispatch_catalog_command(
         // Granular, save-time form validation (single source of truth in the
         // crate). Each deserialises `params` into the matching input struct.
         "catalog.validateMeta" => {
-            let input = serde_json::from_value(params).map_err(|e| e.to_string())?;
+            let input = serde_json::from_value(params).map_err(with_causes)?;
             let errors = wslib_wiretap_catalogue::validate::validate_meta_fields(&input);
             Ok(serde_json::json!({ "valid": errors.is_empty(), "errors": errors }))
         }
         "catalog.validateFrame" => {
-            let input = serde_json::from_value(params).map_err(|e| e.to_string())?;
+            let input = serde_json::from_value(params).map_err(with_causes)?;
             let errors = wslib_wiretap_catalogue::validate::validate_frame_fields(&input);
             Ok(serde_json::json!({ "valid": errors.is_empty(), "errors": errors }))
         }
         "catalog.validateSignal" => {
-            let input = serde_json::from_value(params).map_err(|e| e.to_string())?;
+            let input = serde_json::from_value(params).map_err(with_causes)?;
             let errors = wslib_wiretap_catalogue::validate::validate_signal_fields(&input);
             Ok(serde_json::json!({ "valid": errors.is_empty(), "errors": errors }))
         }
         "catalog.validateChecksum" => {
-            let input = serde_json::from_value(params).map_err(|e| e.to_string())?;
+            let input = serde_json::from_value(params).map_err(with_causes)?;
             let errors = wslib_wiretap_catalogue::validate::validate_checksum_fields(&input);
             Ok(serde_json::json!({ "valid": errors.is_empty(), "errors": errors }))
         }
@@ -101,7 +101,7 @@ pub async fn dispatch_catalog_command(
         }
         // DBC text → catalogue TOML.
         "catalog.import_dbc" => {
-            let toml = wslib_wiretap_catalogue::dbc::convert_dbc_to_toml(&content()?)?;
+            let toml = wslib_wiretap_catalogue::dbc::convert_dbc_to_toml(&content()?).map_err(crate::causes::with_causes)?;
             Ok(serde_json::Value::String(toml))
         }
         // Attach a catalogue to a session so its frames are decoded in Rust and
@@ -111,11 +111,11 @@ pub async fn dispatch_catalog_command(
         "catalog.attach" => {
             let session_id = req("session_id")?;
             let path = params.get("path").and_then(|v| v.as_str()).map(str::to_string);
-            let cat = wslib_wiretap_catalogue::Catalogue::parse(&content()?).map_err(|e| e.to_string())?;
+            let cat = wslib_wiretap_catalogue::Catalogue::parse(&content()?).map_err(with_causes)?;
             let frame_count = cat.frames.len();
             // Return the resolved Catalog so the caller can feed its UI model from
             // this one parse instead of a separate catalog.parse round-trip.
-            let catalog = serde_json::to_value(&cat).map_err(|e| e.to_string())?;
+            let catalog = serde_json::to_value(&cat).map_err(with_causes)?;
             crate::ws::dispatch::attach_catalog(&session_id, path, cat);
             // Decode frames already delivered before this attach (e.g. a capture replay
             // that started before the catalogue bound) so they don't show "No signals".
@@ -143,7 +143,8 @@ pub async fn dispatch_catalog_command(
                 _ => wslib_wiretap_catalogue::dbc::MuxExportMode::Extended,
             };
             let dbc =
-                wslib_wiretap_catalogue::dbc::render_catalogue_as_dbc_with_mode(&content()?, receiver, mode)?;
+                wslib_wiretap_catalogue::dbc::render_catalogue_as_dbc_with_mode(&content()?, receiver, mode)
+                    .map_err(crate::causes::with_causes)?;
             Ok(serde_json::Value::String(dbc))
         }
         // Comment-/formatting-preserving in-place edit. Params: { content, op, ...opArgs }.
@@ -153,18 +154,20 @@ pub async fn dispatch_catalog_command(
             let text = content()?;
             let op: wslib_wiretap_catalogue::edit::EditOp = serde_json::from_value(params.clone())
                 .map_err(|e| format!("invalid edit op: {e}"))?;
-            let next = wslib_wiretap_catalogue::edit::apply_edit(&text, op)?;
+            let next = wslib_wiretap_catalogue::edit::apply_edit(&text, op).map_err(crate::causes::with_causes)?;
             Ok(serde_json::Value::String(next))
         }
         // Params: { content, ops }. All or nothing; returns the new TOML text.
         "catalog.edits" => {
-            let next = wslib_wiretap_catalogue::edit::apply_edits(&content()?, &edit_ops(&params)?)?;
+            let next = wslib_wiretap_catalogue::edit::apply_edits(&content()?, &edit_ops(&params)?)
+                .map_err(crate::causes::with_causes)?;
             Ok(serde_json::Value::String(next))
         }
         // A new catalogue from `ops` alone, refused with its findings unless it validates.
         // Params: { ops }.
         "catalog.build" => {
-            let text = wslib_wiretap_catalogue::edit::apply_edits("", &edit_ops(&params)?)?;
+            let text = wslib_wiretap_catalogue::edit::apply_edits("", &edit_ops(&params)?)
+                .map_err(crate::causes::with_causes)?;
             refuse_unless_valid(&text)?;
             Ok(serde_json::Value::String(text))
         }
@@ -174,7 +177,7 @@ pub async fn dispatch_catalog_command(
         // silent in-memory migration surfaces as a real, saveable diff. Params:
         // { content }.
         "catalog.migrate" => {
-            let m = wslib_wiretap_catalogue::migrate::migrate(&content()?).map_err(|e| e.to_string())?;
+            let m = wslib_wiretap_catalogue::migrate::migrate(&content()?).map_err(crate::causes::with_causes)?;
             Ok(serde_json::json!({
                 "changed": m.changed,
                 "toml": m.toml,
@@ -187,7 +190,7 @@ pub async fn dispatch_catalog_command(
         // non-Modbus catalogue. Params: { content }.
         "catalog.polls" => {
             let polls = crate::io::build_polls_from_catalog(&content()?)?;
-            serde_json::to_value(polls).map_err(|e| e.to_string())
+            serde_json::to_value(polls).map_err(with_causes)
         }
         // Line diff of the working buffer against the last-saved baseline. Drives
         // both the unsaved-changes indicator and the Text-mode diff view from one
@@ -233,6 +236,7 @@ use tauri::{AppHandle, Manager};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
+use crate::causes::with_causes;
 use crate::catalog_share::registry::{CatalogSourceRegistry, SyncIndex, SyncStatus};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -566,7 +570,7 @@ pub async fn import_catalog(
     std::fs::create_dir_all(&dir)
         .map_err(|e| format!("Failed to create {}: {e}", dir.display()))?;
 
-    let desired = text::sanitise_filename(&filename).map_err(|e| e.to_string())?;
+    let desired = text::sanitise_filename(&filename).map_err(with_causes)?;
     let free = if dir.join(&desired).exists() {
         next_free_catalog_filename(&dir, &desired)
     } else {
@@ -592,6 +596,7 @@ fn with_catalogue_name(content: &str, new_name: &str) -> Result<String, String> 
             error_if_exists: false,
         },
     )
+    .map_err(crate::causes::with_causes)
 }
 
 #[cfg(unix)]
@@ -622,7 +627,7 @@ fn refuse_existing(dest: &Path, filename: &str) -> Result<(), String> {
 fn duplicate_catalogue_file(source: &Path, new_filename: &str, new_name: &str) -> Result<(), String> {
     let parent_dir = source.parent()
         .ok_or_else(|| "Invalid source path".to_string())?;
-    let new_filename = text::sanitise_filename(new_filename).map_err(|e| e.to_string())?;
+    let new_filename = text::sanitise_filename(new_filename).map_err(with_causes)?;
     let dest = parent_dir.join(&new_filename);
     refuse_existing(&dest, &new_filename)?;
 
@@ -648,7 +653,7 @@ pub async fn duplicate_catalog(
 fn rename_catalogue_file(old_path: &Path, new_filename: &str, new_name: &str) -> Result<String, String> {
     let parent_dir = old_path.parent()
         .ok_or_else(|| "Invalid path".to_string())?;
-    let new_filename = text::sanitise_filename(new_filename).map_err(|e| e.to_string())?;
+    let new_filename = text::sanitise_filename(new_filename).map_err(with_causes)?;
     let new_path = parent_dir.join(&new_filename);
     if !is_same_file(old_path, &new_path) {
         refuse_existing(&new_path, &new_filename)?;
