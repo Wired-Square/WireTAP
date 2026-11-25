@@ -741,6 +741,45 @@ mod tests {
         assert_eq!(delete_capture_event("c1", "x").await, Err("Invalid event id 'x'".into()));
     }
 
+    #[tokio::test]
+    async fn a_stored_uds_conversation_is_read_back_out_of_its_capture() {
+        use wslib_isotp::testing::{Conversation, Responder};
+        use wslib_uds::testing::{Did, Ecu};
+
+        let _db = use_own_store(scratch_store().await);
+        let mut ecu = Ecu::new().with_did(0xF190, Did::readable(*b"5YJ3E1EA7KF000001"));
+        let responder = Responder::new(Default::default(), move |request: &[u8]| ecu.answer(request));
+        let mut talk = Conversation::new(0x7E0, 0x7E8, false, 1_700_000_000_000_000, responder);
+        talk.exchange(&[0x22, 0xF1, 0x90]);
+        talk.exchange(&[0x3E, 0x00]);
+        let frames: Vec<FrameMessage> = talk
+            .into_frames()
+            .into_iter()
+            .map(|frame| FrameMessage {
+                protocol: "can".into(),
+                timestamp_us: frame.at_us,
+                frame_id: frame.id,
+                bus: 1,
+                dlc: frame.data.len() as u16,
+                bytes: frame.data,
+                ..Default::default()
+            })
+            .collect();
+        insert_frames("c1", &frames).await.unwrap();
+
+        let traffic = analyse("c1", async |c| wiretap_analysis::diagnostics::uds_traffic(c, None).await)
+            .await
+            .unwrap()
+            .unwrap();
+
+        let [conversation] = &traffic.conversations[..] else {
+            panic!("one conversation, got {traffic:?}");
+        };
+        assert_eq!((conversation.bus, conversation.parties.tester.id, conversation.parties.ecu.id), (1, 0x7E0, 0x7E8));
+        let names: Vec<&str> = conversation.transcript.exchanges.iter().map(|e| e.name.as_str()).collect();
+        assert_eq!(names, ["ReadDataByIdentifier DID 0xF190", "TesterPresent"]);
+    }
+
     #[test]
     fn a_sync_caller_waits_on_its_own_store() {
         let _db = use_own_database();

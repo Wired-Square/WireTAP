@@ -153,6 +153,20 @@ pub struct FrameOrderParams {
     pub start_is_extended: bool,
 }
 
+/// UDS conversations in a session's capture.
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct UdsConversationsParams {
+    /// The session whose frame capture to read (from `list_sessions`).
+    pub session_id: String,
+    /// Read the capture's newest this many frames; default 100000,
+    /// Discovery's default live window.
+    #[serde(default)]
+    pub newest: Option<usize>,
+    /// Return each conversation's newest this many requests; default 200.
+    #[serde(default)]
+    pub limit: Option<usize>,
+}
+
 // ── Live session reads ───────────────────────────────────────────────────────
 
 #[derive(Debug, Deserialize, JsonSchema)]
